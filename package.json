@@ -1,0 +1,23 @@
+{
+  "name": "nessa-ui-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The workspace for Nessa UI, an open design system built on shadcn/ui.",
+  "license": "MIT",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "build": "pnpm --filter @nessa-ui/react build",
+    "build:registry": "shadcn build",
+    "build:storybook": "pnpm --filter @nessa-ui/storybook build",
+    "dev": "pnpm --filter @nessa-ui/storybook dev",
+    "storybook": "pnpm --filter @nessa-ui/storybook dev",
+    "test": "pnpm --filter @nessa-ui/storybook test",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "shadcn": "^4.0.0"
+  }
+}

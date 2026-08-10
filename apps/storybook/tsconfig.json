@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["node"],
+    "paths": {
+      "@nessa-ui/react": ["../../packages/react/src/index.ts"],
+      "@/*": ["../../packages/react/src/*"]
+    }
+  },
+  "include": [".storybook", "stories", "vitest.config.ts"]
+}
