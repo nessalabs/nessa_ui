@@ -8,6 +8,14 @@ shadcn/ui source model and provides two ways to adopt the same components:
 
 Storybook is the visual workshop and living component documentation.
 
+## Architecture contract
+
+All future component, theming, packaging, registry, documentation, and tooling
+work is governed by the
+[Nessa Design System Core Contract](./docs/architecture/design-system-contract.md).
+Implementation plans sequence changes but cannot silently override that
+contract; amendments require explicit architecture review.
+
 ## Workspace
 
 ```text
@@ -15,6 +23,7 @@ apps/storybook    visual workshop, stories, and accessibility tests
 packages/react    components, tokens, and package entrypoints
 public/r          generated shadcn registry artifacts
 registry.json     public registry catalog
+docs/architecture permanent design-system contracts
 ```
 
 ## Start Storybook
@@ -30,8 +39,14 @@ Then open [http://localhost:6006](http://localhost:6006).
 
 ## Consume the package
 
+The repository uses pnpm, while consumers can use their package manager of
+choice:
+
 ```bash
 pnpm add @nessa-ui/react @fontsource-variable/geist @fontsource-variable/geist-mono
+npm install @nessa-ui/react @fontsource-variable/geist @fontsource-variable/geist-mono
+yarn add @nessa-ui/react @fontsource-variable/geist @fontsource-variable/geist-mono
+bun add @nessa-ui/react @fontsource-variable/geist @fontsource-variable/geist-mono
 ```
 
 ```tsx
@@ -42,6 +57,24 @@ import "@nessa-ui/react/styles.css"
 
 export function Example() {
   return <Button>Continue</Button>
+}
+```
+
+The default stylesheet includes Nessa tokens and component utilities without
+resetting the host application. Import it before the application's stylesheet;
+Nessa's named cascade layer lets host Tailwind utilities remain authoritative.
+Nessa-owned applications can opt into Tailwind Preflight and global body
+defaults with `@nessa-ui/react/app.css`. A token-only entry is available at
+`@nessa-ui/react/theme.css`.
+
+Package consumers customize the system by overriding semantic variables after
+the Nessa import. Registry consumers own the copied variables directly:
+
+```css
+:root {
+  --primary: oklch(0.45 0.2 260);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.55 0.17 260);
 }
 ```
 

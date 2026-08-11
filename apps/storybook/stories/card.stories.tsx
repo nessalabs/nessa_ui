@@ -14,13 +14,37 @@ import {
 const meta = {
   title: "Components/Card",
   component: Card,
+  subcomponents: {
+    CardHeader,
+    CardTitle,
+    CardDescription,
+    CardAction,
+    CardContent,
+    CardFooter,
+  },
   tags: ["autodocs", "test"],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "A composable surface for grouping related content and actions. Card is a shadcn-style family of layout primitives rather than a single rigid template: combine Header, Title, Description, Action, Content, and Footer only when those regions are meaningful.",
+      },
+    },
+  },
 } satisfies Meta<typeof Card>
 
 export default meta
 type Story = StoryObj<typeof meta>
 
 export const Default: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "A complete Card composition with supporting metadata and a clear primary action.",
+      },
+    },
+  },
   render: () => (
     <Card className="w-[360px]">
       <CardHeader>
@@ -42,4 +66,3 @@ export const Default: Story = {
     </Card>
   ),
 }
-

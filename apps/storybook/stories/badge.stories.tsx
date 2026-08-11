@@ -5,6 +5,25 @@ const meta = {
   title: "Components/Badge",
   component: Badge,
   tags: ["autodocs", "test"],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "A compact, non-interactive label for status, category, or metadata. Badge follows the shadcn composition model and uses Nessa semantic color tokens. Keep labels short; use Button when the element performs an action.",
+      },
+    },
+  },
+  argTypes: {
+    variant: {
+      control: "select",
+      options: ["default", "secondary", "outline", "destructive"],
+      description: "Controls the label's semantic emphasis.",
+    },
+    asChild: {
+      description:
+        "Merges Badge behavior and styles onto its single child element.",
+    },
+  },
   args: {
     children: "New",
     variant: "default",
@@ -17,6 +36,13 @@ type Story = StoryObj<typeof meta>
 export const Playground: Story = {}
 
 export const AllVariants: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story: "Choose the least emphatic variant that still communicates the status.",
+      },
+    },
+  },
   render: () => (
     <div className="flex items-center gap-3">
       <Badge>Default</Badge>
@@ -26,4 +52,3 @@ export const AllVariants: Story = {
     </div>
   ),
 }
-

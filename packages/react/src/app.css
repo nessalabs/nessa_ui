@@ -1,0 +1,14 @@
+@layer theme, base, nessa-components, components, utilities;
+
+@import "tailwindcss/preflight.css" layer(base);
+@import "./styles.css";
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
