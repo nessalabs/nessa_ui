@@ -1,0 +1,16 @@
+# Advisory architecture review ownership. Required code-owner approval stays off
+# until a team has at least two eligible maintainers.
+/packages/react/ @Varuas37
+/apps/storybook/ @Varuas37
+/registry.json @Varuas37
+/public/r/ @Varuas37
+/validation/ @Varuas37
+/docs/architecture/ @Varuas37
+/docs/plans/ @Varuas37
+/README.md @Varuas37
+/.node-version @Varuas37
+/package.json @Varuas37
+/pnpm-lock.yaml @Varuas37
+/pnpm-workspace.yaml @Varuas37
+/tsconfig.base.json @Varuas37
+/.github/ @Varuas37

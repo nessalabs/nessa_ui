@@ -48,7 +48,7 @@ Every nontrivial change must:
 4. receive an independent architecture-conformance review;
 5. resolve every actionable finding before merge.
 
-One-way decisions should receive stable contract identifiers when the future repository-wide standards and `verification/` gate are introduced. Machine-verifiable rules will run on every review; judgment-based rules will require explicit reviewer evidence. That future enforcement work requires its own approved implementation plan and is not created by this contract document.
+One-way decisions have stable identifiers in the normative contract index and are enforced by the repository `validation/` gate. Machine-verifiable rules run on every review; judgment-based rules require explicit reviewer evidence. The gate may sequence adoption through planned activation probes and exact temporary exceptions, but it may not silently weaken this contract.
 
 Changing a normative rule requires an explicit contract amendment explaining the reason, compatibility impact, migration path, and verification changes. Code changes do not establish architectural precedent by themselves.
 
@@ -1048,6 +1048,40 @@ Add a `registry:ui` item named `nessa-provider` with a dependency on `nessa-base
 Add Accordion as its own `registry:ui` item depending on `nessa-provider`, `nessa-base`, and any required Radix primitive. Its copied source exercises the same semantic icon resolution contract as the package build.
 
 The registry consumer fixture installs `nessa-provider`, Accordion, and Button, then typechecks, builds, and verifies computed nested-theme behavior.
+
+## Normative contract index
+
+This table is the exhaustive machine-mirrored index of normative rule groups. Detailed sections above and below explain each invariant; prose without an index entry cannot independently introduce a new normative rule. IDs are permanent and are never recycled.
+
+| ID | Invariant | Authority |
+| --- | --- | --- |
+| GOV-001 | Contract index and machine manifest remain bidirectionally complete. | `#governance-and-change-conformance` |
+| GOV-002 | Implementation plans and code cannot silently override this contract. | `#governance-and-change-conformance` |
+| GOV-003 | Contract weakening requires an explicit reviewed amendment and migration evidence. | `#governance-and-change-conformance` |
+| CSS-001 | Token-only CSS is import-free and owns no reset or body styling. | `#low-specificity-and-named-cascade-layers` |
+| CSS-002 | Default component CSS excludes Preflight and body ownership. | `#low-specificity-and-named-cascade-layers` |
+| CSS-003 | Application CSS is the sole Preflight and body-baseline opt-in. | `#low-specificity-and-named-cascade-layers` |
+| CSS-004 | Package CSS exports and cascade layers preserve the frozen ownership order. | `#low-specificity-and-named-cascade-layers` |
+| TOKEN-001 | Package and registry use one canonical Light/Dark semantic token chain. | `#one-live-token-chain-for-package-and-registry` |
+| TOKEN-002 | Nessa supplies font stacks while applications own font delivery. | `#typography-font-delivery-and-responsive-behavior` |
+| TOKEN-003 | Every current package and registry Light/Dark token projection remains exactly equal. | `#one-live-token-chain-for-package-and-registry` |
+| REG-001 | Committed registry artifacts are deterministic reproductions of the registry source. | `#deterministic-generated-artifacts` |
+| REG-002 | Registry item source content matches canonical component source. | `#one-live-token-chain-for-package-and-registry` |
+| REG-003 | Registry dependencies include the matching Nessa base and required utilities. | `#registry-topology` |
+| SRC-001 | Library runtime never mutates the host document or owns persistence. | `#simplified-color-mode-api` |
+| SRC-002 | Nessa-owned visual behavior does not depend on compiler-global dark variants. | `#exact-meaning-of-data-nessa-mode` |
+| SRC-003 | Copied registry components never reference private Nessa aliases directly. | `#private-component-aliases` |
+| STORY-001 | Every public component module has living Storybook docs and test coverage. | `#verification-infrastructure` |
+| STORY-002 | Input stories preserve explicit accessible names and error associations. | `#accessibility-and-rendering-invariants` |
+| PKG-001 | The React package declares its supported React runtime floor. | `#root-exports-and-build-shape` |
+| PKG-002 | CSS exports and side effects preserve the package distribution contract. | `#root-exports-and-build-shape` |
+| PKG-003 | Published artifacts are freshly built and contain required code, CSS, docs, and license. | `#root-exports-and-build-shape` |
+| A11Y-001 | Canonical Light/Dark token pairs meet the frozen WCAG contrast thresholds. | `#accessibility-and-rendering-invariants` |
+| A11Y-002 | Effective focus and invalid treatments meet non-text contrast or use exact transitional exceptions. | `#accessibility-and-rendering-invariants` |
+| A11Y-003 | Target size, zoom, reflow, focus geometry, and forced-colors evidence require review until browser gates land. | `#accessibility-and-rendering-invariants` |
+| A11Y-004 | Valid wider-gamut contrast requires color-managed browser evidence until automated support lands. | `#accessibility-and-rendering-invariants` |
+| PROVIDER-001 | Provider, scope, mode, SSR, wrapper, and context boundaries activate together under their frozen contract. | `#simplified-color-mode-api` |
+| ICON-001 | Semantic icons activate only with a real consuming component and frozen resolution/accessibility ownership. | `#real-icon-consumer-before-api-stability` |
 
 ## Non-normative adoption roadmap
 
