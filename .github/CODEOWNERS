@@ -7,10 +7,14 @@
 /validation/ @Varuas37
 /docs/architecture/ @Varuas37
 /docs/plans/ @Varuas37
+/AGENTS.md @Varuas37
+/CONTRIBUTION.md @Varuas37
+/CONTRIBUTING.md @Varuas37
 /README.md @Varuas37
 /.node-version @Varuas37
 /package.json @Varuas37
 /pnpm-lock.yaml @Varuas37
 /pnpm-workspace.yaml @Varuas37
+/start.sh @Varuas37
 /tsconfig.base.json @Varuas37
 /.github/ @Varuas37
