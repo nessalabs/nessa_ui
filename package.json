@@ -24,9 +24,7 @@
     "validate:artifacts": "tsx validation/build-and-check.ts",
     "validate:contracts:source": "tsx validation/run.ts --phase=source",
     "validate:contracts:test": "tsx --test validation/tests/*.test.ts",
-    "validate:full": "tsx validation/full.ts",
-    "verify:github-governance": "tsx validation/verify-github-governance.ts",
-    "verify:pr-architecture": "tsx validation/verify-pr-architecture.ts"
+    "validate:full": "tsx validation/full.ts"
   },
   "devDependencies": {
     "@types/culori": "^4.0.1",
