@@ -31,11 +31,14 @@ docs/architecture permanent design-system contracts
 The workspace requires Node.js 22.13 or newer and pnpm 11.9.0.
 
 ```bash
-pnpm install
-pnpm storybook
+./start.sh
 ```
 
 Then open [http://localhost:6006](http://localhost:6006).
+
+`start.sh` verifies the repository's Node and pnpm versions, reconciles
+workspace dependencies against the frozen lockfile, and starts Storybook.
+Override its address with `NESSA_STORYBOOK_HOST` or `NESSA_STORYBOOK_PORT`.
 
 ## Consume the package
 
@@ -97,6 +100,7 @@ pnpm build:registry
 
 | Command | Purpose |
 | --- | --- |
+| `./start.sh` | Verify the toolchain and start the Storybook workshop |
 | `pnpm storybook` | Start the visual workshop |
 | `pnpm build` | Build the React package and compiled theme CSS |
 | `pnpm build:storybook` | Produce the static Storybook site |
@@ -108,6 +112,10 @@ pnpm build:registry
 
 Validation details, focused commands, and performance guarantees live in
 [`validation/README.md`](./validation/README.md).
+
+Contributor setup, protected-main practices, and the explicitly authorized
+worktree workflow live in [CONTRIBUTION.md](./CONTRIBUTION.md). Agents must also
+follow [AGENTS.md](./AGENTS.md).
 
 ## Naming
 
