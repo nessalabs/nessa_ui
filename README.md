@@ -28,7 +28,7 @@ docs/architecture permanent design-system contracts
 
 ## Start Storybook
 
-The workspace requires Node.js 20.19 or newer and pnpm 11.
+The workspace requires Node.js 22.13 or newer and pnpm 11.9.0.
 
 ```bash
 pnpm install

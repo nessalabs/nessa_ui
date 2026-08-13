@@ -116,7 +116,7 @@ pnpm-lock.yaml
 README.md
 ```
 
-Do not add a separately published framework package, pre-commit hook, or mutable generated report. Root development dependencies are limited to `tsx`, `typescript`, `@types/node`, `minimatch`, `postcss`, `postcss-selector-parser`, `culori`, and `@types/culori`: `tsx` executes readable TypeScript, the TypeScript compiler API classifies exports/source syntax, Minimatch resolves declared input globs, PostCSS parses CSS structure, the selector parser distinguishes type and universal selector nodes from class/ID/attribute text, and Culori provides standards-oriented CSS color parsing/conversion primitives. Node 20 built-ins and `node:test` cover everything else. All dependencies are added with pnpm and locked in `pnpm-lock.yaml`; validation imports only direct dependencies, never undeclared transitives.
+Do not add a separately published framework package, pre-commit hook, or mutable generated report. Root development dependencies are limited to `tsx`, `typescript`, `@types/node`, `minimatch`, `postcss`, `postcss-selector-parser`, `culori`, and `@types/culori`: `tsx` executes readable TypeScript, the TypeScript compiler API classifies exports/source syntax, Minimatch resolves declared input globs, PostCSS parses CSS structure, the selector parser distinguishes type and universal selector nodes from class/ID/attribute text, and Culori provides standards-oriented CSS color parsing/conversion primitives. Node 22 built-ins and `node:test` cover everything else. All dependencies are added with pnpm and locked in `pnpm-lock.yaml`; validation imports only direct dependencies, never undeclared transitives.
 
 `validation/tsconfig.json` is independently typechecked and extends the root baseline with `target: "ES2022"`, `module: "NodeNext"`, `moduleResolution: "NodeNext"`, `types: ["node"]`, `strict: true`, `noEmit: true`, and `allowImportingTsExtensions: true`; it includes every `validation/**/*.ts` file. Validation modules use explicit `.ts` imports so runtime and compiler resolution agree.
 
@@ -347,7 +347,7 @@ Add contributor scripts:
 
 `validation.yml` runs exactly on `pull_request` types `opened`, `synchronize`, `reopened`, and `ready_for_review`, plus pushes to `main`. It does not rerun the expensive build/browser/package gate on `pull_request_review`, because approval changes do not change source artifacts; the small architecture-review status described below owns review events. It uses:
 
-- `.node-version` pinned to `20.19.0`;
+- `.node-version` pinned to `22.13.0`;
 - pnpm exactly `11.9.0` from `packageManager`;
 - `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` (`v7.0.1`) with `fetch-depth: 0` so governance can compare the exact base revision;
 - `pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86` (`v6.0.10`) before Node cache configuration;

@@ -36,7 +36,7 @@ jobs:
           cache: pnpm
       - name: Assert toolchain
         run: |
-          test "$(node --version)" = "v20.19.0"
+          test "$(node --version)" = "v22.13.0"
           test "$(pnpm --version)" = "11.9.0"
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
