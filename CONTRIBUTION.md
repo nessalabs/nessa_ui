@@ -32,12 +32,12 @@ deletion of `main` are blocked. Pull requests must be current with `main`, pass
 the required `full` validation check, and have all conversations resolved.
 Nessa uses squash merges, and GitHub deletes merged same-repository branches.
 
-Today, `CODEOWNERS` and `architecture-conformance` are advisory. The repository
-has one eligible maintainer, so requiring an independent approval would
-deadlock maintainer-authored changes. Requiring `architecture-conformance` and
-one current independent approval is the migration target after a second
-eligible maintainer is available; until then, the app-bound `full` check is the
-required automated merge gate.
+The app-bound `full` check is the required automated merge gate. `CODEOWNERS`
+routes review to the design-system owner, but native required approvals remain
+off while the repository has only one eligible maintainer. Enable GitHub's
+standard approval rule when a second maintainer can review without deadlocking
+maintainer-authored pull requests; Nessa does not publish a custom approval
+status.
 
 Maintainers use `origin` for the canonical `nessalabs/nessa_ui` repository. A
 fork contributor should keep `origin` pointed at their fork and add the

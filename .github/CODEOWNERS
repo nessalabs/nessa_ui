@@ -1,5 +1,5 @@
-# Advisory architecture review ownership. Required code-owner approval stays off
-# until a team has at least two eligible maintainers.
+# Ownership routing for design-system and repository-governance changes.
+# Native required approvals can be enabled when a second maintainer is eligible.
 /packages/react/ @Varuas37
 /apps/storybook/ @Varuas37
 /registry.json @Varuas37

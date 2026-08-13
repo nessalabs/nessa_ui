@@ -45,12 +45,18 @@ Every nontrivial change must:
 1. identify the applicable contract sections and public surfaces;
 2. preserve package, registry, documentation, and Storybook parity where applicable;
 3. provide automated evidence for machine-verifiable invariants;
-4. receive an independent architecture-conformance review;
+4. receive an independent architecture review;
 5. resolve every actionable finding before merge.
 
 One-way decisions have stable identifiers in the normative contract index and are enforced by the repository `validation/` gate. Machine-verifiable rules run on every review; judgment-based rules require explicit reviewer evidence. The gate may sequence adoption through planned activation probes and exact temporary exceptions, but it may not silently weaken this contract.
 
 Changing a normative rule requires an explicit contract amendment explaining the reason, compatibility impact, migration path, and verification changes. Code changes do not establish architectural precedent by themselves.
+
+Independent review is a contribution practice, not a custom GitHub status. A
+maintainer may use a qualified human or an isolated read-only agent review and
+must resolve actionable findings before merge. When the repository has a
+second eligible maintainer, standard GitHub approval protection may enforce
+this practice without introducing a repository-owned approval publisher.
 
 ## Reference model and deliberate boundaries
 

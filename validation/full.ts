@@ -18,7 +18,12 @@ async function gitList(repoRoot: string, args: readonly string[]): Promise<strin
 }
 
 async function sourceSnapshot(repoRoot: string): Promise<Map<string, string>> {
-  const paths = await gitList(repoRoot, ["ls-files", "--cached", "--others", "--exclude-standard"])
+  const [indexedPaths, deletedPaths] = await Promise.all([
+    gitList(repoRoot, ["ls-files", "--cached", "--others", "--exclude-standard"]),
+    gitList(repoRoot, ["ls-files", "--deleted"]),
+  ])
+  const deleted = new Set(deletedPaths)
+  const paths = indexedPaths.filter((filePath) => !deleted.has(filePath))
   const entries = await Promise.all(paths.map(async (filePath) => {
     const content = await readFile(path.join(repoRoot, filePath))
     return [filePath, createHash("sha256").update(content).digest("hex")] as const

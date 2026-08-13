@@ -61,8 +61,6 @@ validation/
 ├── build-and-check.ts
 ├── check-package.ts
 ├── check-registry.ts
-├── verify-github-governance.ts
-├── verify-pr-architecture.ts
 ├── framework/
 │   ├── define-check.ts
 │   ├── file-index.ts
@@ -105,9 +103,7 @@ validation/
 ├── CODEOWNERS
 ├── pull_request_template.md
 └── workflows/
-    ├── validation.yml
-    ├── architecture-review.yml
-    └── governance-audit.yml
+    └── validation.yml
 
 docs/architecture/design-system-contract.md
 .node-version
@@ -197,14 +193,14 @@ State transitions are governed:
 
 - `planned → enforced` is required when its activation probe detects the surface;
 - an enforced contract with exceptions remains enforced and returns to zero exceptions when migration completes;
-- `enforced → planned`, weakening/removing a check, weakening an activation probe, or adding an exception requires an explicit normative contract amendment with compatibility, migration, and architecture-owner authorization under the author-role rule below;
+- `enforced → planned`, weakening/removing a check, weakening an activation probe, or adding an exception requires an explicit normative contract amendment with compatibility, migration, and architecture-owner authorization; owner authorship supplies that authorization for an owner-authored change, while another author requires owner review;
 - IDs may be retired but never repurposed.
 
 `validation/amendments.ts` is an append-only typed history for every governed-manifest transition, including strengthening, weakening, or retirement. Each entry records a stable amendment ID, the exact governed source targets changed, transition kind, canonical before/after fingerprints, rationale, compatibility impact, migration/removal condition, and pull-request reference. The canonical snapshot hashes LF-normalized complete source for `validation/contracts.ts` (including probes), `validation/exceptions.ts`, and `validation/nessa/check-metadata.ts`, then hashes the path-keyed digest map. This is deliberately stricter than field-level weakening detection: formatting or structural changes to those authority files also require a reviewed transition, while ordinary checker implementation remains semantic-review-owned rather than function-source fingerprinted.
 
 CI checks out full Git history and passes the pull-request base SHA (or the previous push SHA on `main`) to the governance checker. The checker reads the base revision's governed sources and amendment ledger with `git show`; any snapshot change requires one appended transition whose targets exactly equal the changed governed paths and whose before/after fingerprints exactly equal the computed base/current snapshots. Contract removal additionally requires one zero-target retirement marker per removed ID, all bound to that same snapshot transition, so one change may retire multiple contracts without creating ambiguous competing transitions. This contains all narrower weakening classes—state downgrade, check/probe deletion or narrowing, `global: true → false`, exception addition/broadening, and retirement—without relying on an incomplete semantic parser. Existing amendment entries may never be changed, reordered, or deleted under any circumstance. Corrections and supersessions are new appended entries; a new entry can authorize only its exact content-addressed transition and can never authorize rewriting amendment history. Local `pnpm validate` proves current-tree consistency without fetching; if `origin/main` is locally available it also compares the merge base, while the CI environment supplies the exact base SHA.
 
-The one-time bootstrap is explicit. The initial ledger contains immutable `BOOTSTRAP-001`, recording the exact pre-validation base revision and the canonical fingerprint of the first manifest; the Git commit containing that entry is itself the first governed commit, so the source file does not need to predict its future SHA. A pull-request URL is recorded when one exists but is optional for a direct authorized commit. If the base revision has no validation manifest, history comparison accepts that absence only when the current ledger begins with `BOOTSTRAP-001`, emits `REVIEW GOV-BOOTSTRAP`, and still enforces complete current-tree index/manifest/check/probe/exception consistency. Authorization follows the satisfiable owner-role rule defined below: authenticated owner authorship plus one current non-author approval, or current owner approval when someone else authors. Once any base contains the manifest, its later absence or any second bootstrap is always a failure. An absent/all-zero previous-push SHA on the first post-merge push uses the merge commit's first parent; if that object is unavailable, governance fails with a fetch/history repair message rather than skipping. Synthetic tests cover owner-authored and non-owner-authored initial PRs, first push after merge, normal later PR, shallow/missing base, all-zero SHA, and attempted second bootstrap.
+The one-time bootstrap is explicit. The initial ledger contains immutable `BOOTSTRAP-001`, recording the exact pre-validation base revision and the canonical fingerprint of the first manifest; the Git commit containing that entry is itself the first governed commit, so the source file does not need to predict its future SHA. A pull-request URL is recorded when one exists but is optional for a direct authorized commit. If the base revision has no validation manifest, history comparison accepts that absence only when the current ledger begins with `BOOTSTRAP-001`, emits `REVIEW GOV-BOOTSTRAP`, and still enforces complete current-tree index/manifest/check/probe/exception consistency. Once any base contains the manifest, its later absence or any second bootstrap is always a failure. An absent/all-zero previous-push SHA on the first post-merge push uses the merge commit's first parent; if that object is unavailable, governance fails with a fetch/history repair message rather than skipping. Synthetic tests cover first push after merge, normal later pull requests, shallow/missing base, all-zero SHA, and attempted second bootstrap.
 
 No mechanical fingerprint can prove that an implementation body was not semantically weakened. Therefore every change under governed paths—including check implementation—is code-owner/review-required even when fingerprints do not change. Automated history comparison detects structural weakening; independent architecture review owns semantic weakening. The runner and documentation state that boundary explicitly rather than claiming local code can prove reviewer judgment.
 
@@ -314,7 +310,7 @@ Each ledger tuple names the component module, state, mode, token, opacity/treatm
 3. schedules dependency-safe checks with bounded concurrency and sorts their results in contract-ID order;
 4. catches check crashes and reports them as failures;
 5. prints deterministic `PASS`, `FAIL`, `EXCEPTION`, `PLANNED`, and `REVIEW` rows;
-6. exits nonzero for failures; `REVIEW` rows are enforced externally through required independent approval, not self-attested by the author;
+6. exits nonzero for failures; `REVIEW` rows identify evidence that must be recorded and independently reviewed without pretending reviewer judgment is a machine-verifiable status;
 7. prints a final count and repair-oriented messages with authority links.
 
 No timestamps, colors in non-TTY output, absolute machine paths, or network calls are allowed. The source runner never writes the working tree. Validator self-tests and registry reproduction may use `node:os` temporary directories with guaranteed cleanup. Full artifact validation is source-preserving rather than literally write-free: it may replace only declared ignored build outputs such as `packages/react/dist` and `apps/storybook/storybook-static`.
@@ -330,8 +326,6 @@ Add contributor scripts:
   "validate:artifacts": "tsx validation/build-and-check.ts",
   "check:registry": "tsx validation/check-registry.ts",
   "check:package": "tsx validation/check-package.ts",
-  "verify:github-governance": "tsx validation/verify-github-governance.ts",
-  "verify:pr-architecture": "tsx validation/verify-pr-architecture.ts",
   "typecheck:validation": "tsc -p validation/tsconfig.json --noEmit",
   "typecheck": "pnpm -r typecheck && pnpm typecheck:validation",
   "validate": "pnpm validate:contracts:source",
@@ -339,13 +333,13 @@ Add contributor scripts:
 }
 ```
 
-`validation/full.ts` is the sole full-gate orchestrator. Before any command, it snapshots the sorted path set and SHA-256 content of `git ls-files --cached --others --exclude-standard`, thereby protecting both tracked files and pre-existing nonignored untracked contributor work. It then invokes the source runner, validator self-tests, repository typecheck/tests, clean build plus artifact checks, temporary registry reproduction, package manifest inspection, and Storybook build in the declared order. A single outer `try/finally` always rebuilds the same index and compares paths/content, even when an intermediate command fails; created, removed, or modified paths are reported. It also compares the top-level ignored-path inventory from `git ls-files --others --ignored --exclude-standard --directory` and rejects newly created ignored roots outside the enumerated build outputs (`packages/react/dist`, `apps/storybook/storybook-static`, and OS temporary directories). Arbitrary mutations inside pre-existing ignored content such as `node_modules` are honestly outside preservation enforcement. Known build outputs are validated separately; no claim is made about unrelated ignored-directory contents.
+`validation/full.ts` is the sole full-gate orchestrator. Before any command, it snapshots the sorted path set and SHA-256 content of `git ls-files --cached --others --exclude-standard` after subtracting paths already reported by `git ls-files --deleted`, thereby protecting tracked files that still exist and pre-existing nonignored untracked contributor work without rejecting a legitimate deletion diff. It then invokes the source runner, validator self-tests, repository typecheck/tests, clean build plus artifact checks, temporary registry reproduction, package manifest inspection, and Storybook build in the declared order. A single outer `try/finally` always rebuilds the same index and compares paths/content, even when an intermediate command fails; created, removed, or modified paths are reported. It also compares the top-level ignored-path inventory from `git ls-files --others --ignored --exclude-standard --directory` and rejects newly created ignored roots outside the enumerated build outputs (`packages/react/dist`, `apps/storybook/storybook-static`, and OS temporary directories). Arbitrary mutations inside pre-existing ignored content such as `node_modules` are honestly outside preservation enforcement. Known build outputs are validated separately; no claim is made about unrelated ignored-directory contents.
 
 `build-and-check.ts` runs `pnpm build` with inherited stdio, requires the clean-first package build to succeed, and immediately runs artifact-phase checks against those outputs. It does not accept pre-existing `dist` as evidence. Full-gate preservation belongs to `full.ts`, so it covers every command rather than only the package build.
 
 `check-package.ts` runs `npm pack --dry-run --json --ignore-scripts` with `cwd` set to `packages/react` after the fresh build. It validates JS, declarations, all three CSS files, README, LICENSE, and the deliberately published JS source map, and rejects unintended workspace/source files. The normal declaration check separately enforces that `prepack` exists.
 
-`validation.yml` runs exactly on `pull_request` types `opened`, `synchronize`, `reopened`, and `ready_for_review`, plus pushes to `main`. It does not rerun the expensive build/browser/package gate on `pull_request_review`, because approval changes do not change source artifacts; the small architecture-review status described below owns review events. It uses:
+`validation.yml` runs exactly on `pull_request` types `opened`, `synchronize`, `reopened`, and `ready_for_review`, plus pushes to `main`. It does not rerun the expensive build/browser/package gate on review-only events because they do not change source artifacts; head-changing pull-request events rerun the complete gate. It uses:
 
 - `.node-version` pinned to `22.13.0`;
 - pnpm exactly `11.9.0` from `packageManager`;
@@ -361,28 +355,15 @@ Actions are pinned to full commit SHAs with release tags in comments. The artifa
 
 The clean-CI acceptance test uses an empty Playwright cache and no existing `dist`, `public/r` temporary output, or Storybook build.
 
-### Independent review enforcement
+### Independent review practice
 
-`.github/CODEOWNERS` requests architecture review from `@Varuas37` for every contract-governed path: `packages/react/**`, `apps/storybook/**`, `registry.json`, `public/r/**`, `validation/**`, design-system documentation, root package/toolchain configuration, and `.github/**`. Future governed top-level surfaces must be added in the same change that creates them. Because the repository currently has only one confirmed architecture owner, required code-owner approval is **not** enabled: it would deadlock a pull request authored by that owner. The required ruleset instead requires:
+`.github/CODEOWNERS` routes contract-governed changes to `@Varuas37`: `packages/react/**`, `apps/storybook/**`, `registry.json`, `public/r/**`, `validation/**`, design-system documentation, root package/toolchain configuration, and `.github/**`. Future governed top-level surfaces must be added in the same change that creates them.
 
-- the validation workflow status;
-- at least one approving review from someone other than the author;
-- dismissal of stale approvals after new commits.
+The repository currently has one eligible maintainer, so native required approval and required code-owner approval remain disabled; either rule would deadlock a maintainer-authored pull request. The only required automated status is the app-bound `full` validation job. Nessa does not publish a custom approval or architecture-conformance check and does not maintain a scheduled branch-policy auditor.
 
-Architecture authorization uses one satisfiable role rule for ordinary conformance, bootstrap, and amendments:
+Independent review remains a contribution and contract practice. `review-required` rows identify the evidence a qualified human or isolated read-only agent must examine, and the pull-request template records that evidence. Review findings are resolved before merge, but the validation runner does not claim that semantic reviewer judgment is machine-verifiable. Amendments and `BOOTSTRAP-001` continue to carry their deterministic source evidence in the append-only ledger.
 
-- When GitHub reports `@Varuas37` as the pull-request author, that authenticated authorship is the owner's authorization; one current-head approval from a different reviewer supplies independent conformance review. It does not require a second PR approval or impossible self-approval.
-- When anyone else authors the change, `@Varuas37` must approve; that owner approval is also the required non-author conformance approval.
-
-`review-required` contracts are satisfied through the applicable current-head approval. The PR template records the semantic evidence for the reviewer to evaluate, but the trusted status does not pretend to parse or authenticate free-form prose. Amendments and `BOOTSTRAP-001` carry their machine-validated evidence in source. `validation/verify-pr-architecture.ts` queries the authenticated PR author, exact head SHA, current non-dismissed approvals and their commit IDs through fixed GitHub API calls; it accepts only an approval bound to the current head and applies the role rule above. `.github/workflows/architecture-review.yml` executes only the default branch's trusted workflow definition: `workflow_run` publishes immediately after artifact validation for new/synchronized heads, while a five-minute `schedule` reevaluates every open pull request after review submissions, edits, or dismissals; `workflow_dispatch` provides an explicit retry. It never uses the PR-controlled `pull_request_review` workflow definition, never checks out the pull-request head, and treats PR values only as API data. The bounded polling delay is the tradeoff for fork-safe write authority without introducing a GitHub App.
-
-Because a `workflow_run`/review workflow's own check is not guaranteed to attach to the PR head SHA, the trusted script creates or updates a dedicated `architecture-conformance` check run on the exact API-reported PR head SHA. Its token is scoped to `contents: read`, `pull-requests: read`, and `checks: write`; there are no other secrets or write scopes, no PR code execution, and the check-run write is the sole external mutation. `pnpm verify:pr-architecture` is read-only by default; only the trusted workflow passes `--publish-check`. Missing/ambiguous PR-to-head mapping fails closed. The required ruleset requires this dedicated status as well as artifact validation. Fixtures cover head-SHA targeting/update idempotence, owner-authored bootstrap/amendment/ordinary PRs, non-owner-authored equivalents, stale/dismissed approvals, and no double-approval requirement. During the one-time bootstrap—before this trusted default-branch workflow exists—the independent plan/code review and `BOOTSTRAP-001` are manual evidence; merge protection is not claimed active until the workflow and ruleset audit pass after merge.
-
-Required code-owner approval may be enabled later only after a team such as `@nessalabs/design-system-architecture` exists with at least two eligible members who have repository review access; readiness verification must confirm team membership/access before recommending that change. No team or membership is invented by this implementation.
-
-`validation/verify-github-governance.ts` is an explicit online audit, separate from the offline kernel. Through a fixed `gh api GET /repos/nessalabs/nessa_ui/rules/branches/main` request, it verifies the active `main`-branch rule set: required validation and `architecture-conformance` status names, one required approving review, stale-approval dismissal, and current code-owner-review setting consistent with readiness. It prints either `merge protection confirmed active`, `validation passes but merge protection is not confirmed`, or an actionable mismatch and exits nonzero for missing/mismatched/unavailable evidence. Saved representative API fixtures self-test rule parsing without network access.
-
-The audit runs once read-only during rollout, on pushes to `main`, on a weekly `schedule`, and through `workflow_dispatch` in `.github/workflows/governance-audit.yml`; it is not part of `pnpm validate`/`validate:full`. The audit workflow has read-only permissions. Fork pull requests run the offline validation workflow but not the online audit; unavailable API/auth never gets mislabeled as confirmed protection. If the required repository rule is absent, enabling it is reported as an external configuration step and the gate is not described as merge-blocking until the user separately authorizes that repository mutation.
+When a second eligible maintainer exists, the repository may enable GitHub's standard required-approval rule. That transition uses native branch protection rather than a repository-owned status publisher, and it is documented at the time it becomes enforceable.
 
 The pull-request template requires:
 
@@ -402,11 +383,13 @@ Each high-risk checker has a focused test module. The bootstrap suite freezes th
 - class-token comments/prose exclusion, multiline/template class surfaces, document-root aliases/element access/destructuring, qualified persistence globals, and private aliases in style/object/property APIs;
 - registry embedded-source normalization, complete source-owned metadata projection, import-derived dependencies, and multi-file dependency unioning;
 - exact package root/CSS exports and prepack contract, Storybook meta/tag/named-story/component binding, compound export discovery, and per-story Input label/error associations;
-- paginated approval precedence beyond 100 reviews/open PRs, owner/non-owner approval roles, head-bound check creation/update, active-rules parsing, trusted workflow triggers, and CODEOWNERS coverage;
-- temporary-Git full-orchestrator preservation on success and command failure, including tracked/untracked mutations, allowed build replacement, and unexpected ignored roots;
+- temporary-Git full-orchestrator preservation on success and command failure, including tracked/untracked mutations, pre-existing tracked deletions, allowed build replacement, and unexpected ignored roots;
 - 10,000-path indexing/matching remains within the deliberately generous structural budget.
 
 These fixtures test reusable parsers and policy decisions without mutating repository sources. A new checker behavior or a repaired bug must add the smallest positive/negative regression fixture that proves that behavior; the plan does not claim an artificial Cartesian fixture matrix where a shared runner already owns missing-input/crash behavior.
+
+CODEOWNERS coverage is checked by the live source governance gate rather than a
+duplicated self-test fixture.
 
 Self-tests use temporary directories from `node:fs`/`node:os`, clean them in `finally`, and never edit the working tree.
 
@@ -429,8 +412,8 @@ Self-tests use temporary directories from `node:fs`/`node:os`, clean them in `fi
 - Validator self-tests prove meaningful negative cases.
 - `pnpm validate` is the fast source-only inner-loop gate. `pnpm validate:full` gates reviews/CI in source → validator tests → typecheck/tests → clean build/artifact checks → registry reproduction → package manifest → Storybook order.
 - The reusable kernel contains no Nessa policy, indexes files once, memoizes reads/parses, runs with bounded concurrency, and passes its 10,000-file structural/performance fixture. Ordinary checks spawn no child processes.
-- Artifact validation runs on every pull request and push to `main` without write permissions. The trusted architecture workflow has only `checks: write` in addition to read scopes, solely to publish/update the exact head-bound conformance check.
-- Every contract-governed implementation and governance path has CODEOWNERS, and the required external review/ruleset status is verified rather than implied.
+- Artifact validation runs on every pull request and push to `main` without write permissions.
+- Every contract-governed implementation and governance path has CODEOWNERS; independent review evidence is recorded in the pull request without a custom approval status.
 - Failure messages name the contract, evidence, authority, and repair path.
 - The implementation and its plan both receive independent `PASS 0` reviews.
 

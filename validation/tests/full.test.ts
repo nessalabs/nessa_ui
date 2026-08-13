@@ -45,6 +45,21 @@ test("full gate outer finally reports tracked and untracked mutations even after
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
+test("full gate accepts tracked files deleted before validation starts", async () => {
+  const directory = await fixtureRepo()
+  try {
+    const removedPath = path.join(directory, "removed.ts")
+    await writeFile(removedPath, "removed before validation\n")
+    execFileSync("git", ["add", "removed.ts"], { cwd: directory })
+    await unlink(removedPath)
+    await validateFull({
+      repoRoot: directory,
+      commands: [["fixture", []]],
+      execute: async () => undefined,
+    })
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
 test("full gate allows declared ignored build output replacement", async () => {
   const directory = await fixtureRepo()
   try {
