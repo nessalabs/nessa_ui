@@ -28,7 +28,7 @@ docs/architecture permanent design-system contracts
 
 ## Start Storybook
 
-The workspace requires Node.js 20.19 or newer and pnpm 11.
+The workspace requires Node.js 22.13 or newer and pnpm 11.9.0.
 
 ```bash
 pnpm install
@@ -103,6 +103,11 @@ pnpm build:registry
 | `pnpm build:registry` | Generate installable shadcn registry JSON |
 | `pnpm test` | Run Storybook render and accessibility checks in Chromium |
 | `pnpm typecheck` | Type-check every workspace package |
+| `pnpm validate` | Run the fast, read-only design-contract source gate |
+| `pnpm validate:full` | Run the complete review/CI artifact and contract gate |
+
+Validation details, focused commands, and performance guarantees live in
+[`validation/README.md`](./validation/README.md).
 
 ## Naming
 

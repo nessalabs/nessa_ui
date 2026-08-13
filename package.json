@@ -2,22 +2,41 @@
   "name": "nessa-ui-workspace",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "description": "The workspace for Nessa UI, an open design system built on shadcn/ui.",
   "license": "MIT",
   "packageManager": "pnpm@11.9.0",
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "build": "pnpm --filter @nessa-ui/react build",
     "build:registry": "shadcn build",
     "build:storybook": "pnpm --filter @nessa-ui/storybook build",
+    "check:package": "tsx validation/check-package.ts",
+    "check:registry": "tsx validation/check-registry.ts",
     "dev": "pnpm --filter @nessa-ui/storybook dev",
     "storybook": "pnpm --filter @nessa-ui/storybook dev",
     "test": "pnpm --filter @nessa-ui/storybook test",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck && pnpm typecheck:validation",
+    "typecheck:validation": "tsc -p validation/tsconfig.json --noEmit",
+    "validate": "tsx validation/run.ts --phase=source",
+    "validate:artifacts": "tsx validation/build-and-check.ts",
+    "validate:contracts:source": "tsx validation/run.ts --phase=source",
+    "validate:contracts:test": "tsx --test validation/tests/*.test.ts",
+    "validate:full": "tsx validation/full.ts",
+    "verify:github-governance": "tsx validation/verify-github-governance.ts",
+    "verify:pr-architecture": "tsx validation/verify-pr-architecture.ts"
   },
   "devDependencies": {
-    "shadcn": "^4.0.0"
+    "@types/culori": "^4.0.1",
+    "@types/node": "^24.13.3",
+    "culori": "^4.0.2",
+    "minimatch": "^10.2.6",
+    "postcss": "^8.5.26",
+    "postcss-selector-parser": "^7.1.5",
+    "shadcn": "^4.0.0",
+    "tsx": "^4.23.12",
+    "typescript": "^5.9.3"
   }
 }
