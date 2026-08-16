@@ -1,7 +1,7 @@
 import { defineCheck } from "../../framework/define-check.ts"
 import { checkMetadata } from "../check-metadata.ts"
 
-interface RegistryFile { path: string; content?: string }
+interface RegistryFile { path: string; content?: string; target?: string }
 interface RegistryItem {
   [key: string]: unknown
   name: string
@@ -35,6 +35,17 @@ export function requiredRegistryDependenciesPresent(dependencies: readonly strin
   return dependencies.includes("nessalabs/nessa_ui/nessa-base") && dependencies.includes("nessalabs/nessa_ui/utils")
 }
 
+/**
+ * Resolves a `@/…` import specifier to the registry item it names and the
+ * installation directory that specifier expects the item's files to live in.
+ */
+export function registryAliasFromSpecifier(specifier: string): { itemName: string; targetPrefix: string } | null {
+  const segments = specifier.split("/")
+  if (specifier.startsWith("@/components/ui/") && segments[3]) return { itemName: segments[3], targetPrefix: `components/ui/${segments[3]}` }
+  if ((specifier.startsWith("@/components/") || specifier.startsWith("@/lib/")) && segments[2]) return { itemName: segments[2], targetPrefix: `${segments[1]}/${segments[2]}` }
+  return null
+}
+
 export function dependenciesFromSource(ast: ts.SourceFile): { packages: string[]; registry: string[] } {
   const packages = new Set<string>()
   const registry = new Set<string>()
@@ -42,11 +53,33 @@ export function dependenciesFromSource(ast: ts.SourceFile): { packages: string[]
     if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier)) return
     const specifier = node.moduleSpecifier.text
     if (specifier === "react") return
-    if (specifier === "@/lib/utils") registry.add("nessalabs/nessa_ui/utils")
-    else if (specifier.startsWith("@/components/ui/")) registry.add(`nessalabs/nessa_ui/${specifier.split("/").at(-1)}`)
+    const alias = registryAliasFromSpecifier(specifier)
+    if (alias) registry.add(`nessalabs/nessa_ui/${alias.itemName}`)
     else if (!specifier.startsWith(".") && !specifier.startsWith("@/")) packages.add(specifier.startsWith("@") ? specifier.split("/").slice(0, 2).join("/") : specifier.split("/")[0]!)
   })
   return { packages: [...packages].sort(), registry: [...registry].sort() }
+}
+
+/**
+ * Collects every `@/…` import in a file that names a registry item, so the
+ * check can confirm the alias matches where that item actually installs.
+ */
+export function registryAliasImports(ast: ts.SourceFile): Array<{ specifier: string; itemName: string; targetPrefix: string }> {
+  const imports: Array<{ specifier: string; itemName: string; targetPrefix: string }> = []
+  ast.forEachChild((node) => {
+    if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier)) return
+    const alias = registryAliasFromSpecifier(node.moduleSpecifier.text)
+    if (alias) imports.push({ specifier: node.moduleSpecifier.text, ...alias })
+  })
+  return imports
+}
+
+/**
+ * Whether an installed file target sits inside the directory an import
+ * alias points at (the directory itself, a file in it, or "<dir>.tsx").
+ */
+export function targetMatchesAlias(target: string, targetPrefix: string): boolean {
+  return target === targetPrefix || target.startsWith(`${targetPrefix}/`) || target.startsWith(`${targetPrefix}.`)
 }
 
 export const registryParityCheck = defineCheck({
@@ -78,9 +111,20 @@ export const registryParityCheck = defineCheck({
         if (!embeddedSourceMatches(generatedFile.content, canonical)) {
           findings.push(context.fail(`${item.name} embeds stale source for ${file.path}.`, { contractId: "REG-002", path: publicPath }))
         }
-        const required = dependenciesFromSource(await context.parseTypeScript(file.path))
+        const ast = await context.parseTypeScript(file.path)
+        const required = dependenciesFromSource(ast)
         for (const dependency of required.packages) requiredPackages.add(dependency)
         for (const dependency of required.registry) requiredRegistry.add(dependency)
+        // A cross-item import is only installable when the imported item's
+        // files actually land where the alias points.
+        for (const aliasImport of registryAliasImports(ast)) {
+          const imported = registry.items.find((candidate) => candidate.name === aliasImport.itemName)
+          if (!imported || imported.name === item.name) continue
+          const misplaced = (imported.files ?? []).filter((candidate) => candidate.target && !targetMatchesAlias(candidate.target, aliasImport.targetPrefix))
+          if (misplaced.length) {
+            findings.push(context.fail(`${item.name} imports ${aliasImport.specifier} but ${aliasImport.itemName} installs at ${misplaced[0]!.target}; the alias would not resolve in a consuming project.`, { contractId: "REG-003", path: "registry.json" }))
+          }
+        }
       }
       if ((item.files ?? []).length) {
         if (item.type === "registry:ui") requiredRegistry.add("nessalabs/nessa_ui/nessa-base")

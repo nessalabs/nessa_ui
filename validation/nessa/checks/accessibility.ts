@@ -130,10 +130,15 @@ export const accessibilityCheck = defineCheck({
       }
     }
 
-    const componentPaths = context.files.match(["packages/react/src/components/**/*.tsx"])
+    // Composites carry focus treatments too (for example the dock resize
+    // separator), so they are scanned alongside the component primitives.
+    const componentPaths = context.files.match([
+      "packages/react/src/components/**/*.tsx",
+      "packages/react/src/composites/**/*.tsx",
+    ])
     const scannedComponents = new Set<string>()
     for (const componentPath of componentPaths) {
-      const component = componentPath.replace(/^packages\/react\/src\/components\//, "").replace(/\.tsx$/, "")
+      const component = componentPath.replace(/^packages\/react\/src\/(?:components|composites)\//, "").replace(/\.tsx$/, "")
       scannedComponents.add(component)
       const componentTreatments = focusTreatments.filter((candidate) => candidate.component === component)
       const allowedClasses = new Set([

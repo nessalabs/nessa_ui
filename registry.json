@@ -92,7 +92,10 @@
       "type": "registry:lib",
       "title": "Nessa utilities",
       "description": "Shared class-name composition utilities for Nessa UI.",
-      "dependencies": ["clsx", "tailwind-merge"],
+      "dependencies": [
+        "clsx",
+        "tailwind-merge"
+      ],
       "files": [
         {
           "path": "packages/react/src/lib/utils.ts",
@@ -106,7 +109,10 @@
       "type": "registry:ui",
       "title": "Button",
       "description": "An accessible action primitive with Nessa variants and sizes.",
-      "dependencies": ["class-variance-authority", "radix-ui"],
+      "dependencies": [
+        "class-variance-authority",
+        "radix-ui"
+      ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -124,7 +130,10 @@
       "type": "registry:ui",
       "title": "Badge",
       "description": "A compact label for statuses and metadata.",
-      "dependencies": ["class-variance-authority", "radix-ui"],
+      "dependencies": [
+        "class-variance-authority",
+        "radix-ui"
+      ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -172,11 +181,133 @@
       ]
     },
     {
+      "name": "split-view",
+      "type": "registry:ui",
+      "title": "SplitView",
+      "description": "Controlled resizable panel groups with accessible, keyboard-operable separators.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/split-view/index.ts",
+          "type": "registry:ui",
+          "target": "components/split-view/index.ts"
+        },
+        {
+          "path": "packages/react/src/components/split-view/split-view.tsx",
+          "type": "registry:ui",
+          "target": "components/split-view/split-view.tsx"
+        },
+        {
+          "path": "packages/react/src/components/split-view/split-view-panel.tsx",
+          "type": "registry:ui",
+          "target": "components/split-view/split-view-panel.tsx"
+        },
+        {
+          "path": "packages/react/src/components/split-view/split-view-separator.tsx",
+          "type": "registry:ui",
+          "target": "components/split-view/split-view-separator.tsx"
+        },
+        {
+          "path": "packages/react/src/components/split-view/split-view-context.ts",
+          "type": "registry:ui",
+          "target": "components/split-view/split-view-context.ts"
+        },
+        {
+          "path": "packages/react/src/components/split-view/split-view-math.ts",
+          "type": "registry:ui",
+          "target": "components/split-view/split-view-math.ts"
+        },
+        {
+          "path": "packages/react/src/components/split-view/split-view-options.ts",
+          "type": "registry:ui",
+          "target": "components/split-view/split-view-options.ts"
+        }
+      ]
+    },
+    {
+      "name": "app-shell-layout",
+      "type": "registry:lib",
+      "title": "AppShell layout model",
+      "description": "The serializable, framework-free layout document and pure operations behind AppShell.",
+      "files": [
+        {
+          "path": "packages/react/src/lib/app-shell-layout/index.ts",
+          "type": "registry:lib",
+          "target": "lib/app-shell-layout/index.ts"
+        },
+        {
+          "path": "packages/react/src/lib/app-shell-layout/layout-options.ts",
+          "type": "registry:lib",
+          "target": "lib/app-shell-layout/layout-options.ts"
+        },
+        {
+          "path": "packages/react/src/lib/app-shell-layout/layout-types.ts",
+          "type": "registry:lib",
+          "target": "lib/app-shell-layout/layout-types.ts"
+        },
+        {
+          "path": "packages/react/src/lib/app-shell-layout/layout-normalize.ts",
+          "type": "registry:lib",
+          "target": "lib/app-shell-layout/layout-normalize.ts"
+        },
+        {
+          "path": "packages/react/src/lib/app-shell-layout/layout-operations.ts",
+          "type": "registry:lib",
+          "target": "lib/app-shell-layout/layout-operations.ts"
+        }
+      ]
+    },
+    {
+      "name": "app-shell",
+      "type": "registry:ui",
+      "title": "AppShell",
+      "description": "An IDE-style application shell: resizable docks around a recursively splittable workspace.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/split-view",
+        "nessalabs/nessa_ui/app-shell-layout"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/composites/app-shell/index.ts",
+          "type": "registry:ui",
+          "target": "components/composites/app-shell/index.ts"
+        },
+        {
+          "path": "packages/react/src/composites/app-shell/app-shell.tsx",
+          "type": "registry:ui",
+          "target": "components/composites/app-shell/app-shell.tsx"
+        },
+        {
+          "path": "packages/react/src/composites/app-shell/app-shell-chrome.tsx",
+          "type": "registry:ui",
+          "target": "components/composites/app-shell/app-shell-chrome.tsx"
+        },
+        {
+          "path": "packages/react/src/composites/app-shell/app-shell-dock.tsx",
+          "type": "registry:ui",
+          "target": "components/composites/app-shell/app-shell-dock.tsx"
+        },
+        {
+          "path": "packages/react/src/composites/app-shell/app-shell-workspace.tsx",
+          "type": "registry:ui",
+          "target": "components/composites/app-shell/app-shell-workspace.tsx"
+        }
+      ]
+    },
+    {
       "name": "sidebar",
       "type": "registry:ui",
       "title": "Sidebar",
       "description": "A composable application sidebar with controlled collapse state and keyboard support.",
-      "dependencies": ["class-variance-authority", "radix-ui"],
+      "dependencies": [
+        "class-variance-authority",
+        "radix-ui"
+      ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"

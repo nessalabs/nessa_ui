@@ -78,6 +78,16 @@ test("host-root detection covers property, element, globalThis, aliases, assignm
   assert.deepEqual(hostBoundaryAccesses(parse("document.querySelector('main.content')")), [])
 })
 
+test("divergent alias branches terminate and never hide a host root", () => {
+  // The same name assigned two harmless values must not spin the alias
+  // loop forever…
+  assert.deepEqual(hostBoundaryAccesses(parse("let size; size = minSize; size = collapsedSize; use(size)")), [])
+  // …and when one branch points at a host root, that branch wins no matter
+  // which order the assignments appear in.
+  assert.deepEqual(hostBoundaryAccesses(parse("let el; el = document.body; el = other; el.appendChild(x)")), ["document.body"])
+  assert.deepEqual(hostBoundaryAccesses(parse("let el; el = other; el = document.body; el.appendChild(x)")), ["document.body"])
+})
+
 test("private aliases are detected in copied style/object/property APIs but not prose", () => {
   const references = privateAliasReferences(parse(`const prose = "--_nessa-prose";
     const view = <div style={{ "--_nessa-secret": "red", color: "var(--_nessa-color)" }} />;
