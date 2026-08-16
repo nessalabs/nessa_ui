@@ -160,5 +160,42 @@ The fast and full validation gates codify the broad architectural contracts;
 component-specific behavior, interaction, visual, and accessibility tests
 remain part of each component's implementation.
 
+### Component boundaries
+
+- Define components around meaningful responsibilities, not source length,
+  JSX fragments, or individual DOM elements.
+- A public component should own a distinct semantic, behavioral, state,
+  accessibility, layout, or broadly reusable design-system contract.
+- Prefer one coherent public component with explicit props, variants, slots,
+  and children over a family of exported wrappers that consumers must assemble
+  in a fixed internal sequence.
+- Keep implementation-only structure private. Extract private helpers when they
+  improve readability or testing, but do not make them public without an
+  independent consumer-facing responsibility.
+- Reuse general-purpose design-system primitives for generic content and
+  actions instead of creating context-specific duplicates.
+- Preserve separate boundaries when parts have independent state, lifecycle,
+  semantics, interaction behavior, replacement needs, or reuse across
+  compositions.
+- Avoid both extremes: do not create a component for every small fragment, and
+  do not concentrate unrelated responsibilities into one configurable
+  component.
+- Evaluate the public API from the consumer's composition path. The common case
+  should be concise, while advanced customization should remain possible
+  without exposing internal layout machinery.
+
+### Component API documentation
+
+- Document every named component, hook, and callable helper at its declaration.
+- State the contract in consumer terms: what the callable accepts, what it
+  returns or renders, and any error or side-effect behavior that affects use.
+- Document public properties whose meaning, default, interaction, or ownership
+  cannot be understood from their type alone.
+- Keep documentation stable and responsibility-focused. Do not narrate local
+  implementation steps or repeat information already expressed by the type.
+- Preserve API documentation through package declarations, registry output,
+  and component workshop examples so every distribution path teaches the same
+  contract.
+
 See [validation/README.md](./validation/README.md) for the available validation
 commands and [AGENTS.md](./AGENTS.md) for repository-specific agent rules.

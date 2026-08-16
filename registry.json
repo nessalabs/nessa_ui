@@ -50,7 +50,13 @@
           "destructive-foreground": "oklch(0.985 0.006 255)",
           "border": "oklch(0.885 0.018 255)",
           "input": "oklch(0.86 0.022 255)",
-          "ring": "oklch(0.556 0 0)"
+          "ring": "oklch(0.556 0 0)",
+          "sidebar": "oklch(0.985 0 0)",
+          "sidebar-foreground": "oklch(0.141 0.005 285.823)",
+          "sidebar-accent": "oklch(0.97 0 0)",
+          "sidebar-accent-foreground": "oklch(0.205 0 0)",
+          "sidebar-border": "oklch(0.922 0 0)",
+          "sidebar-ring": "oklch(0.556 0 0)"
         },
         "dark": {
           "background": "oklch(0.155 0.025 258)",
@@ -71,7 +77,13 @@
           "destructive-foreground": "oklch(0.17 0.035 258)",
           "border": "oklch(1 0 0 / 12%)",
           "input": "oklch(1 0 0 / 16%)",
-          "ring": "oklch(0.708 0 0)"
+          "ring": "oklch(0.708 0 0)",
+          "sidebar": "oklch(0.141 0.005 285.823)",
+          "sidebar-foreground": "oklch(0.985 0 0)",
+          "sidebar-accent": "oklch(0.274 0.006 286.033)",
+          "sidebar-accent-foreground": "oklch(0.985 0 0)",
+          "sidebar-border": "oklch(0.274 0.006 286.033)",
+          "sidebar-ring": "oklch(0.708 0 0)"
         }
       }
     },
@@ -156,6 +168,89 @@
           "path": "packages/react/src/components/input.tsx",
           "type": "registry:ui",
           "target": "components/ui/input.tsx"
+        }
+      ]
+    },
+    {
+      "name": "sidebar",
+      "type": "registry:ui",
+      "title": "Sidebar",
+      "description": "A composable application sidebar with controlled collapse state and keyboard support.",
+      "dependencies": ["class-variance-authority", "radix-ui"],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/sidebar.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/sidebar.tsx"
+        },
+        {
+          "path": "packages/react/src/components/sidebar/index.ts",
+          "type": "registry:ui",
+          "target": "components/ui/sidebar/index.ts"
+        },
+        {
+          "path": "packages/react/src/components/sidebar/sidebar-provider.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/sidebar/sidebar-provider.tsx"
+        },
+        {
+          "path": "packages/react/src/components/sidebar/sidebar.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/sidebar/sidebar.tsx"
+        },
+        {
+          "path": "packages/react/src/components/sidebar/sidebar-inner.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/sidebar/sidebar-inner.tsx"
+        },
+        {
+          "path": "packages/react/src/components/sidebar/sidebar-options.ts",
+          "type": "registry:ui",
+          "target": "components/ui/sidebar/sidebar-options.ts"
+        },
+        {
+          "path": "packages/react/src/components/sidebar/sidebar-header.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/sidebar/sidebar-header.tsx"
+        },
+        {
+          "path": "packages/react/src/components/sidebar/sidebar-content.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/sidebar/sidebar-content.tsx"
+        },
+        {
+          "path": "packages/react/src/components/sidebar/sidebar-footer.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/sidebar/sidebar-footer.tsx"
+        },
+        {
+          "path": "packages/react/src/components/sidebar/sidebar-inset.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/sidebar/sidebar-inset.tsx"
+        },
+        {
+          "path": "packages/react/src/components/sidebar/sidebar-group.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/sidebar/sidebar-group.tsx"
+        },
+        {
+          "path": "packages/react/src/components/sidebar/sidebar-menu.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/sidebar/sidebar-menu.tsx"
+        },
+        {
+          "path": "packages/react/src/components/sidebar/sidebar-trigger.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/sidebar/sidebar-trigger.tsx"
+        },
+        {
+          "path": "packages/react/src/components/sidebar/sidebar-rail.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/sidebar/sidebar-rail.tsx"
         }
       ]
     }

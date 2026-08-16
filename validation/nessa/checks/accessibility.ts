@@ -76,11 +76,11 @@ export function resolveTokenValue(tokens: Readonly<Record<string, string>>, toke
 }
 
 export function discoverFocusClasses(source: string): string[] {
-  return source.match(/(?:dark:)?(?:focus-visible|aria-invalid):(?:ring|border)-[^\s"'`]+/g) ?? []
+  return source.match(/(?:dark:)?(?:focus-visible|aria-invalid):(?:(?:ring|border)-|outline-(?!\d|offset-))[^\s"'`]+/g) ?? []
 }
 
 export function focusClassesFromAst(ast: import("typescript").SourceFile): string[] {
-  return classTokens(ast).filter((token) => /^(?:dark:)?(?:focus-visible|aria-invalid):(?:ring|border)-.+$/.test(token))
+  return classTokens(ast).filter((token) => /^(?:dark:)?(?:focus-visible|aria-invalid):(?:ring|border|outline)-.+$/.test(token))
 }
 
 export const accessibilityCheck = defineCheck({
@@ -147,11 +147,12 @@ export const accessibilityCheck = defineCheck({
         if (!allowedClasses.has(className)) findings.push(context.fail(`Unregistered focus treatment ${className} in ${component}.`, { contractId: "A11Y-002" }))
       }
       for (const treatment of componentTreatments) {
-        if (counts.get(treatment.className) !== 1 || (treatment.darkClassName && counts.get(treatment.darkClassName) !== 1)) {
+        const expectedCount = treatment.count ?? 1
+        if (counts.get(treatment.className) !== expectedCount || (treatment.darkClassName && counts.get(treatment.darkClassName) !== expectedCount)) {
           findings.push(context.fail(`Focus treatment inventory is stale for ${component} ${treatment.state}.`, { contractId: "A11Y-002" }))
         }
       }
-      for (const geometry of focusGeometryClasses.filter((entry) => entry.component === component)) if (counts.get(geometry.className) !== 1) findings.push(context.fail(`Focus geometry inventory is stale for ${component} ${geometry.className}.`, { contractId: "A11Y-003" }))
+      for (const geometry of focusGeometryClasses.filter((entry) => entry.component === component)) if (counts.get(geometry.className) !== ("count" in geometry ? geometry.count : 1)) findings.push(context.fail(`Focus geometry inventory is stale for ${component} ${geometry.className}.`, { contractId: "A11Y-003" }))
     }
     for (const treatment of focusTreatments) if (!scannedComponents.has(treatment.component)) findings.push(context.fail(`Focus inventory references missing component ${treatment.component}.`, { contractId: "A11Y-002" }))
     for (const geometry of focusGeometryClasses) if (!scannedComponents.has(geometry.component)) findings.push(context.fail(`Focus geometry inventory references missing component ${geometry.component}.`, { contractId: "A11Y-003" }))
@@ -163,7 +164,7 @@ export const accessibilityCheck = defineCheck({
         let tokenValue: string
         try { tokenValue = resolveTokenValue(tokens[mode], spec.token) }
         catch (error) { findings.push(context.fail(`${mode}: ${error instanceof Error ? error.message : String(error)}`, { contractId: "A11Y-002" })); continue }
-        for (const surface of focusSurfaces) {
+        for (const surface of treatment.surfaces ?? focusSurfaces) {
           let surfaceValue: string
           try { surfaceValue = resolveTokenValue(tokens[mode], surface) }
           catch (error) { findings.push(context.fail(`${mode}: ${error instanceof Error ? error.message : String(error)}`, { contractId: "A11Y-002" })); continue }

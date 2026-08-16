@@ -11,6 +11,8 @@ import {
   CardTitle,
 } from "@nessa-ui/react"
 
+import { storyDocumentation } from "./story-documentation"
+
 const meta = {
   title: "Components/Card",
   component: Card,
@@ -37,14 +39,9 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Default: Story = {
-  parameters: {
-    docs: {
-      description: {
-        story:
-          "A complete Card composition with supporting metadata and a clear primary action.",
-      },
-    },
-  },
+  parameters: storyDocumentation(
+    "A complete Card composition with supporting metadata and a clear primary action.",
+  ),
   render: () => (
     <Card className="w-[360px]">
       <CardHeader>

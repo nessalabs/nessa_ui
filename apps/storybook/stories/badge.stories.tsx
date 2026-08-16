@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { Badge } from "@nessa-ui/react"
 
+import { storyDocumentation } from "./story-documentation"
+
 const meta = {
   title: "Components/Badge",
   component: Badge,
@@ -33,16 +35,16 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-export const Playground: Story = {}
+export const Playground: Story = {
+  parameters: storyDocumentation(
+    "Use the controls to compare Badge variants while keeping the label short and non-interactive.",
+  ),
+}
 
 export const AllVariants: Story = {
-  parameters: {
-    docs: {
-      description: {
-        story: "Choose the least emphatic variant that still communicates the status.",
-      },
-    },
-  },
+  parameters: storyDocumentation(
+    "Choose the least emphatic variant that still communicates the status.",
+  ),
   render: () => (
     <div className="flex items-center gap-3">
       <Badge>Default</Badge>

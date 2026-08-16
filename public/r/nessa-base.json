@@ -35,7 +35,13 @@
       "destructive-foreground": "oklch(0.985 0.006 255)",
       "border": "oklch(0.885 0.018 255)",
       "input": "oklch(0.86 0.022 255)",
-      "ring": "oklch(0.556 0 0)"
+      "ring": "oklch(0.556 0 0)",
+      "sidebar": "oklch(0.985 0 0)",
+      "sidebar-foreground": "oklch(0.141 0.005 285.823)",
+      "sidebar-accent": "oklch(0.97 0 0)",
+      "sidebar-accent-foreground": "oklch(0.205 0 0)",
+      "sidebar-border": "oklch(0.922 0 0)",
+      "sidebar-ring": "oklch(0.556 0 0)"
     },
     "dark": {
       "background": "oklch(0.155 0.025 258)",
@@ -56,7 +62,13 @@
       "destructive-foreground": "oklch(0.17 0.035 258)",
       "border": "oklch(1 0 0 / 12%)",
       "input": "oklch(1 0 0 / 16%)",
-      "ring": "oklch(0.708 0 0)"
+      "ring": "oklch(0.708 0 0)",
+      "sidebar": "oklch(0.141 0.005 285.823)",
+      "sidebar-foreground": "oklch(0.985 0 0)",
+      "sidebar-accent": "oklch(0.274 0.006 286.033)",
+      "sidebar-accent-foreground": "oklch(0.985 0 0)",
+      "sidebar-border": "oklch(0.274 0.006 286.033)",
+      "sidebar-ring": "oklch(0.708 0 0)"
     }
   },
   "type": "registry:base",

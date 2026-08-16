@@ -2,6 +2,8 @@ node_modules
 dist
 storybook-static
 coverage
+design-qa-artifacts/
+design-qa.md
+performance-sidebar-500-rows.md
 .DS_Store
 *.log
-

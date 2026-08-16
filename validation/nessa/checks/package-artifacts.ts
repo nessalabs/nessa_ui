@@ -16,6 +16,10 @@ function canonicalJson(value: unknown): string {
   return JSON.stringify(value)
 }
 
+export function hasUseClientDirective(source: string): boolean {
+  return /^\s*["']use client["'];?/.test(source)
+}
+
 export function packageDeclarationIssues(pkg: PackageJson): string[] {
   const issues: string[] = []
   if (pkg.peerDependencies?.react !== ">=19.0.0" || pkg.peerDependencies?.["react-dom"] !== ">=19.0.0") issues.push("react peers")
@@ -69,6 +73,11 @@ export const packageArtifactsBuiltCheck = defineCheck({
       "packages/react/dist/app.css",
     ]) {
       if (!context.files.has(filePath)) findings.push(context.fail(`Fresh package build omitted ${filePath}.`, { contractId: "PKG-003", path: filePath }))
+    }
+    for (const modulePath of context.files.match(["packages/react/dist/**/*.js"])) {
+      if (!hasUseClientDirective(await context.readText(modulePath))) {
+        findings.push(context.fail("Built package module lost its React client boundary.", { contractId: "PKG-003", path: modulePath }))
+      }
     }
     if (context.files.has("packages/react/dist/styles.css")) {
       const styles = await context.parseCss("packages/react/dist/styles.css")

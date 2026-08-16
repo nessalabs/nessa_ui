@@ -17,12 +17,13 @@ test("public token references resolve exactly and cycles fail closed", () => {
   assert.throws(() => resolveTokenValue({}, "--missing"), /Missing token/)
 })
 
-test("focus inventory discovers ring and border layers independently", () => {
-  assert.deepEqual(discoverFocusClasses("focus-visible:ring-ring/40 focus-visible:border-ring aria-invalid:ring-destructive/20 aria-invalid:border-destructive"), [
-    "focus-visible:ring-ring/40", "focus-visible:border-ring", "aria-invalid:ring-destructive/20", "aria-invalid:border-destructive",
+test("focus inventory discovers ring, border, and outline color layers independently", () => {
+  assert.deepEqual(discoverFocusClasses("focus-visible:ring-ring/40 focus-visible:border-ring aria-invalid:ring-destructive/20 aria-invalid:border-destructive focus-visible:outline-sidebar-ring focus-visible:outline-2 focus-visible:outline-offset-2"), [
+    "focus-visible:ring-ring/40", "focus-visible:border-ring", "aria-invalid:ring-destructive/20", "aria-invalid:border-destructive", "focus-visible:outline-sidebar-ring",
   ])
   assert.ok(focusTreatments.some((entry) => entry.layer === "ring"))
   assert.ok(focusTreatments.some((entry) => entry.layer === "border"))
+  assert.ok(focusTreatments.some((entry) => entry.layer === "outline"))
   assert.deepEqual(discoverFocusClasses("focus-visible:ring-[#fff] aria-invalid:border-[transparent]"), ["focus-visible:ring-[#fff]", "aria-invalid:border-[transparent]"])
 })
 

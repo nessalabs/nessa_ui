@@ -15,6 +15,7 @@
     "build:storybook": "pnpm --filter @nessa-ui/storybook build",
     "check:package": "tsx validation/check-package.ts",
     "check:registry": "tsx validation/check-registry.ts",
+    "check:storybook-docs": "pnpm --filter @nessa-ui/storybook test:docs",
     "dev": "pnpm --filter @nessa-ui/storybook dev",
     "storybook": "pnpm --filter @nessa-ui/storybook dev",
     "test": "pnpm --filter @nessa-ui/storybook test",

@@ -19,4 +19,7 @@ export const contrastMatrix = Object.freeze([
   { foreground: "--ring", background: "--background", minimum: 3, role: "focus-source" },
   { foreground: "--ring", background: "--card", minimum: 3, role: "focus-source" },
   { foreground: "--ring", background: "--popover", minimum: 3, role: "focus-source" },
+  { foreground: "--sidebar-foreground", background: "--sidebar", minimum: 4.5, role: "normal-text" },
+  { foreground: "--sidebar-accent-foreground", background: "--sidebar-accent", minimum: 4.5, role: "normal-text" },
+  { foreground: "--sidebar-ring", background: "--sidebar", minimum: 3, role: "focus-source" },
 ] satisfies readonly ContrastPair[])
