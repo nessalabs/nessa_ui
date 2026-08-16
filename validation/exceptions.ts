@@ -55,15 +55,6 @@ export const exceptions = Object.freeze([
   {
     kind: "occurrence",
     contractId: "SRC-002",
-    path: "packages/react/src/components/button.tsx",
-    needle: "dark:bg-destructive/70",
-    maximumOccurrences: 1,
-    rationale: "Existing destructive variant still carries its shadcn dark override.",
-    removalCondition: "Replace with a semantic destructive token during canonical theme generation.",
-  },
-  {
-    kind: "occurrence",
-    contractId: "SRC-002",
     path: "packages/react/src/components/input.tsx",
     needle: "dark:aria-invalid:ring-destructive/40",
     maximumOccurrences: 1,

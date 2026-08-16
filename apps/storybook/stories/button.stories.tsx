@@ -2,6 +2,8 @@ import type { Meta, StoryObj } from "@storybook/react-vite"
 import { Button } from "@nessa-ui/react"
 import { ArrowRight, Plus } from "lucide-react"
 
+import { storyDocumentation } from "./story-documentation"
+
 const meta = {
   title: "Components/Button",
   component: Button,
@@ -40,16 +42,16 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-export const Playground: Story = {}
+export const Playground: Story = {
+  parameters: storyDocumentation(
+    "Use the controls to compare Button hierarchy and sizing with one stable action label.",
+  ),
+}
 
 export const WithIcon: Story = {
-  parameters: {
-    docs: {
-      description: {
-        story: "Place a quiet 16px icon after the label when it reinforces the action.",
-      },
-    },
-  },
+  parameters: storyDocumentation(
+    "Place a quiet 16px icon after the label when it reinforces the action.",
+  ),
   render: () => (
     <Button>
       Continue
@@ -59,13 +61,9 @@ export const WithIcon: Story = {
 }
 
 export const IconOnly: Story = {
-  parameters: {
-    docs: {
-      description: {
-        story: "Icon-only buttons require an accessible name through `aria-label`.",
-      },
-    },
-  },
+  parameters: storyDocumentation(
+    "Icon-only buttons require an accessible name through `aria-label`.",
+  ),
   render: () => (
     <Button size="icon" aria-label="Create item">
       <Plus />
@@ -74,13 +72,9 @@ export const IconOnly: Story = {
 }
 
 export const AllVariants: Story = {
-  parameters: {
-    docs: {
-      description: {
-        story: "Semantic variants establish hierarchy without changing the component API.",
-      },
-    },
-  },
+  parameters: storyDocumentation(
+    "Semantic variants establish hierarchy without changing the component API.",
+  ),
   render: () => (
     <div className="flex flex-wrap items-center gap-3">
       <Button>Default</Button>

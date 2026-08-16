@@ -69,7 +69,7 @@ export async function validateFull(options: FullValidationOptions = {}): Promise
       ["pnpm", ["validate:artifacts"]],
       ["pnpm", ["check:registry"]],
       ["pnpm", ["check:package"]],
-      ["pnpm", ["build:storybook"]],
+      ["pnpm", ["check:storybook-docs"]],
     ]
     for (const [command, args] of commands) {
       if (options.execute) await options.execute(command, args, repoRoot)

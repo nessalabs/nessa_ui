@@ -1,2 +1,8 @@
 @import "../../../packages/react/src/app.css";
 @source "../stories";
+
+/* Storybook owns the Docs chrome; Nessa owns the component preview surface. */
+.sbdocs-preview {
+  background: var(--background) !important;
+  color: var(--foreground) !important;
+}

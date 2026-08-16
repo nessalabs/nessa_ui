@@ -2,6 +2,7 @@ import type { Preview } from "@storybook/react-vite"
 
 import "@fontsource-variable/geist"
 import "@fontsource-variable/geist-mono"
+import { NessaDocsPage } from "./docs-page"
 import "./preview.css"
 
 const preview: Preview = {
@@ -17,6 +18,9 @@ const preview: Preview = {
         color: /(background|color)$/i,
         date: /Date$/i,
       },
+    },
+    docs: {
+      page: NessaDocsPage,
     },
     layout: "centered",
   },

@@ -1,14 +1,28 @@
+const sidebarFocusComponents = Object.freeze([
+  { component: "sidebar/sidebar-group", count: 1 },
+  { component: "sidebar/sidebar-menu", count: 1 },
+  { component: "sidebar/sidebar-trigger", count: 1 },
+] as const)
+
+type FocusComponent =
+  | "button"
+  | "badge"
+  | "input"
+  | (typeof sidebarFocusComponents)[number]["component"]
+
 export interface FocusTreatment {
-  component: "button" | "badge" | "input"
-  layer: "ring" | "border"
+  component: FocusComponent
+  layer: "ring" | "border" | "outline"
   state: string
   className: string
   darkClassName?: string
+  count?: number
+  surfaces?: readonly string[]
   light: { token: string; opacity: number }
   dark: { token: string; opacity: number }
 }
 
-export const focusTreatments = Object.freeze([
+export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
   {
     component: "button",
     layer: "ring",
@@ -54,7 +68,17 @@ export const focusTreatments = Object.freeze([
   { component: "badge", layer: "border", state: "focus-visible:border", className: "focus-visible:border-ring", light: { token: "--ring", opacity: 1 }, dark: { token: "--ring", opacity: 1 } },
   { component: "input", layer: "border", state: "focus-visible:border", className: "focus-visible:border-ring", light: { token: "--ring", opacity: 1 }, dark: { token: "--ring", opacity: 1 } },
   { component: "input", layer: "border", state: "aria-invalid:border", className: "aria-invalid:border-destructive", light: { token: "--destructive", opacity: 1 }, dark: { token: "--destructive", opacity: 1 } },
-] satisfies readonly FocusTreatment[])
+  ...sidebarFocusComponents.map(({ component, count }) => ({
+    component,
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-sidebar-ring",
+    count,
+    surfaces: ["--sidebar"],
+    light: { token: "--sidebar-ring", opacity: 1 },
+    dark: { token: "--sidebar-ring", opacity: 1 },
+  } as const)),
+])
 
 export const focusSurfaces = Object.freeze(["--background", "--card", "--popover"] as const)
 
@@ -64,4 +88,8 @@ export const focusGeometryClasses = Object.freeze([
   { component: "button", className: "focus-visible:ring-[3px]" },
   { component: "badge", className: "focus-visible:ring-[3px]" },
   { component: "input", className: "focus-visible:ring-[3px]" },
+  ...sidebarFocusComponents.flatMap(({ component, count }) => [
+    { component, className: "focus-visible:outline-2", count },
+    { component, className: "focus-visible:outline-offset-2", count },
+  ] as const),
 ] as const)

@@ -23,7 +23,16 @@ export default defineConfig({
             enabled: true,
             provider: playwright({}),
             headless: true,
-            instances: [{ browser: "chromium" }],
+            instances: [
+              { browser: "chromium", name: "chromium-fine-pointer" },
+              {
+                browser: "chromium",
+                name: "chromium-touch",
+                provider: playwright({
+                  contextOptions: { hasTouch: true },
+                }),
+              },
+            ],
           },
         },
       },
