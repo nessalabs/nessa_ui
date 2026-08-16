@@ -1,7 +1,7 @@
 # Nessa UI agent instructions
 
 These instructions apply to every agent working anywhere in this repository.
-Read and follow [CONTRIBUTION.md](./CONTRIBUTION.md) before changing files or
+Read and follow [CONTRIBUTING.md](./CONTRIBUTING.md) before changing files or
 Git state.
 
 ## Branch and worktree authorization
