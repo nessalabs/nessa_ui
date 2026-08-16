@@ -46,4 +46,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-003",
+    kind: "transition",
+    contractId: "A11Y-002",
+    baseRevision: "a969e1a073043d0d34d1476deb0749697d7af435",
+    targets: ["validation/nessa/check-metadata.ts"],
+    beforeFingerprint: "078a941c919a625be47f3abd40a1e61fdbc508b9b4c8206cc06104c1c518fe8a",
+    afterFingerprint: "8cb616c48a66a3e3008059733cd6d1857c9f04e349cd5916058d2f921d902a0f",
+    rationale: "Extends focus-treatment accessibility scanning to composite components (packages/react/src/composites) so composed surfaces such as the AppShell dock resize separator are measured by the same A11Y-002 evidence gate as the primitives, and corrects the storybook-coverage input declaration to the files that check actually reads (the package index and story files) now that coverage derives from public module exports.",
+    compatibility: "Strictly widens accessibility validation coverage and tightens Storybook coverage to every component and composite module the package index exports, including directory modules the previous file-glob loop silently skipped; lib modules remain outside story coverage, and there are no consumer runtime API changes and no weakening of any existing requirement.",
+    migration: "New composite components must register their focus treatments in validation/nessa/focus-treatments.ts exactly as component primitives already do, and every component or composite module exported from packages/react/src/index.ts must ship a matching Storybook story file.",
+    supersedes: null,
+    pullRequest: null,
+  },
 ])

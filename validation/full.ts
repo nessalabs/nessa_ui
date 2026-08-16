@@ -66,6 +66,7 @@ export async function validateFull(options: FullValidationOptions = {}): Promise
       ["pnpm", ["validate:contracts:test"]],
       ["pnpm", ["typecheck"]],
       ["pnpm", ["test"]],
+      ["pnpm", ["test:unit"]],
       ["pnpm", ["validate:artifacts"]],
       ["pnpm", ["check:registry"]],
       ["pnpm", ["check:package"]],

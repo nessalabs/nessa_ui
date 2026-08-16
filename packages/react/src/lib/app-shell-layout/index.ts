@@ -1,0 +1,48 @@
+/** @responsibility Re-exports the public surface of the app-shell layout model. */
+
+export {
+  AppShellDockSide,
+  PaneDropRegion,
+  PaneSplitDirection,
+  SplitOrientation,
+  splitDirectionIsAfter,
+  splitDirectionToOrientation,
+} from "./layout-options"
+export {
+  APP_SHELL_LAYOUT_VERSION,
+  type AppShellDockState,
+  type AppShellLayout,
+  type LayoutNode,
+  type LayoutNodeId,
+  type PaneNode,
+  type PaneViewId,
+  type SplitNode,
+  type WorkspaceLayout,
+} from "./layout-types"
+export {
+  collectPanes,
+  findNode,
+  normalizeAppShellLayout,
+  normalizeWeights,
+  normalizeWorkspaceLayout,
+} from "./layout-normalize"
+export {
+  closePane,
+  createAppShellLayout,
+  createPaneNode,
+  focusPane,
+  insertRelativeTo,
+  maximizePane,
+  promoteRecentPane,
+  removeNode,
+  resetPaneSizes,
+  resizeDock,
+  restorePane,
+  setDockOpen,
+  setSplitWeights,
+  splitPane,
+  toggleDock,
+  type CreateAppShellLayoutOptions,
+  type CreatePaneOptions,
+  type SplitPaneOptions,
+} from "./layout-operations"

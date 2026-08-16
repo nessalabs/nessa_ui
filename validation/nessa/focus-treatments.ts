@@ -8,6 +8,8 @@ type FocusComponent =
   | "button"
   | "badge"
   | "input"
+  | "split-view/split-view-separator"
+  | "app-shell/app-shell-dock"
   | (typeof sidebarFocusComponents)[number]["component"]
 
 export interface FocusTreatment {
@@ -68,6 +70,25 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
   { component: "badge", layer: "border", state: "focus-visible:border", className: "focus-visible:border-ring", light: { token: "--ring", opacity: 1 }, dark: { token: "--ring", opacity: 1 } },
   { component: "input", layer: "border", state: "focus-visible:border", className: "focus-visible:border-ring", light: { token: "--ring", opacity: 1 }, dark: { token: "--ring", opacity: 1 } },
   { component: "input", layer: "border", state: "aria-invalid:border", className: "aria-invalid:border-destructive", light: { token: "--destructive", opacity: 1 }, dark: { token: "--destructive", opacity: 1 } },
+  {
+    component: "split-view/split-view-separator",
+    layer: "ring",
+    state: "focus-visible",
+    className: "focus-visible:ring-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  {
+    component: "app-shell/app-shell-dock",
+    layer: "ring",
+    state: "focus-visible",
+    className: "focus-visible:ring-ring",
+    count: 1,
+    surfaces: ["--sidebar"],
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
   ...sidebarFocusComponents.map(({ component, count }) => ({
     component,
     layer: "outline",
@@ -92,4 +113,8 @@ export const focusGeometryClasses = Object.freeze([
     { component, className: "focus-visible:outline-2", count },
     { component, className: "focus-visible:outline-offset-2", count },
   ] as const),
+  { component: "split-view/split-view-separator", className: "focus-visible:ring-2", count: 1 },
+  { component: "split-view/split-view-separator", className: "focus-visible:ring-offset-0", count: 1 },
+  { component: "app-shell/app-shell-dock", className: "focus-visible:ring-2", count: 1 },
+  { component: "app-shell/app-shell-dock", className: "focus-visible:ring-offset-0", count: 1 },
 ] as const)

@@ -306,25 +306,49 @@ export function hostBoundaryAccesses(ast: ts.SourceFile): string[] {
 
 function collectAliases(ast: ts.SourceFile): Map<string, string> {
   const aliases = new Map<string, string>([["document", "document"], ["window", "window"], ["globalThis", "globalThis"]])
+  // A name assigned two different resolvable values (for example
+  // `size = minSize` in one branch and `size = collapsedSize` in another)
+  // has no single alias; without a bound the fixed-point loop flips between
+  // the values and never terminates. Each name may refine a few times —
+  // enough for any realistic alias chain to propagate — then freezes at its
+  // current value so oscillating names cannot spin the loop.
+  //
+  // When the two candidate values disagree, the one touching a host or
+  // persistence root always wins, so a branch that sometimes points at
+  // `document`/storage can never hide behind a harmless branch.
+  const HOST_HINTS = ["document", "localStorage", "sessionStorage", "indexedDB", "cookieStore", "cookie"]
+  const touchesHostRoot = (value: string): boolean =>
+    HOST_HINTS.some((hint) => value === hint || value.startsWith(`${hint}.`) || value.includes(`.${hint}`))
+  const MAX_ALIAS_REFINEMENTS = 5
+  const refinementCounts = new Map<string, number>()
+  const record = (name: string, resolved: string): boolean => {
+    const existing = aliases.get(name)
+    if (existing === resolved) return false
+    if (existing !== undefined && touchesHostRoot(existing) && !touchesHostRoot(resolved)) return false
+    const count = refinementCounts.get(name) ?? 0
+    if (count >= MAX_ALIAS_REFINEMENTS && !(touchesHostRoot(resolved) && !touchesHostRoot(existing ?? ""))) return false
+    refinementCounts.set(name, count + 1)
+    aliases.set(name, resolved)
+    return true
+  }
   let changed = true
   while (changed) {
     changed = false
     ast.forEachChild(function collect(node) {
       if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
         const resolved = accessPath(node.initializer, aliases)
-        if (resolved && aliases.get(node.name.text) !== resolved) { aliases.set(node.name.text, resolved); changed = true }
+        if (resolved && record(node.name.text, resolved)) changed = true
       }
       if (ts.isBindingElement(node) && ts.isIdentifier(node.name) && ts.isObjectBindingPattern(node.parent) && ts.isVariableDeclaration(node.parent.parent) && node.parent.parent.initializer) {
         const base = accessPath(node.parent.parent.initializer, aliases)
         const property = node.propertyName?.getText(ast) ?? node.name.text
         if (base && ["localStorage", "sessionStorage", "indexedDB", "cookieStore", "cookie"].includes(property)) {
-          const resolved = `${base}.${property}`
-          if (aliases.get(node.name.text) !== resolved) { aliases.set(node.name.text, resolved); changed = true }
+          if (record(node.name.text, `${base}.${property}`)) changed = true
         }
       }
       if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken && ts.isIdentifier(node.left)) {
         const resolved = accessPath(node.right, aliases)
-        if (resolved && aliases.get(node.left.text) !== resolved) { aliases.set(node.left.text, resolved); changed = true }
+        if (resolved && record(node.left.text, resolved)) changed = true
       }
       ts.forEachChild(node, collect)
     })

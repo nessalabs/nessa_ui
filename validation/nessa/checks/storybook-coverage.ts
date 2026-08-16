@@ -84,11 +84,13 @@ export function storyDocumentsPublicComponent(analysis: StoryAnalysis, publicNam
 export function publicComponentModules(index: ts.SourceFile): Map<string, string[]> {
   const modules = new Map<string, string[]>()
   index.forEachChild((node) => {
-    if (!ts.isExportDeclaration(node) || !node.moduleSpecifier || !ts.isStringLiteral(node.moduleSpecifier) || !node.moduleSpecifier.text.startsWith("./components/")) return
+    if (!ts.isExportDeclaration(node) || !node.moduleSpecifier || !ts.isStringLiteral(node.moduleSpecifier)) return
+    const specifier = node.moduleSpecifier.text
+    if (!specifier.startsWith("./components/") && !specifier.startsWith("./composites/")) return
     const names = node.exportClause && ts.isNamedExports(node.exportClause)
       ? node.exportClause.elements.filter((element) => !element.isTypeOnly && /^[A-Z][A-Za-z0-9]*$/.test(element.name.text)).map((element) => element.name.text)
       : []
-    if (names.length) modules.set(node.moduleSpecifier.text.replace(/^\.\/components\//, ""), names)
+    if (names.length) modules.set(specifier.replace(/^\.\/(?:components|composites)\//, ""), names)
   })
   return modules
 }
@@ -98,17 +100,17 @@ export const storybookCoverageCheck = defineCheck({
   ...checkMetadata["storybook-coverage"],
   async run(context) {
     const findings = []
-    const modules = context.files.match(["packages/react/src/components/**/*.tsx"])
     const stories = context.files.match(["apps/storybook/stories/**/*.stories.tsx"])
     const publicModules = publicComponentModules(await context.parseTypeScript("packages/react/src/index.ts"))
 
-    for (const modulePath of modules) {
-      const moduleName = modulePath.replace(/^packages\/react\/src\/components\//, "").replace(/\.tsx$/, "")
-      if (!publicModules.has(moduleName)) continue
-      const storyPath = stories.find((candidate) => candidate.replace(/^apps\/storybook\/stories\//, "").replace(/\.stories\.tsx$/, "") === moduleName)
-      if (!storyPath) { findings.push(context.fail(`Public component module ${moduleName} has no Storybook story.`, { contractId: "STORY-001", path: modulePath })); continue }
+    // Every component or composite module the package index exports must
+    // have a matching story file — directory modules (sidebar, split-view,
+    // app-shell) included. Lib modules (utils, layout model) are exempt.
+    for (const [moduleName, publicNames] of publicModules) {
+      const storyName = moduleName.split("/").at(-1)
+      const storyPath = stories.find((candidate) => candidate.replace(/^apps\/storybook\/stories\//, "").replace(/\.stories\.tsx$/, "") === storyName)
+      if (!storyPath) { findings.push(context.fail(`Public component module ${moduleName} has no Storybook story.`, { contractId: "STORY-001", path: "packages/react/src/index.ts" })); continue }
       const analysis = analyzeStory(await context.parseTypeScript(storyPath))
-      const publicNames = publicModules.get(moduleName) ?? []
       if (!analysis.hasTaggedMeta || analysis.namedStories.size === 0 || !storyDocumentsPublicComponent(analysis, publicNames)) findings.push(context.fail(`${moduleName} story must export tagged metadata bound to a public module component and at least one named story.`, { contractId: "STORY-001", path: storyPath }))
     }
     const inputPath = "apps/storybook/stories/input.stories.tsx"
