@@ -114,7 +114,7 @@ Validation details, focused commands, and performance guarantees live in
 [`validation/README.md`](./validation/README.md).
 
 Contributor setup, protected-main practices, and the explicitly authorized
-worktree workflow live in [CONTRIBUTION.md](./CONTRIBUTION.md). Agents must also
+worktree workflow live in [CONTRIBUTING.md](./CONTRIBUTING.md). Agents must also
 follow [AGENTS.md](./AGENTS.md).
 
 ## Naming
