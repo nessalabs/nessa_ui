@@ -8,6 +8,7 @@ type FocusComponent =
   | "button"
   | "badge"
   | "input"
+  | "conversation-rail"
   | "split-view/split-view-separator"
   | "app-shell/app-shell-dock"
   | (typeof sidebarFocusComponents)[number]["component"]
@@ -71,6 +72,15 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
   { component: "input", layer: "border", state: "focus-visible:border", className: "focus-visible:border-ring", light: { token: "--ring", opacity: 1 }, dark: { token: "--ring", opacity: 1 } },
   { component: "input", layer: "border", state: "aria-invalid:border", className: "aria-invalid:border-destructive", light: { token: "--destructive", opacity: 1 }, dark: { token: "--destructive", opacity: 1 } },
   {
+    component: "conversation-rail",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  {
     component: "split-view/split-view-separator",
     layer: "ring",
     state: "focus-visible",
@@ -113,6 +123,8 @@ export const focusGeometryClasses = Object.freeze([
     { component, className: "focus-visible:outline-2", count },
     { component, className: "focus-visible:outline-offset-2", count },
   ] as const),
+  { component: "conversation-rail", className: "focus-visible:outline-2", count: 1 },
+  { component: "conversation-rail", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "split-view/split-view-separator", className: "focus-visible:ring-2", count: 1 },
   { component: "split-view/split-view-separator", className: "focus-visible:ring-offset-0", count: 1 },
   { component: "app-shell/app-shell-dock", className: "focus-visible:ring-2", count: 1 },
