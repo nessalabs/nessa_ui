@@ -1,0 +1,23 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "math-block",
+  "title": "Math Block",
+  "description": "KaTeX-rendered TeX formulas that stay steady while streaming, with markdown-format copy for display math.",
+  "dependencies": [
+    "katex"
+  ],
+  "registryDependencies": [
+    "nessalabs/nessa_ui/nessa-base",
+    "nessalabs/nessa_ui/utils",
+    "nessalabs/nessa_ui/code-block"
+  ],
+  "files": [
+    {
+      "path": "packages/react/src/components/math-block.tsx",
+      "content": "\"use client\"\n\nimport * as React from \"react\"\nimport katex from \"katex\"\n\nimport { cn } from \"@/lib/utils\"\nimport { CopyButton } from \"./code-block\"\n\nimport \"katex/dist/katex.min.css\"\n\nexport interface MathBlockProps\n  extends Omit<React.ComponentProps<\"div\">, \"children\"> {\n  /** The TeX source, without dollar delimiters. */\n  tex: string\n  /** Render inline with the surrounding text instead of as a display block. */\n  inline?: boolean\n}\n\n/**\n * A TeX formula rendered through KaTeX. While a formula streams in, invalid\n * intermediate source keeps the last successful render on screen instead of\n * flashing KaTeX's error state, so the formula grows without jitter; until\n * the first successful parse the raw source shows muted. Display formulas\n * carry a copy control that copies the TeX in markdown form (`$$…$$`).\n * MessageMarkdown composes it automatically for `$…$` and `$$…$$` math.\n */\nfunction MathBlock({ tex, inline = false, className, ...props }: MathBlockProps) {\n  const lastGood = React.useRef<{ html: string; inline: boolean } | null>(null)\n  const rendered = React.useMemo(() => {\n    try {\n      return katex.renderToString(tex, {\n        displayMode: !inline,\n        throwOnError: true,\n      })\n    } catch {\n      return null\n    }\n  }, [inline, tex])\n  React.useEffect(() => {\n    if (rendered !== null) lastGood.current = { html: rendered, inline }\n  }, [inline, rendered])\n  // Mid-stream TeX is often momentarily invalid; keep the previous\n  // successful render rather than swapping to an error state — but only a\n  // render of the same mode, so a display formula never appears inline.\n  const html =\n    rendered ??\n    (lastGood.current !== null && lastGood.current.inline === inline\n      ? lastGood.current.html\n      : null)\n\n  if (inline) {\n    if (html === null) {\n      return (\n        <span\n          data-slot=\"math-block\"\n          data-inline=\"true\"\n          className={cn(\"font-mono text-[0.875em] text-muted-foreground\", className)}\n          {...props}\n        >\n          {tex}\n        </span>\n      )\n    }\n    return (\n      <span\n        data-slot=\"math-block\"\n        data-inline=\"true\"\n        className={className}\n        dangerouslySetInnerHTML={{ __html: html }}\n        {...props}\n      />\n    )\n  }\n\n  return (\n    <div\n      data-slot=\"math-block\"\n      className={cn(\"group/copy relative min-w-0 max-w-full\", className)}\n      {...props}\n    >\n      {html === null ? (\n        <pre className=\"overflow-x-auto whitespace-pre-wrap py-1 font-mono text-[0.8125em] text-muted-foreground\">\n          {tex}\n        </pre>\n      ) : (\n        <div\n          className=\"overflow-x-auto overflow-y-hidden py-1 [&_.katex-display]:my-0\"\n          dangerouslySetInnerHTML={{ __html: html }}\n        />\n      )}\n      <CopyButton text={`$$\\n${tex}\\n$$`} label=\"Copy math\" className=\"top-0\" />\n    </div>\n  )\n}\n\nexport { MathBlock }\n",
+      "type": "registry:ui",
+      "target": "components/ui/math-block.tsx"
+    }
+  ],
+  "type": "registry:ui"
+}

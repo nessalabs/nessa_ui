@@ -213,6 +213,135 @@
       ]
     },
     {
+      "name": "code-block",
+      "type": "registry:ui",
+      "title": "Code Block",
+      "description": "A syntax-highlighted code block backed by Pierre's Shiki-based rendering, with a provider for app-wide code theming.",
+      "dependencies": [
+        "@pierre/diffs",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/code-block.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/code-block.tsx"
+        }
+      ]
+    },
+    {
+      "name": "math-block",
+      "type": "registry:ui",
+      "title": "Math Block",
+      "description": "KaTeX-rendered TeX formulas that stay steady while streaming, with markdown-format copy for display math.",
+      "dependencies": [
+        "katex"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/code-block"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/math-block.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/math-block.tsx"
+        }
+      ]
+    },
+    {
+      "name": "mermaid-diagram",
+      "type": "registry:ui",
+      "title": "Mermaid Diagram",
+      "description": "Mermaid diagrams \u2014 flowcharts, sequence diagrams, and every other Mermaid grammar \u2014 rendered to SVG with app-wide light and dark theming and a fullscreen pan-and-zoom viewer.",
+      "dependencies": [
+        "lucide-react",
+        "mermaid"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/code-block"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/mermaid-diagram.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/mermaid-diagram.tsx"
+        }
+      ]
+    },
+    {
+      "name": "message",
+      "type": "registry:ui",
+      "title": "Message",
+      "description": "A composable chat message row with optional avatar, bubble variants, streaming text, attachments, threading, and header and footer meta slots.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/message.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/message.tsx"
+        }
+      ]
+    },
+    {
+      "name": "message-markdown",
+      "type": "registry:ui",
+      "title": "Message Markdown",
+      "description": "Assistant markdown rendering for messages: GitHub-flavored markdown, KaTeX math, Mermaid diagrams, and syntax-highlighted code styled with Nessa tokens.",
+      "dependencies": [
+        "react-markdown",
+        "remark-gfm",
+        "remark-math"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/code-block",
+        "nessalabs/nessa_ui/math-block",
+        "nessalabs/nessa_ui/mermaid-diagram"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/message-markdown.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/message-markdown.tsx"
+        }
+      ]
+    },
+    {
+      "name": "message-scroller",
+      "type": "registry:ui",
+      "title": "Message Scroller",
+      "description": "A stick-to-bottom transcript scroller that follows streamed replies, releases on reader scroll, and restores the live edge with a floating control.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/message-scroller.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/message-scroller.tsx"
+        }
+      ]
+    },
+    {
       "name": "conversation-rail",
       "type": "registry:ui",
       "title": "Conversation Rail",
@@ -358,7 +487,9 @@
       "type": "registry:ui",
       "title": "Searchable Listbox",
       "description": "A reusable searchable single-select list with accessible roving focus.",
-      "dependencies": ["lucide-react"],
+      "dependencies": [
+        "lucide-react"
+      ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -376,7 +507,10 @@
       "type": "registry:ui",
       "title": "Model Picker",
       "description": "A provider-aware searchable chooser dedicated to model selection.",
-      "dependencies": ["lucide-react", "radix-ui"],
+      "dependencies": [
+        "lucide-react",
+        "radix-ui"
+      ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/searchable-listbox",
@@ -395,7 +529,10 @@
       "type": "registry:ui",
       "title": "Model Capability Controls",
       "description": "Fast-mode and thinking-level controls composed beside a selected model.",
-      "dependencies": ["lucide-react", "radix-ui"],
+      "dependencies": [
+        "lucide-react",
+        "radix-ui"
+      ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -418,7 +555,9 @@
       "type": "registry:ui",
       "title": "Chat Composer",
       "description": "A compound chat-entry surface with input, footer, action, and submit primitives.",
-      "dependencies": ["lucide-react"],
+      "dependencies": [
+        "lucide-react"
+      ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
