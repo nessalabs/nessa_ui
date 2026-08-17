@@ -181,6 +181,26 @@
       ]
     },
     {
+      "name": "chat-composer",
+      "type": "registry:ui",
+      "title": "Chat Composer",
+      "description": "A compound chat-entry surface with input, footer, action, and submit primitives.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/chat-composer.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/chat-composer.tsx"
+        }
+      ]
+    },
+    {
       "name": "conversation-rail",
       "type": "registry:ui",
       "title": "Conversation Rail",

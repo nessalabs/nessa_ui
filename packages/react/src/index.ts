@@ -12,6 +12,19 @@ export {
   CardTitle,
 } from "./components/card"
 export {
+  ChatComposer,
+  ChatComposerAction,
+  ChatComposerActions,
+  ChatComposerFooter,
+  ChatComposerInput,
+  ChatComposerSubmit,
+  type ChatComposerActionProps,
+  type ChatComposerBorderMode,
+  type ChatComposerInputProps,
+  type ChatComposerProps,
+  type ChatComposerSubmitProps,
+} from "./components/chat-composer"
+export {
   ConversationRail,
   ConversationRailItem,
   ConversationRailMarker,
