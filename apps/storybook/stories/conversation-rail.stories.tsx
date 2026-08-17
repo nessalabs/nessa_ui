@@ -91,27 +91,41 @@ function RailExample({
 }
 
 function ScrollSyncExample() {
-  const [visibleIds, setVisibleIds] = React.useState<readonly string[]>([
-    turns[0]!.id,
-  ])
+  const [visibility, setVisibility] = React.useState<
+    ReadonlyMap<string, number>
+  >(new Map([[turns[0]!.id, 1]]))
   const scrollRef = React.useRef<HTMLDivElement | null>(null)
   const messageRefs = React.useRef(new Map<string, HTMLElement>())
+
+  // The most-visible observed turn (ratios refresh at observer thresholds)
+  // is the single current one (and owns aria-current);
+  // other turns at least half on screen only get a softer tint.
+  const visibleIds = [...visibility.entries()]
+    .filter(([, ratio]) => ratio >= 0.5)
+    .map(([id]) => id)
+  const primaryId = [...visibility.entries()].reduce(
+    (best, candidate) => (candidate[1] > best[1] ? candidate : best),
+    ["", 0] as readonly [string, number],
+  )[0]
 
   React.useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        setVisibleIds((current) => {
-          const next = new Set(current)
+        setVisibility((current) => {
+          const next = new Map(current)
           for (const entry of entries) {
             const id = (entry.target as HTMLElement).dataset.turnId
             if (!id) continue
-            if (entry.isIntersecting) next.add(id)
+            if (entry.isIntersecting) next.set(id, entry.intersectionRatio)
             else next.delete(id)
           }
-          return turns.filter((turn) => next.has(turn.id)).map((turn) => turn.id)
+          return next
         })
       },
-      { root: scrollRef.current, threshold: 0.5 },
+      {
+        root: scrollRef.current,
+        threshold: Array.from({ length: 21 }, (_, step) => step / 20),
+      },
     )
     for (const element of messageRefs.current.values()) {
       observer.observe(element)
@@ -123,10 +137,7 @@ function ScrollSyncExample() {
     <div className="flex min-h-72 w-[min(40rem,calc(100vw-2rem))] items-center gap-6 rounded-3xl border border-border bg-background p-8">
       <ConversationRail>
         {turns.map((turn) => (
-          <ConversationRailItem
-            key={turn.id}
-            active={visibleIds.includes(turn.id)}
-          >
+          <ConversationRailItem key={turn.id} active={turn.id === primaryId}>
             <ConversationRailTrigger
               aria-label={turn.title}
               onClick={() =>
@@ -135,7 +146,13 @@ function ScrollSyncExample() {
                   ?.scrollIntoView({ behavior: "smooth", block: "nearest" })
               }
             >
-              <ConversationRailMarker />
+              <ConversationRailMarker
+                className={
+                  turn.id !== primaryId && visibleIds.includes(turn.id)
+                    ? "bg-foreground/70"
+                    : undefined
+                }
+              />
             </ConversationRailTrigger>
             <ConversationRailPreview>
               <p className="m-0 font-medium text-foreground">{turn.title}</p>
@@ -213,7 +230,7 @@ export const TurnNavigator: Story = {
 
 export const HoverAndFocusPreview: Story = {
   parameters: storyDocumentation(
-    "Hovering or focusing a marker fades and slides its preview card in beside the rail; the preview is linked to the trigger through aria-describedby.",
+    "Hovering or focusing a marker fades and slides its preview card in beside the rail; the preview is linked to the trigger through aria-describedby, and both clicking and Escape dismiss it.",
   ),
   render: () => <RailExample />,
   play: async ({ canvasElement }) => {
@@ -238,6 +255,10 @@ export const HoverAndFocusPreview: Story = {
     trigger.focus()
     await waitFor(() =>
       expect(getComputedStyle(preview).opacity).toBe("1"),
+    )
+    await userEvent.keyboard("{Escape}")
+    await waitFor(() =>
+      expect(getComputedStyle(preview).opacity).toBe("0"),
     )
     trigger.blur()
     await waitFor(() =>
@@ -278,12 +299,22 @@ export const ProximityHill: Story = {
     // Moving well beyond the falloff radius lets the hill decay back to base.
     fireEvent.pointerMove(list, { clientY: centerRect.top + 500 })
     await waitFor(() => expect(widthOf(1)).toBeCloseTo(7, 0))
+    // Touch pointers never raise the hill and clear any leftover boosts.
+    fireEvent.pointerMove(list, {
+      clientY: centerRect.top + centerRect.height / 2,
+    })
+    await waitFor(() => expect(widthOf(2)).toBeCloseTo(28, 0))
+    fireEvent.pointerMove(list, {
+      clientY: centerRect.top + centerRect.height / 2,
+      pointerType: "touch",
+    })
+    await waitFor(() => expect(widthOf(2)).toBeCloseTo(7, 0))
   },
 }
 
 export const ScrollSync: Story = {
   parameters: storyDocumentation(
-    "The host observes message visibility with an IntersectionObserver and feeds it into each item's active prop, so the rail tints the turns currently on screen while scrolling; clicking a tick scrolls its message into view.",
+    "The host observes message visibility with an IntersectionObserver: the most-visible observed turn becomes the single active one (owning aria-current) while other on-screen turns get a softer tint, and clicking a tick scrolls its message into view.",
   ),
   render: () => <ScrollSyncExample />,
   play: async ({ canvasElement }) => {
