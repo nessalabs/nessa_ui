@@ -8,9 +8,21 @@ import {
   AppShellDockSide,
   AppShellHeader,
   AppShellMain,
+  AppShellPaneDragHandle,
   AppShellStatusBar,
   AppShellWorkspace,
   Button,
+  ChatComposer,
+  ChatComposerAction,
+  ChatComposerActions,
+  ChatComposerFooter,
+  ChatComposerInput,
+  ChatComposerSubmit,
+  ConversationRail,
+  ConversationRailItem,
+  ConversationRailMarker,
+  ConversationRailPreview,
+  ConversationRailTrigger,
   PaneSplitDirection,
   SidebarContent,
   SidebarGroup,
@@ -18,6 +30,7 @@ import {
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuItem,
+  collectPanes,
   createAppShellLayout,
   splitPane,
   useAppShell,
@@ -25,18 +38,19 @@ import {
   type PaneNode,
 } from "@nessa-ui/react"
 import {
+  Bot,
+  Bug,
   Columns2,
-  FileCode,
-  FileText,
-  GitBranch,
+  GripVertical,
   Maximize2,
   Minimize2,
   PanelBottom,
   PanelLeft,
   PanelRight,
+  Plus,
   Rows2,
-  SlidersHorizontal,
-  TerminalSquare,
+  Sparkles,
+  Telescope,
   X,
 } from "lucide-react"
 
@@ -50,7 +64,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "AppShell composes an IDE-style application frame: a header, pixel-sized resizable docks on the left, right, and bottom, a status bar, and a center workspace whose panes split recursively in any direction. The whole arrangement is one serializable layout document; the shell renders it and reports changes, while the consuming application owns state and persistence. Docks host content such as the Sidebar components; workspace panes are resolved by the application through renderPane.",
+          "AppShell composes an agent-workspace frame: a header, pixel-sized resizable docks, a status bar, and a center workspace whose panes split recursively in any direction and can be rearranged by dragging one pane onto another to swap them. The whole arrangement is one serializable layout document; the shell renders it and reports changes, while the consuming application owns state and persistence. This catalog demonstrates it as a multi-agent chat app: conversations live in the sidebar dock, every chat opens in a pane, and panes split, maximize (Shift+Escape), swap by dragging, and close like an IDE.",
       },
     },
   },
@@ -58,6 +72,84 @@ const meta = {
 
 export default meta
 type Story = StoryObj<typeof meta>
+
+interface AgentChat {
+  id: string
+  name: string
+  icon: React.ComponentType<{ className?: string }>
+  tagline: string
+  messages: Array<{ from: "user" | "agent"; text: string }>
+}
+
+const agentChats: AgentChat[] = [
+  {
+    id: "chat:planner",
+    name: "Planner",
+    icon: Bot,
+    tagline: "Sketching the Q3 roadmap",
+    messages: [
+      { from: "user", text: "Break the app-shell work into shippable slices." },
+      {
+        from: "agent",
+        text: "Three verticals: resize-only layout, then dragging panes, then tabs. Each lands behind the same layout document, so nothing gets rebuilt.",
+      },
+      { from: "user", text: "What's the risk on the drag slice?" },
+      {
+        from: "agent",
+        text: "Drop-target hit testing. I'd copy Zed's nearest-edge rule — it behaves predictably in the corners.",
+      },
+    ],
+  },
+  {
+    id: "chat:reviewer",
+    name: "Reviewer",
+    icon: Bug,
+    tagline: "2 findings on the open diff",
+    messages: [
+      { from: "user", text: "Anything blocking on the layout-model diff?" },
+      {
+        from: "agent",
+        text: "Two findings: closePane should return the freed space to the split partner, and the weights need a zero-total guard. Both have suggested fixes attached.",
+      },
+    ],
+  },
+  {
+    id: "chat:researcher",
+    name: "Researcher",
+    icon: Telescope,
+    tagline: "Compared 4 pane-tree designs",
+    messages: [
+      { from: "user", text: "How do Zed and VS Code store pane layouts?" },
+      {
+        from: "agent",
+        text: "Both use an n-ary tree with the same split rule. Zed keeps orientation on every node; VS Code alternates by depth. Sizes: Zed uses flex weights, VS Code pixels.",
+      },
+      { from: "user", text: "Which should we copy?" },
+      {
+        from: "agent",
+        text: "Weights with explicit orientation — display-independent saves, readable subtrees.",
+      },
+    ],
+  },
+  {
+    id: "chat:composer",
+    name: "Composer",
+    icon: Sparkles,
+    tagline: "Drafting release notes",
+    messages: [
+      { from: "user", text: "Draft the changelog entry for the shell." },
+      {
+        from: "agent",
+        text: "“New: split any pane in any direction, drag panes to rearrange, and maximize with Shift+Escape. Layouts persist per project.” Want a longer variant too?",
+      },
+    ],
+  },
+]
+
+/** Finds a chat by view id, so unknown ids render a placeholder. */
+function chatForView(viewId: string | undefined): AgentChat | undefined {
+  return agentChats.find((chat) => chat.id === viewId)
+}
 
 function IconAction({
   label,
@@ -84,26 +176,147 @@ function IconAction({
   )
 }
 
-function DemoPane({ pane }: { pane: PaneNode }) {
+function ChatMessages({ chat, paneId }: { chat: AgentChat; paneId: string }) {
+  // The rail anchors on the user's turns only — each marker is a question
+  // the user asked, not every message in the transcript.
+  const userTurns = chat.messages
+    .map((message, index) => ({ message, index }))
+    .filter(({ message }) => message.from === "user")
+  const [activeTurn, setActiveTurn] = React.useState(
+    userTurns.at(-1)?.index ?? 0,
+  )
+  const turnRefs = React.useRef<Array<HTMLDivElement | null>>([])
+
+  return (
+    // A size container, so the rail can appear only when the pane is wide
+    // enough for it — narrow splits keep the full width for messages.
+    <div className="@container relative flex min-h-0 min-w-0 flex-1">
+      {/* Focusable so keyboard users can scroll the transcript; role="log"
+          tells screen readers this is a message history. */}
+      <div
+        role="log"
+        aria-label={`${chat.name} conversation`}
+        tabIndex={0}
+        className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-auto p-3 outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring @[24rem]:ps-9"
+      >
+        {chat.messages.map((message, index) => (
+          <div
+            key={index}
+            ref={(element) => {
+              turnRefs.current[index] = element
+            }}
+            className={
+              message.from === "user"
+                ? "ms-auto max-w-[85%] rounded-lg rounded-ee-sm bg-primary px-3 py-2 text-xs leading-5 text-primary-foreground"
+                : "me-auto max-w-[85%] rounded-lg rounded-es-sm bg-muted px-3 py-2 text-xs leading-5"
+            }
+          >
+            {message.text}
+          </div>
+        ))}
+      </div>
+      {/* The official conversation rail: one marker per turn, previews on
+          hover, clicking scrolls the transcript to that turn. It floats at
+          the center-left of the chat and only appears when there is room. */}
+      <ConversationRail
+        className="absolute start-1.5 top-1/2 hidden -translate-y-1/2 @[24rem]:block"
+        aria-label={`${chat.name} conversation turns in ${paneId}`}
+      >
+        {userTurns.map(({ message, index }, turn) => (
+          <ConversationRailItem key={index} active={index === activeTurn}>
+            <ConversationRailTrigger
+              aria-label={`Go to your message ${turn + 1}`}
+              onClick={() => {
+                setActiveTurn(index)
+                turnRefs.current[index]?.scrollIntoView({
+                  block: "nearest",
+                  behavior: "smooth",
+                })
+              }}
+            >
+              <ConversationRailMarker />
+            </ConversationRailTrigger>
+            <ConversationRailPreview>
+              <p className="m-0 font-medium text-foreground">You</p>
+              <p className="m-0 mt-1 text-muted-foreground">{message.text}</p>
+            </ConversationRailPreview>
+          </ConversationRailItem>
+        ))}
+      </ConversationRail>
+    </div>
+  )
+}
+
+function PaneComposer({ agentName }: { agentName: string }) {
+  const [message, setMessage] = React.useState("")
+
+  return (
+    <div className="shrink-0 border-t border-border p-2">
+      <ChatComposer
+        size="compact"
+        borderMode="always"
+        submitOnEnter
+        onSubmit={(event) => {
+          event.preventDefault()
+          setMessage("")
+        }}
+      >
+        <ChatComposerInput
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          placeholder={`Message ${agentName}…`}
+          aria-label={`Message ${agentName}`}
+        />
+        <ChatComposerFooter>
+          <ChatComposerActions>
+            <ChatComposerAction aria-label="Add attachment" title="Add attachment">
+              <Plus aria-hidden="true" />
+            </ChatComposerAction>
+          </ChatComposerActions>
+          <ChatComposerActions className="justify-end">
+            <ChatComposerSubmit disabled={!message.trim()} />
+          </ChatComposerActions>
+        </ChatComposerFooter>
+      </ChatComposer>
+    </div>
+  )
+}
+
+function ChatPane({ pane }: { pane: PaneNode }) {
   const { closePane, layout, maximizePane, restorePane, splitPane } =
     useAppShell()
   const maximized = layout.workspace.maximizedPaneId === pane.id
-  const view = pane.activeViewId ?? "untitled"
+  const chat = chatForView(pane.activeViewId)
+  const Icon = chat?.icon ?? Bot
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-9 shrink-0 items-center gap-0.5 overflow-hidden border-b border-border bg-muted/40 ps-2.5 pe-1.5">
-        <FileText aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className="me-auto ms-1.5 truncate text-xs font-medium">
-          {view}
-        </span>
+      <div className="flex h-9 shrink-0 items-center gap-0.5 overflow-hidden border-b border-border bg-muted/40 pe-1.5">
+        {/* Dragging the grip (or the title beside it) moves this pane onto
+            another pane's edge. */}
+        <AppShellPaneDragHandle
+          paneId={pane.id}
+          className="flex h-full min-w-0 flex-1 items-center gap-1.5 ps-2"
+          title="Drag to move this pane"
+        >
+          <GripVertical
+            aria-hidden
+            className="size-3.5 shrink-0 text-muted-foreground/70"
+          />
+          <Icon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className="truncate text-xs font-medium">
+            {chat?.name ?? "No conversation"}
+          </span>
+        </AppShellPaneDragHandle>
         <IconAction
           label="Split pane right"
           onClick={() =>
+            // A split opens an empty pane — pick any conversation from
+            // the sidebar to fill it, instead of duplicating this chat.
             splitPane({
               paneId: pane.id,
               direction: PaneSplitDirection.Right,
-              views: ["untitled"],
+              views: [],
             })
           }
         >
@@ -115,7 +328,7 @@ function DemoPane({ pane }: { pane: PaneNode }) {
             splitPane({
               paneId: pane.id,
               direction: PaneSplitDirection.Down,
-              views: ["untitled"],
+              views: [],
             })
           }
         >
@@ -140,11 +353,16 @@ function DemoPane({ pane }: { pane: PaneNode }) {
           <X aria-hidden className="size-3.5" />
         </IconAction>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-3 font-mono text-xs leading-6 text-muted-foreground">
-        <p className="text-foreground/70">{`// ${view}`}</p>
-        <p>Rendered by the application through renderPane.</p>
-        <p>The layout document stores view ids, never elements.</p>
-      </div>
+      {chat ? (
+        <>
+          <ChatMessages chat={chat} paneId={pane.id} />
+          <PaneComposer agentName={chat.name} />
+        </>
+      ) : (
+        <div className="flex min-h-0 flex-1 items-center justify-center p-4 text-xs text-muted-foreground">
+          Pick a conversation from the sidebar.
+        </div>
+      )}
     </div>
   )
 }
@@ -178,32 +396,29 @@ function HeaderDockToggles() {
   )
 }
 
-function ExplorerDock() {
+function ConversationsDock() {
+  const { layout, openView } = useAppShell()
+  const activePane = collectPanes(layout.workspace.root).find(
+    (pane) => pane.id === layout.workspace.activePaneId,
+  )
+
   return (
     <SidebarContent className="min-h-0 flex-1 overflow-auto">
       <SidebarGroup>
-        <SidebarGroupLabel>Explorer</SidebarGroupLabel>
+        <SidebarGroupLabel>Agents</SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
-            <SidebarMenuItem
-              size="sm"
-              isActive
-              icon={<FileText aria-hidden className="size-4" />}
-            >
-              readme.md
-            </SidebarMenuItem>
-            <SidebarMenuItem
-              size="sm"
-              icon={<FileCode aria-hidden className="size-4" />}
-            >
-              layout-model.ts
-            </SidebarMenuItem>
-            <SidebarMenuItem
-              size="sm"
-              icon={<FileCode aria-hidden className="size-4" />}
-            >
-              split-view.tsx
-            </SidebarMenuItem>
+            {agentChats.map((chat) => (
+              <SidebarMenuItem
+                key={chat.id}
+                icon={<chat.icon aria-hidden className="size-4" />}
+                description={chat.tagline}
+                isActive={activePane?.activeViewId === chat.id}
+                onClick={() => openView({ viewId: chat.id })}
+              >
+                {chat.name}
+              </SidebarMenuItem>
+            ))}
           </SidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>
@@ -211,96 +426,68 @@ function ExplorerDock() {
   )
 }
 
-function TerminalDock() {
-  return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-border px-3 text-xs font-medium">
-        <TerminalSquare aria-hidden className="size-3.5 text-muted-foreground" />
-        Terminal
-      </div>
-      <div className="min-h-0 flex-1 overflow-auto p-3 font-mono text-xs leading-5 text-muted-foreground">
-        <p>
-          <span className="text-foreground/80">➜ nessa</span> pnpm storybook
-        </p>
-        <p>Storybook ready at http://localhost:6006</p>
-      </div>
-    </div>
-  )
-}
-
-function InspectorDock() {
-  return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-border px-3 text-xs font-medium">
-        <SlidersHorizontal aria-hidden className="size-3.5 text-muted-foreground" />
-        Inspector
-      </div>
-      <dl className="grid grid-cols-2 gap-x-2 gap-y-1.5 p-3 text-xs">
-        <dt className="text-muted-foreground">Kind</dt>
-        <dd>Markdown</dd>
-        <dt className="text-muted-foreground">Size</dt>
-        <dd>4.2 KB</dd>
-        <dt className="text-muted-foreground">Modified</dt>
-        <dd>Today</dd>
-      </dl>
-    </div>
-  )
-}
-
 function StatusBarContent() {
   const { layout } = useAppShell()
+  const panes = collectPanes(layout.workspace.root)
+  const activePane = panes.find(
+    (pane) => pane.id === layout.workspace.activePaneId,
+  )
+  const activeChat = chatForView(activePane?.activeViewId)
 
   return (
     <>
-      <span className="inline-flex items-center gap-1">
-        <GitBranch aria-hidden className="size-3" />
-        main
+      <span>
+        {agentChats.length} agents · {panes.length}{" "}
+        {panes.length === 1 ? "pane" : "panes"}
       </span>
       <span className="ms-auto">
-        Active pane: {layout.workspace.activePaneId}
+        {activeChat ? `Talking to ${activeChat.name}` : "No conversation"}
       </span>
     </>
   )
 }
 
-function ShellExample({
-  defaultLayout,
-}: {
-  defaultLayout?: AppShellLayout
-}) {
+function ShellExample({ defaultLayout }: { defaultLayout?: AppShellLayout }) {
   return (
-    <div className="h-[540px] w-full overflow-hidden rounded-lg border border-border shadow-xs">
+    // A definite width (not content-derived), so size containment inside
+    // the panes can never collapse the frame in Storybook's centered canvas.
+    <div className="h-[560px] w-[min(60rem,calc(100vw-3rem))] max-w-full overflow-hidden rounded-lg border border-border shadow-xs">
       <AppShell
         defaultLayout={
           defaultLayout ??
           createAppShellLayout({
-            views: ["readme.md"],
-            openDocks: [AppShellDockSide.Left, AppShellDockSide.Bottom],
+            views: ["chat:planner"],
+            openDocks: [AppShellDockSide.Left],
           })
         }
       >
         <AppShellHeader className="bg-sidebar">
-          <span className="text-sm font-semibold tracking-tight">
-            Nessa Studio
+          <span className="inline-flex items-center gap-1.5 text-sm font-semibold tracking-tight">
+            <Sparkles aria-hidden className="size-4" />
+            Nessa
           </span>
           <HeaderDockToggles />
         </AppShellHeader>
         <AppShellBody>
-          <AppShellDock side={AppShellDockSide.Left} minSize={180} maxSize={420}>
-            <ExplorerDock />
+          <AppShellDock side={AppShellDockSide.Left} minSize={200} maxSize={400}>
+            <ConversationsDock />
           </AppShellDock>
           <AppShellMain>
-            <AppShellWorkspace renderPane={(pane) => <DemoPane pane={pane} />} />
+            <AppShellWorkspace renderPane={(pane) => <ChatPane pane={pane} />} />
             <AppShellDock
               side={AppShellDockSide.Bottom}
               minSize={120}
               maxSize={360}
             >
-              <TerminalDock />
+              <div className="p-3 font-mono text-xs text-muted-foreground">
+                Bottom dock — agent run logs.
+              </div>
             </AppShellDock>
           </AppShellMain>
-          <AppShellDock side={AppShellDockSide.Right} minSize={180} maxSize={420}>
-            <InspectorDock />
+          <AppShellDock side={AppShellDockSide.Right} minSize={200} maxSize={420}>
+            <div className="p-3 text-xs text-muted-foreground">
+              Right dock — agent settings and context.
+            </div>
           </AppShellDock>
         </AppShellBody>
         <AppShellStatusBar className="bg-sidebar">
@@ -311,9 +498,9 @@ function ShellExample({
   )
 }
 
-export const IdeShell: Story = {
+export const AgentWorkspace: Story = {
   parameters: storyDocumentation(
-    "The full composition: header, left and bottom docks open, a splittable workspace, and a status bar reading from the shared layout document. Sidebar components furnish the left dock, pane and dock actions are icon buttons with accessible names, and every region resizes from its separators.",
+    "The full composition as a multi-agent chat app: conversations in the sidebar dock open into workspace panes with messages and a composer. Split a chat with the pane actions, drag it by its grip onto another pane's edge to rearrange, maximize with Shift+Escape, and resize every region from its separators.",
   ),
   render: () => <ShellExample />,
 }
@@ -325,7 +512,7 @@ export const SplitAndClose: Story = {
   render: () => (
     <ShellExample
       defaultLayout={createAppShellLayout({
-        views: ["readme.md"],
+        views: ["chat:planner"],
         openDocks: [],
       })}
     />
@@ -357,6 +544,120 @@ export const SplitAndClose: Story = {
     closeButton.click()
 
     await waitFor(() => expect(panes()).toHaveLength(1))
+  },
+}
+
+export const SwapPanes: Story = {
+  parameters: storyDocumentation(
+    "Dragging one pane onto another swaps them — the split structure and orientations stay exactly as they were, and new sections come from the explicit split actions instead. While hovering, the target highlights and previews the incoming content, a miniature of the dragged pane rides the cursor, and uninvolved panes fade.",
+  ),
+  render: () => (
+    <ShellExample
+      defaultLayout={splitPane(
+        createAppShellLayout({ views: ["chat:planner"], openDocks: [] }),
+        {
+          paneId: "pane-1",
+          direction: PaneSplitDirection.Right,
+          newPaneId: "pane-2",
+          views: ["chat:reviewer"],
+        },
+      )}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const pane = (id: string) =>
+      canvasElement.querySelector<HTMLElement>(`[data-pane-id="${id}"]`)
+
+    await waitFor(() => {
+      expect(pane("pane-1")).not.toBeNull()
+      expect(pane("pane-2")).not.toBeNull()
+    })
+
+    const leftBefore = {
+      "pane-1": pane("pane-1")!.getBoundingClientRect().left,
+      "pane-2": pane("pane-2")!.getBoundingClientRect().left,
+    }
+
+    const handle = pane("pane-2")!.querySelector<HTMLElement>(
+      '[data-slot="app-shell-pane-drag-handle"]',
+    )!
+    const handleRect = handle.getBoundingClientRect()
+    const targetRect = pane("pane-1")!.getBoundingClientRect()
+    const centerX = targetRect.left + targetRect.width / 2
+    const centerY = targetRect.top + targetRect.height / 2
+
+    handle.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        bubbles: true,
+        button: 0,
+        clientX: handleRect.left + 10,
+        clientY: handleRect.top + 10,
+      }),
+    )
+    handle.dispatchEvent(
+      new PointerEvent("pointermove", {
+        bubbles: true,
+        clientX: centerX,
+        clientY: centerY,
+      }),
+    )
+
+    // Hovering the target: the pane ghost is up, the source slot shows
+    // its lifted-out placeholder, and the whole target highlights with a
+    // faint preview of the incoming content. Computed styles are asserted
+    // — not just class names — so a missing Tailwind rule can never pass
+    // silently again.
+    await waitFor(() => {
+      expect(
+        canvasElement.querySelector('[data-slot="app-shell-drag-ghost"]'),
+      ).not.toBeNull()
+      expect(pane("pane-2")!.getAttribute("data-drag-source")).toBe("true")
+      const liftedContent = pane("pane-2")!.querySelector<HTMLElement>(
+        '[data-slot="app-shell-pane-content"]',
+      )
+      expect(liftedContent).not.toBeNull()
+      expect(getComputedStyle(liftedContent!).visibility).toBe("hidden")
+      const lift = pane("pane-2")!.querySelector<HTMLElement>(
+        '[data-slot="app-shell-pane-lift"]',
+      )
+      expect(lift).not.toBeNull()
+      expect(getComputedStyle(lift!).borderTopStyle).toBe("dashed")
+      const preview = pane("pane-1")!.querySelector<HTMLElement>(
+        '[data-slot="app-shell-drop-preview"]',
+      )
+      expect(preview).not.toBeNull()
+      expect(getComputedStyle(preview!).backgroundColor).not.toBe(
+        "rgba(0, 0, 0, 0)",
+      )
+      // The preview scrims this pane's content and shows the incoming
+      // pane's content faintly on top.
+      expect(preview!.querySelector("div")?.hasChildNodes()).toBe(true)
+    })
+
+    handle.dispatchEvent(
+      new PointerEvent("pointerup", {
+        bubbles: true,
+        clientX: centerX,
+        clientY: centerY,
+      }),
+    )
+
+    // Released in the swap zone: the panes trade places — same row, same
+    // orientation, positions exchanged.
+    await waitFor(() => {
+      expect(pane("pane-1")!.getBoundingClientRect().left).toBeCloseTo(
+        leftBefore["pane-2"],
+        0,
+      )
+      expect(pane("pane-2")!.getBoundingClientRect().left).toBeCloseTo(
+        leftBefore["pane-1"],
+        0,
+      )
+      expect(pane("pane-1")!.getBoundingClientRect().top).toBeCloseTo(
+        pane("pane-2")!.getBoundingClientRect().top,
+        0,
+      )
+    })
   },
 }
 
@@ -400,19 +701,19 @@ export const MaximizeAndRestore: Story = {
     <ShellExample
       defaultLayout={splitPane(
         splitPane(
-          createAppShellLayout({ views: ["readme.md"], openDocks: [] }),
+          createAppShellLayout({ views: ["chat:planner"], openDocks: [] }),
           {
             paneId: "pane-1",
             direction: PaneSplitDirection.Right,
             newPaneId: "pane-2",
-            views: ["notes.md"],
+            views: ["chat:reviewer"],
           },
         ),
         {
           paneId: "pane-2",
           direction: PaneSplitDirection.Down,
           newPaneId: "pane-3",
-          views: ["todo.md"],
+          views: ["chat:researcher"],
         },
       )}
     />
@@ -429,7 +730,7 @@ export const MaximizeAndRestore: Story = {
         '[data-slot="app-shell-workspace"]',
       )
 
-    // A nested arrangement: pane-1 beside a column of pane-2 over pane-3.
+    // A nested arrangement: planner beside reviewer over researcher.
     await waitFor(() => expect(panes()).toHaveLength(3))
 
     const firstPane = panes()[0]

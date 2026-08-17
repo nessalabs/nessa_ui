@@ -10,17 +10,21 @@ import {
   createAppShellLayout,
   focusPane,
   maximizePane,
+  movePane,
+  normalizeAppShellLayout,
+  openView,
   resetPaneSizes,
   resizeDock,
-  normalizeAppShellLayout,
   restorePane,
   setDockOpen,
   splitPane,
+  swapPanes,
   toggleDock,
   type AppShellDockSide,
   type AppShellLayout,
   type LayoutNode,
   type LayoutNodeId,
+  type MovePaneOptions,
   type PaneSplitDirection,
   type PaneViewId,
 } from "@/lib/app-shell-layout"
@@ -119,6 +123,9 @@ type AppShellLayoutOperation =
   | "dock-toggle"
   | "split"
   | "close"
+  | "move"
+  | "swap"
+  | "open-view"
   | "focus"
   | "maximize"
   | "restore"
@@ -238,6 +245,12 @@ interface UseAppShellResult {
   splitPane: (options: SplitPaneActionOptions) => LayoutNodeId | null
   /** Closes a pane. The last remaining pane never closes. */
   closePane: (options?: { paneId?: LayoutNodeId }) => void
+  /** Moves a pane onto another pane's edge (or merges on Center). */
+  movePane: (options: MovePaneOptions) => void
+  /** Swaps two panes in place; the first keeps focus. */
+  swapPanes: (options: { paneId: LayoutNodeId; withPaneId: LayoutNodeId }) => void
+  /** Opens a view in a pane and focuses it. Defaults to the active pane. */
+  openView: (options: { viewId: PaneViewId; paneId?: LayoutNodeId }) => void
   /** Focuses a pane. */
   focusPane: (options: { paneId: LayoutNodeId }) => void
   /** Maximizes a pane over the workspace. Defaults to the active pane. */
@@ -315,6 +328,12 @@ function useAppShell(): UseAppShellResult {
             paneId: options?.paneId ?? current.workspace.activePaneId,
           }),
         ),
+      movePane: (options: MovePaneOptions) =>
+        settle("move", (current) => movePane(current, options)),
+      swapPanes: (options: { paneId: LayoutNodeId; withPaneId: LayoutNodeId }) =>
+        settle("swap", (current) => swapPanes(current, options)),
+      openView: (options: { viewId: PaneViewId; paneId?: LayoutNodeId }) =>
+        settle("open-view", (current) => openView(current, options)),
       focusPane: (options: { paneId: LayoutNodeId }) =>
         settle("focus", (current) => focusPane(current, options)),
       maximizePane: (options?: { paneId?: LayoutNodeId }) =>
