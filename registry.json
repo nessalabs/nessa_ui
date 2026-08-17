@@ -181,6 +181,23 @@
       ]
     },
     {
+      "name": "conversation-rail",
+      "type": "registry:ui",
+      "title": "Conversation Rail",
+      "description": "An edge-mounted conversation navigator with proximity-magnified turn markers, hover or focus previews, and host-owned selection.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/conversation-rail.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/conversation-rail.tsx"
+        }
+      ]
+    },
+    {
       "name": "split-view",
       "type": "registry:ui",
       "title": "SplitView",
