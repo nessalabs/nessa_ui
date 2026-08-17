@@ -156,7 +156,9 @@ export const MathResponse: Story = {
   },
 }
 
-const streamedMarkdown = `# Streaming markdown, smoothly
+// Content headings start at h2: the docs page owns the h1, and the docs
+// gate asserts the page's last h1 sits inside the initial viewport.
+const streamedMarkdown = `## Streaming markdown, smoothly
 
 The pacing that drives the letter-by-letter reveal feeds this document too: the smoothed text streams through MessageMarkdown with \`streaming\` set, so newly arrived prose fades in with the very same animation while headings, lists, code, tables, diagrams, and math render as their blocks complete.
 
