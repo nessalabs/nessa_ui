@@ -12,7 +12,17 @@ import {
   AppShellStatusBar,
   AppShellWorkspace,
   Button,
-  Input,
+  ChatComposer,
+  ChatComposerAction,
+  ChatComposerActions,
+  ChatComposerFooter,
+  ChatComposerInput,
+  ChatComposerSubmit,
+  ConversationRail,
+  ConversationRailItem,
+  ConversationRailMarker,
+  ConversationRailPreview,
+  ConversationRailTrigger,
   PaneSplitDirection,
   SidebarContent,
   SidebarGroup,
@@ -37,8 +47,8 @@ import {
   PanelBottom,
   PanelLeft,
   PanelRight,
+  Plus,
   Rows2,
-  SendHorizontal,
   Sparkles,
   Telescope,
   X,
@@ -166,54 +176,109 @@ function IconAction({
   )
 }
 
-function ChatMessages({ chat }: { chat: AgentChat }) {
+function ChatMessages({ chat, paneId }: { chat: AgentChat; paneId: string }) {
+  // The rail anchors on the user's turns only — each marker is a question
+  // the user asked, not every message in the transcript.
+  const userTurns = chat.messages
+    .map((message, index) => ({ message, index }))
+    .filter(({ message }) => message.from === "user")
+  const [activeTurn, setActiveTurn] = React.useState(
+    userTurns.at(-1)?.index ?? 0,
+  )
+  const turnRefs = React.useRef<Array<HTMLDivElement | null>>([])
+
   return (
-    // Focusable so keyboard users can scroll the transcript; role="log"
-    // tells screen readers this is a message history.
-    <div
-      role="log"
-      aria-label={`${chat.name} conversation`}
-      tabIndex={0}
-      className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-auto p-3 outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
-    >
-      {chat.messages.map((message, index) => (
-        <div
-          key={index}
-          className={
-            message.from === "user"
-              ? "ms-auto max-w-[85%] rounded-lg rounded-ee-sm bg-primary px-3 py-2 text-xs leading-5 text-primary-foreground"
-              : "me-auto max-w-[85%] rounded-lg rounded-es-sm bg-muted px-3 py-2 text-xs leading-5"
-          }
-        >
-          {message.text}
-        </div>
-      ))}
+    // A size container, so the rail can appear only when the pane is wide
+    // enough for it — narrow splits keep the full width for messages.
+    <div className="@container relative flex min-h-0 min-w-0 flex-1">
+      {/* Focusable so keyboard users can scroll the transcript; role="log"
+          tells screen readers this is a message history. */}
+      <div
+        role="log"
+        aria-label={`${chat.name} conversation`}
+        tabIndex={0}
+        className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-auto p-3 outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring @[24rem]:ps-9"
+      >
+        {chat.messages.map((message, index) => (
+          <div
+            key={index}
+            ref={(element) => {
+              turnRefs.current[index] = element
+            }}
+            className={
+              message.from === "user"
+                ? "ms-auto max-w-[85%] rounded-lg rounded-ee-sm bg-primary px-3 py-2 text-xs leading-5 text-primary-foreground"
+                : "me-auto max-w-[85%] rounded-lg rounded-es-sm bg-muted px-3 py-2 text-xs leading-5"
+            }
+          >
+            {message.text}
+          </div>
+        ))}
+      </div>
+      {/* The official conversation rail: one marker per turn, previews on
+          hover, clicking scrolls the transcript to that turn. It floats at
+          the center-left of the chat and only appears when there is room. */}
+      <ConversationRail
+        className="absolute start-1.5 top-1/2 hidden -translate-y-1/2 @[24rem]:block"
+        aria-label={`${chat.name} conversation turns in ${paneId}`}
+      >
+        {userTurns.map(({ message, index }, turn) => (
+          <ConversationRailItem key={index} active={index === activeTurn}>
+            <ConversationRailTrigger
+              aria-label={`Go to your message ${turn + 1}`}
+              onClick={() => {
+                setActiveTurn(index)
+                turnRefs.current[index]?.scrollIntoView({
+                  block: "nearest",
+                  behavior: "smooth",
+                })
+              }}
+            >
+              <ConversationRailMarker />
+            </ConversationRailTrigger>
+            <ConversationRailPreview>
+              <p className="m-0 font-medium text-foreground">You</p>
+              <p className="m-0 mt-1 text-muted-foreground">{message.text}</p>
+            </ConversationRailPreview>
+          </ConversationRailItem>
+        ))}
+      </ConversationRail>
     </div>
   )
 }
 
-function ChatComposer({ agentName }: { agentName: string }) {
+function PaneComposer({ agentName }: { agentName: string }) {
+  const [message, setMessage] = React.useState("")
+
   return (
-    <form
-      className="flex shrink-0 items-center gap-1.5 border-t border-border p-2"
-      onSubmit={(event) => event.preventDefault()}
-    >
-      <Input
-        aria-label={`Message ${agentName}`}
-        placeholder={`Message ${agentName}…`}
-        className="h-8 text-xs"
-      />
-      <Button
-        type="submit"
-        size="icon"
-        variant="ghost"
-        className="size-8 shrink-0 text-muted-foreground hover:text-foreground"
-        aria-label="Send message"
-        title="Send message"
+    <div className="shrink-0 border-t border-border p-2">
+      <ChatComposer
+        size="compact"
+        borderMode="always"
+        submitOnEnter
+        onSubmit={(event) => {
+          event.preventDefault()
+          setMessage("")
+        }}
       >
-        <SendHorizontal aria-hidden className="size-4" />
-      </Button>
-    </form>
+        <ChatComposerInput
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          placeholder={`Message ${agentName}…`}
+          aria-label={`Message ${agentName}`}
+        />
+        <ChatComposerFooter>
+          <ChatComposerActions>
+            <ChatComposerAction aria-label="Add attachment" title="Add attachment">
+              <Plus aria-hidden="true" />
+            </ChatComposerAction>
+          </ChatComposerActions>
+          <ChatComposerActions className="justify-end">
+            <ChatComposerSubmit disabled={!message.trim()} />
+          </ChatComposerActions>
+        </ChatComposerFooter>
+      </ChatComposer>
+    </div>
   )
 }
 
@@ -290,8 +355,8 @@ function ChatPane({ pane }: { pane: PaneNode }) {
       </div>
       {chat ? (
         <>
-          <ChatMessages chat={chat} />
-          <ChatComposer agentName={chat.name} />
+          <ChatMessages chat={chat} paneId={pane.id} />
+          <PaneComposer agentName={chat.name} />
         </>
       ) : (
         <div className="flex min-h-0 flex-1 items-center justify-center p-4 text-xs text-muted-foreground">
@@ -384,7 +449,9 @@ function StatusBarContent() {
 
 function ShellExample({ defaultLayout }: { defaultLayout?: AppShellLayout }) {
   return (
-    <div className="h-[560px] w-full overflow-hidden rounded-lg border border-border shadow-xs">
+    // A definite width (not content-derived), so size containment inside
+    // the panes can never collapse the frame in Storybook's centered canvas.
+    <div className="h-[560px] w-[min(60rem,calc(100vw-3rem))] max-w-full overflow-hidden rounded-lg border border-border shadow-xs">
       <AppShell
         defaultLayout={
           defaultLayout ??
