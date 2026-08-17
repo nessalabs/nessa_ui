@@ -132,6 +132,23 @@ export {
   type ChatComposerSubmitProps,
 } from "./components/chat-composer"
 export {
+  ComposerDeliveryMode,
+  ComposerQueue,
+  ComposerQueueItem,
+  type ComposerDeliveryModeProps,
+  type ComposerDeliveryModeValue,
+  type ComposerQueueProps,
+  type ComposerQueueItemProps,
+} from "./components/composer-queue"
+export {
+  ComposerAccessMode,
+  ComposerAccessModeIcon,
+  composerAccessModeLabels,
+  type ComposerAccessModeIconProps,
+  type ComposerAccessModeProps,
+  type ComposerAccessModeValue,
+} from "./components/composer-access-mode"
+export {
   Sidebar,
   SidebarContent,
   SidebarCollapsible,
