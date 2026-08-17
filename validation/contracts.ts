@@ -39,6 +39,7 @@ export const contracts = Object.freeze([
   contract("SRC-003", "Copied registry components never reference private Nessa aliases directly.", "docs/architecture/design-system-contract.md#private-component-aliases", "enforced", "source-boundaries"),
   contract("STORY-001", "Every public component module has living Storybook docs and test coverage.", "docs/architecture/design-system-contract.md#verification-infrastructure", "enforced", "storybook-coverage"),
   contract("STORY-002", "Input stories preserve explicit accessible names and error associations.", "docs/architecture/design-system-contract.md#accessibility-and-rendering-invariants", "enforced", "storybook-coverage"),
+  contract("INT-001", "ModelPicker previews cannot move its model-option hit-target surface.", "docs/architecture/design-system-contract.md#interaction-geometry-stability", "enforced", "interaction-stability"),
   contract("PKG-001", "The React package declares its supported React runtime floor.", "docs/architecture/design-system-contract.md#root-exports-and-build-shape", "enforced", "package-artifacts"),
   contract("PKG-002", "CSS exports and side effects preserve the package distribution contract.", "docs/architecture/design-system-contract.md#root-exports-and-build-shape", "enforced", "package-artifacts"),
   contract("PKG-003", "Published artifacts are freshly built and contain required code, CSS, docs, and license.", "docs/architecture/design-system-contract.md#root-exports-and-build-shape", "enforced", "package-artifacts"),

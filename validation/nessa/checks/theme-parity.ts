@@ -20,14 +20,25 @@ export function extractThemeTokens(root: Root): ThemeTokens {
   return result
 }
 
+const reducedMotionCss = {
+  "@media (prefers-reduced-motion: reduce)": {
+    ":root, :where([data-nessa-root], [data-nessa-theme], [data-nessa-scale])": {
+      "--nessa-motion-duration-fast": "0ms",
+      "--nessa-motion-duration-normal": "0ms",
+      "--nessa-motion-duration-slow": "0ms",
+      "--nessa-motion-duration-ambient": "0ms",
+    },
+  },
+}
+
 export const themeParityCheck = defineCheck({
   id: "theme-parity",
   ...checkMetadata["theme-parity"],
   async run(context) {
     const findings = []
     const tokens = extractThemeTokens(await context.parseCss("packages/react/src/theme.css"))
-    const registry = await context.readJson<{ items: { name: string; cssVars?: { theme?: Record<string, string>; light?: Record<string, string>; dark?: Record<string, string> } }[] }>("registry.json")
-    const publicBase = await context.readJson<{ cssVars?: { theme?: Record<string, string>; light?: Record<string, string>; dark?: Record<string, string> } }>("public/r/nessa-base.json")
+    const registry = await context.readJson<{ items: { name: string; cssVars?: { theme?: Record<string, string>; light?: Record<string, string>; dark?: Record<string, string> }; css?: Record<string, unknown> }[] }>("registry.json")
+    const publicBase = await context.readJson<{ cssVars?: { theme?: Record<string, string>; light?: Record<string, string>; dark?: Record<string, string> }; css?: Record<string, unknown> }>("public/r/nessa-base.json")
     const sourceBase = registry.items.find((item) => item.name === "nessa-base")
     if (!sourceBase?.cssVars || !publicBase.cssVars) {
       return [context.fail("nessa-base cssVars are missing.", { contractId: "TOKEN-001" })]
@@ -63,7 +74,13 @@ export const themeParityCheck = defineCheck({
     if (themeVars.radius !== radius || publicThemeVars.radius !== radius) {
       findings.push(context.fail("Radius drifted across package and registry base.", { contractId: "TOKEN-003" }))
     }
-    if (!findings.length) findings.push(context.pass("Light/Dark tokens, fonts, and radius match package and registry artifacts.", { contractId: "TOKEN-003" }))
+    if (
+      JSON.stringify(sourceBase.css) !== JSON.stringify(reducedMotionCss) ||
+      JSON.stringify(publicBase.css) !== JSON.stringify(reducedMotionCss)
+    ) {
+      findings.push(context.fail("Reduced-motion token overrides differ across package and registry artifacts.", { contractId: "TOKEN-003" }))
+    }
+    if (!findings.length) findings.push(context.pass("Light/Dark tokens, fonts, radius, and reduced-motion overrides match package and registry artifacts.", { contractId: "TOKEN-003" }))
     return findings
   },
 })

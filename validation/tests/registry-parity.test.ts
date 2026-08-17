@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import ts from "typescript"
 
-import { canonicalJson, dependenciesFromSource, embeddedSourceMatches, registryAliasFromSpecifier, requiredRegistryDependenciesPresent, sourceOwnedProjection, targetMatchesAlias } from "../nessa/checks/registry-parity.ts"
+import { canonicalJson, dependenciesFromSource, embeddedSourceMatches, registryAliasFromSpecifier, relativeRegistryTopology, requiredRegistryDependenciesPresent, sourceOwnedProjection, targetMatchesAlias } from "../nessa/checks/registry-parity.ts"
 
 test("embedded registry source permits only line-ending normalization", () => {
   assert.equal(embeddedSourceMatches("one\r\ntwo\r\n", "one\ntwo\n"), true)
@@ -59,6 +59,30 @@ test("install targets must sit inside the directory an import alias points at", 
   assert.equal(targetMatchesAlias("components/split-view/index.ts", "components/split-view"), true)
   assert.equal(targetMatchesAlias("components/ui/button.tsx", "components/ui/button"), true)
   assert.equal(targetMatchesAlias("components/ui/split-view/index.ts", "components/split-view"), false)
+})
+
+test("relative registry imports preserve their installed target topology", () => {
+  const ast = ts.createSourceFile("foo.ts", 'import { Bar } from "./bar"', ts.ScriptTarget.ES2022, true)
+  const valid = relativeRegistryTopology(
+    ast,
+    "packages/react/src/components/foo.tsx",
+    "components/ui/foo.tsx",
+    "foo",
+    new Map([["packages/react/src/components/bar", { owner: "bar", target: "components/ui/bar.tsx" }]]),
+  )
+  assert.deepEqual(valid.issues, [])
+  assert.equal(valid.relativeRegistryItems.get("./bar"), "bar")
+
+  const invalid = relativeRegistryTopology(
+    ast,
+    "packages/react/src/components/foo.tsx",
+    "components/ui/foo.tsx",
+    "foo",
+    new Map([["packages/react/src/components/bar", { owner: "bar", target: "lib/bar.ts" }]]),
+  )
+  assert.deepEqual(invalid.issues, [
+    "./bar resolves to components/ui/bar after installation, not lib/bar",
+  ])
 })
 
 test("registry UI dependencies require both Nessa base and utils", () => {

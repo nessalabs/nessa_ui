@@ -1,3 +1,5 @@
+import path from "node:path"
+
 import { defineCheck } from "../../framework/define-check.ts"
 import { checkMetadata } from "../check-metadata.ts"
 
@@ -46,7 +48,10 @@ export function registryAliasFromSpecifier(specifier: string): { itemName: strin
   return null
 }
 
-export function dependenciesFromSource(ast: ts.SourceFile): { packages: string[]; registry: string[] } {
+export function dependenciesFromSource(
+  ast: ts.SourceFile,
+  relativeRegistryItems: ReadonlyMap<string, string> = new Map(),
+): { packages: string[]; registry: string[] } {
   const packages = new Set<string>()
   const registry = new Set<string>()
   ast.forEachChild((node) => {
@@ -55,6 +60,7 @@ export function dependenciesFromSource(ast: ts.SourceFile): { packages: string[]
     if (specifier === "react") return
     const alias = registryAliasFromSpecifier(specifier)
     if (alias) registry.add(`nessalabs/nessa_ui/${alias.itemName}`)
+    else if (relativeRegistryItems.has(specifier)) registry.add(`nessalabs/nessa_ui/${relativeRegistryItems.get(specifier)}`)
     else if (!specifier.startsWith(".") && !specifier.startsWith("@/")) packages.add(specifier.startsWith("@") ? specifier.split("/").slice(0, 2).join("/") : specifier.split("/")[0]!)
   })
   return { packages: [...packages].sort(), registry: [...registry].sort() }
@@ -82,6 +88,44 @@ export function targetMatchesAlias(target: string, targetPrefix: string): boolea
   return target === targetPrefix || target.startsWith(`${targetPrefix}/`) || target.startsWith(`${targetPrefix}.`)
 }
 
+interface RegistryFileLocation {
+  owner: string
+  target: string
+}
+
+function moduleStem(value: string) {
+  return value.replace(/\.(?:[cm]?[jt]sx?)$/, "")
+}
+
+export function relativeRegistryTopology(
+  ast: ts.SourceFile,
+  sourcePath: string,
+  sourceTarget: string,
+  owner: string,
+  registryFileBySourceStem: ReadonlyMap<string, RegistryFileLocation>,
+) {
+  const relativeRegistryItems = new Map<string, string>()
+  const issues: string[] = []
+  ast.forEachChild((node) => {
+    if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier)) return
+    const specifier = node.moduleSpecifier.text
+    if (!specifier.startsWith(".")) return
+    const resolvedSourceStem = moduleStem(path.posix.normalize(path.posix.join(path.posix.dirname(sourcePath), specifier)))
+    const dependency = registryFileBySourceStem.get(resolvedSourceStem) ?? registryFileBySourceStem.get(`${resolvedSourceStem}/index`)
+    if (!dependency) {
+      issues.push(`${specifier} is not copied by any registry item`)
+      return
+    }
+    if (dependency.owner !== owner) relativeRegistryItems.set(specifier, dependency.owner)
+    const resolvedTargetStem = moduleStem(path.posix.normalize(path.posix.join(path.posix.dirname(sourceTarget), specifier)))
+    const dependencyTargetStem = moduleStem(dependency.target)
+    if (dependencyTargetStem !== resolvedTargetStem && dependencyTargetStem !== `${resolvedTargetStem}/index`) {
+      issues.push(`${specifier} resolves to ${resolvedTargetStem} after installation, not ${dependencyTargetStem}`)
+    }
+  })
+  return { issues, relativeRegistryItems }
+}
+
 export const registryParityCheck = defineCheck({
   id: "registry-parity",
   ...checkMetadata["registry-parity"],
@@ -89,6 +133,12 @@ export const registryParityCheck = defineCheck({
     const findings = []
     const registry = await context.readJson<{ items: RegistryItem[] }>("registry.json")
     const catalog = await context.readJson<{ items: RegistryItem[] }>("public/r/registry.json")
+    const registryFileBySourceStem = new Map<string, RegistryFileLocation>()
+    for (const candidate of registry.items) {
+      for (const file of candidate.files ?? []) {
+        if (file.target) registryFileBySourceStem.set(moduleStem(file.path), { owner: candidate.name, target: file.target })
+      }
+    }
     if (canonicalJson(registry.items.map(sourceOwnedProjection)) !== canonicalJson(catalog.items.map(sourceOwnedProjection))) findings.push(context.fail("Public registry catalog metadata drifted from registry.json.", { contractId: "REG-001" }))
 
     for (const item of registry.items) {
@@ -112,7 +162,9 @@ export const registryParityCheck = defineCheck({
           findings.push(context.fail(`${item.name} embeds stale source for ${file.path}.`, { contractId: "REG-002", path: publicPath }))
         }
         const ast = await context.parseTypeScript(file.path)
-        const required = dependenciesFromSource(ast)
+        const topology = relativeRegistryTopology(ast, file.path, file.target ?? file.path, item.name, registryFileBySourceStem)
+        for (const issue of topology.issues) findings.push(context.fail(`${item.name} relative import ${issue}.`, { contractId: "REG-003", path: file.path }))
+        const required = dependenciesFromSource(ast, topology.relativeRegistryItems)
         for (const dependency of required.packages) requiredPackages.add(dependency)
         for (const dependency of required.registry) requiredRegistry.add(dependency)
         // A cross-item import is only installable when the imported item's

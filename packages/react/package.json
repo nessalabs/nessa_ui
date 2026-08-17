@@ -37,6 +37,7 @@
   "dependencies": {
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "lucide-react": "^0.468.0",
     "radix-ui": "^1.4.3",
     "tailwind-merge": "^3.3.1"
   },
@@ -45,7 +46,6 @@
     "@tailwindcss/cli": "^4.1.11",
     "@types/react": "^19.1.9",
     "@types/react-dom": "^19.1.7",
-    "lucide-react": "^0.468.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "rimraf": "^6.0.1",

@@ -7,7 +7,7 @@
     "build": "storybook build",
     "dev": "storybook dev -p 6006",
     "test:docs": "pnpm build && node scripts/check-docs.mjs",
-    "test": "vitest run --project=storybook",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

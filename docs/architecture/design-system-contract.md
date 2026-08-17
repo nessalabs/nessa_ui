@@ -187,8 +187,13 @@ Semantic roles describe intent and remain public across themes:
 --nessa-motion-duration-fast
 --nessa-motion-duration-normal
 --nessa-motion-duration-slow
+--nessa-motion-duration-ambient
 --nessa-motion-easing-standard
 --nessa-motion-easing-emphasized
+--nessa-thinking-fill-base
+--nessa-thinking-fill-current
+--nessa-thinking-fill-highlight
+--nessa-fast-mode-active
 ```
 
 Surface and foreground pairs remain the color contract. Published Nessa themes provide every required semantic color for Light and Dark. Consumer-authored themes may override a subset and inherit the rest. Control dimensions and motion are semantic tokens, while public typography and spacing scales remain deliberately reusable foundations.
@@ -425,19 +430,50 @@ Motion is token-driven CSS, not provider state. Components use duration/easing s
 
 ```css
 @media (prefers-reduced-motion: reduce) {
+  :root,
   :where(
     [data-nessa-root],
     [data-nessa-theme],
     [data-nessa-scale]
   ) {
-    --_nessa-motion-duration-fast: 0ms;
-    --_nessa-motion-duration-normal: 0ms;
-    --_nessa-motion-duration-slow: 0ms;
+    --nessa-motion-duration-fast: 0ms;
+    --nessa-motion-duration-normal: 0ms;
+    --nessa-motion-duration-slow: 0ms;
+    --nessa-motion-duration-ambient: 0ms;
   }
 }
 ```
 
 Essential state changes remain understandable without animation. There is no `motion` provider prop in the foundation.
+
+### Interaction geometry stability
+
+ModelPicker hover, focus, and pointer preview must not resize or reposition the
+model-option surface that produced the interaction. Preview-specific auxiliary
+content must reserve stable geometry or render on an independently positioned
+surface. Model capabilities remain separate, application-composed controls and
+must not be mounted in response to model-row preview.
+
+Thinking levels are an ordered, consumer-supplied catalog. The slider derives
+its detents, labels, and proportional positions from that catalog, supports
+continuous pointer preview between detents, and commits the nearest level on
+release. Crossing a level midpoint updates the visible label and invokes the
+optional checkpoint callback. Keyboard movement stays discrete and mirrors
+horizontal direction in RTL. The `accent: "ultra"` field opts into the maximum
+stream treatment without hard-coding a label or catalog length.
+
+The filled range owns a constant semantic gradient. A separate, low-opacity
+horizontal sheen moves continuously from right to left, with ordinal energy
+increasing by level and an optional bounded Fast-mode speed multiplier. Reduced
+motion disables ambient and checkpoint motion while preserving state. The
+composed Ultra popover uses a restrained semantic violet shader; Fast mode keeps
+its transparent hit target and communicates activation through the icon alone.
+
+ChatComposer remains intrinsically shrinkable. Its footer action groups may
+wrap as units, its input owns overflow under a whole-composer height cap, and
+the footer remains visible. ModelPicker uses one searchable model list and a
+provider tab rail with stable accessible names, complete Home/End and
+direction-aware arrow navigation, and one reachable tab stop.
 
 ### Accessibility and rendering invariants
 
@@ -1079,6 +1115,7 @@ This table is the exhaustive machine-mirrored index of normative rule groups. De
 | SRC-003 | Copied registry components never reference private Nessa aliases directly. | `#private-component-aliases` |
 | STORY-001 | Every public component module has living Storybook docs and test coverage. | `#verification-infrastructure` |
 | STORY-002 | Input stories preserve explicit accessible names and error associations. | `#accessibility-and-rendering-invariants` |
+| INT-001 | ModelPicker previews cannot move its model-option hit-target surface. | `#interaction-geometry-stability` |
 | PKG-001 | The React package declares its supported React runtime floor. | `#root-exports-and-build-shape` |
 | PKG-002 | CSS exports and side effects preserve the package distribution contract. | `#root-exports-and-build-shape` |
 | PKG-003 | Published artifacts are freshly built and contain required code, CSS, docs, and license. | `#root-exports-and-build-shape` |
