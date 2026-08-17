@@ -9,6 +9,7 @@ const composerFocusComponents = Object.freeze([
   { component: "model-capability-controls", count: 3 },
   { component: "model-picker", count: 2 },
   { component: "searchable-listbox", count: 2 },
+  { component: "sectioned-listbox", count: 1 },
 ] as const)
 
 type FocusComponent =
