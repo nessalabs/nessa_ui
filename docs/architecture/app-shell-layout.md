@@ -90,6 +90,25 @@ controlled), disabled panels, and non-px/% units. Unlike upstream, pointer
 handling uses capture on the separator element itself — no document-level
 capture-phase listeners — and horizontal resizing respects RTL.
 
+## Dragging panes
+
+`AppShellPaneDragHandle` makes part of a pane's chrome draggable, and
+dragging does exactly one thing: swap two panes. Picking a pane up lifts it
+out — its content turns invisible in place (still mounted, so its state
+survives), the emptied slot shows a dashed outline, and a faded miniature
+of the pane follows the cursor as the drag ghost. Hovering any other pane
+highlights its whole surface and previews the incoming content faintly over
+its own fading content; releasing applies `swapPanes`, which exchanges the
+two panes without touching any split or orientation, and both panes glide
+to their new positions with a short transform animation (skipped under
+prefers-reduced-motion). Panes not involved fade slightly so the source and
+target stand out, and Escape cancels. New sections are never created by
+dragging — they come from the explicit split actions — though the model's
+`movePane` operation remains available to applications that want edge-drop
+behavior. Dragging uses plain pointer events — no drag-and-drop library —
+and is a pointer-only affordance; keyboard users reach the same layouts
+through the split and close actions.
+
 ## Accessibility
 
 Every separator — SplitView and dock — implements the ARIA window-splitter

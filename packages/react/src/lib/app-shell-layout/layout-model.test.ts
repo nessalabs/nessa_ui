@@ -5,6 +5,7 @@ import { describe, test } from "node:test"
 
 import {
   AppShellDockSide,
+  PaneDropRegion,
   PaneSplitDirection,
   SplitOrientation,
 } from "./layout-options"
@@ -19,12 +20,15 @@ import {
   focusPane,
   insertRelativeTo,
   maximizePane,
+  movePane,
+  openView,
   removeNode,
   resizeDock,
   restorePane,
   setDockOpen,
   setSplitWeights,
   splitPane,
+  swapPanes,
 } from "./layout-operations"
 import type {
   AppShellLayout,
@@ -401,6 +405,154 @@ describe("insertRelativeTo and removeNode", () => {
       children.map((child) => child.weight),
       [0.5, 0.5],
     )
+  })
+})
+
+describe("movePane and openView", () => {
+  /** Three panes side by side: a | b | c, with b active. */
+  const threeAcross = () =>
+    layoutWith(
+      {
+        type: "split",
+        id: "s0",
+        weight: 1,
+        orientation: SplitOrientation.Horizontal,
+        children: [
+          createPaneNode({ id: "a", weight: 0.5, views: ["one"] }),
+          createPaneNode({ id: "b", weight: 0.25, views: ["two"] }),
+          createPaneNode({ id: "c", weight: 0.25, views: ["three"] }),
+        ],
+      },
+      "b",
+    )
+
+  test("dropping on an edge splits the target across the axis", () => {
+    const moved = movePane(threeAcross(), {
+      paneId: "c",
+      targetPaneId: "a",
+      region: PaneDropRegion.Top,
+    })
+
+    const root = moved.workspace.root as SplitNode
+    const first = root.children[0] as SplitNode
+
+    assert.equal(first.type, "split")
+    assert.equal(first.orientation, SplitOrientation.Vertical)
+    assert.deepEqual(
+      first.children.map((child) => child.id),
+      ["c", "a"],
+    )
+    assert.equal(moved.workspace.activePaneId, "c")
+  })
+
+  test("dropping on a same-axis edge inserts a sibling", () => {
+    const moved = movePane(threeAcross(), {
+      paneId: "c",
+      targetPaneId: "a",
+      region: PaneDropRegion.Left,
+    })
+
+    const root = moved.workspace.root as SplitNode
+
+    assert.deepEqual(
+      root.children.map((child) => child.id),
+      ["c", "a", "b"],
+    )
+  })
+
+  test("dropping on center merges views into the target", () => {
+    const moved = movePane(threeAcross(), {
+      paneId: "c",
+      targetPaneId: "a",
+      region: PaneDropRegion.Center,
+    })
+
+    const root = moved.workspace.root as SplitNode
+    const target = root.children[0]
+
+    assert.deepEqual(
+      root.children.map((child) => child.id),
+      ["a", "b"],
+    )
+    assert.equal(target.type, "pane")
+    assert.deepEqual(target.type === "pane" ? target.views : [], [
+      "one",
+      "three",
+    ])
+    assert.equal(
+      target.type === "pane" ? target.activeViewId : undefined,
+      "three",
+    )
+    assert.equal(moved.workspace.activePaneId, "a")
+  })
+
+  test("moving onto itself or an unknown pane changes nothing", () => {
+    const layout = threeAcross()
+
+    assert.equal(
+      movePane(layout, {
+        paneId: "a",
+        targetPaneId: "a",
+        region: PaneDropRegion.Left,
+      }),
+      layout,
+    )
+    assert.equal(
+      movePane(layout, {
+        paneId: "a",
+        targetPaneId: "ghost",
+        region: PaneDropRegion.Left,
+      }),
+      layout,
+    )
+  })
+
+  test("openView activates a view and focuses its pane", () => {
+    const layout = threeAcross()
+    const opened = openView(layout, { viewId: "four", paneId: "a" })
+
+    const root = opened.workspace.root as SplitNode
+    const pane = root.children[0]
+
+    assert.equal(pane.type, "pane")
+    assert.deepEqual(pane.type === "pane" ? pane.views : [], ["one", "four"])
+    assert.equal(pane.type === "pane" ? pane.activeViewId : undefined, "four")
+    assert.equal(opened.workspace.activePaneId, "a")
+    assert.equal(openView(opened, { viewId: "four", paneId: "a" }), opened)
+  })
+
+  test("swapPanes exchanges positions while keeping each position's size", () => {
+    const layout = threeAcross()
+    const swapped = swapPanes(layout, { paneId: "c", withPaneId: "a" })
+    const root = swapped.workspace.root as SplitNode
+
+    assert.deepEqual(
+      root.children.map((child) => child.id),
+      ["c", "b", "a"],
+    )
+    assert.deepEqual(
+      root.children.map((child) => child.weight),
+      [0.5, 0.25, 0.25],
+    )
+    assert.deepEqual(
+      root.children.map((child) => (child.type === "pane" ? child.views : [])),
+      [["three"], ["two"], ["one"]],
+    )
+    assert.equal(swapped.workspace.activePaneId, "c")
+    assert.equal(swapPanes(layout, { paneId: "a", withPaneId: "a" }), layout)
+    assert.equal(
+      swapPanes(layout, { paneId: "a", withPaneId: "ghost" }),
+      layout,
+    )
+  })
+
+  test("openView focuses a pane already showing the view", () => {
+    const layout = threeAcross()
+    const opened = openView(layout, { viewId: "one", paneId: "a" })
+
+    assert.equal(opened.workspace.root, layout.workspace.root)
+    assert.equal(opened.workspace.activePaneId, "a")
+    assert.equal(openView(layout, { viewId: "ghost", paneId: "missing" }), layout)
   })
 })
 

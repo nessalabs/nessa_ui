@@ -23,6 +23,13 @@ export {
 } from "./app-shell-chrome"
 export { AppShellDock, type AppShellDockProps } from "./app-shell-dock"
 export {
+  AppShellPaneDragHandle,
+  useAppShellDrag,
+  type AppShellDragContextValue,
+  type AppShellPaneDragHandleProps,
+  type PaneDropTarget,
+} from "./app-shell-drag"
+export {
   AppShellWorkspace,
   type AppShellWorkspaceProps,
 } from "./app-shell-workspace"

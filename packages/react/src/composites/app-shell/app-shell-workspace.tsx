@@ -13,6 +13,7 @@ import {
   type SplitViewSize,
 } from "@/components/split-view"
 import {
+  PaneDropRegion,
   findNode,
   setSplitWeights,
   focusPane,
@@ -23,6 +24,7 @@ import {
 } from "@/lib/app-shell-layout"
 
 import { useAppShellContext } from "./app-shell"
+import { AppShellDragProvider, useAppShellDrag } from "./app-shell-drag"
 
 /** Properties accepted by the workspace region. */
 interface AppShellWorkspaceProps
@@ -63,6 +65,7 @@ function WorkspacePane({
   renderPane: AppShellWorkspaceProps["renderPane"]
 }) {
   const { updateLayout } = useAppShellContext()
+  const { draggingPaneId, dropTarget } = useAppShellDrag()
 
   /** Promotes this pane to the active pane when interaction enters it. */
   const activate = () => {
@@ -74,19 +77,110 @@ function WorkspacePane({
     }
   }
 
+  /**
+   * Fills a preview container with a snapshot of another pane's content.
+   * Used in both directions while a swap is being previewed: the target
+   * shows the dragged pane's content, and the dragged pane's emptied slot
+   * shows the target's content as the shadow moving in.
+   *
+   * @param element - The preview container, when mounted.
+   * @param paneId - The pane whose content to snapshot.
+   */
+  const fillPreviewWith = (
+    element: HTMLDivElement | null,
+    paneId: LayoutNodeId | null,
+  ) => {
+    if (!element || paneId === null) return
+
+    const workspace = element.closest('[data-slot="app-shell-workspace"]')
+    const panes =
+      workspace?.querySelectorAll<HTMLElement>('[data-slot="app-shell-pane"]') ??
+      []
+    const content = [...panes]
+      .find((candidate) => candidate.dataset.paneId === paneId)
+      ?.querySelector<HTMLElement>('[data-slot="app-shell-pane-content"]')
+
+    if (!content) return
+
+    const snapshot = content.cloneNode(true) as HTMLElement
+    snapshot.removeAttribute("data-slot")
+    snapshot.classList.remove("invisible")
+    snapshot.style.width = "100%"
+    snapshot.style.height = "100%"
+    element.replaceChildren(snapshot)
+  }
+
+  const isDropTarget = dropTarget?.paneId === pane.id
+  const isDragSource = draggingPaneId === pane.id
+  // While a drag is running, panes not involved in it fade slightly so the
+  // lifted source and the highlighted target stand out.
+  const dimmed = draggingPaneId !== null && !isDragSource && !isDropTarget
+
   return (
     <div
       data-slot="app-shell-pane"
       data-pane-id={pane.id}
       data-active={active || undefined}
+      data-drag-source={isDragSource || undefined}
+      data-drag-dimmed={dimmed || undefined}
       className={cn(
-        "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
+        "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden transition-opacity",
         "data-active:ring-1 data-active:ring-inset data-active:ring-ring/40",
+        "data-drag-dimmed:opacity-75",
       )}
       onFocusCapture={activate}
       onPointerDownCapture={activate}
     >
-      {renderPane(pane)}
+      {/* While this pane is being dragged, its content lifts out — mounted
+          (state survives) but invisible, with the emptied slot shown below.
+          While this pane is hovered as the drop target, the swap preview's
+          scrim fades it visually. */}
+      <div
+        data-slot="app-shell-pane-content"
+        className={cn(
+          "flex h-full min-h-0 min-w-0 flex-1 flex-col",
+          isDragSource && "invisible",
+        )}
+      >
+        {renderPane(pane)}
+      </div>
+      {isDragSource ? (
+        // The emptied slot. While a target is hovered, the target pane's
+        // content appears here as a faint shadow — the other half of the
+        // swap being previewed.
+        <div
+          aria-hidden
+          inert
+          data-slot="app-shell-pane-lift"
+          // Opaque, so nothing beneath can bleed through the preview.
+          className="absolute inset-1 z-10 overflow-hidden rounded-md border-2 border-dashed border-ring/50 bg-muted"
+        >
+          {dropTarget ? (
+            <div
+              key={dropTarget.paneId}
+              ref={(element) => fillPreviewWith(element, dropTarget.paneId)}
+              className="h-full w-full bg-background opacity-60"
+            />
+          ) : null}
+        </div>
+      ) : null}
+      {isDropTarget ? (
+        // The whole pane highlights and previews the swap: an opaque card
+        // fully covers this pane's own content (nothing bleeds through)
+        // and shows the dragged pane's content in its place. Releasing
+        // here swaps the two.
+        <div
+          aria-hidden
+          inert
+          data-slot="app-shell-drop-preview"
+          className="pointer-events-none absolute inset-1 z-20 overflow-hidden rounded-md bg-background ring-2 ring-inset ring-ring/70"
+        >
+          <div
+            ref={(element) => fillPreviewWith(element, draggingPaneId)}
+            className="h-full w-full opacity-90"
+          />
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -244,22 +338,26 @@ function AppShellWorkspace({
 }: AppShellWorkspaceProps) {
   const { layout } = useAppShellContext()
   const { workspace } = layout
+  const workspaceRef = React.useRef<HTMLDivElement>(null)
 
   return (
     <div
+      ref={workspaceRef}
       data-slot="app-shell-workspace"
       data-maximized={workspace.maximizedPaneId !== undefined || undefined}
       className={cn("relative flex min-h-0 min-w-0 flex-1", className)}
       {...props}
     >
-      <WorkspaceNode
-        node={workspace.root}
-        activePaneId={workspace.activePaneId}
-        maximizedPaneId={workspace.maximizedPaneId}
-        renderPane={renderPane}
-        minPaneSize={minPaneSize}
-        separatorLabel={separatorLabel}
-      />
+      <AppShellDragProvider workspaceRef={workspaceRef}>
+        <WorkspaceNode
+          node={workspace.root}
+          activePaneId={workspace.activePaneId}
+          maximizedPaneId={workspace.maximizedPaneId}
+          renderPane={renderPane}
+          minPaneSize={minPaneSize}
+          separatorLabel={separatorLabel}
+        />
+      </AppShellDragProvider>
     </div>
   )
 }

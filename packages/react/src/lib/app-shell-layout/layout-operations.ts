@@ -2,6 +2,7 @@
 
 import {
   AppShellDockSide,
+  PaneDropRegion,
   PaneSplitDirection,
   SplitOrientation,
   splitDirectionIsAfter,
@@ -453,6 +454,273 @@ function closePane(
 }
 
 /**
+ * Turns a drop region into the matching split direction.
+ *
+ * @param region - An edge drop region (never Center).
+ * @returns The direction a pane dropped on that edge splits toward.
+ */
+function dropRegionToDirection(
+  region: Exclude<PaneDropRegion, typeof PaneDropRegion.Center>,
+): PaneSplitDirection {
+  switch (region) {
+    case PaneDropRegion.Top:
+      return PaneSplitDirection.Up
+    case PaneDropRegion.Bottom:
+      return PaneSplitDirection.Down
+    case PaneDropRegion.Left:
+      return PaneSplitDirection.Left
+    case PaneDropRegion.Right:
+      return PaneSplitDirection.Right
+  }
+}
+
+/** Values accepted when moving a pane. */
+interface MovePaneOptions {
+  /** The pane being moved. */
+  paneId: LayoutNodeId
+  /** The pane it is dropped on. */
+  targetPaneId: LayoutNodeId
+  /** Where on the target it lands. */
+  region: PaneDropRegion
+}
+
+/**
+ * Moves a pane somewhere else in the tree. This is simply "remove, then
+ * insert" — the same building blocks splitting and closing already use —
+ * so the tree self-repairs exactly as it does for those operations.
+ *
+ * @example
+ * ```txt
+ *   ┌─────┬─────┐   drag B onto     ┌───────────┐
+ *   │  A  │  B  │   A's top edge →  │     B     │
+ *   └─────┴─────┘                   ├───────────┤
+ *                                   │     A     │
+ *                                   └───────────┘
+ * ```
+ *
+ * Dropping on Center merges the moved pane's views into the target pane
+ * instead of splitting (the moved pane's active view stays active).
+ *
+ * @param layout - The current layout document.
+ * @param options - The moved pane, the target pane, and the drop region.
+ * @returns The next document, or the same document when the move is not
+ * possible (unknown panes, moving onto itself).
+ */
+function movePane(
+  layout: AppShellLayout,
+  options: MovePaneOptions,
+): AppShellLayout {
+  const { workspace } = layout
+  const source = findNode(workspace.root, options.paneId)
+  const target = findNode(workspace.root, options.targetPaneId)
+
+  if (
+    options.paneId === options.targetPaneId ||
+    !source ||
+    source.type !== "pane" ||
+    !target ||
+    target.type !== "pane"
+  ) {
+    return layout
+  }
+
+  if (options.region === PaneDropRegion.Center) {
+    // Center = merge: the target pane absorbs the moved pane's views and
+    // the moved pane closes. (A tab strip renders the combined list later.)
+    const mergedViews = [
+      ...target.views,
+      ...source.views.filter((view) => !target.views.includes(view)),
+    ]
+    const merged: PaneNode = {
+      ...target,
+      views: mergedViews,
+      ...(source.activeViewId !== undefined
+        ? { activeViewId: source.activeViewId }
+        : {}),
+    }
+
+    const replaceTarget = (node: LayoutNode): LayoutNode => {
+      if (node.type === "pane") {
+        return node.id === merged.id ? merged : node
+      }
+
+      const children = node.children.map(replaceTarget)
+      const unchanged = children.every(
+        (child, index) => child === node.children[index],
+      )
+
+      return unchanged ? node : { ...node, children }
+    }
+
+    return focusPane(
+      closePane(
+        { ...layout, workspace: { ...workspace, root: replaceTarget(workspace.root) } },
+        { paneId: options.paneId },
+      ),
+      { paneId: options.targetPaneId },
+    )
+  }
+
+  const { root: remaining, removed } = removeNode(workspace.root, options.paneId)
+
+  if (!remaining || !removed) {
+    return layout
+  }
+
+  // The moved pane's old wrapper split may still exist until normalization,
+  // so the new wrapper id is probed for uniqueness like generated pane ids.
+  let wrapSplitId = `split:${options.paneId}`
+
+  while (findNode(remaining, wrapSplitId)) {
+    wrapSplitId = `${wrapSplitId}+`
+  }
+
+  const root = insertRelativeTo(
+    remaining,
+    options.targetPaneId,
+    removed,
+    dropRegionToDirection(options.region),
+    wrapSplitId,
+  )
+
+  return normalizeAppShellLayout({
+    ...layout,
+    workspace: {
+      ...workspace,
+      root,
+      activePaneId: options.paneId,
+      recentPaneIds: promoteRecentPane(workspace.recentPaneIds, options.paneId),
+    },
+  })
+}
+
+/**
+ * Swaps two panes: each takes the other's place in the tree while keeping
+ * that position's size. Nothing else about the tree changes, so no
+ * normalization is needed.
+ *
+ * @example
+ * ```txt
+ *   ┌─────┬───┐    swap A and B     ┌─────┬───┐
+ *   │  A  │ B │        →            │  B  │ A │
+ *   └─────┴───┘                     └─────┴───┘
+ *    A ⅔   B ⅓                       B ⅔   A ⅓
+ * ```
+ *
+ * @param layout - The current layout document.
+ * @param options - The two panes to swap; the first one keeps focus.
+ * @returns The next document, or the same document when either pane is
+ * missing or both are the same pane.
+ */
+function swapPanes(
+  layout: AppShellLayout,
+  options: { paneId: LayoutNodeId; withPaneId: LayoutNodeId },
+): AppShellLayout {
+  const { workspace } = layout
+  const first = findNode(workspace.root, options.paneId)
+  const second = findNode(workspace.root, options.withPaneId)
+
+  if (
+    options.paneId === options.withPaneId ||
+    !first ||
+    first.type !== "pane" ||
+    !second ||
+    second.type !== "pane"
+  ) {
+    return layout
+  }
+
+  const visit = (node: LayoutNode): LayoutNode => {
+    if (node.type === "pane") {
+      if (node.id === first.id) return { ...second, weight: node.weight }
+      if (node.id === second.id) return { ...first, weight: node.weight }
+      return node
+    }
+
+    const children = node.children.map(visit)
+    const unchanged = children.every(
+      (child, index) => child === node.children[index],
+    )
+
+    return unchanged ? node : { ...node, children }
+  }
+
+  return {
+    ...layout,
+    workspace: {
+      ...workspace,
+      root: visit(workspace.root),
+      activePaneId: options.paneId,
+      recentPaneIds: promoteRecentPane(workspace.recentPaneIds, options.paneId),
+    },
+  }
+}
+
+/**
+ * Opens a view in a pane: the view joins the pane's list (if not already
+ * there) and becomes its active view.
+ *
+ * @example
+ * ```txt
+ * pane views ["chat:a"] + openView "chat:b"
+ *   → views ["chat:a", "chat:b"], active "chat:b"
+ * ```
+ *
+ * @param layout - The current layout document.
+ * @param options - The view to open and the pane to open it in (defaults
+ * to the active pane).
+ * @returns The next document with the pane focused, or the same document
+ * when the pane is missing.
+ */
+function openView(
+  layout: AppShellLayout,
+  options: { viewId: PaneViewId; paneId?: LayoutNodeId },
+): AppShellLayout {
+  const { workspace } = layout
+  const paneId = options.paneId ?? workspace.activePaneId
+
+  const visit = (node: LayoutNode): LayoutNode => {
+    if (node.type === "pane") {
+      if (node.id !== paneId || node.activeViewId === options.viewId) {
+        return node
+      }
+
+      return {
+        ...node,
+        views: node.views.includes(options.viewId)
+          ? node.views
+          : [...node.views, options.viewId],
+        activeViewId: options.viewId,
+      }
+    }
+
+    const children = node.children.map(visit)
+    const unchanged = children.every(
+      (child, index) => child === node.children[index],
+    )
+
+    return unchanged ? node : { ...node, children }
+  }
+
+  const root = visit(workspace.root)
+
+  if (root === workspace.root) {
+    // The pane may already show this view — "open" still means "take me
+    // there", so it gets focused. A missing pane changes nothing.
+    const pane = findNode(workspace.root, paneId)
+
+    return pane && pane.type === "pane" && pane.activeViewId === options.viewId
+      ? focusPane(layout, { paneId })
+      : layout
+  }
+
+  return focusPane(
+    { ...layout, workspace: { ...workspace, root } },
+    { paneId },
+  )
+}
+
+/**
  * Focuses a pane, promoting it in the most-recently-active list.
  *
  * @param layout - The current layout document.
@@ -706,6 +974,8 @@ export {
   focusPane,
   insertRelativeTo,
   maximizePane,
+  movePane,
+  openView,
   promoteRecentPane,
   removeNode,
   resetPaneSizes,
@@ -714,8 +984,10 @@ export {
   setDockOpen,
   setSplitWeights,
   splitPane,
+  swapPanes,
   toggleDock,
   type CreateAppShellLayoutOptions,
   type CreatePaneOptions,
+  type MovePaneOptions,
   type SplitPaneOptions,
 }

@@ -293,6 +293,11 @@
           "target": "components/composites/app-shell/app-shell-dock.tsx"
         },
         {
+          "path": "packages/react/src/composites/app-shell/app-shell-drag.tsx",
+          "type": "registry:ui",
+          "target": "components/composites/app-shell/app-shell-drag.tsx"
+        },
+        {
           "path": "packages/react/src/composites/app-shell/app-shell-workspace.tsx",
           "type": "registry:ui",
           "target": "components/composites/app-shell/app-shell-workspace.tsx"
