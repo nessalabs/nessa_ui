@@ -4,6 +4,13 @@ const sidebarFocusComponents = Object.freeze([
   { component: "sidebar/sidebar-trigger", count: 1 },
 ] as const)
 
+const composerFocusComponents = Object.freeze([
+  { component: "chat-composer", count: 3 },
+  { component: "model-capability-controls", count: 3 },
+  { component: "model-picker", count: 2 },
+  { component: "searchable-listbox", count: 2 },
+] as const)
+
 type FocusComponent =
   | "button"
   | "badge"
@@ -11,6 +18,7 @@ type FocusComponent =
   | "conversation-rail"
   | "split-view/split-view-separator"
   | "app-shell/app-shell-dock"
+  | (typeof composerFocusComponents)[number]["component"]
   | (typeof sidebarFocusComponents)[number]["component"]
 
 export interface FocusTreatment {
@@ -71,6 +79,15 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
   { component: "badge", layer: "border", state: "focus-visible:border", className: "focus-visible:border-ring", light: { token: "--ring", opacity: 1 }, dark: { token: "--ring", opacity: 1 } },
   { component: "input", layer: "border", state: "focus-visible:border", className: "focus-visible:border-ring", light: { token: "--ring", opacity: 1 }, dark: { token: "--ring", opacity: 1 } },
   { component: "input", layer: "border", state: "aria-invalid:border", className: "aria-invalid:border-destructive", light: { token: "--destructive", opacity: 1 }, dark: { token: "--destructive", opacity: 1 } },
+  ...composerFocusComponents.map(({ component, count }) => ({
+    component,
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  } as const)),
   {
     component: "conversation-rail",
     layer: "outline",
@@ -119,6 +136,10 @@ export const focusGeometryClasses = Object.freeze([
   { component: "button", className: "focus-visible:ring-[3px]" },
   { component: "badge", className: "focus-visible:ring-[3px]" },
   { component: "input", className: "focus-visible:ring-[3px]" },
+  ...composerFocusComponents.flatMap(({ component, count }) => [
+    { component, className: "focus-visible:outline-2", count },
+    { component, className: "focus-visible:outline-offset-2", count },
+  ] as const),
   ...sidebarFocusComponents.flatMap(({ component, count }) => [
     { component, className: "focus-visible:outline-2", count },
     { component, className: "focus-visible:outline-offset-2", count },

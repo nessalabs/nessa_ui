@@ -36,6 +36,32 @@ export default defineConfig({
           },
         },
       },
+      {
+        extends: true,
+        plugins: [
+          storybookTest({
+            configDir: path.join(dirname, ".storybook"),
+            tags: { include: ["reduced-motion"] },
+          }),
+        ],
+        test: {
+          name: "storybook-reduced-motion",
+          browser: {
+            enabled: true,
+            provider: playwright({}),
+            headless: true,
+            instances: [
+              {
+                browser: "chromium",
+                name: "chromium-reduced-motion",
+                provider: playwright({
+                  contextOptions: { reducedMotion: "reduce" },
+                }),
+              },
+            ],
+          },
+        },
+      },
     ],
   },
 })

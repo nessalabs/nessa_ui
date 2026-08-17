@@ -60,4 +60,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-004",
+    kind: "transition",
+    contractId: "INT-001",
+    baseRevision: "f792709798fc10e4923f52077ed096611a7850e5",
+    targets: ["validation/contracts.ts", "validation/nessa/check-metadata.ts"],
+    beforeFingerprint: "8cb616c48a66a3e3008059733cd6d1857c9f04e349cd5916058d2f921d902a0f",
+    afterFingerprint: "f1496eff9e0b91537ee5aa395e43704e81623c50f1f5338fb472c282e7b4d435",
+    rationale: "Adds an enforced interaction-stability check for ModelPicker so hover and focus previews cannot move the option hit-target surface that produced them.",
+    compatibility: "Adds validation and Storybook evidence for a new component family without weakening existing AppShell, SplitView, theme, registry, or accessibility requirements.",
+    migration: "ModelPicker implementations keep preview-dependent content out of option-flow geometry and maintain the focused narrow-viewport interaction story.",
+    supersedes: null,
+    pullRequest: null,
+  },
 ])

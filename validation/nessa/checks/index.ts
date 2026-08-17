@@ -2,6 +2,7 @@ import type { CheckDefinition } from "../../framework/types.ts"
 import { accessibilityCheck } from "./accessibility.ts"
 import { cssOwnershipCheck } from "./css-ownership.ts"
 import { governanceCheck } from "./governance.ts"
+import { interactionStabilityCheck } from "./interaction-stability.ts"
 import { packageArtifactsBuiltCheck, packageArtifactsCheck } from "./package-artifacts.ts"
 import { registryParityCheck } from "./registry-parity.ts"
 import { sourceBoundariesCheck } from "./source-boundaries.ts"
@@ -15,6 +16,7 @@ export const nessaChecks = Object.freeze([
   registryParityCheck,
   sourceBoundariesCheck,
   storybookCoverageCheck,
+  interactionStabilityCheck,
   packageArtifactsCheck,
   accessibilityCheck,
   packageArtifactsBuiltCheck,

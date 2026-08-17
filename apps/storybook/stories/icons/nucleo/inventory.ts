@@ -1,14 +1,21 @@
 import { ChatComposeIcon } from "./chat-compose-icon"
+import { FastIcon } from "./fast-icon"
 import { FolderClosedIcon } from "./folder-closed-icon"
 import { FolderOpenIcon } from "./folder-open-icon"
 import { SidebarLeftIcon } from "./sidebar-left-icon"
 import { SidebarRightIcon } from "./sidebar-right-icon"
+import { ThinkingIcon } from "./thinking-icon"
 
 const nucleoIconInventory = [
   {
     id: "chat-compose",
     name: "Chat compose",
     component: ChatComposeIcon,
+  },
+  {
+    id: "fast",
+    name: "Fast",
+    component: FastIcon,
   },
   {
     id: "folder-closed",
@@ -29,6 +36,11 @@ const nucleoIconInventory = [
     id: "sidebar-right",
     name: "Sidebar right",
     component: SidebarRightIcon,
+  },
+  {
+    id: "thinking",
+    name: "Thinking",
+    component: ThinkingIcon,
   },
 ] as const
 
