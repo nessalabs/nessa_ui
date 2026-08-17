@@ -11,6 +11,18 @@ export {
   CardHeader,
   CardTitle,
 } from "./components/card"
+export {
+  ConversationRail,
+  ConversationRailItem,
+  ConversationRailMarker,
+  ConversationRailPreview,
+  ConversationRailTrigger,
+  type ConversationRailItemProps,
+  type ConversationRailMarkerProps,
+  type ConversationRailPreviewProps,
+  type ConversationRailProps,
+  type ConversationRailTriggerProps,
+} from "./components/conversation-rail"
 export { Input } from "./components/input"
 export {
   Sidebar,
