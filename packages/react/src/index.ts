@@ -94,6 +94,12 @@ export {
   type SearchableListboxRenderState,
 } from "./components/searchable-listbox"
 export {
+  SectionedListbox,
+  type SectionedListboxProps,
+  type SectionedListboxRenderState,
+  type SectionedListboxSection,
+} from "./components/sectioned-listbox"
+export {
   ModelPicker,
   type ModelPickerGroup,
   type ModelPickerModel,
