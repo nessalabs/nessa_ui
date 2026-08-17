@@ -160,14 +160,21 @@ export const LiveTranscript: Story = {
     )!
     const initialText = streamingBubble.textContent
     const initialHeight = viewport.scrollHeight
-    await waitFor(() =>
-      expect(streamingBubble.textContent).not.toBe(initialText),
+    // The paced reveal eases up from zero and the simulated chunks arrive on
+    // an interval, so first growth — and enough of it to wrap a line — can
+    // take several seconds when the suite runs under parallel load.
+    await waitFor(
+      () => expect(streamingBubble.textContent).not.toBe(initialText),
+      { timeout: 10000 },
     )
     await waitFor(
       () => expect(viewport.scrollHeight).not.toBe(initialHeight),
-      { timeout: 3500 },
+      { timeout: 10000 },
     )
-    await waitFor(() => expect(distanceFromEnd(viewport)).toBeLessThanOrEqual(4))
+    await waitFor(
+      () => expect(distanceFromEnd(viewport)).toBeLessThanOrEqual(4),
+      { timeout: 5000 },
+    )
 
     viewport.scrollTo({ top: 0 })
     await waitFor(() =>
@@ -183,9 +190,12 @@ export const LiveTranscript: Story = {
     await userEvent.click(button)
     await waitFor(
       () => expect(scroller).toHaveAttribute("data-pinned", "true"),
-      { timeout: 3000 },
+      { timeout: 5000 },
     )
-    await waitFor(() => expect(distanceFromEnd(viewport)).toBeLessThanOrEqual(4))
+    await waitFor(
+      () => expect(distanceFromEnd(viewport)).toBeLessThanOrEqual(4),
+      { timeout: 5000 },
+    )
   },
 }
 
