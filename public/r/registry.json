@@ -571,6 +571,49 @@
       ]
     },
     {
+      "name": "composer-queue",
+      "type": "registry:ui",
+      "title": "Composer Queue",
+      "description": "Pending-message rows and queue-or-steer delivery controls for active agent runs.",
+      "dependencies": [
+        "@dnd-kit/core",
+        "@dnd-kit/sortable",
+        "@dnd-kit/utilities",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/composer-queue.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/composer-queue.tsx"
+        }
+      ]
+    },
+    {
+      "name": "composer-access-mode",
+      "type": "registry:ui",
+      "title": "Composer Access Mode",
+      "description": "A compact access and approval mode dropdown using distinct shield states.",
+      "dependencies": [
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/composer-access-mode.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/composer-access-mode.tsx"
+        }
+      ]
+    },
+    {
       "name": "sidebar",
       "type": "registry:ui",
       "title": "Sidebar",
