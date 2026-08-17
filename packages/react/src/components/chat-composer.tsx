@@ -37,6 +37,7 @@ export interface ChatComposerProps extends React.ComponentProps<"form"> {
   size?: "default" | "compact"
 }
 
+/** Renders the compound message-entry form and provides layout behavior to its slots. */
 function ChatComposer({
   borderMode = "none",
   width,
@@ -100,14 +101,20 @@ function ChatComposer({
 }
 
 export interface ChatComposerInputProps
-  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  extends React.ComponentPropsWithRef<"textarea"> {
+  /** Caps the textarea's own autosized height before it begins scrolling. */
   maxHeight?: number
 }
 
-const ChatComposerInput = React.forwardRef<
-  HTMLTextAreaElement,
-  ChatComposerInputProps
->(({ className, maxHeight = 240, onChange, onKeyDown, ...props }, forwardedRef) => {
+/** Renders the autosizing message input owned by a ChatComposer. */
+function ChatComposerInput({
+  className,
+  maxHeight = 240,
+  onChange,
+  onKeyDown,
+  ref: forwardedRef,
+  ...props
+}: ChatComposerInputProps) {
   const { composerMaxHeight, constrained, size, submitOnEnter } =
     React.useContext(ChatComposerContext)
   const localRef = React.useRef<HTMLTextAreaElement | null>(null)
@@ -151,7 +158,7 @@ const ChatComposerInput = React.forwardRef<
       rows={1}
       aria-label="Message"
       className={cn(
-        "min-w-0 w-full resize-none bg-transparent px-1 py-1 font-sans text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+        "min-w-0 w-full resize-none bg-transparent px-1 py-1 font-sans text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50",
         constrained ? "min-h-0 max-h-full" : "min-h-14",
         size === "compact" && !constrained && "min-h-10 text-sm leading-5",
         size === "compact" && constrained && "text-sm leading-5",
@@ -189,9 +196,9 @@ const ChatComposerInput = React.forwardRef<
       {...props}
     />
   )
-})
-ChatComposerInput.displayName = "ChatComposerInput"
+}
 
+/** Renders the wrapping footer row that positions composer action groups. */
 function ChatComposerFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -205,6 +212,7 @@ function ChatComposerFooter({ className, ...props }: React.ComponentProps<"div">
   )
 }
 
+/** Groups related composer actions into one non-wrapping control cluster. */
 function ChatComposerActions({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -219,13 +227,11 @@ function ChatComposerActions({ className, ...props }: React.ComponentProps<"div"
 }
 
 export interface ChatComposerActionProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {}
+  extends React.ComponentPropsWithRef<"button"> {}
 
-const ChatComposerAction = React.forwardRef<
-  HTMLButtonElement,
-  ChatComposerActionProps
->(
-  ({ className, ...props }, ref) => (
+/** Renders a compact non-submit composer action. */
+function ChatComposerAction({ className, ref, ...props }: ChatComposerActionProps) {
+  return (
     <button
       ref={ref}
       type="button"
@@ -236,41 +242,50 @@ const ChatComposerAction = React.forwardRef<
       )}
       {...props}
     />
-  ),
-)
-ChatComposerAction.displayName = "ChatComposerAction"
+  )
+}
 
 export interface ChatComposerSubmitProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  extends React.ComponentPropsWithRef<"button"> {
   loading?: boolean
 }
 
-const ChatComposerSubmit = React.forwardRef<
-  HTMLButtonElement,
-  ChatComposerSubmitProps
->(({ className, loading = false, children, disabled, ...props }, ref) => (
-  <button
-    ref={ref}
-    type="submit"
-    data-slot="chat-composer-submit"
-    aria-label={loading ? "Sending message" : "Send message"}
-    aria-busy={loading || undefined}
-    disabled={disabled || loading}
-    className={cn(
-      "inline-flex size-9 shrink-0 items-center justify-center rounded-full border-0 bg-primary p-0 text-primary-foreground shadow-xs outline-none transition-[color,background-color,box-shadow,transform] hover:bg-primary/90 focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 active:translate-y-px [&_svg]:size-4",
-      className,
-    )}
-    {...props}
-  >
-    {children ??
-      (loading ? (
-        <LoaderCircle aria-hidden="true" className="animate-spin" />
-      ) : (
-        <ArrowUp aria-hidden="true" />
-      ))}
-  </button>
-))
-ChatComposerSubmit.displayName = "ChatComposerSubmit"
+/** Renders the submit action with an icon-only loading fallback. */
+function ChatComposerSubmit({
+  className,
+  loading = false,
+  children,
+  disabled,
+  ref,
+  "aria-label": ariaLabel,
+  ...props
+}: ChatComposerSubmitProps) {
+  return (
+    <button
+      ref={ref}
+      type="submit"
+      data-slot="chat-composer-submit"
+      aria-label={
+        ariaLabel ??
+        (children == null ? (loading ? "Sending message" : "Send message") : undefined)
+      }
+      aria-busy={loading || undefined}
+      disabled={disabled || loading}
+      className={cn(
+        "inline-flex size-9 shrink-0 items-center justify-center rounded-full border-0 bg-primary p-0 text-primary-foreground shadow-xs outline-none transition-[color,background-color,box-shadow,transform] hover:bg-primary/90 focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 active:translate-y-px [&_svg]:size-4",
+        className,
+      )}
+      {...props}
+    >
+      {children ??
+        (loading ? (
+          <LoaderCircle aria-hidden="true" className="animate-spin" />
+        ) : (
+          <ArrowUp aria-hidden="true" />
+        ))}
+    </button>
+  )
+}
 
 export {
   ChatComposer,

@@ -1,6 +1,8 @@
 export { ChatComposeIcon } from "./chat-compose-icon"
+export { FastIcon } from "./fast-icon"
 export { FolderClosedIcon } from "./folder-closed-icon"
 export { FolderOpenIcon } from "./folder-open-icon"
 export { SidebarLeftIcon } from "./sidebar-left-icon"
 export { SidebarRightIcon } from "./sidebar-right-icon"
+export { ThinkingIcon } from "./thinking-icon"
 export { NUCLEO_ICON_COUNT, nucleoIconInventory } from "./inventory"

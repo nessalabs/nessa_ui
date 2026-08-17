@@ -29,6 +29,13 @@
         "theme": {
           "font-sans": "\"Geist Variable\", \"Geist\", ui-sans-serif, system-ui, sans-serif",
           "font-mono": "\"Geist Mono Variable\", \"Geist Mono\", ui-monospace, monospace",
+          "nessa-motion-duration-instant": "0ms",
+          "nessa-motion-duration-fast": "120ms",
+          "nessa-motion-duration-normal": "200ms",
+          "nessa-motion-duration-slow": "300ms",
+          "nessa-motion-duration-ambient": "3.2s",
+          "nessa-motion-easing-standard": "cubic-bezier(0.2, 0, 0, 1)",
+          "nessa-motion-easing-emphasized": "cubic-bezier(0.4, 0, 0.2, 1)",
           "radius": "0.625rem"
         },
         "light": {
@@ -56,7 +63,18 @@
           "sidebar-accent": "oklch(0.97 0 0)",
           "sidebar-accent-foreground": "oklch(0.205 0 0)",
           "sidebar-border": "oklch(0.922 0 0)",
-          "sidebar-ring": "oklch(0.556 0 0)"
+          "sidebar-ring": "oklch(0.556 0 0)",
+          "nessa-motion-duration-instant": "0ms",
+          "nessa-motion-duration-fast": "120ms",
+          "nessa-motion-duration-normal": "200ms",
+          "nessa-motion-duration-slow": "300ms",
+          "nessa-motion-duration-ambient": "3.2s",
+          "nessa-motion-easing-standard": "cubic-bezier(0.2, 0, 0, 1)",
+          "nessa-motion-easing-emphasized": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "nessa-thinking-fill-base": "oklch(0.56 0.2 265)",
+          "nessa-thinking-fill-current": "oklch(0.68 0.2 304)",
+          "nessa-thinking-fill-highlight": "oklch(0.86 0.11 214)",
+          "nessa-fast-mode-active": "oklch(0.57 0.22 300)"
         },
         "dark": {
           "background": "oklch(0.155 0.025 258)",
@@ -83,7 +101,21 @@
           "sidebar-accent": "oklch(0.274 0.006 286.033)",
           "sidebar-accent-foreground": "oklch(0.985 0 0)",
           "sidebar-border": "oklch(0.274 0.006 286.033)",
-          "sidebar-ring": "oklch(0.708 0 0)"
+          "sidebar-ring": "oklch(0.708 0 0)",
+          "nessa-thinking-fill-base": "oklch(0.54 0.19 264)",
+          "nessa-thinking-fill-current": "oklch(0.67 0.2 306)",
+          "nessa-thinking-fill-highlight": "oklch(0.82 0.12 210)",
+          "nessa-fast-mode-active": "oklch(0.72 0.19 306)"
+        }
+      },
+      "css": {
+        "@media (prefers-reduced-motion: reduce)": {
+          ":root, :where([data-nessa-root], [data-nessa-theme], [data-nessa-scale])": {
+            "--nessa-motion-duration-fast": "0ms",
+            "--nessa-motion-duration-normal": "0ms",
+            "--nessa-motion-duration-slow": "0ms",
+            "--nessa-motion-duration-ambient": "0ms"
+          }
         }
       }
     },
@@ -177,26 +209,6 @@
           "path": "packages/react/src/components/input.tsx",
           "type": "registry:ui",
           "target": "components/ui/input.tsx"
-        }
-      ]
-    },
-    {
-      "name": "chat-composer",
-      "type": "registry:ui",
-      "title": "Chat Composer",
-      "description": "A compound chat-entry surface with input, footer, action, and submit primitives.",
-      "dependencies": [
-        "lucide-react"
-      ],
-      "registryDependencies": [
-        "nessalabs/nessa_ui/nessa-base",
-        "nessalabs/nessa_ui/utils"
-      ],
-      "files": [
-        {
-          "path": "packages/react/src/components/chat-composer.tsx",
-          "type": "registry:ui",
-          "target": "components/ui/chat-composer.tsx"
         }
       ]
     },
@@ -338,6 +350,84 @@
           "path": "packages/react/src/composites/app-shell/app-shell-workspace.tsx",
           "type": "registry:ui",
           "target": "components/composites/app-shell/app-shell-workspace.tsx"
+        }
+      ]
+    },
+    {
+      "name": "searchable-listbox",
+      "type": "registry:ui",
+      "title": "Searchable Listbox",
+      "description": "A reusable searchable single-select list with accessible roving focus.",
+      "dependencies": ["lucide-react"],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/searchable-listbox.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/searchable-listbox.tsx"
+        }
+      ]
+    },
+    {
+      "name": "model-picker",
+      "type": "registry:ui",
+      "title": "Model Picker",
+      "description": "A provider-aware searchable chooser dedicated to model selection.",
+      "dependencies": ["lucide-react", "radix-ui"],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/searchable-listbox",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/model-picker.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/model-picker.tsx"
+        }
+      ]
+    },
+    {
+      "name": "model-capability-controls",
+      "type": "registry:ui",
+      "title": "Model Capability Controls",
+      "description": "Fast-mode and thinking-level controls composed beside a selected model.",
+      "dependencies": ["lucide-react", "radix-ui"],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/model-capability-controls.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/model-capability-controls.tsx"
+        },
+        {
+          "path": "packages/react/src/components/model-capabilities.ts",
+          "type": "registry:lib",
+          "target": "components/ui/model-capabilities.ts"
+        }
+      ]
+    },
+    {
+      "name": "chat-composer",
+      "type": "registry:ui",
+      "title": "Chat Composer",
+      "description": "A compound chat-entry surface with input, footer, action, and submit primitives.",
+      "dependencies": ["lucide-react"],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/chat-composer.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/chat-composer.tsx"
         }
       ]
     },

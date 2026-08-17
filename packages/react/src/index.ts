@@ -12,19 +12,6 @@ export {
   CardTitle,
 } from "./components/card"
 export {
-  ChatComposer,
-  ChatComposerAction,
-  ChatComposerActions,
-  ChatComposerFooter,
-  ChatComposerInput,
-  ChatComposerSubmit,
-  type ChatComposerActionProps,
-  type ChatComposerBorderMode,
-  type ChatComposerInputProps,
-  type ChatComposerProps,
-  type ChatComposerSubmitProps,
-} from "./components/chat-composer"
-export {
   ConversationRail,
   ConversationRailItem,
   ConversationRailMarker,
@@ -37,6 +24,49 @@ export {
   type ConversationRailTriggerProps,
 } from "./components/conversation-rail"
 export { Input } from "./components/input"
+export {
+  SearchableListbox,
+  type SearchableListboxProps,
+  type SearchableListboxRenderState,
+} from "./components/searchable-listbox"
+export {
+  ModelPicker,
+  type ModelPickerGroup,
+  type ModelPickerModel,
+  type ModelPickerProps,
+  type ModelPickerValue,
+} from "./components/model-picker"
+export {
+  type ModelCapabilities,
+  type ModelThinkingLevel,
+} from "./components/model-capabilities"
+export {
+  ModelFastMode,
+  ModelFastModeIcon,
+  ModelThinkingControl,
+  ModelThinkingIcon,
+  ModelThinkingSlider,
+  type ModelFastModeProps,
+  type ModelFastModeIconProps,
+  type ModelThinkingControlProps,
+  type ModelThinkingIconProps,
+  type ModelThinkingSliderProps,
+  type ModelThinkingSliderSize,
+  type ModelThinkingValueTextFormatter,
+} from "./components/model-capability-controls"
+export {
+  ChatComposer,
+  ChatComposerAction,
+  ChatComposerActions,
+  ChatComposerFooter,
+  ChatComposerInput,
+  ChatComposerSubmit,
+  type ChatComposerBorderMode,
+  type ChatComposerActionProps,
+  type ChatComposerInputProps,
+  type ChatComposerProps,
+  type ChatComposerSubmitProps,
+} from "./components/chat-composer"
 export {
   Sidebar,
   SidebarContent,
