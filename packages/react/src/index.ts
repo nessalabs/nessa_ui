@@ -25,6 +25,70 @@ export {
 } from "./components/conversation-rail"
 export { Input } from "./components/input"
 export {
+  CodeBlock,
+  CodeBlockProvider,
+  CopyButton,
+  useCodeBlockConfig,
+  type CodeBlockConfig,
+  type CodeBlockMode,
+  type CodeBlockProps,
+  type CodeBlockProviderProps,
+} from "./components/code-block"
+export { MathBlock, type MathBlockProps } from "./components/math-block"
+export {
+  MermaidDiagram,
+  type MermaidDiagramProps,
+} from "./components/mermaid-diagram"
+export {
+  Message,
+  MessageAttachment,
+  MessageAttachments,
+  MessageAvatar,
+  MessageBubble,
+  MessageContent,
+  MessageFooter,
+  MessageGroup,
+  MessageHeader,
+  MessageStreamText,
+  MessageThread,
+  MessageThreadReplies,
+  MessageThreadSummary,
+  useMessageStreamText,
+  type MessageAlign,
+  type MessageAttachmentProps,
+  type MessageAttachmentsProps,
+  type MessageAvatarProps,
+  type MessageBubbleProps,
+  type MessageBubbleVariant,
+  type MessageContentProps,
+  type MessageFooterProps,
+  type MessageGroupProps,
+  type MessageHeaderProps,
+  type MessageProps,
+  type MessageStreamTextOptions,
+  type MessageStreamTextProps,
+  type MessageStreamTextState,
+  type MessageThreadProps,
+  type MessageThreadRepliesProps,
+  type MessageThreadSummaryProps,
+} from "./components/message"
+export {
+  MessageMarkdown,
+  type MessageMarkdownProps,
+} from "./components/message-markdown"
+export {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerViewport,
+  useMessageScroller,
+  type MessageScrollerButtonProps,
+  type MessageScrollerContentProps,
+  type MessageScrollerProps,
+  type MessageScrollerState,
+  type MessageScrollerViewportProps,
+} from "./components/message-scroller"
+export {
   SearchableListbox,
   type SearchableListboxProps,
   type SearchableListboxRenderState,

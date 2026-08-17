@@ -19,6 +19,9 @@ export default defineConfig({
         ],
         test: {
           name: "storybook",
+          // Async surfaces (Shiki highlighting, Mermaid rendering) can take
+          // several seconds when the full suite runs in parallel.
+          testTimeout: 30000,
           browser: {
             enabled: true,
             provider: playwright({}),
