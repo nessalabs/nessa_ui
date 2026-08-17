@@ -6,6 +6,10 @@ const sidebarFocusComponents = Object.freeze([
 
 const composerFocusComponents = Object.freeze([
   { component: "chat-composer", count: 3 },
+  { component: "code-block", count: 1 },
+  { component: "mermaid-diagram", count: 6 },
+  { component: "message", count: 4 },
+  { component: "message-scroller", count: 2 },
   { component: "model-capability-controls", count: 3 },
   { component: "model-picker", count: 2 },
   { component: "searchable-listbox", count: 2 },

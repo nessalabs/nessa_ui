@@ -1,4 +1,6 @@
+import * as React from "react"
 import type { Preview } from "@storybook/react-vite"
+import { CodeBlockProvider } from "@nessa-ui/react"
 
 import "@fontsource-variable/geist"
 import "@fontsource-variable/geist-mono"
@@ -42,7 +44,13 @@ const preview: Preview = {
       const isDark = context.globals.theme === "dark"
       document.documentElement.classList.toggle("dark", isDark)
 
-      return Story()
+      // Provide the resolved color mode to every code surface, exactly like
+      // a host app wiring its own mode into CodeBlockProvider at the root.
+      return React.createElement(
+        CodeBlockProvider,
+        { mode: isDark ? "dark" : "light" },
+        Story(),
+      )
     },
   ],
 }
