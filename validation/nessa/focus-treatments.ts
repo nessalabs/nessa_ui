@@ -10,7 +10,7 @@ const composerFocusComponents = Object.freeze([
   { component: "composer-access-mode", count: 2 },
   { component: "composer-queue", count: 5 },
   { component: "mermaid-diagram", count: 6 },
-  { component: "message", count: 4 },
+  { component: "message", count: 5 },
   { component: "message-scroller", count: 2 },
   { component: "model-capability-controls", count: 3 },
   { component: "model-picker", count: 2 },

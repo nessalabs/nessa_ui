@@ -440,6 +440,57 @@ function MessageFooter({ className, ...props }: MessageFooterProps) {
   )
 }
 
+export interface MessageActionsProps extends React.ComponentProps<"div"> {}
+
+/**
+ * The hover-revealed action row under a bubble: MessageAction icon buttons,
+ * optionally alongside meta text such as the sent time. Hidden until the
+ * pointer hovers anywhere on the message row or an action holds keyboard
+ * focus, so transcripts stay quiet while copy, edit, and retry affordances
+ * stay one hover away. Pass `className="opacity-100"` to keep a row's actions
+ * always visible.
+ */
+function MessageActions({ className, ...props }: MessageActionsProps) {
+  return (
+    <div
+      data-slot="message-actions"
+      className={cn(
+        // Reveal binds to :focus-visible, not :focus-within: a pointer click
+        // parks focus on the clicked action, and plain focus-within would
+        // keep the row lit after the pointer moves on.
+        "flex items-center gap-1 px-1 text-xs text-muted-foreground opacity-0 transition-opacity group-hover/message:opacity-100 group-has-[:focus-visible]/message:opacity-100",
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
+export interface MessageActionProps extends React.ComponentProps<"button"> {}
+
+/**
+ * One icon action in a MessageActions row. Icon-only by design, so name each
+ * action with `aria-label`; what clicking it does — copying, entering an edit
+ * state, retrying — stays host-owned through `onClick`.
+ */
+function MessageAction({
+  className,
+  type = "button",
+  ...props
+}: MessageActionProps) {
+  return (
+    <button
+      type={type}
+      data-slot="message-action"
+      className={cn(
+        "inline-flex size-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3.5 [&_svg]:shrink-0",
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
 export interface MessageAttachmentsProps extends React.ComponentProps<"div"> {}
 
 const attachmentPagerButtonClass =
@@ -727,6 +778,8 @@ function MessageThreadReplies({
 
 export {
   Message,
+  MessageAction,
+  MessageActions,
   MessageAttachment,
   MessageAttachments,
   MessageAvatar,
