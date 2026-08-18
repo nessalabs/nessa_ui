@@ -23,6 +23,7 @@ type FocusComponent =
   | "badge"
   | "input"
   | "conversation-rail"
+  | "file-diff-list"
   | "split-view/split-view-separator"
   | "app-shell/app-shell-dock"
   | (typeof composerFocusComponents)[number]["component"]
@@ -105,6 +106,15 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     dark: { token: "--ring", opacity: 1 },
   },
   {
+    component: "file-diff-list",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 3,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  {
     component: "split-view/split-view-separator",
     layer: "ring",
     state: "focus-visible",
@@ -151,6 +161,12 @@ export const focusGeometryClasses = Object.freeze([
     { component, className: "focus-visible:outline-2", count },
     { component, className: "focus-visible:outline-offset-2", count },
   ] as const),
+  // The scrollable list region draws its outline inset so the card's
+  // overflow clipping cannot swallow it; the row action and toggle buttons
+  // sit inside padded rows and keep the standard outset offset.
+  { component: "file-diff-list", className: "focus-visible:outline-2", count: 3 },
+  { component: "file-diff-list", className: "focus-visible:outline-offset-2", count: 2 },
+  { component: "file-diff-list", className: "focus-visible:-outline-offset-2", count: 1 },
   { component: "conversation-rail", className: "focus-visible:outline-2", count: 1 },
   { component: "conversation-rail", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "split-view/split-view-separator", className: "focus-visible:ring-2", count: 1 },

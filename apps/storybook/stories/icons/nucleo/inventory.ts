@@ -1,5 +1,6 @@
 import { ChatComposeIcon } from "./chat-compose-icon"
 import { FastIcon } from "./fast-icon"
+import { FileCopyIcon } from "./file-copy-icon"
 import { FolderClosedIcon } from "./folder-closed-icon"
 import { FolderOpenIcon } from "./folder-open-icon"
 import { SidebarLeftIcon } from "./sidebar-left-icon"
@@ -16,6 +17,11 @@ const nucleoIconInventory = [
     id: "fast",
     name: "Fast",
     component: FastIcon,
+  },
+  {
+    id: "file-copy",
+    name: "File copy",
+    component: FileCopyIcon,
   },
   {
     id: "folder-closed",
