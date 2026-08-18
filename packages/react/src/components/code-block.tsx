@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { registerCustomTheme } from "@pierre/diffs"
 import { File } from "@pierre/diffs/react"
 import type {
   DiffsThemeNames,
@@ -22,9 +23,8 @@ export type CodeBlockMode = "system" | "light" | "dark"
 export interface CodeBlockConfig {
   /**
    * The syntax theme: a single Shiki theme name, or a `{ dark, light }` pair
-   * picked from by `mode`. Defaults to Catppuccin Mocha (dark) and Light+
-   * (light), the strongest WCAG-contrast performers among the bundled
-   * themes. Pierre's own themes remain available by name.
+   * picked from by `mode`. Defaults to Nessa's own restrained "nessa-dark"
+   * (dark) and Light+ (light). Pierre's own themes remain available by name.
    */
   theme?: DiffsThemeNames | ThemesType
   /**
@@ -40,14 +40,102 @@ export interface CodeBlockConfig {
 }
 
 /**
- * The default syntax theme pair, chosen by measuring WCAG contrast across
- * every bundled Shiki theme: Catppuccin Mocha is the only dark theme whose
- * every token color — comments included, the usual offender — clears the AA
- * 4.5:1 threshold, and Light+ has the highest minimum contrast of any light
- * theme.
+ * Nessa's own dark syntax theme: a neutral near-black ground that sits flush
+ * with the neutral dark palette, and a deliberately restrained token set —
+ * calm periwinkle keywords, sage strings, one soft accent per role instead of
+ * a rainbow. Every color is chosen to clear WCAG AA 4.5:1 on the ground and
+ * on diff-wash rows, comments included, so the a11y gate never trips on
+ * rendered code.
+ */
+const nessaDarkTheme = {
+  name: "nessa-dark",
+  type: "dark" as const,
+  bg: "#101010",
+  fg: "#e6e6e6",
+  colors: {
+    "editor.background": "#101010",
+    "editor.foreground": "#e6e6e6",
+  },
+  tokenColors: [
+    {
+      scope: ["comment", "punctuation.definition.comment"],
+      settings: { foreground: "#9aa3ad" },
+    },
+    {
+      scope: ["string", "punctuation.definition.string"],
+      settings: { foreground: "#9ecb9a" },
+    },
+    {
+      scope: [
+        "constant.numeric",
+        "constant.language",
+        "constant.character",
+        "constant.other",
+      ],
+      settings: { foreground: "#d8b078" },
+    },
+    {
+      scope: [
+        "keyword",
+        "storage.type",
+        "storage.modifier",
+        "keyword.control",
+        "entity.name.tag",
+      ],
+      settings: { foreground: "#a8b8f8" },
+    },
+    {
+      scope: ["keyword.operator", "punctuation"],
+      settings: { foreground: "#b0b6bd" },
+    },
+    {
+      scope: ["entity.name.function", "support.function"],
+      settings: { foreground: "#cbb0f0" },
+    },
+    {
+      scope: [
+        "entity.name.type",
+        "entity.name.class",
+        "support.type",
+        "support.class",
+        "entity.other.inherited-class",
+      ],
+      settings: { foreground: "#8fd1e3" },
+    },
+    {
+      scope: [
+        "support.type.property-name",
+        "variable.other.property",
+        "variable.other.object.property",
+        "entity.other.attribute-name",
+        "meta.object-literal.key",
+      ],
+      settings: { foreground: "#9fc6e9" },
+    },
+    {
+      scope: ["variable", "variable.parameter", "meta.definition.variable"],
+      settings: { foreground: "#e6e6e6" },
+    },
+    {
+      scope: ["markup.heading"],
+      settings: { foreground: "#e6e6e6", fontStyle: "bold" },
+    },
+    {
+      scope: ["markup.inline.raw", "markup.raw.block"],
+      settings: { foreground: "#c9d1d9" },
+    },
+  ],
+}
+
+registerCustomTheme("nessa-dark", async () => nessaDarkTheme)
+
+/**
+ * The default syntax theme pair: Nessa's own restrained near-black dark
+ * theme, and Light+ — the bundled light theme with the highest minimum WCAG
+ * contrast.
  */
 const defaultCodeTheme: ThemesType = {
-  dark: "catppuccin-mocha",
+  dark: "nessa-dark",
   light: "light-plus",
 }
 

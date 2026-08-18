@@ -74,4 +74,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-005",
+    kind: "transition",
+    contractId: "A11Y-002",
+    baseRevision: "074c6de966fa2c603d1e6eec3dd7bc37bab4e077",
+    targets: ["validation/exceptions.ts"],
+    beforeFingerprint: "f1496eff9e0b91537ee5aa395e43704e81623c50f1f5338fb472c282e7b4d435",
+    afterFingerprint: "22709c0ab698f9ec6303b75205b58bedad282f42f2557a1afa522ad90ea50549",
+    rationale: "Re-fingerprints the ledgered focus-contrast exceptions after the core palette moved from blue-tinted tokens to the neutral shadcn scale; every excepted combination still fails its required ratio for the same reason, only the measured token and surface values changed.",
+    compatibility: "No exception is added or removed and no requirement weakens; the same subtle focus-tint failures remain ledgered with their measurements updated to the neutral palette.",
+    migration: "None for consumers; hosts overriding theme tokens keep their own responsibility for focus contrast on custom surfaces.",
+    supersedes: null,
+    pullRequest: null,
+  },
 ])

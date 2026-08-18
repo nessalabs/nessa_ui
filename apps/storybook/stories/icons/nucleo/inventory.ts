@@ -1,17 +1,31 @@
+import { BashIcon } from "./bash-icon"
 import { ChatComposeIcon } from "./chat-compose-icon"
+import { EditIcon } from "./edit-icon"
 import { FastIcon } from "./fast-icon"
 import { FileCopyIcon } from "./file-copy-icon"
 import { FolderClosedIcon } from "./folder-closed-icon"
 import { FolderOpenIcon } from "./folder-open-icon"
+import { SearchIcon } from "./search-icon"
 import { SidebarLeftIcon } from "./sidebar-left-icon"
 import { SidebarRightIcon } from "./sidebar-right-icon"
 import { ThinkingIcon } from "./thinking-icon"
+import { TodoIcon } from "./todo-icon"
 
 const nucleoIconInventory = [
+  {
+    id: "bash",
+    name: "Bash",
+    component: BashIcon,
+  },
   {
     id: "chat-compose",
     name: "Chat compose",
     component: ChatComposeIcon,
+  },
+  {
+    id: "edit",
+    name: "Edit",
+    component: EditIcon,
   },
   {
     id: "fast",
@@ -34,6 +48,11 @@ const nucleoIconInventory = [
     component: FolderOpenIcon,
   },
   {
+    id: "search",
+    name: "Search",
+    component: SearchIcon,
+  },
+  {
     id: "sidebar-left",
     name: "Sidebar left",
     component: SidebarLeftIcon,
@@ -47,6 +66,11 @@ const nucleoIconInventory = [
     id: "thinking",
     name: "Thinking",
     component: ThinkingIcon,
+  },
+  {
+    id: "todo",
+    name: "Todo",
+    component: TodoIcon,
   },
 ] as const
 
