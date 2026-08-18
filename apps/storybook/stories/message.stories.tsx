@@ -3,8 +3,14 @@ import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, userEvent, waitFor, within } from "storybook/test"
 import {
   Button,
+  ChatComposer,
+  ChatComposerActions,
+  ChatComposerFooter,
+  ChatComposerInput,
   Input,
   Message,
+  MessageAction,
+  MessageActions,
   MessageAttachment,
   MessageAttachments,
   MessageAvatar,
@@ -18,7 +24,14 @@ import {
   MessageThreadReplies,
   MessageThreadSummary,
 } from "@nessa-ui/react"
-import { FileSpreadsheet } from "lucide-react"
+import {
+  Check,
+  Copy,
+  FileSpreadsheet,
+  Pencil,
+  ThumbsDown,
+  ThumbsUp,
+} from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"
 
@@ -43,7 +56,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A composable chat message kit. Message lays out one conversation row and aligns it from the sender — from=\"user\" end-aligns, from=\"assistant\" start-aligns, and align overrides either — while exposing data-from and data-align for host styling. Inside it, MessageAvatar is an optional slot that renders an image with an initials fallback by default and accepts arbitrary children for fully custom avatars; MessageContent columns the optional MessageHeader, a MessageBubble, and the optional MessageFooter. The bubble ships three variants: muted for received messages, primary for sent messages, and plain for unbubbled prose such as assistant responses. MessageGroup tightens spacing between consecutive messages from the same sender. Slack-style threading composes from MessageThread wrapping a parent row, MessageThreadSummary — a facepile-plus-count button whose meta text swaps to an action label on hover, with expansion state host-owned via onClick and aria-expanded — and MessageThreadReplies, which indents replies to the parent's content column behind a connector rule. Every piece is an ordinary styled element, so hosts compose their own user and response message components from these primitives — or replace any slot entirely — instead of configuring a monolith.",
+          "A composable chat message kit. Message lays out one conversation row and aligns it from the sender — from=\"user\" end-aligns, from=\"assistant\" start-aligns, and align overrides either — while exposing data-from and data-align for host styling. Inside it, MessageAvatar is an optional slot that renders an image with an initials fallback by default and accepts arbitrary children for fully custom avatars; MessageContent columns the optional MessageHeader, a MessageBubble, and the optional MessageFooter. The bubble ships three variants: muted for received messages, primary for sent messages, and plain for unbubbled prose such as assistant responses. MessageGroup tightens spacing between consecutive messages from the same sender. Slack-style threading composes from MessageThread wrapping a parent row, MessageThreadSummary — a facepile-plus-count button whose meta text swaps to an action label on hover, with expansion state host-owned via onClick and aria-expanded — and MessageThreadReplies, which indents replies to the parent's content column behind a connector rule. MessageActions is a hover-revealed action row under a bubble — MessageAction icon buttons alongside meta text such as the sent time — that also reveals while an action holds keyboard focus and hides again once the pointer moves on; what each action does, including swapping the bubble for an edit composer, stays host-owned. Every piece is an ordinary styled element, so hosts compose their own user and response message components from these primitives — or replace any slot entirely — instead of configuring a monolith.",
       },
     },
   },
@@ -141,6 +154,202 @@ export const PlainResponse: Story = {
     await expect(
       canvas.getByText("Explain the cascade layers nessa ships."),
     ).toHaveAttribute("data-variant", "primary")
+  },
+}
+
+function ActionsAndEditingExample() {
+  const [text, setText] = React.useState(
+    "Do we have all our changes pushed to GitHub?",
+  )
+  const [draft, setDraft] = React.useState("")
+  const [editing, setEditing] = React.useState(false)
+  const [copied, setCopied] = React.useState(false)
+  const [reaction, setReaction] = React.useState<"up" | "down" | null>(null)
+  const editorRef = React.useRef<HTMLTextAreaElement | null>(null)
+
+  // Focus lands in the editor with the caret at the end. Programmatic focus
+  // (unlike autoFocus) keeps :focus-visible tied to how the edit began, so
+  // pointer clicks skip the inner outline while keyboard users keep it.
+  React.useEffect(() => {
+    const editor = editorRef.current
+    if (!editing || editor === null) return
+    editor.focus()
+    editor.setSelectionRange(editor.value.length, editor.value.length)
+  }, [editing])
+
+  const copyMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      // Clipboard access can be denied in embedded frames; the copied state
+      // below still demonstrates the interaction.
+    }
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1500)
+  }
+
+  const cancelEdit = () => setEditing(false)
+
+  return (
+    <ThreadFrame>
+      <Message from="user">
+        <MessageContent className={editing ? "w-full max-w-full" : undefined}>
+          {editing ? (
+            <ChatComposer
+              size="compact"
+              borderMode="always"
+              className="w-full"
+              onSubmit={(event) => {
+                event.preventDefault()
+                setText(draft)
+                setEditing(false)
+              }}
+            >
+              <ChatComposerInput
+                ref={editorRef}
+                aria-label="Edit message"
+                // The composer surface already shows the focus ring through
+                // borderMode="always", so the input's own outline would double
+                // up inside it.
+                className="focus-visible:[outline-style:none]"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") cancelEdit()
+                }}
+              />
+              <ChatComposerFooter className="justify-end">
+                <ChatComposerActions className="gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={cancelEdit}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" size="sm">
+                    Send
+                  </Button>
+                </ChatComposerActions>
+              </ChatComposerFooter>
+            </ChatComposer>
+          ) : (
+            <>
+              <MessageBubble variant="primary">{text}</MessageBubble>
+              <MessageActions>
+                <span className="pr-1 tabular-nums">9:57 PM</span>
+                <MessageAction
+                  aria-label={copied ? "Copied" : "Copy message"}
+                  onClick={copyMessage}
+                >
+                  {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+                </MessageAction>
+                <MessageAction
+                  aria-label="Edit message"
+                  onClick={() => {
+                    setDraft(text)
+                    setEditing(true)
+                  }}
+                >
+                  <Pencil aria-hidden="true" />
+                </MessageAction>
+              </MessageActions>
+            </>
+          )}
+        </MessageContent>
+      </Message>
+      <Message from="assistant">
+        <MessageAvatar fallback="N" alt="Nessa" />
+        <MessageContent>
+          <MessageBubble>
+            Everything on this branch is committed and pushed — the remote is
+            up to date.
+          </MessageBubble>
+          <MessageActions>
+            <MessageAction
+              aria-label="Good response"
+              aria-pressed={reaction === "up"}
+              className={reaction === "up" ? "bg-accent text-foreground" : undefined}
+              onClick={() =>
+                setReaction((current) => (current === "up" ? null : "up"))
+              }
+            >
+              <ThumbsUp aria-hidden="true" />
+            </MessageAction>
+            <MessageAction
+              aria-label="Bad response"
+              aria-pressed={reaction === "down"}
+              className={reaction === "down" ? "bg-accent text-foreground" : undefined}
+              onClick={() =>
+                setReaction((current) => (current === "down" ? null : "down"))
+              }
+            >
+              <ThumbsDown aria-hidden="true" />
+            </MessageAction>
+          </MessageActions>
+        </MessageContent>
+      </Message>
+    </ThreadFrame>
+  )
+}
+
+export const ActionsAndEditing: Story = {
+  parameters: storyDocumentation(
+    "MessageActions puts an icon-action row under the bubble — here the sent time with copy and edit on the user side, reactions on the assistant side — that stays transparent until the message row is hovered or an action receives keyboard focus. Every behavior is host-owned through onClick: copy writes the clipboard and swaps its icon to a check, the reactions toggle aria-pressed, and edit swaps the bubble for a compact ChatComposer prefilled with the message — Send commits the new text, Cancel or Escape restores the bubble unchanged. Compose the same row with retry, share, or anything else your transcript needs.",
+  ),
+  render: () => <ActionsAndEditingExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const copyAction = canvas.getByRole("button", { name: "Copy message" })
+    const actionsRow = copyAction.closest(
+      '[data-slot="message-actions"]',
+    ) as HTMLElement
+    // Actions stay transparent until the row is hovered or an action holds
+    // keyboard focus.
+    await expect(Number(getComputedStyle(actionsRow).opacity)).toBe(0)
+    const activeElement = () => canvasElement.ownerDocument.activeElement
+    for (let hops = 0; hops < 12 && activeElement() !== copyAction; hops += 1) {
+      await userEvent.tab()
+    }
+    await expect(copyAction).toHaveFocus()
+    await waitFor(() =>
+      expect(Number(getComputedStyle(actionsRow).opacity)).toBe(1),
+    )
+    // Copy confirms by swapping to a check.
+    await userEvent.click(copyAction)
+    await expect(
+      canvas.getByRole("button", { name: "Copied" }),
+    ).toBeVisible()
+    // Edit swaps the bubble for a prefilled composer.
+    await userEvent.click(canvas.getByRole("button", { name: "Edit message" }))
+    const editor = canvas.getByRole("textbox", { name: "Edit message" })
+    await expect(editor).toHaveValue(
+      "Do we have all our changes pushed to GitHub?",
+    )
+    // Cancel restores the original bubble unchanged.
+    await userEvent.type(editor, " Really?")
+    await userEvent.click(canvas.getByRole("button", { name: "Cancel" }))
+    await expect(
+      canvas.getByText("Do we have all our changes pushed to GitHub?"),
+    ).toBeVisible()
+    // Send commits the edited text.
+    await userEvent.click(canvas.getByRole("button", { name: "Edit message" }))
+    const reopened = canvas.getByRole("textbox", { name: "Edit message" })
+    await userEvent.clear(reopened)
+    await userEvent.type(reopened, "Is everything on this branch on GitHub?")
+    await userEvent.click(canvas.getByRole("button", { name: "Send" }))
+    await expect(
+      canvas.getByText("Is everything on this branch on GitHub?"),
+    ).toBeVisible()
+    await expect(
+      canvas.queryByRole("textbox", { name: "Edit message" }),
+    ).not.toBeInTheDocument()
+    // Reactions are ordinary toggle buttons with host-owned pressed state.
+    const thumbsUp = canvas.getByRole("button", { name: "Good response" })
+    await expect(thumbsUp).toHaveAttribute("aria-pressed", "false")
+    await userEvent.click(thumbsUp)
+    await expect(thumbsUp).toHaveAttribute("aria-pressed", "true")
   },
 }
 

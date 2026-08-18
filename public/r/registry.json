@@ -284,7 +284,7 @@
       "name": "message",
       "type": "registry:ui",
       "title": "Message",
-      "description": "A composable chat message row with optional avatar, bubble variants, streaming text, attachments, threading, and header and footer meta slots.",
+      "description": "A composable chat message row with optional avatar, bubble variants, streaming text, attachments, threading, hover-revealed action icons, and header and footer meta slots.",
       "dependencies": [
         "lucide-react"
       ],

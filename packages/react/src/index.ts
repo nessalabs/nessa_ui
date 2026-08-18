@@ -41,6 +41,8 @@ export {
 } from "./components/mermaid-diagram"
 export {
   Message,
+  MessageAction,
+  MessageActions,
   MessageAttachment,
   MessageAttachments,
   MessageAvatar,
@@ -54,6 +56,8 @@ export {
   MessageThreadReplies,
   MessageThreadSummary,
   useMessageStreamText,
+  type MessageActionProps,
+  type MessageActionsProps,
   type MessageAlign,
   type MessageAttachmentProps,
   type MessageAttachmentsProps,
