@@ -179,7 +179,7 @@ export const CollapsedSummary: Story = {
 
 export const HoverRowActions: Story = {
   parameters: storyDocumentation(
-    "Row actions stay transparent until the row is hovered or an action receives focus, so pointer and keyboard users both reach open, copy, and revert without permanent chrome.",
+    "Row actions stay transparent until the row is hovered or an action receives keyboard focus; a pointer click never pins a row's actions open once the pointer moves on.",
   ),
   render: () => <RowActionsExample />,
   play: async ({ canvasElement }) => {
@@ -189,7 +189,11 @@ export const HoverRowActions: Story = {
     })
     const actionsGroup = openAction.parentElement as HTMLElement
     await expect(Number(getComputedStyle(actionsGroup).opacity)).toBe(0)
-    openAction.focus()
+    const activeElement = () => canvasElement.ownerDocument.activeElement
+    for (let hops = 0; hops < 12 && activeElement() !== openAction; hops += 1) {
+      await userEvent.tab()
+    }
+    await expect(openAction).toHaveFocus()
     await waitFor(() =>
       expect(Number(getComputedStyle(actionsGroup).opacity)).toBe(1),
     )
