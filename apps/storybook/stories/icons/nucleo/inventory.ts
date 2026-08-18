@@ -5,6 +5,7 @@ import { FastIcon } from "./fast-icon"
 import { FileCopyIcon } from "./file-copy-icon"
 import { FolderClosedIcon } from "./folder-closed-icon"
 import { FolderOpenIcon } from "./folder-open-icon"
+import { GlobeIcon } from "./globe-icon"
 import { SearchIcon } from "./search-icon"
 import { SidebarLeftIcon } from "./sidebar-left-icon"
 import { SidebarRightIcon } from "./sidebar-right-icon"
@@ -46,6 +47,11 @@ const nucleoIconInventory = [
     id: "folder-open",
     name: "Folder open",
     component: FolderOpenIcon,
+  },
+  {
+    id: "globe",
+    name: "Globe",
+    component: GlobeIcon,
   },
   {
     id: "search",

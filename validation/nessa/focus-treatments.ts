@@ -25,6 +25,7 @@ type FocusComponent =
   | "input"
   | "conversation-rail"
   | "file-diff-list"
+  | "reference"
   | "split-view/split-view-separator"
   | "app-shell/app-shell-dock"
   | (typeof composerFocusComponents)[number]["component"]
@@ -98,6 +99,15 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     dark: { token: "--ring", opacity: 1 },
   } as const)),
   {
+    component: "reference",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 6,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  {
     component: "conversation-rail",
     layer: "outline",
     state: "focus-visible",
@@ -168,6 +178,12 @@ export const focusGeometryClasses = Object.freeze([
   { component: "file-diff-list", className: "focus-visible:outline-2", count: 3 },
   { component: "file-diff-list", className: "focus-visible:outline-offset-2", count: 2 },
   { component: "file-diff-list", className: "focus-visible:-outline-offset-2", count: 1 },
+  // The pager buttons and the scrollable excerpt region sit at the card
+  // edge, so their outlines draw inset like file-diff-list's list region;
+  // chip and links keep the outset offset.
+  { component: "reference", className: "focus-visible:outline-2", count: 6 },
+  { component: "reference", className: "focus-visible:outline-offset-2", count: 3 },
+  { component: "reference", className: "focus-visible:-outline-offset-2", count: 3 },
   { component: "conversation-rail", className: "focus-visible:outline-2", count: 1 },
   { component: "conversation-rail", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "split-view/split-view-separator", className: "focus-visible:ring-2", count: 1 },

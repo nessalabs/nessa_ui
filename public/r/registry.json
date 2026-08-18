@@ -661,6 +661,27 @@
       ]
     },
     {
+      "name": "reference",
+      "type": "registry:ui",
+      "title": "Reference",
+      "description": "An inline citation chip for agent and research surfaces: hover or focus reveals a floating source card with excerpt, locator, pager, and link; clicking follows the source.",
+      "dependencies": [
+        "lucide-react",
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/reference.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/reference.tsx"
+        }
+      ]
+    },
+    {
       "name": "sidebar",
       "type": "registry:ui",
       "title": "Sidebar",
