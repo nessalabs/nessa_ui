@@ -175,6 +175,21 @@ export {
   type ComposerAccessModeValue,
 } from "./components/composer-access-mode"
 export {
+  ToolCall,
+  ToolCallContent,
+  ToolCallDiff,
+  ToolCallFile,
+  ToolCallTabs,
+  ToolCallTrigger,
+  type ToolCallContentProps,
+  type ToolCallDiffProps,
+  type ToolCallFileProps,
+  type ToolCallProps,
+  type ToolCallStatus,
+  type ToolCallTabsProps,
+  type ToolCallTriggerProps,
+} from "./components/tool-call"
+export {
   Sidebar,
   SidebarContent,
   SidebarCollapsible,
