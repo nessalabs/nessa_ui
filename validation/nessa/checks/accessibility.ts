@@ -49,8 +49,9 @@ function luminance(value: LinearColor): number {
   return 0.2126 * value.r + 0.7152 * value.g + 0.0722 * value.b
 }
 
-export function contrastRatio(foregroundValue: string, backgroundValue: string, opacity = 1): { ratio: number; wideGamut: boolean } {
-  const background = color(backgroundValue)
+export function contrastRatio(foregroundValue: string, backgroundValue: string, opacity = 1, overlay?: { value: string; opacity: number }): { ratio: number; wideGamut: boolean } {
+  const surface = color(backgroundValue)
+  const background = overlay ? composite(color(overlay.value), surface, overlay.opacity) : surface
   const foreground = composite(color(foregroundValue), background, opacity)
   const first = luminance(foreground)
   const second = luminance(background)
@@ -76,11 +77,11 @@ export function resolveTokenValue(tokens: Readonly<Record<string, string>>, toke
 }
 
 export function discoverFocusClasses(source: string): string[] {
-  return source.match(/(?:dark:)?(?:focus-visible|aria-invalid):(?:(?:ring|border)-|outline-(?!\d|offset-))[^\s"'`]+/g) ?? []
+  return source.match(/(?:dark:)?(?:focus-visible|aria-invalid):(?:(?:ring|border)-|-?outline-(?!\d|offset-))[^\s"'`]+/g) ?? []
 }
 
 export function focusClassesFromAst(ast: import("typescript").SourceFile): string[] {
-  return classTokens(ast).filter((token) => /^(?:dark:)?(?:focus-visible|aria-invalid):(?:ring|border|outline)-.+$/.test(token))
+  return classTokens(ast).filter((token) => /^(?:dark:)?(?:focus-visible|aria-invalid):-?(?:ring|border|outline)-.+$/.test(token))
 }
 
 export const accessibilityCheck = defineCheck({
@@ -94,11 +95,14 @@ export const accessibilityCheck = defineCheck({
 
     for (const mode of ["light", "dark"] as const) {
       for (const pair of contrastMatrix) {
+        const label = pair.overlay ? `${pair.foreground}/${pair.background}+${pair.overlay.token}@${pair.overlay.opacity}` : `${pair.foreground}/${pair.background}`
         let foreground: string | undefined
         let background: string | undefined
+        let overlayValue: string | undefined
         try {
           foreground = resolveTokenValue(tokens[mode], pair.foreground)
           background = resolveTokenValue(tokens[mode], pair.background)
+          if (pair.overlay) overlayValue = resolveTokenValue(tokens[mode], pair.overlay.token)
         } catch (error) {
           findings.push(context.fail(error instanceof Error ? error.message : String(error), { contractId: "A11Y-001" }))
           continue
@@ -108,21 +112,23 @@ export const accessibilityCheck = defineCheck({
           continue
         }
         try {
-          const exception = contrastExceptions.find((entry) => entry.mode === mode && entry.foreground === pair.foreground && entry.background === pair.background)
+          // Contrast exceptions identify token-on-token pairs only; overlay
+          // pairs cannot be excepted and fail closed.
+          const exception = pair.overlay ? undefined : contrastExceptions.find((entry) => entry.mode === mode && entry.foreground === pair.foreground && entry.background === pair.background)
           if (exception && (exception.expectedForegroundValue !== foreground || exception.expectedBackgroundValue !== background || exception.requiredRatio !== pair.minimum)) {
-            findings.push(context.fail(`Contrast exception fingerprint changed for ${mode} ${pair.foreground}/${pair.background}.`, { contractId: "A11Y-001" }))
+            findings.push(context.fail(`Contrast exception fingerprint changed for ${mode} ${label}.`, { contractId: "A11Y-001" }))
             continue
           }
-          const measured = contrastRatio(foreground, background)
+          const measured = contrastRatio(foreground, background, 1, pair.overlay && overlayValue ? { value: overlayValue, opacity: pair.overlay.opacity } : undefined)
           if (measured.wideGamut) {
-            findings.push(context.review(`${mode} ${pair.foreground}/${pair.background} is valid wider-gamut color and needs browser evidence.`, { contractId: "A11Y-004" }))
+            findings.push(context.review(`${mode} ${label} is valid wider-gamut color and needs browser evidence.`, { contractId: "A11Y-004" }))
             continue
           }
           if (measured.ratio + 1e-6 < pair.minimum) {
-            if (exception) activeContrastExceptions.push(`${mode} ${pair.foreground}/${pair.background}=${measured.ratio.toFixed(2)}:1`)
-            else findings.push(context.fail(`${mode} ${pair.foreground}/${pair.background} is ${measured.ratio.toFixed(2)}:1 (requires ${pair.minimum}:1).`, { contractId: "A11Y-001" }))
+            if (exception) activeContrastExceptions.push(`${mode} ${label}=${measured.ratio.toFixed(2)}:1`)
+            else findings.push(context.fail(`${mode} ${label} is ${measured.ratio.toFixed(2)}:1 (requires ${pair.minimum}:1).`, { contractId: "A11Y-001" }))
           } else if (exception) {
-            findings.push(context.fail(`Contrast exception is stale because ${mode} ${pair.foreground}/${pair.background} now passes.`, { contractId: "A11Y-001", repair: "Remove the exception." }))
+            findings.push(context.fail(`Contrast exception is stale because ${mode} ${label} now passes.`, { contractId: "A11Y-001", repair: "Remove the exception." }))
           }
         } catch (error) {
           findings.push(context.fail(error instanceof Error ? error.message : String(error), { contractId: "A11Y-001" }))

@@ -1,5 +1,6 @@
 export { ChatComposeIcon } from "./chat-compose-icon"
 export { FastIcon } from "./fast-icon"
+export { FileCopyIcon } from "./file-copy-icon"
 export { FolderClosedIcon } from "./folder-closed-icon"
 export { FolderOpenIcon } from "./folder-open-icon"
 export { SidebarLeftIcon } from "./sidebar-left-icon"

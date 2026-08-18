@@ -138,6 +138,26 @@ export {
   type ChatComposerSubmitProps,
 } from "./components/chat-composer"
 export {
+  DiffStat,
+  FileDiffCard,
+  FileDiffCardActions,
+  FileDiffCardHeader,
+  FileDiffCardHeading,
+  FileDiffCardIcon,
+  FileDiffCardTitle,
+  FileDiffList,
+  FileDiffListItem,
+  FileDiffListItemAction,
+  FileDiffListItemActions,
+  FileDiffListToggle,
+  FileDiffPath,
+  type DiffStatProps,
+  type FileDiffCardProps,
+  type FileDiffListProps,
+  type FileDiffListToggleProps,
+  type FileDiffPathProps,
+} from "./components/file-diff-list"
+export {
   ComposerDeliveryMode,
   ComposerQueue,
   ComposerQueueItem,
