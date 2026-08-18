@@ -74,4 +74,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-005",
+    kind: "transition",
+    contractId: "A11Y-002",
+    baseRevision: "ee4c96fb1bd0ff6c6bc7dddc465a1717eabcac1e",
+    targets: ["validation/exceptions.ts"],
+    beforeFingerprint: "f1496eff9e0b91537ee5aa395e43704e81623c50f1f5338fb472c282e7b4d435",
+    afterFingerprint: "f38a4fccf18bd94104a1a3ac947cbdf9d1701ff8e853811412597da94c6ec012",
+    rationale: "Re-fingerprints the three dark-mode destructive focus-ring exceptions after the dark surface palette moved from blue-tinted tokens (hue 258) to neutral grays (background oklch(0.145 0 0), card/popover oklch(0.195 0 0)); the destructive ring at 30% opacity remains below 3:1 on these darker neutral surfaces for the same reviewed reason.",
+    compatibility: "No exception is added, removed, or weakened; only the recorded surface values move with the theme so the fingerprint guard keeps detecting genuine palette drift.",
+    migration: "Consumers pick up the neutral dark palette from the theme tokens automatically; any application relying on the previous blue-tinted dark surfaces should re-verify custom surface pairings against the neutral values.",
+    supersedes: null,
+    pullRequest: null,
+  },
 ])
