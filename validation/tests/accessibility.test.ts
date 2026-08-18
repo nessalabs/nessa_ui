@@ -3,6 +3,7 @@ import test from "node:test"
 
 import { contrastRatio, discoverFocusClasses, focusClassesFromAst, focusExceptionFingerprintMatches, resolveTokenValue } from "../nessa/checks/accessibility.ts"
 import { exceptions } from "../exceptions.ts"
+import { contrastMatrix } from "../nessa/contrast-matrix.ts"
 import { focusTreatments } from "../nessa/focus-treatments.ts"
 import ts from "typescript"
 
@@ -25,11 +26,17 @@ test("focus inventory discovers ring, border, and outline color layers independe
   assert.ok(focusTreatments.some((entry) => entry.layer === "border"))
   assert.ok(focusTreatments.some((entry) => entry.layer === "outline"))
   assert.deepEqual(discoverFocusClasses("focus-visible:ring-[#fff] aria-invalid:border-[transparent]"), ["focus-visible:ring-[#fff]", "aria-invalid:border-[transparent]"])
+  assert.deepEqual(discoverFocusClasses("focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"), ["focus-visible:outline-ring"])
 })
 
 test("semantic focus discovery ignores comments/prose and cannot satisfy a removed runtime class", () => {
   const ast = ts.createSourceFile("fixture.tsx", `// focus-visible:ring-comment\nconst prose = "focus-visible:ring-prose"; const view = <div className="focus-visible:border-ring" />`, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TSX)
   assert.deepEqual(focusClassesFromAst(ast), ["focus-visible:border-ring"])
+})
+
+test("semantic focus discovery sees negative-prefixed geometry utilities", () => {
+  const ast = ts.createSourceFile("fixture.tsx", `const view = <ul className="focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring" />`, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TSX)
+  assert.deepEqual(focusClassesFromAst(ast), ["focus-visible:outline-2", "focus-visible:-outline-offset-2", "focus-visible:outline-ring"])
 })
 
 test("the reviewed focus exception set is exact, unique, and remains 18 tuples", () => {
@@ -50,6 +57,30 @@ test("alpha compositing is evaluated against the adjacent background", () => {
   const translucent = contrastRatio("oklch(0 0 0 / 40%)", "oklch(1 0 0)")
   assert.ok(translucent.ratio < opaque.ratio)
   assert.ok(translucent.ratio > 1)
+})
+
+test("surface overlays composite over the adjacent background before measuring", () => {
+  // A 50% black wash over white yields a linear 0.5 gray surface, so black
+  // text measures (0.5 + 0.05) / 0.05 = 11 against it instead of 21.
+  const washed = contrastRatio("oklch(0 0 0)", "oklch(1 0 0)", 1, { value: "oklch(0 0 0)", opacity: 0.5 })
+  assert.ok(Math.abs(washed.ratio - 11) < 1e-6)
+  const wideWash = contrastRatio("oklch(0 0 0)", "oklch(1 0 0)", 1, { value: "oklch(0.7 0.35 145)", opacity: 0.5 })
+  assert.equal(wideWash.wideGamut, true)
+})
+
+test("custom text tokens are enforced on their rendered surfaces, including the hover wash", () => {
+  const keys = contrastMatrix.map((pair) => [pair.foreground, pair.background, pair.overlay ? `${pair.overlay.token}@${pair.overlay.opacity}` : ""].join("|"))
+  for (const expected of [
+    "--nessa-diff-addition|--card|",
+    "--nessa-diff-addition|--card|--accent@0.5",
+    "--nessa-diff-deletion|--card|",
+    "--nessa-diff-deletion|--card|--accent@0.5",
+    "--nessa-fast-mode-active|--card|",
+    "--nessa-fast-mode-active|--background|",
+  ]) {
+    assert.ok(keys.includes(expected), `missing contrast pair ${expected}`)
+  }
+  assert.ok(contrastMatrix.filter((pair) => pair.overlay).every((pair) => pair.role === "normal-text" && pair.minimum === 4.5))
 })
 
 test("malformed colors fail and wider-gamut colors are identified", () => {
