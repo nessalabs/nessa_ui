@@ -328,7 +328,10 @@ function FileDiffListItemActions({
     <div
       data-slot="file-diff-list-item-actions"
       className={cn(
-        "flex items-center gap-0.5 opacity-0 transition-opacity group-focus-within/file-row:opacity-100 group-hover/file-row:opacity-100",
+        // Reveal binds to :focus-visible, not :focus-within: a pointer click
+        // parks focus on the clicked action, and plain focus-within would keep
+        // this row's actions lit while the pointer hovers other rows.
+        "flex items-center gap-0.5 opacity-0 transition-opacity group-has-[:focus-visible]/file-row:opacity-100 group-hover/file-row:opacity-100",
         className,
       )}
       {...props}
