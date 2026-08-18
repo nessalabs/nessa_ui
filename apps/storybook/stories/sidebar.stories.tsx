@@ -41,9 +41,6 @@ import { storyDocumentation } from "./story-documentation"
 const pinnedChats = [
   "Plan the customer research sprint",
   "Review the launch narrative",
-  "Refine the voice experience",
-  "Map the release workflow",
-  "Prepare the product brief",
 ]
 
 const projects = [
@@ -343,48 +340,52 @@ function ChatSidebarDemo() {
           </SidebarMenu>
         </SidebarHeader>
 
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>Pinned</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {pinnedChats.map((chat) => (
-                  <SidebarMenuItem
-                    key={chat}
-                    isActive={activeItem === chat}
-                    tooltip={chat}
-                    onClick={() => selectItem(chat)}
-                    showTrailingOnHover
-                    trailing={
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-6"
-                          aria-label={`Pin ${chat}`}
-                          onClick={() => setLastAction(`Pinned ${chat}`)}
-                        >
-                          <Pin />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-6"
-                          aria-label={`Archive ${chat}`}
-                          onClick={() => setLastAction(`Archived ${chat}`)}
-                        >
-                          <Archive />
-                        </Button>
-                      </>
-                    }
-                  >
-                    {chat}
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+        <SidebarGroup className="shrink-0 px-2">
+          <SidebarGroupLabel>Pinned</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {pinnedChats.map((chat) => (
+                <SidebarMenuItem
+                  key={chat}
+                  isActive={activeItem === chat}
+                  tooltip={chat}
+                  onClick={() => selectItem(chat)}
+                  showTrailingOnHover
+                  trailing={
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-6"
+                        aria-label={`Pin ${chat}`}
+                        onClick={() => setLastAction(`Pinned ${chat}`)}
+                      >
+                        <Pin />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-6"
+                        aria-label={`Archive ${chat}`}
+                        onClick={() => setLastAction(`Archived ${chat}`)}
+                      >
+                        <Archive />
+                      </Button>
+                    </>
+                  }
+                >
+                  {chat}
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
+        <SidebarContent>
+          <div
+            aria-hidden
+            className="pointer-events-none sticky top-0 z-10 -mb-4 h-4 shrink-0 bg-gradient-to-b from-sidebar to-transparent"
+          />
           <SidebarGroup>
             <SidebarGroupLabel>Projects</SidebarGroupLabel>
             <SidebarGroupContent>
