@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { HoverCard } from "radix-ui"
+import { HoverCard, Slot } from "radix-ui"
 import { ArrowUpRight, ChevronLeft, ChevronRight } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -10,11 +10,6 @@ import { cn } from "@/lib/utils"
  * One cited source rendered by `ReferenceCard`.
  */
 export interface ReferenceSource {
-  /**
-   * Stable key for the source. Falls back to the array index when omitted,
-   * which is fine for the usual static citation lists.
-   */
-  id?: string
   /** Display name of the cited document ("Stripe Investor Letter"). */
   title: React.ReactNode
   /**
@@ -34,39 +29,156 @@ export interface ReferenceSource {
   sourceLabel?: React.ReactNode
 }
 
+/**
+ * Shared state between a `Reference` root and the trigger and content
+ * composed inside it, so touch taps can open the card and the content can
+ * report where it lives for the focus-within hold.
+ */
+interface ReferenceContextValue {
+  /** Whether the card is currently open. */
+  open: boolean
+  /** Opens the card (used by the trigger's touch-tap path). */
+  openCard: () => void
+  /**
+   * Closes the card unconditionally (Escape, focus leaving the card),
+   * returning focus to the trigger when it was inside the card so keyboard
+   * users are not stranded on `body`.
+   */
+  closeCard: () => void
+  /** Registers (or with `null`, unregisters) the trigger element. */
+  registerTrigger: (element: HTMLElement | null) => void
+  /** Registers (or with `null`, unregisters) the mounted content element. */
+  registerContent: (element: HTMLElement | null) => void
+}
+
+const ReferenceContext = React.createContext<ReferenceContextValue | null>(
+  null,
+)
+
+/**
+ * Reads the surrounding reference's context.
+ *
+ * @param consumer - Component name used in the error when rendered outside a
+ * `Reference`.
+ */
+function useReference(consumer: string) {
+  const context = React.useContext(ReferenceContext)
+  if (!context) {
+    throw new Error(`${consumer} must be used within a Reference.`)
+  }
+  return context
+}
+
 export interface ReferenceProps
   extends React.ComponentProps<typeof HoverCard.Root> {}
 
 /**
  * An inline citation for agent and research surfaces: a small chip embedded
- * in flowing text that reveals its supporting evidence in a floating card on
- * hover or keyboard focus, and navigates to the source when clicked.
+ * in flowing text that reveals its supporting evidence in a floating card,
+ * and navigates to the source when clicked.
  *
  * Compose `ReferenceTrigger` (the chip) with `ReferenceContent` (the card).
  * Inside the content, `ReferenceCard` renders the batteries-included
  * source view — title, excerpt, locator, source link, and a pager when a
  * claim cites several sources — or pass any custom node instead.
  *
- * Built on Radix `HoverCard`: the card opens on pointer hover or trigger
- * focus, stays open while the pointer is over it, and dismisses on Escape.
- * The trigger itself is a real link (or button), so keyboard and screen
- * reader users can always follow the citation even without the preview.
+ * Built on Radix `HoverCard`. The card opens on pointer hover or trigger
+ * focus. On touch — where hover does not exist — the first tap reveals the
+ * card instead of navigating, and a second tap (or the card's links)
+ * follows the source; tapping outside dismisses. It stays open while the
+ * pointer — or focus — is inside it, and Escape dismisses it, returning
+ * focus to the chip. The card itself is a pointer-first affordance:
+ * sequential keyboard navigation cannot reliably reach the portaled card
+ * from the chip, which is why the chip is a real link — keyboard and screen
+ * reader users follow the citation through the chip itself.
+ *
+ * @param openDelay - Hover delay before the card opens, in milliseconds.
+ * Deliberately faster than the Radix default of 700. @default 150
+ * @param closeDelay - Delay before the card closes after the pointer
+ * leaves, in milliseconds (Radix default is 300). @default 200
  */
-function Reference({ openDelay = 150, closeDelay = 200, ...props }: ReferenceProps) {
+function Reference({
+  openDelay = 150,
+  closeDelay = 200,
+  open: openProp,
+  defaultOpen = false,
+  onOpenChange,
+  ...props
+}: ReferenceProps) {
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(defaultOpen)
+  const open = openProp ?? uncontrolledOpen
+  const triggerRef = React.useRef<HTMLElement | null>(null)
+  const contentRef = React.useRef<HTMLElement | null>(null)
+
+  const setOpen = React.useCallback(
+    (next: boolean) => {
+      setUncontrolledOpen(next)
+      onOpenChange?.(next)
+    },
+    [onOpenChange],
+  )
+
+  /**
+   * Radix closes the card when the trigger blurs, which would also fire
+   * while focus is moving into the card (clicking the scrollable excerpt,
+   * focusing a pager button). Holding the card open while focus is inside
+   * it keeps those interactions alive; Escape and focus leaving the card
+   * close it through `closeCard`.
+   */
+  const handleOpenChange = React.useCallback(
+    (next: boolean) => {
+      if (
+        !next &&
+        contentRef.current?.contains(document.activeElement)
+      ) {
+        return
+      }
+      setOpen(next)
+    },
+    [setOpen],
+  )
+
+  const context = React.useMemo<ReferenceContextValue>(
+    () => ({
+      open,
+      openCard: () => setOpen(true),
+      closeCard: () => {
+        // Capture before the state update unmounts the content.
+        const focusWasInside = contentRef.current?.contains(
+          document.activeElement,
+        )
+        setOpen(false)
+        if (focusWasInside) triggerRef.current?.focus()
+      },
+      registerTrigger: (element) => {
+        triggerRef.current = element
+      },
+      registerContent: (element) => {
+        contentRef.current = element
+      },
+    }),
+    [open, setOpen],
+  )
+
   return (
-    <HoverCard.Root
-      openDelay={openDelay}
-      closeDelay={closeDelay}
-      {...props}
-    />
+    <ReferenceContext.Provider value={context}>
+      <HoverCard.Root
+        openDelay={openDelay}
+        closeDelay={closeDelay}
+        open={open}
+        onOpenChange={handleOpenChange}
+        {...props}
+      />
+    </ReferenceContext.Provider>
   )
 }
 
 export interface ReferenceTriggerProps extends React.ComponentProps<"a"> {
   /**
    * Merges the trigger behavior and chip styling onto the child element
-   * instead of rendering the built-in chip. Use it to promote an existing
-   * inline element (for example a superscript) into the trigger.
+   * instead of rendering the built-in `<a>`/`<button>`. Use it to promote
+   * an existing inline element into the trigger; pass a link-like child
+   * when combining with `href`.
    */
   asChild?: boolean
 }
@@ -75,49 +187,80 @@ export interface ReferenceTriggerProps extends React.ComponentProps<"a"> {
  * The inline chip that anchors the citation. Renders an `<a>` when `href`
  * is given (clicking follows the source) and a `<button>` otherwise; either
  * way it stays baseline-friendly so it can sit inside a sentence. Give it a
- * short label as children — a citation number, favicon, or domain.
+ * short label as children — a citation number, favicon, or domain. Long
+ * labels clip at `max-w-48` (an inline-flex box cannot ellipsize), so keep
+ * chip labels short and put full titles in the card.
+ *
+ * The chip is intentionally smaller than 24px: as an inline target inside a
+ * sentence it relies on the WCAG 2.5.8 (Target Size, Minimum) inline
+ * exception. A chip rendered standalone — outside flowing text — should be
+ * given a larger hit area via `className`.
+ *
+ * On touch, the first tap opens the card instead of navigating and a
+ * second tap follows the source (see `Reference`); the card's links also
+ * carry navigation for touch users.
  */
 function ReferenceTrigger({
   asChild = false,
   className,
   href,
   children,
+  onClick,
+  ref,
   ...props
 }: ReferenceTriggerProps) {
-  const chipClassName = cn(
-    "mx-0.5 box-border inline-flex max-w-48 shrink-0 cursor-pointer items-center gap-1 truncate rounded-full border border-border bg-background px-1.5 py-px align-baseline font-sans text-xs font-medium text-muted-foreground no-underline transition-colors hover:border-ring/60 hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring data-[state=open]:border-ring/60 data-[state=open]:text-foreground [&>svg]:size-3 [&>svg]:shrink-0",
-    className,
-  )
+  const { open, openCard, registerTrigger } = useReference("ReferenceTrigger")
+  const Comp = (
+    asChild ? Slot.Root : href !== undefined ? "a" : "button"
+  ) as React.ElementType
 
-  if (asChild) {
-    return (
-      <HoverCard.Trigger data-slot="reference-trigger" asChild {...props}>
-        {children}
-      </HoverCard.Trigger>
-    )
-  }
+  /**
+   * Registers the element for close-time focus return and forwards it to
+   * the consumer's ref, honoring the callback-ref cleanup contract.
+   */
+  const composedRef = React.useCallback(
+    (element: HTMLAnchorElement | null) => {
+      registerTrigger(element)
+      let consumerCleanup: (() => void) | void
+      if (typeof ref === "function") consumerCleanup = ref(element)
+      else if (ref) ref.current = element
+      return () => {
+        registerTrigger(null)
+        if (typeof consumerCleanup === "function") consumerCleanup()
+        else if (typeof ref === "function") ref(null)
+        else if (ref) ref.current = null
+      }
+    },
+    [registerTrigger, ref],
+  )
 
   return (
     <HoverCard.Trigger asChild>
-      {href !== undefined ? (
-        <a
-          data-slot="reference-trigger"
-          href={href}
-          className={chipClassName}
-          {...props}
-        >
-          {children}
-        </a>
-      ) : (
-        <button
-          data-slot="reference-trigger"
-          type="button"
-          className={chipClassName}
-          {...(props as React.ComponentProps<"button">)}
-        >
-          {children}
-        </button>
-      )}
+      <Comp
+        ref={composedRef}
+        data-slot="reference-trigger"
+        {...(href !== undefined ? { href } : {})}
+        {...(!asChild && href === undefined ? { type: "button" } : {})}
+        className={cn(
+          "mx-0.5 box-border inline-flex max-w-48 shrink-0 cursor-pointer items-center gap-1 overflow-hidden whitespace-nowrap rounded-full border border-border bg-background px-1.5 py-px align-baseline font-sans text-xs font-medium text-muted-foreground no-underline transition-colors hover:border-ring/60 hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring data-[state=open]:border-ring/60 data-[state=open]:text-foreground [&>svg]:size-3 [&>svg]:shrink-0",
+          className,
+        )}
+        onClick={(event: React.MouseEvent<HTMLAnchorElement>) => {
+          // Touch has no hover to reveal the card, so the tap's synthesized
+          // click does it: the first tap opens instead of navigating, a
+          // second tap falls through to the link. Scroll gestures never
+          // synthesize a click, so they cannot open the card spuriously.
+          const pointerType = (event.nativeEvent as PointerEvent).pointerType
+          if (pointerType === "touch" && !open) {
+            event.preventDefault()
+            openCard()
+          }
+          onClick?.(event)
+        }}
+        {...props}
+      >
+        {children}
+      </Comp>
     </HoverCard.Trigger>
   )
 }
@@ -135,10 +278,13 @@ export interface ReferenceContentProps
 }
 
 /**
- * The floating card revealed on hover or focus. A popover-toned surface
- * positioned above the chip by default, with collision-aware flipping from
- * Radix. Put a `ReferenceCard` inside for the standard source view, or any
- * custom node for bespoke previews.
+ * The floating card revealed on hover, focus, or touch tap. A popover-toned
+ * surface positioned above the chip by default, with collision-aware
+ * flipping from Radix. Put a `ReferenceCard` inside for the standard source
+ * view, or any custom node for bespoke previews.
+ *
+ * While focus is inside the card it stays open; it closes when focus moves
+ * out of it, and Escape closes it from anywhere.
  */
 function ReferenceContent({
   portalContainer,
@@ -149,16 +295,67 @@ function ReferenceContent({
   collisionPadding = 12,
   className,
   children,
+  ref,
+  onBlur,
+  onEscapeKeyDown,
   ...props
 }: ReferenceContentProps) {
+  const { closeCard, registerContent } = useReference("ReferenceContent")
+
+  /**
+   * Registers the content element for the root's focus-within hold and
+   * forwards it to the consumer's ref, honoring the callback-ref cleanup
+   * contract: a consumer-returned cleanup is invoked on detach, otherwise
+   * callback refs are called with `null` and object refs are reset.
+   */
+  const composedRef = React.useCallback(
+    (element: HTMLDivElement | null) => {
+      registerContent(element)
+      let consumerCleanup: (() => void) | void
+      if (typeof ref === "function") consumerCleanup = ref(element)
+      else if (ref) ref.current = element
+      return () => {
+        registerContent(null)
+        if (typeof consumerCleanup === "function") consumerCleanup()
+        else if (typeof ref === "function") ref(null)
+        else if (ref) ref.current = null
+      }
+    },
+    [registerContent, ref],
+  )
+
   return (
     <HoverCard.Portal container={portalContainer}>
       <HoverCard.Content
+        ref={composedRef}
         data-slot="reference-content"
         side={side}
         align={align}
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
+        onBlur={(event) => {
+          onBlur?.(event)
+          // The root holds the card open while focus is inside it, so the
+          // card owns closing itself when focus moves back out. A null
+          // relatedTarget is not treated as leaving: it also fires when
+          // focus falls to `body` from in-card interactions (clicking the
+          // excerpt text, a pager button disabling itself), where closing
+          // would yank the card out from under the pointer — pointer-out
+          // and outside-press dismissal cover those endings instead.
+          if (
+            event.relatedTarget &&
+            !event.currentTarget.contains(event.relatedTarget as Node)
+          ) {
+            closeCard()
+          }
+        }}
+        onEscapeKeyDown={(event) => {
+          // Escape pressed while focus is inside the card would be vetoed
+          // by the focus-within hold, so the card closes itself — unless
+          // the consumer prevented the dismissal (the Radix contract).
+          onEscapeKeyDown?.(event)
+          if (!event.defaultPrevented) closeCard()
+        }}
         className={cn(
           "z-50 w-[min(22rem,calc(100vw-1.5rem))] rounded-xl border border-border bg-popover font-sans text-sm text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           className,
@@ -197,6 +394,25 @@ export interface ReferenceCardProps
    * `"h-auto max-h-64"`) to retune or release it.
    */
   excerptClassName?: string
+  /**
+   * Accessible name for the scrollable excerpt region.
+   *
+   * @default "Excerpt from <title>" when the title is a string, otherwise
+   * "Source excerpt"
+   */
+  excerptLabel?: string
+  /**
+   * Accessible name for the pager's previous button.
+   *
+   * @default "Previous source"
+   */
+  previousLabel?: string
+  /**
+   * Accessible name for the pager's next button.
+   *
+   * @default "Next source"
+   */
+  nextLabel?: string
 }
 
 /**
@@ -205,27 +421,36 @@ export interface ReferenceCardProps
  * excerpt as the body, and a footer holding the locator chip ("Page 14")
  * and an explicit source link. State is internal — feed it `sources` and it
  * handles paging; hosts needing a different layout compose their own
- * content instead.
+ * content instead. The pager counter uses the locale-neutral "1 / 2" form
+ * (matching `MessageAttachments`), and the pager and excerpt accessible
+ * names are overridable for localized hosts.
  *
  * The card keeps a stable silhouette while paging: with several sources the
  * excerpt region takes a fixed height and scrolls overflow instead of
  * resizing the card, and the excerpt and footer rows render whenever any
  * sibling source needs them so a sparse source cannot collapse them away.
- * A scrolling excerpt gains a tab stop (and a labelled region role) so
- * keyboard users can reach the clipped text.
+ * A scrolling excerpt gains a tab stop (and a labelled region role) so the
+ * clipped text is focusable; note the card overall is a pointer-first
+ * surface (see `Reference`).
  */
 function ReferenceCard({
   sources,
   defaultIndex = 0,
   excerptClassName,
+  excerptLabel,
+  previousLabel = "Previous source",
+  nextLabel = "Next source",
   className,
   ...props
 }: ReferenceCardProps) {
   const lastIndex = Math.max(0, sources.length - 1)
-  const [index, setIndex] = React.useState(() =>
+  const [rawIndex, setRawIndex] = React.useState(() =>
     Math.min(Math.max(defaultIndex, 0), lastIndex),
   )
-  const source = sources[Math.min(index, lastIndex)]
+  // Clamp once and use everywhere, so a shrinking sources array cannot
+  // desync the pager buttons from the displayed source.
+  const index = Math.min(rawIndex, lastIndex)
+  const source = sources[index]
 
   const excerptRef = React.useRef<HTMLDivElement>(null)
   // Scroll regions must be keyboard-reachable, but a tab stop is only owed
@@ -296,9 +521,9 @@ function ReferenceCard({
           >
             <button
               type="button"
-              aria-label="Previous source"
+              aria-label={previousLabel}
               disabled={index === 0}
-              onClick={() => setIndex((current) => Math.max(0, current - 1))}
+              onClick={() => setRawIndex(Math.max(0, index - 1))}
               className={pagerButtonClassName}
             >
               <ChevronLeft aria-hidden="true" />
@@ -307,15 +532,13 @@ function ReferenceCard({
               aria-live="polite"
               className="text-xs tabular-nums text-muted-foreground"
             >
-              {Math.min(index, lastIndex) + 1} of {sources.length}
+              {index + 1} / {sources.length}
             </span>
             <button
               type="button"
-              aria-label="Next source"
+              aria-label={nextLabel}
               disabled={index >= lastIndex}
-              onClick={() =>
-                setIndex((current) => Math.min(lastIndex, current + 1))
-              }
+              onClick={() => setRawIndex(Math.min(lastIndex, index + 1))}
               className={pagerButtonClassName}
             >
               <ChevronRight aria-hidden="true" />
@@ -329,9 +552,10 @@ function ReferenceCard({
           data-slot="reference-card-excerpt"
           role="region"
           aria-label={
-            typeof source.title === "string"
+            excerptLabel ??
+            (typeof source.title === "string"
               ? `Excerpt from ${source.title}`
-              : "Source excerpt"
+              : "Source excerpt")
           }
           tabIndex={excerptScrollable ? 0 : undefined}
           className={cn(
@@ -348,7 +572,7 @@ function ReferenceCard({
       {hasFooter ? (
         <div
           data-slot="reference-card-footer"
-          className="flex min-h-6 items-center justify-between gap-2"
+          className="flex min-h-6 items-center gap-2"
         >
           {source.meta !== undefined ? (
             <span
@@ -357,14 +581,12 @@ function ReferenceCard({
             >
               {source.meta}
             </span>
-          ) : (
-            <span aria-hidden="true" />
-          )}
+          ) : null}
           {source.href !== undefined ? (
             <a
               data-slot="reference-card-source-link"
               href={source.href}
-              className="inline-flex items-center gap-1 text-xs font-medium text-popover-foreground no-underline hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&>svg]:size-3"
+              className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-popover-foreground no-underline hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&>svg]:size-3"
             >
               {source.sourceLabel ?? "View source"}
               <ArrowUpRight aria-hidden="true" />
