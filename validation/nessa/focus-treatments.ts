@@ -25,6 +25,7 @@ type FocusComponent =
   | "input"
   | "conversation-rail"
   | "file-diff-list"
+  | "reference"
   | "selection-tooltip"
   | "split-view/split-view-separator"
   | "app-shell/app-shell-dock"
@@ -98,6 +99,15 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   } as const)),
+  {
+    component: "reference",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 6,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
   {
     component: "conversation-rail",
     layer: "outline",
@@ -178,6 +188,12 @@ export const focusGeometryClasses = Object.freeze([
   { component: "file-diff-list", className: "focus-visible:outline-2", count: 3 },
   { component: "file-diff-list", className: "focus-visible:outline-offset-2", count: 2 },
   { component: "file-diff-list", className: "focus-visible:-outline-offset-2", count: 1 },
+  // The pager buttons and the scrollable excerpt region sit at the card
+  // edge, so their outlines draw inset like file-diff-list's list region;
+  // chip and links keep the outset offset.
+  { component: "reference", className: "focus-visible:outline-2", count: 6 },
+  { component: "reference", className: "focus-visible:outline-offset-2", count: 3 },
+  { component: "reference", className: "focus-visible:-outline-offset-2", count: 3 },
   // Every selection-tooltip outline draws inset: the shelf is a clipping
   // scroll region, and an outset outline on its items or on the shelf itself
   // would be swallowed at the overflow edge.

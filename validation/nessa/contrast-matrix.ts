@@ -15,6 +15,8 @@ export const contrastMatrix = Object.freeze([
   { foreground: "--primary-foreground", background: "--primary", minimum: 4.5, role: "normal-text" },
   { foreground: "--secondary-foreground", background: "--secondary", minimum: 4.5, role: "normal-text" },
   { foreground: "--muted-foreground", background: "--muted", minimum: 4.5, role: "normal-text" },
+  { foreground: "--muted-foreground", background: "--background", minimum: 4.5, role: "normal-text" },
+  { foreground: "--muted-foreground", background: "--popover", minimum: 4.5, role: "normal-text" },
   { foreground: "--accent-foreground", background: "--accent", minimum: 4.5, role: "normal-text" },
   { foreground: "--destructive-foreground", background: "--destructive", minimum: 4.5, role: "normal-text" },
   { foreground: "--input", background: "--background", minimum: 3, role: "required-boundary" },

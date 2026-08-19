@@ -240,6 +240,17 @@ export {
   type SidebarShortcutModifier,
 } from "./components/sidebar"
 export {
+  Reference,
+  ReferenceCard,
+  ReferenceContent,
+  ReferenceTrigger,
+  type ReferenceCardProps,
+  type ReferenceContentProps,
+  type ReferenceProps,
+  type ReferenceSource,
+  type ReferenceTriggerProps,
+} from "./components/reference"
+export {
   SplitView,
   SplitViewOrientation,
   SplitViewPanel,
