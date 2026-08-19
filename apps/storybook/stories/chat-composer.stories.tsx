@@ -5,11 +5,16 @@ import {
   ChatComposer,
   ChatComposerAction,
   ChatComposerActions,
+  ChatComposerAttachment,
+  ChatComposerAttachments,
   ChatComposerFooter,
   ChatComposerInput,
   ChatComposerSubmit,
+  ChatComposerTrigger,
   ModelPicker,
   ModelThinkingControl,
+  SectionedListbox,
+  type ChatComposerAttachmentKind,
   type ChatComposerBorderMode,
   type ModelPickerGroup,
   type ModelPickerValue,
@@ -17,6 +22,12 @@ import {
 import { Mic, Plus, Shield } from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"
+import {
+  filterSlashSections,
+  mentionSections,
+  renderSlashItem,
+  renderTeammate,
+} from "./composer-demo-data"
 import { KimiModelIcon } from "./icons/model/kimi-model-icon"
 import { FastIcon, ThinkingIcon } from "./icons/nucleo"
 
@@ -223,7 +234,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A compound chat-entry surface built from input, footer, action, and submit primitives. Compose it with ModelPicker or application-owned controls without moving message, upload, voice, or runtime state into the design system.",
+          "A compound chat-entry surface built from input, footer, action, and submit primitives, plus opt-in attachment capabilities: a stacked attachments-row of pills, paste-to-attachment capture, and key-triggered menus (such as / and @) that anchor host-supplied content above the composer. Pair it with ChatComposerEditor for inline chip attachments, and compose it with ModelPicker or application-owned controls without moving message, upload, voice, or runtime state into the design system.",
       },
     },
   },
@@ -569,7 +580,7 @@ export const AlwaysBorder: Story = {
 
 export const KeyboardFocusWithoutBorder: Story = {
   parameters: storyDocumentation(
-    "The default borderless composer keeps its outer border transparent while keyboard focus remains visible on the textarea and action controls.",
+    "The default borderless composer keeps its outer border transparent and draws no box around the focused textarea — the caret is the input's focus indicator, since browsers apply :focus-visible to editable fields on pointer focus too. Action controls keep their visible focus outlines.",
   ),
   render: () => <ComposerExample />,
   play: async ({ canvasElement }) => {
@@ -582,8 +593,8 @@ export const KeyboardFocusWithoutBorder: Story = {
 
     await userEvent.tab()
     await expect(input).toHaveFocus()
-    await expect(getComputedStyle(input).outlineStyle).not.toBe("none")
-    await expect(getComputedStyle(input).outlineWidth).not.toBe("0px")
+    await expect(getComputedStyle(input).outlineStyle).toBe("none")
+    await expect(getComputedStyle(input).borderTopWidth).toBe("0px")
     await expect(getComputedStyle(composer).borderTopColor).toBe(
       "rgba(0, 0, 0, 0)",
     )
@@ -754,5 +765,268 @@ export const VisibleSubmitLabel: Story = {
   play: async ({ canvasElement }) => {
     const submit = within(canvasElement).getByRole("button", { name: "Send now" })
     await expect(submit).not.toHaveAttribute("aria-label")
+  },
+}
+
+interface RowAttachment {
+  id: string
+  kind: ChatComposerAttachmentKind
+  label: string
+}
+
+/**
+ * Harness for the row-placement stories: hosts message, attachment, and
+ * submitted state, stacks attachments as pills above the plain textarea
+ * input, converts large pastes into pasted-text pills, and wires the `/` and
+ * `@` trigger menus over the textarea surface.
+ */
+function RowComposerExample({
+  initialAttachments = [],
+  initialMessage = "",
+  composerMaxHeight,
+}: {
+  initialAttachments?: RowAttachment[]
+  initialMessage?: string
+  composerMaxHeight?: number
+}) {
+  const [message, setMessage] = React.useState(initialMessage)
+  const [attachments, setAttachments] =
+    React.useState<RowAttachment[]>(initialAttachments)
+  const [submitted, setSubmitted] = React.useState("")
+  const nextId = React.useRef(0)
+
+  const addAttachment = (kind: ChatComposerAttachmentKind, label: string) => {
+    nextId.current += 1
+    setAttachments((previous) => [
+      ...previous,
+      { id: `attachment-${nextId.current}`, kind, label },
+    ])
+  }
+  const removeAttachment = (id: string) => {
+    setAttachments((previous) =>
+      previous.filter((attachment) => attachment.id !== id),
+    )
+  }
+
+  return (
+    <div
+      data-slot="chat-composer-demo-frame"
+      className="grid min-w-0 w-[min(60rem,calc(100vw-2rem))] gap-3 rounded-[2rem] bg-background p-2 sm:p-8"
+    >
+      {submitted ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Sent: {submitted}
+        </p>
+      ) : null}
+      <ChatComposer
+        maxHeight={composerMaxHeight}
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (!message.trim() && attachments.length === 0) return
+          setSubmitted(
+            [
+              message.trim(),
+              attachments.length > 0
+                ? `(+${attachments.length} attachments)`
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" "),
+          )
+          setMessage("")
+          setAttachments([])
+        }}
+      >
+        <ChatComposerAttachments>
+          {attachments.map((attachment) => (
+            <ChatComposerAttachment
+              key={attachment.id}
+              kind={attachment.kind}
+              itemLabel={attachment.label}
+              onRemove={() => removeAttachment(attachment.id)}
+            >
+              {attachment.label}
+            </ChatComposerAttachment>
+          ))}
+        </ChatComposerAttachments>
+        <ChatComposerInput
+          maxHeight={composerMaxHeight === undefined ? undefined : 480}
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          onPasteAttachment={(text) =>
+            addAttachment(
+              "pasted-text",
+              `Pasted text (${text.split("\n").length} lines)`,
+            )
+          }
+          placeholder="Message, / for skills, @ to mention"
+        />
+        <ChatComposerTrigger trigger="/" label="Skills and plugins">
+          {({ query, clearTrigger }) => (
+            <SectionedListbox
+              sections={filterSlashSections(query)}
+              getItemId={(item) => item.id}
+              renderItem={renderSlashItem}
+              onValueChange={(_, item) => {
+                clearTrigger()
+                addAttachment(item.kind, item.label)
+              }}
+              listLabel="Skills and plugins"
+              emptyMessage="No matching skills or plugins"
+            />
+          )}
+        </ChatComposerTrigger>
+        <ChatComposerTrigger trigger="@" label="Mention a teammate">
+          {({ query, clearTrigger }) => (
+            <SectionedListbox
+              sections={mentionSections(query)}
+              getItemId={(teammate) => teammate.id}
+              renderItem={renderTeammate}
+              onValueChange={(_, teammate) => {
+                clearTrigger()
+                addAttachment("mention", teammate.name)
+              }}
+              listLabel="Teammates"
+              emptyMessage="No teammates found"
+            />
+          )}
+        </ChatComposerTrigger>
+        <ChatComposerFooter>
+          <ChatComposerActions>
+            <ChatComposerAction aria-label="Add attachment" title="Add attachment">
+              <Plus aria-hidden="true" />
+            </ChatComposerAction>
+          </ChatComposerActions>
+          <ChatComposerActions className="justify-end">
+            <ChatComposerSubmit
+              disabled={!message.trim() && attachments.length === 0}
+            />
+          </ChatComposerActions>
+        </ChatComposerFooter>
+      </ChatComposer>
+    </div>
+  )
+}
+
+export const Attachments: Story = {
+  parameters: storyDocumentation(
+    "The row placement option stacks attachments as atomic pills with kind-specific icons above the input. Trigger menus attach pills over the plain textarea too, the remove control deletes the whole pill, and Backspace at the start of the input removes the trailing pill without touching typed text.",
+  ),
+  render: () => (
+    <RowComposerExample
+      initialAttachments={[
+        { id: "seed-skill", kind: "skill", label: "Skill Creator" },
+        { id: "seed-plugin", kind: "plugin", label: "Linear" },
+      ]}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const body = canvasElement.ownerDocument.body
+    const rootStyle = getComputedStyle(
+      canvasElement.ownerDocument.documentElement,
+    )
+    const pills = () =>
+      Array.from(
+        canvasElement.querySelectorAll<HTMLElement>(
+          '[data-slot="chat-composer-attachment"]',
+        ),
+      )
+    await expect(pills()).toHaveLength(2)
+    await expect(pills()[0]).toHaveAttribute("data-kind", "skill")
+    await expect(pills()[1]).toHaveAttribute("data-kind", "plugin")
+    for (const pill of pills()) {
+      await expect(getComputedStyle(pill).backgroundColor).toBe(
+        rootStyle.getPropertyValue("--accent").trim(),
+      )
+      await expect(pill.querySelector("svg")).not.toBeNull()
+    }
+
+    const input = canvas.getByRole("textbox", { name: "Message" })
+    await userEvent.type(input, "hello")
+    await expect(input).toHaveValue("hello")
+
+    const textarea = input as HTMLTextAreaElement
+    textarea.focus()
+    textarea.setSelectionRange(0, 0)
+    await userEvent.keyboard("{Backspace}")
+    await expect(pills()).toHaveLength(1)
+    await expect(input).toHaveValue("hello")
+    await expect(pills()[0]).toHaveAttribute("data-kind", "skill")
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Remove Skill Creator" }),
+    )
+    await expect(pills()).toHaveLength(0)
+    await expect(input).toHaveValue("hello")
+
+    // Trigger menus also work over the textarea surface: the token is
+    // removed from the value and the selection lands as a pill.
+    textarea.focus()
+    textarea.setSelectionRange(5, 5)
+    await userEvent.type(input, " /lin", {
+      initialSelectionStart: 5,
+      initialSelectionEnd: 5,
+    })
+    const panel = () =>
+      body.querySelector<HTMLElement>(
+        '[data-slot="chat-composer-trigger-panel"][data-trigger="/"]',
+      )
+    await waitFor(async () => expect(panel()).not.toBeNull())
+    await userEvent.keyboard("{Enter}")
+    await waitFor(async () => expect(panel()).toBeNull())
+    await expect(pills()).toHaveLength(1)
+    await expect(pills()[0]).toHaveAttribute("data-kind", "plugin")
+    await expect(input).toHaveValue("hello ")
+  },
+}
+
+export const AttachmentsCappedHeight: Story = {
+  parameters: storyDocumentation(
+    "With maxHeight set, the attachments row caps its own height and scrolls when pills wrap, while the input remains the scrolling text region and the footer stays visible.",
+  ),
+  render: () => (
+    <RowComposerExample
+      composerMaxHeight={200}
+      initialAttachments={[
+        { id: "seed-1", kind: "skill", label: "Skill Creator" },
+        { id: "seed-2", kind: "plugin", label: "Linear" },
+        { id: "seed-3", kind: "skill", label: "Commit Helper" },
+        { id: "seed-4", kind: "plugin", label: "Context Packs" },
+        { id: "seed-5", kind: "mention", label: "Mira Chen" },
+        { id: "seed-6", kind: "file", label: "release-notes.md" },
+      ]}
+      initialMessage={Array.from(
+        { length: 18 },
+        (_, index) => `Line ${index + 1}`,
+      ).join("\n")}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const composer = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="chat-composer"]',
+    )!
+    const attachmentsRow = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="chat-composer-attachments"]',
+    )!
+    const footer = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="chat-composer-footer"]',
+    )!
+    const input = canvas.getByRole("textbox", { name: "Message" })
+    const composerRect = composer.getBoundingClientRect()
+    const attachmentsRect = attachmentsRow.getBoundingClientRect()
+    const footerRect = footer.getBoundingClientRect()
+    const inputRect = input.getBoundingClientRect()
+
+    await expect(composerRect.height).toBeLessThanOrEqual(200)
+    await expect(attachmentsRect.top).toBeGreaterThanOrEqual(composerRect.top)
+    await expect(attachmentsRect.height).toBeGreaterThan(20)
+    await expect(attachmentsRect.height).toBeLessThanOrEqual(96)
+    await expect(inputRect.top).toBeGreaterThanOrEqual(attachmentsRect.bottom)
+    await expect(inputRect.height).toBeGreaterThan(16)
+    await expect(footerRect.bottom).toBeLessThanOrEqual(composerRect.bottom)
+    await expect(input.scrollHeight).toBeGreaterThan(input.clientHeight)
+    await expect(getComputedStyle(input).overflowY).toBe("auto")
   },
 }
