@@ -105,6 +105,12 @@ function SelectionTooltip({
   const resolvedExpanded = expanded ?? uncontrolledExpanded
   const setExpanded = React.useCallback(
     (next: boolean) => {
+      // Re-measure at the moment of expansion, while the pill is still
+      // collapsed: commit-time measurements go stale when late layout shifts
+      // (a web font swapping in) resize the pill without a React commit.
+      if (next && !previousExpandedRef.current && rootRef.current !== null) {
+        collapsedWidthRef.current = rootRef.current.getBoundingClientRect().width
+      }
       // Rescue focus before the shelf goes display:none, while its focused
       // item is still visible and focusable.
       if (

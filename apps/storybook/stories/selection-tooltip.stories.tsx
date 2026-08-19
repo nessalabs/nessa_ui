@@ -153,6 +153,9 @@ export const Playground: Story = {
     await expect(getComputedStyle(chevron).rotate).toBe("none")
     await expect(more).toHaveAttribute("aria-expanded", "false")
     const pill = canvas.getByRole("group", { name: "Selection actions" })
+    // Let the web fonts settle first: a font swap after this measurement
+    // would shift the pill's collapsed width and fake a geometry change.
+    await canvasElement.ownerDocument.fonts.ready
     const collapsedPillRect = pill.getBoundingClientRect()
     const collapsedMoreRect = more.getBoundingClientRect()
     await userEvent.click(more)
