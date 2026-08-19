@@ -49,6 +49,14 @@ interface ReferenceContextValue {
   registerTrigger: (element: HTMLElement | null) => void
   /** Registers (or with `null`, unregisters) the mounted content element. */
   registerContent: (element: HTMLElement | null) => void
+  /** Whether the node lives inside the trigger element. */
+  isWithinTrigger: (node: Node) => boolean
+  /**
+   * Re-arms opening after a close-time focus return. The programmatic
+   * focus schedules a Radix open that would undo the dismissal, so it is
+   * swallowed once; a fresh hover or a blur re-arms opening.
+   */
+  clearOpenSuppression: () => void
 }
 
 const ReferenceContext = React.createContext<ReferenceContextValue | null>(
@@ -109,6 +117,10 @@ function Reference({
   const open = openProp ?? uncontrolledOpen
   const triggerRef = React.useRef<HTMLElement | null>(null)
   const contentRef = React.useRef<HTMLElement | null>(null)
+  // True while the next Radix open request should be ignored: returning
+  // focus to the trigger on close fires the trigger's focus-open, which
+  // would reopen the card ~openDelay after an Escape dismissal.
+  const suppressOpenRef = React.useRef(false)
 
   const setOpen = React.useCallback(
     (next: boolean) => {
@@ -127,6 +139,10 @@ function Reference({
    */
   const handleOpenChange = React.useCallback(
     (next: boolean) => {
+      if (next && suppressOpenRef.current) {
+        suppressOpenRef.current = false
+        return
+      }
       if (
         !next &&
         contentRef.current?.contains(document.activeElement)
@@ -148,13 +164,22 @@ function Reference({
           document.activeElement,
         )
         setOpen(false)
-        if (focusWasInside) triggerRef.current?.focus()
+        if (focusWasInside) {
+          // The focus return fires the trigger's focus-open; swallow that
+          // one request so the dismissal sticks.
+          suppressOpenRef.current = true
+          triggerRef.current?.focus()
+        }
       },
       registerTrigger: (element) => {
         triggerRef.current = element
       },
       registerContent: (element) => {
         contentRef.current = element
+      },
+      isWithinTrigger: (node) => triggerRef.current?.contains(node) ?? false,
+      clearOpenSuppression: () => {
+        suppressOpenRef.current = false
       },
     }),
     [open, setOpen],
@@ -206,10 +231,13 @@ function ReferenceTrigger({
   href,
   children,
   onClick,
+  onPointerEnter,
+  onBlur,
   ref,
   ...props
 }: ReferenceTriggerProps) {
-  const { open, openCard, registerTrigger } = useReference("ReferenceTrigger")
+  const { open, openCard, registerTrigger, clearOpenSuppression } =
+    useReference("ReferenceTrigger")
   const Comp = (
     asChild ? Slot.Root : href !== undefined ? "a" : "button"
   ) as React.ElementType
@@ -257,6 +285,17 @@ function ReferenceTrigger({
           }
           onClick?.(event)
         }}
+        onPointerEnter={(event: React.PointerEvent<HTMLAnchorElement>) => {
+          // A fresh hover is new intent to open; re-arm a suppressed open.
+          clearOpenSuppression()
+          onPointerEnter?.(event)
+        }}
+        onBlur={(event: React.FocusEvent<HTMLAnchorElement>) => {
+          // Once focus leaves the trigger, any later focus-open is fresh
+          // user intent, not the close-time focus return.
+          clearOpenSuppression()
+          onBlur?.(event)
+        }}
         {...props}
       >
         {children}
@@ -298,9 +337,11 @@ function ReferenceContent({
   ref,
   onBlur,
   onEscapeKeyDown,
+  onPointerDownOutside,
   ...props
 }: ReferenceContentProps) {
-  const { closeCard, registerContent } = useReference("ReferenceContent")
+  const { closeCard, registerContent, isWithinTrigger } =
+    useReference("ReferenceContent")
 
   /**
    * Registers the content element for the root's focus-within hold and
@@ -355,6 +396,16 @@ function ReferenceContent({
           // the consumer prevented the dismissal (the Radix contract).
           onEscapeKeyDown?.(event)
           if (!event.defaultPrevented) closeCard()
+        }}
+        onPointerDownOutside={(event) => {
+          onPointerDownOutside?.(event)
+          if (event.defaultPrevented) return
+          // A press on the trigger itself is not an outside dismissal: on
+          // touch, dismissing here would flush the card closed before the
+          // tap's synthesized click, making the second tap reopen instead
+          // of following the link. The click decides what the tap means.
+          const target = event.target as Node | null
+          if (target && isWithinTrigger(target)) event.preventDefault()
         }}
         className={cn(
           "z-50 w-[min(22rem,calc(100vw-1.5rem))] rounded-xl border border-border bg-popover font-sans text-sm text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",

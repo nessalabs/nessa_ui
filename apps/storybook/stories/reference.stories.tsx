@@ -260,6 +260,12 @@ export const KeyboardAccess: Story = {
     await expect(openCard()).not.toBeNull()
     await userEvent.keyboard("{Escape}")
     await waitFor(() => expect(openCard()).toBeNull())
+    // Escape returns focus to the chip so keyboard users keep their place…
+    await expect(document.activeElement).toBe(trigger)
+    // …and the focus return must not re-arm the hover-card's focus-open:
+    // the card has to STAY closed past the 150ms open delay.
+    await new Promise((resolve) => setTimeout(resolve, 350))
+    await expect(openCard()).toBeNull()
   },
 }
 
@@ -290,17 +296,41 @@ export const TouchAccess: Story = {
       name: "Source: Attention Is All You Need",
     })
     await expect(openCard()).toBeNull()
-    // A touch tap arrives as a synthesized click with pointerType "touch";
-    // the trigger opens the card and prevents the navigation default so the
-    // first tap previews instead of leaving the page.
-    const tap = new PointerEvent("click", {
+    const touchInit = {
       pointerType: "touch",
       bubbles: true,
       cancelable: true,
-    })
-    trigger.dispatchEvent(tap)
-    await expect(tap.defaultPrevented).toBe(true)
+    } as const
+    // A touch tap is a pointerdown followed by a synthesized click; the
+    // trigger opens the card and prevents the navigation default so the
+    // first tap previews instead of leaving the page.
+    trigger.dispatchEvent(new PointerEvent("pointerdown", touchInit))
+    const firstTap = new PointerEvent("click", touchInit)
+    trigger.dispatchEvent(firstTap)
+    await expect(firstTap.defaultPrevented).toBe(true)
     await waitFor(() => expect(openCard()).not.toBeNull())
+    // Second tap on the chip: its pointerdown must NOT count as an
+    // outside-press dismissal (that would flush the card closed and make
+    // the click reopen it forever); with the card still open, the click
+    // falls through to the link so the second tap navigates.
+    trigger.dispatchEvent(new PointerEvent("pointerdown", touchInit))
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    await expect(openCard()).not.toBeNull()
+    // Document-level bubble listeners run after the component's handlers,
+    // so record whether the component prevented the click there — then
+    // block the real navigation to keep the test on this page.
+    let preventedByComponent: boolean | null = null
+    const guard = (event: Event) => {
+      preventedByComponent = event.defaultPrevented
+      event.preventDefault()
+    }
+    document.addEventListener("click", guard)
+    try {
+      trigger.dispatchEvent(new PointerEvent("click", touchInit))
+    } finally {
+      document.removeEventListener("click", guard)
+    }
+    await expect(preventedByComponent).toBe(false)
     // Navigation for touch users lives in the card's links.
     await expect(
       cardCanvas().getByRole("link", { name: "Open paper" }),
