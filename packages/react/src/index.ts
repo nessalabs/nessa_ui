@@ -93,6 +93,22 @@ export {
   type MessageScrollerViewportProps,
 } from "./components/message-scroller"
 export {
+  SelectionTooltip,
+  SelectionTooltipAction,
+  SelectionTooltipLabel,
+  SelectionTooltipMore,
+  SelectionTooltipSeparator,
+  SelectionTooltipShelf,
+  useSelectionTooltip,
+  type SelectionTooltipActionProps,
+  type SelectionTooltipLabelProps,
+  type SelectionTooltipMoreProps,
+  type SelectionTooltipProps,
+  type SelectionTooltipSeparatorProps,
+  type SelectionTooltipShelfProps,
+  type SelectionTooltipSide,
+} from "./components/selection-tooltip"
+export {
   SearchableListbox,
   type SearchableListboxProps,
   type SearchableListboxRenderState,
