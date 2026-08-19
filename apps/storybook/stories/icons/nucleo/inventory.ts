@@ -1,5 +1,7 @@
 import { BashIcon } from "./bash-icon"
+import { ChatAddIcon } from "./chat-add-icon"
 import { ChatComposeIcon } from "./chat-compose-icon"
+import { CommentIcon } from "./comment-icon"
 import { EditIcon } from "./edit-icon"
 import { FastIcon } from "./fast-icon"
 import { FileCopyIcon } from "./file-copy-icon"
@@ -19,9 +21,19 @@ const nucleoIconInventory = [
     component: BashIcon,
   },
   {
+    id: "chat-add",
+    name: "Chat add",
+    component: ChatAddIcon,
+  },
+  {
     id: "chat-compose",
     name: "Chat compose",
     component: ChatComposeIcon,
+  },
+  {
+    id: "comment",
+    name: "Comment",
+    component: CommentIcon,
   },
   {
     id: "edit",

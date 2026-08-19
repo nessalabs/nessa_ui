@@ -1,5 +1,7 @@
 export { BashIcon } from "./bash-icon"
+export { ChatAddIcon } from "./chat-add-icon"
 export { ChatComposeIcon } from "./chat-compose-icon"
+export { CommentIcon } from "./comment-icon"
 export { EditIcon } from "./edit-icon"
 export { FastIcon } from "./fast-icon"
 export { FileCopyIcon } from "./file-copy-icon"

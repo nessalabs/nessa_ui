@@ -26,6 +26,7 @@ type FocusComponent =
   | "conversation-rail"
   | "file-diff-list"
   | "reference"
+  | "selection-tooltip"
   | "split-view/split-view-separator"
   | "app-shell/app-shell-dock"
   | (typeof composerFocusComponents)[number]["component"]
@@ -126,6 +127,15 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     dark: { token: "--ring", opacity: 1 },
   },
   {
+    component: "selection-tooltip",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 3,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  {
     component: "split-view/split-view-separator",
     layer: "ring",
     state: "focus-visible",
@@ -184,6 +194,11 @@ export const focusGeometryClasses = Object.freeze([
   { component: "reference", className: "focus-visible:outline-2", count: 6 },
   { component: "reference", className: "focus-visible:outline-offset-2", count: 3 },
   { component: "reference", className: "focus-visible:-outline-offset-2", count: 3 },
+  // Every selection-tooltip outline draws inset: the shelf is a clipping
+  // scroll region, and an outset outline on its items or on the shelf itself
+  // would be swallowed at the overflow edge.
+  { component: "selection-tooltip", className: "focus-visible:outline-2", count: 3 },
+  { component: "selection-tooltip", className: "focus-visible:-outline-offset-2", count: 3 },
   { component: "conversation-rail", className: "focus-visible:outline-2", count: 1 },
   { component: "conversation-rail", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "split-view/split-view-separator", className: "focus-visible:ring-2", count: 1 },

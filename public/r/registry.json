@@ -487,6 +487,27 @@
       ]
     },
     {
+      "name": "selection-tooltip",
+      "type": "registry:ui",
+      "title": "Selection Tooltip",
+      "description": "A floating selection-callout pill of actions with a chevron-revealed, horizontally scrollable shelf.",
+      "dependencies": [
+        "lucide-react",
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/selection-tooltip.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/selection-tooltip.tsx"
+        }
+      ]
+    },
+    {
       "name": "searchable-listbox",
       "type": "registry:ui",
       "title": "Searchable Listbox",
