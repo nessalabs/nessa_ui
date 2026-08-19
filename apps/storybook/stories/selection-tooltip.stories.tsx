@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react"
 import {
+  Button,
   Input,
   SelectionTooltip,
   SelectionTooltipAction,
@@ -323,7 +324,12 @@ function ShelfHighlightAction() {
 function ControlledDemo() {
   const [open, setOpen] = React.useState(false)
   return (
-    <div className="rounded-3xl border border-border bg-card p-6">
+    <div className="flex flex-col items-start gap-4 rounded-3xl border border-border bg-card p-6">
+      {/* Flips the prop directly, without going through the pill's own
+          toggle — the path a controlled host takes from its own UI. */}
+      <Button variant="outline" size="sm" onClick={() => setOpen(!open)}>
+        Toggle tools
+      </Button>
       <SelectionTooltip expanded={open} onExpandedChange={setOpen}>
         <SelectionTooltipAction aria-label="Comment">
           <CommentIcon aria-hidden="true" />
@@ -354,6 +360,28 @@ export const ControlledShelf: Story = {
 
     const more = canvas.getByRole("button", { name: "More actions" })
     await expect(getComputedStyle(shelf).display).toBe("none")
+
+    // Expanding by flipping the prop directly (not via the chevron) must
+    // also hold the collapsed geometry: this is the path covered by the
+    // ResizeObserver measurement rather than setExpanded's.
+    const pill = canvas.getByRole("group", { name: "Selection actions" })
+    await canvasElement.ownerDocument.fonts.ready
+    const collapsedPillRect = pill.getBoundingClientRect()
+    const collapsedMoreRect = more.getBoundingClientRect()
+    const externalToggle = canvas.getByRole("button", { name: "Toggle tools" })
+    await userEvent.click(externalToggle)
+    await expect(getComputedStyle(shelf).display).toBe("flex")
+    await expect(pill.getBoundingClientRect().width).toBeCloseTo(
+      collapsedPillRect.width,
+      1,
+    )
+    await expect(more.getBoundingClientRect().left).toBeCloseTo(
+      collapsedMoreRect.left,
+      1,
+    )
+    await userEvent.click(externalToggle)
+    await expect(getComputedStyle(shelf).display).toBe("none")
+
     await userEvent.click(more)
     await expect(getComputedStyle(shelf).display).toBe("flex")
 

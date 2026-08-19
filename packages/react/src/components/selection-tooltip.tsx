@@ -109,7 +109,10 @@ function SelectionTooltip({
       // collapsed: commit-time measurements go stale when late layout shifts
       // (a web font swapping in) resize the pill without a React commit.
       if (next && !previousExpandedRef.current && rootRef.current !== null) {
-        collapsedWidthRef.current = rootRef.current.getBoundingClientRect().width
+        const width = rootRef.current.getBoundingClientRect().width
+        // A hidden pill measures 0; locking that would collapse the pill
+        // entirely, so only positive measurements replace the last good one.
+        if (width > 0) collapsedWidthRef.current = width
       }
       // Rescue focus before the shelf goes display:none, while its focused
       // item is still visible and focusable.
@@ -152,11 +155,28 @@ function SelectionTooltip({
   React.useLayoutEffect(() => {
     if (!resolvedExpanded) {
       // Subpixel-exact width, so locking it cannot shift the pill by the
-      // fraction offsetWidth would round away.
-      collapsedWidthRef.current =
-        rootRef.current?.getBoundingClientRect().width ?? null
+      // fraction offsetWidth would round away. A hidden pill measures 0 and
+      // is skipped, keeping the last good measurement.
+      const width = rootRef.current?.getBoundingClientRect().width
+      if (width !== undefined && width > 0) collapsedWidthRef.current = width
     }
   })
+  // Commit-time measurements alone go stale when layout shifts without a
+  // React commit (a web font swapping in). setExpanded re-measures for the
+  // toggle path; this observer keeps the measurement fresh for controlled
+  // hosts that flip `expanded` directly.
+  React.useLayoutEffect(() => {
+    const node = rootRef.current
+    if (resolvedExpanded || node === null) return
+    if (typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(() => {
+      const width = node.getBoundingClientRect().width
+      // A pill hidden via CSS resizes to 0; that must not poison the lock.
+      if (width > 0) collapsedWidthRef.current = width
+    })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [resolvedExpanded])
   const composedRef = React.useCallback(
     (node: HTMLDivElement) => {
       rootRef.current = node
