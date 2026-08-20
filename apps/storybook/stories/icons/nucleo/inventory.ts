@@ -1,10 +1,13 @@
 import { BashIcon } from "./bash-icon"
+import { ChatAddIcon } from "./chat-add-icon"
 import { ChatComposeIcon } from "./chat-compose-icon"
+import { CommentIcon } from "./comment-icon"
 import { EditIcon } from "./edit-icon"
 import { FastIcon } from "./fast-icon"
 import { FileCopyIcon } from "./file-copy-icon"
 import { FolderClosedIcon } from "./folder-closed-icon"
 import { FolderOpenIcon } from "./folder-open-icon"
+import { GlobeIcon } from "./globe-icon"
 import { SearchIcon } from "./search-icon"
 import { SidebarLeftIcon } from "./sidebar-left-icon"
 import { SidebarRightIcon } from "./sidebar-right-icon"
@@ -18,9 +21,19 @@ const nucleoIconInventory = [
     component: BashIcon,
   },
   {
+    id: "chat-add",
+    name: "Chat add",
+    component: ChatAddIcon,
+  },
+  {
     id: "chat-compose",
     name: "Chat compose",
     component: ChatComposeIcon,
+  },
+  {
+    id: "comment",
+    name: "Comment",
+    component: CommentIcon,
   },
   {
     id: "edit",
@@ -46,6 +59,11 @@ const nucleoIconInventory = [
     id: "folder-open",
     name: "Folder open",
     component: FolderOpenIcon,
+  },
+  {
+    id: "globe",
+    name: "Globe",
+    component: GlobeIcon,
   },
   {
     id: "search",

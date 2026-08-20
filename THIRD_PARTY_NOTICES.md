@@ -44,7 +44,7 @@ SOFTWARE.
 The icons in the Storybook Nucleo inventory are licensed from
 [Nucleo](https://nucleoapp.com/).
 
-Current tracked Nucleo icon count: 12
+Current tracked Nucleo icon count: 15
 
 The canonical inventory is maintained in
 `apps/storybook/stories/icons/nucleo/inventory.ts`.

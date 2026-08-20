@@ -487,6 +487,27 @@
       ]
     },
     {
+      "name": "selection-tooltip",
+      "type": "registry:ui",
+      "title": "Selection Tooltip",
+      "description": "A floating selection-callout pill of actions with a chevron-revealed, horizontally scrollable shelf.",
+      "dependencies": [
+        "lucide-react",
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/selection-tooltip.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/selection-tooltip.tsx"
+        }
+      ]
+    },
+    {
       "name": "searchable-listbox",
       "type": "registry:ui",
       "title": "Searchable Listbox",
@@ -679,6 +700,27 @@
           "path": "packages/react/src/components/tool-call.tsx",
           "type": "registry:ui",
           "target": "components/ui/tool-call.tsx"
+        }
+      ]
+    },
+    {
+      "name": "reference",
+      "type": "registry:ui",
+      "title": "Reference",
+      "description": "An inline citation chip for agent and research surfaces: hover or focus reveals a floating source card with excerpt, locator, pager, and link; clicking follows the source.",
+      "dependencies": [
+        "lucide-react",
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/reference.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/reference.tsx"
         }
       ]
     },
