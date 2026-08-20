@@ -579,9 +579,10 @@
       "name": "chat-composer",
       "type": "registry:ui",
       "title": "Chat Composer",
-      "description": "A compound chat-entry surface with input, footer, action, and submit primitives.",
+      "description": "A compound chat-entry surface with input, footer, action, and submit primitives, plus attachment pills, paste-to-attachment capture, and key-triggered menus anchored above the composer.",
       "dependencies": [
-        "lucide-react"
+        "lucide-react",
+        "radix-ui"
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
@@ -592,6 +593,27 @@
           "path": "packages/react/src/components/chat-composer.tsx",
           "type": "registry:ui",
           "target": "components/ui/chat-composer.tsx"
+        }
+      ]
+    },
+    {
+      "name": "chat-composer-editor",
+      "type": "registry:ui",
+      "title": "Chat Composer Editor",
+      "description": "A rich chat-composer input where attachments are atomic inline chips flowing with the text, with press and hover actions, plain-text paste and drop, and trigger-menu integration.",
+      "dependencies": [
+        "react-dom"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/chat-composer",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/chat-composer-editor.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/chat-composer-editor.tsx"
         }
       ]
     },
