@@ -28,6 +28,7 @@ type FocusComponent =
   | "input"
   | "conversation-rail"
   | "file-diff-list"
+  | "questionnaire"
   | "reference"
   | "selection-tooltip"
   | "split-view/split-view-separator"
@@ -88,6 +89,17 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     darkClassName: "dark:aria-invalid:ring-destructive/40",
     light: { token: "--destructive", opacity: 0.2 },
     dark: { token: "--destructive", opacity: 0.4 },
+  },
+  // The questionnaire choice indicator is a native input styled in place; it
+  // takes the standard full-strength outline treatment.
+  {
+    component: "questionnaire",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
   },
   { component: "button", layer: "border", state: "focus-visible:border", className: "focus-visible:border-ring", light: { token: "--ring", opacity: 1 }, dark: { token: "--ring", opacity: 1 } },
   { component: "badge", layer: "border", state: "focus-visible:border", className: "focus-visible:border-ring", light: { token: "--ring", opacity: 1 }, dark: { token: "--ring", opacity: 1 } },
@@ -177,6 +189,8 @@ export const focusGeometryClasses = Object.freeze([
   { component: "button", className: "focus-visible:ring-[3px]" },
   { component: "badge", className: "focus-visible:ring-[3px]" },
   { component: "input", className: "focus-visible:ring-[3px]" },
+  { component: "questionnaire", className: "focus-visible:outline-2", count: 1 },
+  { component: "questionnaire", className: "focus-visible:outline-offset-2", count: 1 },
   ...composerFocusComponents.flatMap(({ component, count }) => [
     { component, className: "focus-visible:outline-2", count },
     { component, className: "focus-visible:outline-offset-2", count },
