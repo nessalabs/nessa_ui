@@ -14,7 +14,10 @@ const composerFocusComponents = Object.freeze([
   { component: "message-scroller", count: 2 },
   { component: "model-capability-controls", count: 3 },
   { component: "model-picker", count: 2 },
-  { component: "searchable-listbox", count: 2 },
+  // Only the options carry a focus outline. Like the composer textarea, the
+  // search field draws none: browsers match :focus-visible on editable fields
+  // for pointer focus too, so an outline there would box the row permanently.
+  { component: "searchable-listbox", count: 1 },
   { component: "sectioned-listbox", count: 1 },
   { component: "tool-call", count: 3 },
 ] as const)
