@@ -192,7 +192,9 @@ function SearchableListbox<Item>({
       <label
         data-slot="searchable-listbox-search"
         className={cn(
-          "flex h-11 items-center gap-2 border-b border-border px-3 text-muted-foreground transition-colors focus-within:bg-accent/50",
+          // The search row owns the focus treatment for the field it wraps,
+          // because the bare input must not paint an outline of its own.
+          "flex h-11 items-center gap-2 border-b border-border px-3 text-muted-foreground transition-colors focus-within:bg-accent/50 focus-within:text-foreground",
           searchClassName,
         )}
       >
@@ -215,7 +217,12 @@ function SearchableListbox<Item>({
           autoComplete="off"
           disabled={disabled}
           aria-controls={listboxId}
-          className="h-full min-w-0 flex-1 appearance-none bg-transparent font-sans text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50"
+          // The field carries no outline of its own: browsers match
+          // :focus-visible on editable fields for pointer focus too, so an
+          // outline here reads as a permanent box around the search row for as
+          // long as the surface is open. The caret indicates focus, and the
+          // wrapping row owns the surface treatment.
+          className="h-full min-w-0 flex-1 appearance-none bg-transparent font-sans text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:pointer-events-none disabled:opacity-50"
         />
       </label>
       <div

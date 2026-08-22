@@ -1,7 +1,7 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { Check, FileSearch, Play, Wrench } from "lucide-react"
-import { expect, userEvent, within } from "storybook/test"
+import { expect, userEvent, waitFor, within } from "storybook/test"
 import {
   SearchableListbox,
   type SearchableListboxRenderState,
@@ -127,14 +127,26 @@ type Story = StoryObj<typeof meta>
 
 export const Playground: Story = {
   parameters: storyDocumentation(
-    "Use item identity and keyword callbacks to adapt domain records without reshaping them into presentation-only data.",
+    "Use item identity and keyword callbacks to adapt domain records without reshaping them into presentation-only data. The search field draws no box of its own — browsers apply :focus-visible to editable fields on pointer focus too, so an outline there would frame the row for as long as the surface is open. The caret plus the row's focus treatment indicate focus, and options keep their visible focus outlines.",
   ),
   render: () => <SearchableListboxExample />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     const search = canvas.getByPlaceholderText("Search commands")
+    const searchRow = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="searchable-listbox-search"]',
+    )!
+    await expect(getComputedStyle(searchRow).backgroundColor).toBe(
+      "rgba(0, 0, 0, 0)",
+    )
     await userEvent.type(search, "review")
-    await expect(getComputedStyle(search).outlineStyle).not.toBe("none")
+    await expect(search).toHaveFocus()
+    await expect(getComputedStyle(search).outlineStyle).toBe("none")
+    await waitFor(() =>
+      expect(getComputedStyle(searchRow).backgroundColor).not.toBe(
+        "rgba(0, 0, 0, 0)",
+      ),
+    )
     await expect(
       canvas.getByRole("option", { name: /review changes/i }),
     ).toBeVisible()
