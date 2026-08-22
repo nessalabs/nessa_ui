@@ -725,6 +725,25 @@
       ]
     },
     {
+      "name": "questionnaire",
+      "type": "registry:ui",
+      "title": "Questionnaire",
+      "description": "A composable question-flow kit: header with step counter or progress bar, fieldset questions with title and description, single or multiple selection over native inputs with custom check indicators, a freeform text answer, and an actions row with submit.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/input",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/questionnaire.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/questionnaire.tsx"
+        }
+      ]
+    },
+    {
       "name": "sidebar",
       "type": "registry:ui",
       "title": "Sidebar",
