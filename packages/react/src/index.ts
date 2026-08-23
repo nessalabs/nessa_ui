@@ -84,6 +84,27 @@ export {
   type PopoverSurfaceProps,
 } from "./components/popover-surface"
 export {
+  ContextMenu,
+  ContextMenuCheckboxItem,
+  ContextMenuContent,
+  ContextMenuGroup,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuPortal,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+  type ContextMenuCheckboxItemProps,
+  type ContextMenuItemProps,
+  type ContextMenuLabelProps,
+  type ContextMenuSubTriggerProps,
+} from "./components/context-menu"
+export {
   CodeBlock,
   CodeBlockProvider,
   CopyButton,
