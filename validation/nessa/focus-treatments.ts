@@ -27,6 +27,7 @@ type FocusComponent =
   | "badge"
   | "input"
   | "conversation-rail"
+  | "event-calendar"
   | "file-diff-list"
   | "questionnaire"
   | "reference"
@@ -131,6 +132,15 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     state: "focus-visible",
     className: "focus-visible:outline-ring",
     count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  {
+    component: "event-calendar",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 5,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -246,6 +256,11 @@ export const focusGeometryClasses = Object.freeze([
   { component: "tool-approval", className: "focus-visible:outline-2", count: 2 },
   { component: "tool-approval", className: "focus-visible:-outline-offset-2", count: 1 },
   { component: "tool-approval", className: "focus-visible:outline-offset-2", count: 1 },
+  // Every event-calendar outline draws inset: the day and week surfaces sit
+  // inside the scrolling time grid and month cells clip their overflow, so
+  // an outset outline would be swallowed at the region edges.
+  { component: "event-calendar", className: "focus-visible:outline-2", count: 5 },
+  { component: "event-calendar", className: "focus-visible:-outline-offset-2", count: 5 },
   { component: "conversation-rail", className: "focus-visible:outline-2", count: 1 },
   { component: "conversation-rail", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "split-view/split-view-separator", className: "focus-visible:ring-2", count: 1 },

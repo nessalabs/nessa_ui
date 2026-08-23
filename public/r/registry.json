@@ -787,6 +787,50 @@
       ]
     },
     {
+      "name": "popover-surface",
+      "type": "registry:ui",
+      "title": "Popover surface",
+      "description": "The floating overlay surface underneath Nessa's popover-style chrome: popover tokens over a hairline border, with elevation and radius variants and asChild projection.",
+      "dependencies": [
+        "class-variance-authority",
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/popover-surface.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/popover-surface.tsx"
+        }
+      ]
+    },
+    {
+      "name": "event-calendar",
+      "type": "registry:ui",
+      "title": "Event calendar",
+      "description": "An Outlook-style scheduling surface with day, week, and month views: a toolbar with Today, paging, and a view switcher, a scrollable time grid with cascade-stacked event chips, an all-day shelf, a now indicator, drag or keyboard range selection with a slot for the host's own quick-create UI, and event rescheduling by drag, edge-drag resizing, or keyboard chords behind a confirmable move gate.",
+      "dependencies": [
+        "class-variance-authority",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/popover-surface",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/event-calendar.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/event-calendar.tsx"
+        }
+      ]
+    },
+    {
       "name": "sidebar",
       "type": "registry:ui",
       "title": "Sidebar",
