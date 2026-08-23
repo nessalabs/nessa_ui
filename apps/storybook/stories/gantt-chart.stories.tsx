@@ -2,6 +2,7 @@ import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, fireEvent, userEvent, waitFor, within } from "storybook/test"
 import {
+  Button,
   GanttChart,
   GanttChartGrid,
   GanttChartToolbar,
@@ -164,13 +165,23 @@ export const ProjectPlan: Story = {
       "rgba(0, 0, 0, 0)",
     )
 
-    const progressFill = bar.querySelector<HTMLElement>(
+    // Primitives is 60% done: the in-bar meter paints its track and its
+    // fill spans 60% of it (computed styles, not class names).
+    const meter = bar.querySelector<HTMLElement>(
       '[data-slot="gantt-chart-bar-progress"]',
     )
-    await expect(progressFill).not.toBeNull()
+    await expect(meter).not.toBeNull()
     await expect(
-      parseFloat(getComputedStyle(progressFill as HTMLElement).width),
-    ).toBeGreaterThan(0)
+      getComputedStyle(meter as HTMLElement).backgroundColor,
+    ).not.toBe("rgba(0, 0, 0, 0)")
+    const meterFill = (meter as HTMLElement)
+      .firstElementChild as HTMLElement
+    await expect(
+      parseFloat(getComputedStyle(meterFill).width),
+    ).toBeCloseTo(
+      parseFloat(getComputedStyle(meter as HTMLElement).width) * 0.6,
+      0,
+    )
 
     const today = canvasElement.querySelector<HTMLElement>(
       '[data-slot="gantt-chart-today"]',
@@ -385,6 +396,112 @@ export const PointerRescheduling: Story = {
   },
 }
 
+function CascadeDemo() {
+  const [moveDependents, setMoveDependents] = React.useState(false)
+  return (
+    <GanttChart
+      now={storyNow}
+      defaultTasks={demoTasks}
+      moveDependents={moveDependents}
+      className="w-[880px] max-w-full"
+    >
+      <GanttChartToolbar>
+        <Button
+          variant={moveDependents ? "secondary" : "outline"}
+          size="sm"
+          aria-pressed={moveDependents}
+          onClick={() => setMoveDependents((current) => !current)}
+        >
+          Cascade dependents
+        </Button>
+      </GanttChartToolbar>
+      <GanttChartGrid />
+    </GanttChart>
+  )
+}
+
+export const DependentCascade: Story = {
+  parameters: storyDocumentation(
+    "The moveDependents option: while it is on, the built-in confirmation asks per move — Move all takes every transitive dependent along by the same day count (simplest finish-to-start push scheduling), Only this reschedules just the task — and names how many tasks would follow; while it is off, arrows stay purely visual and the dialog shows its plain Move. The host owns the toggle (a toolbar button here), the built-in ask is only the example: renderMoveConfirm plus confirm({ moveDependents }) and the context's dependentTaskIds let hosts build their own chooser. The play test commits a Move all and asserts Composites followed by computed offset, then an Only this and proves the chain stayed put.",
+  ),
+  render: () => <CascadeDemo />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Cascade dependents" }),
+    )
+
+    const composites = await canvas.findByRole("button", {
+      name: /^Composites,/,
+    })
+    const compositesLeft = parseFloat(getComputedStyle(composites).left)
+
+    const primitives = canvas.getByRole("button", { name: /^Primitives,/ })
+    primitives.focus()
+    await userEvent.keyboard("{Shift>}{ArrowRight}{/Shift}")
+    await userEvent.keyboard("{Enter}")
+    const dialog = await canvas.findByRole("dialog", { name: "Confirm move" })
+    // Primitives feeds Composites → Code freeze / Hardening → Beta → GA.
+    await expect(
+      within(dialog).getByText("Also moves 5 dependent tasks."),
+    ).toBeInTheDocument()
+    await expect(
+      within(dialog).getByRole("button", { name: "Move all" }),
+    ).toHaveFocus()
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Move all" }),
+    )
+    await waitFor(async () => {
+      const moved = canvas.getByRole("button", { name: /^Composites,/ })
+      await expect(parseFloat(getComputedStyle(moved).left)).toBeCloseTo(
+        compositesLeft + WEEK_SCALE_DAY_WIDTH,
+        0,
+      )
+    })
+
+    // Only this: the task moves again, the chain stays where it landed.
+    const primitivesAgain = canvas.getByRole("button", {
+      name: /^Primitives,/,
+    })
+    primitivesAgain.focus()
+    await userEvent.keyboard("{Shift>}{ArrowRight}{/Shift}")
+    await userEvent.keyboard("{Enter}")
+    const secondDialog = await canvas.findByRole("dialog", {
+      name: "Confirm move",
+    })
+    await userEvent.click(
+      within(secondDialog).getByRole("button", { name: "Only this" }),
+    )
+    await waitFor(async () => {
+      const settled = canvas.getByRole("button", { name: /^Composites,/ })
+      await expect(parseFloat(getComputedStyle(settled).left)).toBeCloseTo(
+        compositesLeft + WEEK_SCALE_DAY_WIDTH,
+        0,
+      )
+    })
+
+    // With the option off, the dialog goes back to its plain Move.
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Cascade dependents" }),
+    )
+    const primitivesThird = canvas.getByRole("button", {
+      name: /^Primitives,/,
+    })
+    primitivesThird.focus()
+    await userEvent.keyboard("{Shift>}{ArrowLeft}{/Shift}")
+    await userEvent.keyboard("{Enter}")
+    const thirdDialog = await canvas.findByRole("dialog", {
+      name: "Confirm move",
+    })
+    await expect(
+      within(thirdDialog).queryByRole("button", { name: "Move all" }),
+    ).toBeNull()
+    await userEvent.click(
+      within(thirdDialog).getByRole("button", { name: "Keep" }),
+    )
+  },
+}
+
 export const CustomTaskContent: Story = {
   parameters: storyDocumentation(
     "renderTask replaces every bar's interior — here a name with a live percent readout — while the chart keeps geometry, drag, and selection; taskClassName layers styling policy (dimming completed work) without touching the task data. The play test asserts the custom interior renders inside a bar the chart still positions.",
@@ -443,11 +560,15 @@ export const LocalizedLabels: Story = {
         taskListHeader: "Tâche",
         moveAction: "Déplacer",
         resizeAction: "Redimensionner",
+        moveAllAction: "Tout déplacer",
+        moveOnlyAction: "Celle-ci seulement",
         keepAction: "Conserver",
         confirmMoveLabel: "Confirmer le déplacement",
         confirmResizeLabel: "Confirmer le redimensionnement",
         confirmMoveTitle: (name) => `Déplacer « ${name} » ?`,
         confirmResizeTitle: (name) => `Redimensionner « ${name} » ?`,
+        cascadeNote: (count) =>
+          `Déplace aussi ${count} tâche${count === 1 ? "" : "s"} dépendante${count === 1 ? "" : "s"}.`,
         collapseGroup: (name) => `Réduire ${name}`,
         expandGroup: (name) => `Développer ${name}`,
         taskBar: (name, start, end) => `${name}, du ${start} au ${end}`,

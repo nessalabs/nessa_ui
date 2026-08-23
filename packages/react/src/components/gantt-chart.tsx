@@ -187,7 +187,19 @@ export interface GanttChartTaskRenderContext {
 export interface GanttChartMoveConfirmContext {
   task: GanttChartTask
   range: GanttChartRange
-  confirm: () => void
+  /**
+   * Ids of the task's transitive dependents whenever the proposed dates
+   * change its finish (empty otherwise) — the tasks a cascading commit
+   * would shift, listed regardless of the `moveDependents` default so a
+   * host's own confirmation UI can offer the choice either way.
+   */
+  dependentTaskIds: string[]
+  /**
+   * Commits the move. `moveDependents` chooses per commit whether the
+   * dependents in `dependentTaskIds` shift along; omitted, it falls back
+   * to the chart's `moveDependents` prop.
+   */
+  confirm: (options?: { moveDependents?: boolean }) => void
   cancel: () => void
 }
 
@@ -233,6 +245,10 @@ export interface GanttChartLabels {
   moveAction: string
   /** Confirm button of the built-in dialog for a duration change. */
   resizeAction: string
+  /** Cascading commit button while the dialog offers the choice. */
+  moveAllAction: string
+  /** This-task-only commit button while the dialog offers the choice. */
+  moveOnlyAction: string
   /** Dismiss button of the built-in confirmation dialog. */
   keepAction: string
   /** Accessible name of the built-in dialog for a move. */
@@ -241,6 +257,11 @@ export interface GanttChartLabels {
   confirmResizeLabel: string
   confirmMoveTitle: (taskName: string) => string
   confirmResizeTitle: (taskName: string) => string
+  /**
+   * Line in the confirmation dialog naming how many dependent tasks will
+   * shift along, shown while `moveDependents` is enabled.
+   */
+  cascadeNote: (taskCount: number) => string
   /** Announcement of a summary row's collapse toggle while expanded. */
   collapseGroup: (taskName: string) => string
   /** Announcement of a summary row's collapse toggle while collapsed. */
@@ -277,11 +298,17 @@ export const ganttChartDefaultLabels: GanttChartLabels = Object.freeze({
   taskListHeader: "Task",
   moveAction: "Move",
   resizeAction: "Resize",
+  moveAllAction: "Move all",
+  moveOnlyAction: "Only this",
   keepAction: "Keep",
   confirmMoveLabel: "Confirm move",
   confirmResizeLabel: "Confirm resize",
   confirmMoveTitle: (taskName: string) => `Move “${taskName}”?`,
   confirmResizeTitle: (taskName: string) => `Resize “${taskName}”?`,
+  cascadeNote: (taskCount: number) =>
+    taskCount === 1
+      ? "Also moves 1 dependent task."
+      : `Also moves ${taskCount} dependent tasks.`,
   collapseGroup: (taskName: string) => `Collapse ${taskName}`,
   expandGroup: (taskName: string) => `Expand ${taskName}`,
   taskBar: (name: string, start: string, end: string) =>
@@ -810,11 +837,14 @@ interface GanttChartContextValue {
   taskClassName?: (
     context: GanttChartTaskRenderContext,
   ) => string | undefined
+  moveDependents: boolean
+  /** Transitive dependents of a task, in dependency-graph order. */
+  dependentIdsOf: (taskId: string) => string[]
   pendingMove: PendingMove | null
   requestMove: (task: GanttChartTask, start: Date, end: Date) => void
   adjustMove: (task: GanttChartTask, start: Date, end: Date) => void
   promotePendingMove: () => void
-  confirmPendingMove: () => void
+  confirmPendingMove: (options?: { moveDependents?: boolean }) => void
   cancelPendingMove: () => void
   confirmMoves: boolean
   renderMoveConfirm?: (
@@ -920,6 +950,19 @@ export interface GanttChartProps
    */
   confirmMoves?: boolean
   /**
+   * Whether a committed move or resize that shifts a task's finish also
+   * shifts every task that transitively depends on it (`dependsOn`,
+   * followed through the graph) by the same number of days — finish-to-
+   * start scheduling in its simplest push-and-pull form, in both
+   * directions. Off by default so dependency arrows stay purely visual.
+   * While it is on, the built-in confirmation dialog turns the choice
+   * per-move — "Move all" versus "Only this" — and either way a host's
+   * own `renderMoveConfirm` UI can decide with
+   * `confirm({ moveDependents })`; this prop is the default for commits
+   * made without an explicit choice.
+   */
+  moveDependents?: boolean
+  /**
    * Replaces the built-in move-confirmation dialog with the host's own
    * UI, positioned at the proposed dates. While it is open the move is
    * only pending, and the context's `confirm`/`cancel` commit or abandon
@@ -987,6 +1030,7 @@ function GanttChart({
   labels: labelsProp,
   shortcuts: shortcutsProp,
   confirmMoves = true,
+  moveDependents = false,
   renderMoveConfirm,
   renderTask,
   taskClassName,
@@ -1103,11 +1147,61 @@ function GanttChart({
     }
   }, [tasks, pendingMove])
 
-  const commitMove = (task: GanttChartTask, start: Date, end: Date) => {
+  /**
+   * A task's transitive dependents: every task reachable by following
+   * `dependsOn` edges away from it, cycle-safe, in breadth-first order.
+   */
+  const dependentIdsOf = React.useCallback(
+    (taskId: string) => {
+      const successorsOf = new Map<string, string[]>()
+      for (const task of tasks) {
+        for (const predecessorId of task.dependsOn ?? []) {
+          const successors = successorsOf.get(predecessorId) ?? []
+          successors.push(task.id)
+          successorsOf.set(predecessorId, successors)
+        }
+      }
+      const dependents: string[] = []
+      const seen = new Set([taskId])
+      const queue = [taskId]
+      while (queue.length) {
+        const id = queue.shift() as string
+        for (const successorId of successorsOf.get(id) ?? []) {
+          if (seen.has(successorId)) continue
+          seen.add(successorId)
+          dependents.push(successorId)
+          queue.push(successorId)
+        }
+      }
+      return dependents
+    },
+    [tasks],
+  )
+
+  const commitMove = (
+    task: GanttChartTask,
+    start: Date,
+    end: Date,
+    cascade: boolean = moveDependents,
+  ) => {
     const moved = { ...task, start, end }
-    const next = tasks.map((candidate) =>
-      candidate.id === task.id ? moved : candidate,
-    )
+    // Dependents follow the finish: a whole-task move or an end resize
+    // shifts them by the same day count, a start-only resize leaves the
+    // finish — and therefore the chain — untouched.
+    const finishDelta = differenceInCalendarDays(end, task.end)
+    const shiftedIds =
+      cascade && finishDelta !== 0
+        ? new Set(dependentIdsOf(task.id))
+        : new Set<string>()
+    const next = tasks.map((candidate) => {
+      if (candidate.id === task.id) return moved
+      if (!shiftedIds.has(candidate.id)) return candidate
+      return {
+        ...candidate,
+        start: addDays(candidate.start, finishDelta),
+        end: addDays(candidate.end, finishDelta),
+      }
+    })
     if (tasksProp === undefined) setUncontrolledTasks(next)
     onTasksChange?.(next)
     onTaskMove?.(moved)
@@ -1144,9 +1238,14 @@ function GanttChart({
     })
   }
 
-  const confirmPendingMove = () => {
+  const confirmPendingMove = (options?: { moveDependents?: boolean }) => {
     if (!pendingMove) return
-    commitMove(pendingMove.task, pendingMove.start, pendingMove.end)
+    commitMove(
+      pendingMove.task,
+      pendingMove.start,
+      pendingMove.end,
+      options?.moveDependents ?? moveDependents,
+    )
     setPendingMove(null)
   }
 
@@ -1219,6 +1318,8 @@ function GanttChart({
     onTaskSelect,
     renderTask,
     taskClassName,
+    moveDependents,
+    dependentIdsOf,
     pendingMove,
     requestMove,
     adjustMove,
@@ -1670,14 +1771,21 @@ function TaskBar({
       onPointerDown={beginMove}
     >
       {progressPercent !== null ? (
+        // Progress draws as a slim current-color meter inside the bar, so
+        // the bar stays a single tone in both modes — never the two-tone
+        // done/remaining split that reads as white-on-white in dark.
         <span
           aria-hidden="true"
           data-slot="gantt-chart-bar-progress"
-          className="absolute inset-y-0 left-0 bg-current/25"
-          style={{ width: `${progressPercent}%` }}
-        />
+          className="absolute inset-x-2 bottom-[2px] h-[3px] overflow-hidden rounded-full bg-current/25"
+        >
+          <span
+            className="absolute inset-y-0 left-0 rounded-full bg-current/70"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </span>
       ) : null}
-      <span className="relative z-10 flex w-full min-w-0 items-center">
+      <span className="relative z-10 flex w-full min-w-0 items-center pb-1">
         {renderTask?.(renderContext) ?? (
           <span className="w-full truncate">{task.name}</span>
         )}
@@ -1712,7 +1820,7 @@ function DefaultMoveConfirm({
 }: {
   context: GanttChartMoveConfirmContext
 }) {
-  const { locale, labels } = useGanttChart("GanttChartGrid")
+  const { locale, labels, moveDependents } = useGanttChart("GanttChartGrid")
   const confirmRef = React.useRef<HTMLButtonElement>(null)
 
   React.useEffect(() => {
@@ -1748,15 +1856,45 @@ function DefaultMoveConfirm({
               addDays(context.range.end, -1),
             )}`}
       </p>
-      <div className="flex items-center gap-2">
-        <Button
-          ref={confirmRef}
-          size="sm"
-          className="h-7"
-          onClick={context.confirm}
-        >
-          {durationChanged ? labels.resizeAction : labels.moveAction}
-        </Button>
+      {moveDependents && context.dependentTaskIds.length ? (
+        <p className="text-xs text-muted-foreground">
+          {labels.cascadeNote(context.dependentTaskIds.length)}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        {moveDependents && context.dependentTaskIds.length ? (
+          // With the cascade option on and dependents in play, the choice
+          // is per move: take the chain along, or reschedule just this
+          // task. Hosts build their own version of this ask through
+          // renderMoveConfirm and confirm({ moveDependents }).
+          <>
+            <Button
+              ref={confirmRef}
+              size="sm"
+              className="h-7"
+              onClick={() => context.confirm({ moveDependents: true })}
+            >
+              {labels.moveAllAction}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7"
+              onClick={() => context.confirm({ moveDependents: false })}
+            >
+              {labels.moveOnlyAction}
+            </Button>
+          </>
+        ) : (
+          <Button
+            ref={confirmRef}
+            size="sm"
+            className="h-7"
+            onClick={() => context.confirm()}
+          >
+            {durationChanged ? labels.resizeAction : labels.moveAction}
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"
@@ -1877,6 +2015,8 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
     labels,
     collapsedIds,
     toggleCollapsed,
+    moveDependents,
+    dependentIdsOf,
     pendingMove,
     requestMove,
     confirmPendingMove,
@@ -2161,12 +2301,16 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
                 key={row.task.id}
                 data-slot="gantt-chart-row"
                 data-summary={row.summary || undefined}
-                className="flex border-b border-border/40"
+                className="flex"
                 style={{ height: rowHeight }}
               >
+                {/* The cell and the lane each own their bottom border: a
+                    border on the row itself is a 1px seam the opaque sticky
+                    cell cannot cover, and the dependency arrows bleed
+                    through it across the pinned column. */}
                 <div
                   data-slot="gantt-chart-task-cell"
-                  className="sticky left-0 z-20 flex shrink-0 items-center gap-1 border-r border-border bg-background pe-3 text-sm"
+                  className="sticky left-0 z-20 flex shrink-0 items-center gap-1 border-b border-r border-border/40 border-r-border bg-background pe-3 text-sm"
                   style={{
                     width: taskListWidth,
                     paddingInlineStart: 8 + row.depth * 16,
@@ -2216,7 +2360,7 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
                 </div>
                 <div
                   data-slot="gantt-chart-lane"
-                  className="relative shrink-0"
+                  className="relative shrink-0 border-b border-border/40"
                   style={{ width: timelineWidth }}
                 >
                   <TaskBar
@@ -2302,6 +2446,13 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
                           start: pendingMove.start,
                           end: pendingMove.end,
                         },
+                        dependentTaskIds:
+                          differenceInCalendarDays(
+                            pendingMove.end,
+                            pendingMove.task.end,
+                          ) !== 0
+                            ? dependentIdsOf(pendingMove.task.id)
+                            : [],
                         confirm: confirmPendingMove,
                         cancel: cancelPendingMove,
                       })}
