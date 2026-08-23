@@ -65,6 +65,10 @@ export {
 } from "./components/code-block"
 export { MathBlock, type MathBlockProps } from "./components/math-block"
 export {
+  GeneratingSurface,
+  type GeneratingSurfaceProps,
+} from "./components/generating-surface"
+export {
   MermaidDiagram,
   type MermaidDiagramProps,
 } from "./components/mermaid-diagram"

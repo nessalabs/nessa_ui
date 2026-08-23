@@ -117,7 +117,49 @@ function extractFencedCode(
  */
 const MarkdownSourceContext = React.createContext("")
 
-type PreProps = React.ComponentProps<"pre"> & { node?: unknown }
+/**
+ * Whether the surrounding reply is still streaming — MermaidDiagram uses it
+ * to keep its generating placeholder up while a fence is still open.
+ */
+const MarkdownStreamingContext = React.createContext(false)
+
+type MarkdownPosition = {
+  position?: { start: { offset?: number }; end: { offset?: number } }
+}
+
+type PreProps = React.ComponentProps<"pre"> & { node?: MarkdownPosition }
+
+/**
+ * The delimiter run that opened a fenced block. A `code` node's position
+ * starts at the delimiter itself — container prefixes (blockquote markers,
+ * list markers, indentation) fall outside the slice — so the opener is
+ * always at the head of the raw text.
+ */
+const fenceOpenerPattern = /^(`{3,}|~{3,})/
+
+/**
+ * Whether a fenced block's raw markdown is still missing its closing
+ * fence, which is how a streaming ```mermaid fence says more source is
+ * coming. CommonMark requires the closer to repeat the opener's delimiter
+ * at least as many times, and both halves matter: a shorter run, or the
+ * other delimiter, is diagram content rather than the end of the block —
+ * without the length check a ````-fenced diagram ends at its first ```
+ * line. Continuation lines keep their container prefix, and a fence nested
+ * two lists deep carries more indentation than CommonMark's three-space
+ * limit from that prefix alone, so leading markers and whitespace are
+ * matched loosely instead of bounded. Both line terminators are accepted
+ * so a CR-only stream cannot pin the diagram open.
+ */
+function isFenceOpen(raw: string) {
+  const opener = fenceOpenerPattern.exec(raw)?.[1]
+  // Unreachable for a real fenced node; treating it as closed keeps an
+  // unexpected shape from stranding the diagram in its placeholder.
+  if (opener === undefined) return false
+  const closer = new RegExp(
+    `[\\r\\n][\\t >]*${opener[0]}{${opener.length},}$`,
+  )
+  return !closer.test(raw)
+}
 
 /**
  * Routes fenced code to the specialized surfaces: MathBlock for `$$…$$`
@@ -127,12 +169,29 @@ type PreProps = React.ComponentProps<"pre"> & { node?: unknown }
  * in place instead of remounting on every chunk, which would flicker between
  * source text and rendered output.
  */
-function MarkdownPre({ node: _node, children, ...rest }: PreProps) {
+function MarkdownPre({ node, children, ...rest }: PreProps) {
+  const source = React.useContext(MarkdownSourceContext)
+  const replyStreaming = React.useContext(MarkdownStreamingContext)
   const fenced = extractFencedCode(children)
   if (fenced === null) return <pre {...rest}>{children}</pre>
   if (fenced.isMath) return <MathBlock tex={fenced.code} className="my-3" />
   if (fenced.language === "mermaid") {
-    return <MermaidDiagram chart={fenced.code} className="my-3" />
+    // While the reply streams, an unclosed fence at the tail parses as a
+    // code block running to the end of the source, so "does the block's raw
+    // slice end with a closing fence?" tells whether the diagram source is
+    // complete. An open fence keeps the diagram's generating placeholder up
+    // rather than revealing a half-streamed diagram that reflows on every
+    // chunk.
+    const start = node?.position?.start.offset
+    const end = node?.position?.end.offset
+    const raw =
+      start !== undefined && end !== undefined
+        ? source.slice(start, end).trimEnd()
+        : null
+    const fenceOpen = replyStreaming && raw !== null && isFenceOpen(raw)
+    return (
+      <MermaidDiagram chart={fenced.code} streaming={fenceOpen} className="my-3" />
+    )
   }
   return (
     <CodeBlock code={fenced.code} language={fenced.language} className="my-3" />
@@ -227,13 +286,15 @@ function MessageMarkdown({
       {...props}
     >
       <MarkdownSourceContext.Provider value={children}>
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm, remarkMath]}
-          rehypePlugins={streaming ? streamingRehypePlugins : staticRehypePlugins}
-          components={{ ...defaultComponents, ...components }}
-        >
-          {children}
-        </ReactMarkdown>
+        <MarkdownStreamingContext.Provider value={streaming}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={streaming ? streamingRehypePlugins : staticRehypePlugins}
+            components={{ ...defaultComponents, ...components }}
+          >
+            {children}
+          </ReactMarkdown>
+        </MarkdownStreamingContext.Provider>
       </MarkdownSourceContext.Provider>
     </div>
   )
