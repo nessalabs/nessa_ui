@@ -397,7 +397,9 @@ export const PointerRescheduling: Story = {
 }
 
 function CascadeDemo() {
-  const [moveDependents, setMoveDependents] = React.useState(false)
+  // The story lands with the cascade on so the Move all / Only this ask
+  // is one drag away; the toolbar button hands the choice to the user.
+  const [moveDependents, setMoveDependents] = React.useState(true)
   return (
     <GanttChart
       now={storyNow}
@@ -427,9 +429,9 @@ export const DependentCascade: Story = {
   render: () => <CascadeDemo />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await userEvent.click(
+    await expect(
       canvas.getByRole("button", { name: "Cascade dependents" }),
-    )
+    ).toHaveAttribute("aria-pressed", "true")
 
     const composites = await canvas.findByRole("button", {
       name: /^Composites,/,
