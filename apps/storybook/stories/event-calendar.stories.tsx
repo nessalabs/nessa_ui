@@ -437,7 +437,7 @@ export const DragToCreate: Story = {
 
 export const DragToMove: Story = {
   parameters: storyDocumentation(
-    "Rescheduling by direct manipulation with the confirmation gate opted out (confirmMoves={false}): grabbing a chip and dragging shows a ghost preview snapped to the slot grid, and releasing commits the move immediately — across times and across days — through onEventMove. From the keyboard, the vim-flavored default chords Mod+Shift+H/J/K/L nudge a pending ghost, Mod+Alt+J/K grow or shrink its duration, and Enter places it (every shortcut is host-replaceable via the shortcuts prop). The play test drags the design crit from 1:00 PM to 3:00 PM by computed chip offset, chords it to Wednesday and half an hour later, then stretches its bottom edge from 5:00 to 6:00 and proves the new duration by computed chip height.",
+    "Rescheduling by direct manipulation with the confirmation gate opted out (confirmMoves={false}): grabbing a chip and dragging shows a ghost preview snapped to the slot grid, and releasing commits the move immediately — across times and across days — through onEventMove. From the keyboard, the default Shift+Arrow keys nudge a pending ghost (the same gesture that extends a draft selection, aimed at a focused event instead), Mod+Alt+J/K grow or shrink its duration, and Enter places it (every shortcut is host-replaceable via the shortcuts prop). The play test drags the design crit from 1:00 PM to 3:00 PM by computed chip offset, nudges it to Wednesday and half an hour later with Shift+Arrow, then stretches its bottom edge from 5:00 to 6:00 and proves the new duration by computed chip height.",
   ),
   render: () => (
     <StoryFrame>
@@ -497,7 +497,7 @@ export const DragToMove: Story = {
       0,
     )
     movedChip.focus()
-    await userEvent.keyboard("{Meta>}{Shift>}l{/Shift}{/Meta}")
+    await userEvent.keyboard("{Shift>}{ArrowRight}{/Shift}")
     const adjustingGhost = canvasElement.querySelector<HTMLElement>(
       '[data-slot="event-calendar-move-preview"]',
     )
@@ -507,7 +507,7 @@ export const DragToMove: Story = {
       name: /Design crit, Wednesday, August 19, 3:00 PM/,
     })
     await waitFor(() => expect(wednesdayChip).toHaveFocus())
-    await userEvent.keyboard("{Meta>}{Shift>}j{/Shift}{/Meta}")
+    await userEvent.keyboard("{Shift>}{ArrowDown}{/Shift}")
     await userEvent.keyboard("{Enter}")
     const nudgedChip = await canvas.findByRole("button", {
       name: /Design crit, Wednesday, August 19, 3:30 PM to 5:00 PM/,
@@ -565,7 +565,7 @@ export const DragToMove: Story = {
 
 export const MoveConfirmation: Story = {
   parameters: storyDocumentation(
-    "Every reschedule is gated by default: dropping, edge-drag resizing, or chord-moving an event parks it as pending and the built-in confirmation dialog renders at the proposed slot, committing through Move or abandoning through Keep and Escape. The dialog autofocuses Move, so from the keyboard a chorded nudge, Enter, Enter places and commits without touching the pointer. Hosts swap in their own dialog with renderMoveConfirm or turn the gate off with confirmMoves={false}. The play test drags the design crit from 1:00 PM toward 3:00 PM, confirms, proves the chip landed, then drags again and keeps the original time via cancel.",
+    "Every reschedule is gated by default: dropping, edge-drag resizing, or Shift+Arrow nudging an event parks it as pending and the built-in confirmation dialog renders at the proposed slot, committing through Move or abandoning through Keep and Escape. The dialog autofocuses Move, so from the keyboard a nudge, Enter, Enter places and commits without touching the pointer. Hosts swap in their own dialog with renderMoveConfirm or turn the gate off with confirmMoves={false}. The play test drags the design crit from 1:00 PM toward 3:00 PM, confirms, proves the chip landed, then drags again and keeps the original time via cancel.",
   ),
   render: () => (
     <StoryFrame>
@@ -643,14 +643,14 @@ export const MoveConfirmation: Story = {
       0,
     )
 
-    // Keyboard chords adjust a silent ghost — the dialog appears once, on
+    // Keyboard nudges adjust a silent ghost — the dialog appears once, on
     // Enter, so chained nudges are never interrupted.
     keptChip.focus()
-    await userEvent.keyboard("{Meta>}{Shift>}j{/Shift}{/Meta}")
+    await userEvent.keyboard("{Shift>}{ArrowDown}{/Shift}")
     await expect(
       canvas.queryByRole("dialog", { name: "Confirm move" }),
     ).toBeNull()
-    await userEvent.keyboard("{Meta>}{Shift>}j{/Shift}{/Meta}")
+    await userEvent.keyboard("{Shift>}{ArrowDown}{/Shift}")
     await expect(
       canvas.queryByRole("dialog", { name: "Confirm move" }),
     ).toBeNull()

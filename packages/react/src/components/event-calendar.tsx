@@ -284,8 +284,9 @@ export interface EventCalendarKeyboardShortcut {
 }
 
 /**
- * The calendar's shortcut map. Every action ships a vim-flavored default;
- * hosts replace any entry with their own shortcut or `false` to disable
+ * The calendar's shortcut map. Every action ships a sensible default —
+ * vim-flavored navigation, Shift+Arrow to move a focused event; hosts
+ * replace any entry with their own shortcut or `false` to disable
  * it, and `shortcuts={false}` on the calendar turns the whole map off.
  */
 export interface EventCalendarShortcuts {
@@ -301,13 +302,13 @@ export interface EventCalendarShortcuts {
   weekView?: EventCalendarKeyboardShortcut | false
   /** Switches to the month view. @defaultValue `m` */
   monthView?: EventCalendarKeyboardShortcut | false
-  /** Nudges a focused event one day earlier. @defaultValue `Mod+Shift+H` */
+  /** Nudges a focused event one day earlier. @defaultValue `Shift+ArrowLeft` */
   moveEventLeft?: EventCalendarKeyboardShortcut | false
-  /** Nudges a focused event one slot later. @defaultValue `Mod+Shift+J` */
+  /** Nudges a focused event one slot later. @defaultValue `Shift+ArrowDown` */
   moveEventDown?: EventCalendarKeyboardShortcut | false
-  /** Nudges a focused event one slot earlier. @defaultValue `Mod+Shift+K` */
+  /** Nudges a focused event one slot earlier. @defaultValue `Shift+ArrowUp` */
   moveEventUp?: EventCalendarKeyboardShortcut | false
-  /** Nudges a focused event one day later. @defaultValue `Mod+Shift+L` */
+  /** Nudges a focused event one day later. @defaultValue `Shift+ArrowRight` */
   moveEventRight?: EventCalendarKeyboardShortcut | false
   /** Grows a focused event one slot longer. @defaultValue `Mod+Alt+J` */
   resizeEventLonger?: EventCalendarKeyboardShortcut | false
@@ -322,7 +323,12 @@ type ResolvedShortcuts = Record<
   EventCalendarKeyboardShortcut | undefined
 >
 
-/** The out-of-the-box vim-flavored keymap. */
+/**
+ * The out-of-the-box keymap: vim-flavored navigation (h/l/t/d/w/m) and
+ * Shift+Arrow to move a focused event — the same gesture that already
+ * extends a draft selection on the empty grid, just aimed at an event
+ * chip instead.
+ */
 const DEFAULT_SHORTCUTS: Record<
   EventCalendarShortcutAction,
   EventCalendarKeyboardShortcut
@@ -333,10 +339,10 @@ const DEFAULT_SHORTCUTS: Record<
   dayView: { key: "d" },
   weekView: { key: "w" },
   monthView: { key: "m" },
-  moveEventLeft: { key: "h", modifier: "mod", shiftKey: true },
-  moveEventDown: { key: "j", modifier: "mod", shiftKey: true },
-  moveEventUp: { key: "k", modifier: "mod", shiftKey: true },
-  moveEventRight: { key: "l", modifier: "mod", shiftKey: true },
+  moveEventLeft: { key: "ArrowLeft", shiftKey: true },
+  moveEventDown: { key: "ArrowDown", shiftKey: true },
+  moveEventUp: { key: "ArrowUp", shiftKey: true },
+  moveEventRight: { key: "ArrowRight", shiftKey: true },
   resizeEventLonger: { key: "j", modifier: "mod", altKey: true },
   resizeEventShorter: { key: "k", modifier: "mod", altKey: true },
 })
@@ -728,9 +734,9 @@ export interface EventCalendarProps
    */
   labels?: Partial<EventCalendarLabels>
   /**
-   * The calendar's keyboard shortcuts. Merged over the vim-flavored
-   * defaults (`h`/`l` page, `t` today, `d`/`w`/`m` switch views,
-   * `Mod+Shift+H/J/K/L` move a focused event) — override any action with
+   * The calendar's keyboard shortcuts. Merged over the defaults (`h`/`l`
+   * page, `t` today, `d`/`w`/`m` switch views, `Shift+ArrowLeft/Down/Up/Right`
+   * move a focused event) — override any action with
    * a different shortcut, disable one with `false`, or pass `false` for
    * the whole prop to turn every shortcut off.
    */
