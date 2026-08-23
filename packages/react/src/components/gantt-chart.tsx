@@ -1634,13 +1634,18 @@ function TaskBar({
       ? Math.round(clamp(row.progress, 0, 1) * 100)
       : null
 
+  // Summary brackets are derived roll-ups: activating one has no built-in
+  // effect, so it never takes the pressed/selected treatment — the click
+  // still reaches onTaskSelect for hosts that give it a meaning.
+  const selectable = !row.summary
+
   const sharedButtonProps = {
     type: "button" as const,
     "data-task-id": task.id,
     "data-tone": tone,
     "data-moving": moving || undefined,
-    "data-selected": selected || undefined,
-    "aria-pressed": selected,
+    "data-selected": (selectable && selected) || undefined,
+    "aria-pressed": selectable ? selected : undefined,
     "aria-label": label,
     onKeyDown: handleKeyDown,
     onBlur: () => {
@@ -1651,7 +1656,7 @@ function TaskBar({
         suppressClickRef.current = false
         return
       }
-      selectTask(task.id)
+      if (selectable) selectTask(task.id)
       onTaskSelect?.(task, domEvent)
     },
   }
@@ -1678,7 +1683,6 @@ function TaskBar({
           surfaceTransitionClassName,
           insetFocusClassName,
           taskClassName?.(renderContext),
-          selected && "ring-2 ring-ring ring-offset-1 ring-offset-background",
         )}
         style={{ left, width }}
       >
