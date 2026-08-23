@@ -30,7 +30,9 @@ type FocusComponent =
   | "file-diff-list"
   | "questionnaire"
   | "reference"
+  | "json-tree"
   | "selection-tooltip"
+  | "tool-approval"
   | "split-view/split-view-separator"
   | "app-shell/app-shell-dock"
   | (typeof composerFocusComponents)[number]["component"]
@@ -151,6 +153,24 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     dark: { token: "--ring", opacity: 1 },
   },
   {
+    component: "json-tree",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  {
+    component: "tool-approval",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 2,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  {
     component: "split-view/split-view-separator",
     layer: "ring",
     state: "focus-visible",
@@ -216,6 +236,16 @@ export const focusGeometryClasses = Object.freeze([
   // would be swallowed at the overflow edge.
   { component: "selection-tooltip", className: "focus-visible:outline-2", count: 3 },
   { component: "selection-tooltip", className: "focus-visible:-outline-offset-2", count: 3 },
+  // The fold toggles routinely sit inside clipping scroll regions (the
+  // tool-approval payload, say), so their lone outline draws inset.
+  { component: "json-tree", className: "focus-visible:outline-2", count: 1 },
+  { component: "json-tree", className: "focus-visible:-outline-offset-2", count: 1 },
+  // The command payload is a scroll region at the card edge, so its outline
+  // draws inset like the other clipping scroll surfaces; the scope-menu
+  // items sit on the padded popover and keep the standard outset offset.
+  { component: "tool-approval", className: "focus-visible:outline-2", count: 2 },
+  { component: "tool-approval", className: "focus-visible:-outline-offset-2", count: 1 },
+  { component: "tool-approval", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "conversation-rail", className: "focus-visible:outline-2", count: 1 },
   { component: "conversation-rail", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "split-view/split-view-separator", className: "focus-visible:ring-2", count: 1 },

@@ -224,6 +224,33 @@ export {
   type ToolCallTabsProps,
   type ToolCallTriggerProps,
 } from "./components/tool-call"
+export { JsonTree, type JsonTreeProps } from "./components/json-tree"
+export {
+  ToolApproval,
+  ToolApprovalAction,
+  ToolApprovalActionMenu,
+  ToolApprovalActionMenuItem,
+  ToolApprovalActions,
+  ToolApprovalCommand,
+  ToolApprovalDescription,
+  ToolApprovalHeader,
+  ToolApprovalHeading,
+  ToolApprovalIcon,
+  ToolApprovalTitle,
+  type ToolApprovalActionMenuItemProps,
+  type ToolApprovalActionMenuProps,
+  type ToolApprovalActionProps,
+  type ToolApprovalActionsProps,
+  type ToolApprovalCommandProps,
+  type ToolApprovalDescriptionProps,
+  type ToolApprovalHeaderProps,
+  type ToolApprovalHeadingProps,
+  type ToolApprovalIconProps,
+  type ToolApprovalProps,
+  type ToolApprovalResolution,
+  type ToolApprovalTitleProps,
+  type ToolApprovalVariant,
+} from "./components/tool-approval"
 export {
   Sidebar,
   SidebarContent,
