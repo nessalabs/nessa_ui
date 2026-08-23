@@ -23,7 +23,36 @@ export {
   type ConversationRailProps,
   type ConversationRailTriggerProps,
 } from "./components/conversation-rail"
+export {
+  EventCalendar,
+  EventCalendarGrid,
+  EventCalendarToolbar,
+  eventCalendarDefaultLabels,
+  eventCalendarToneVariants,
+  formatEventLocation,
+  isAllDayEvent,
+  type EventCalendarEvent,
+  type EventCalendarEventRenderContext,
+  type EventCalendarGridProps,
+  type EventCalendarMoveConfirmContext,
+  type EventCalendarProps,
+  type EventCalendarKeyboardShortcut,
+  type EventCalendarLabels,
+  type EventCalendarLocation,
+  type EventCalendarQuickCreateContext,
+  type EventCalendarRange,
+  type EventCalendarShortcutModifier,
+  type EventCalendarShortcuts,
+  type EventCalendarTone,
+  type EventCalendarToolbarProps,
+  type EventCalendarView,
+} from "./components/event-calendar"
 export { Input } from "./components/input"
+export {
+  PopoverSurface,
+  popoverSurfaceVariants,
+  type PopoverSurfaceProps,
+} from "./components/popover-surface"
 export {
   CodeBlock,
   CodeBlockProvider,

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "popover-surface",
+  "title": "Popover surface",
+  "description": "The floating overlay surface underneath Nessa's popover-style chrome: popover tokens over a hairline border, with elevation and radius variants and asChild projection.",
+  "dependencies": [
+    "class-variance-authority",
+    "radix-ui"
+  ],
+  "registryDependencies": [
+    "nessalabs/nessa_ui/nessa-base",
+    "nessalabs/nessa_ui/utils"
+  ],
+  "files": [
+    {
+      "path": "packages/react/src/components/popover-surface.tsx",
+      "content": "\"use client\"\n\nimport * as React from \"react\"\nimport { Slot } from \"radix-ui\"\nimport { cva, type VariantProps } from \"class-variance-authority\"\n\nimport { cn } from \"@/lib/utils\"\n\n/**\n * The floating-surface recipe shared by Nessa's overlay chrome: popover\n * tokens over a hairline border. Exported — like `buttonVariants` — so\n * primitives that render through other libraries' content components can\n * reuse the exact classes.\n */\nconst popoverSurfaceVariants = cva(\n  \"border border-border bg-popover font-sans text-popover-foreground\",\n  {\n    variants: {\n      elevation: {\n        md: \"shadow-md\",\n        xl: \"shadow-xl\",\n      },\n      radius: {\n        lg: \"rounded-lg\",\n        xl: \"rounded-xl\",\n        \"2xl\": \"rounded-2xl\",\n      },\n    },\n    defaultVariants: {\n      elevation: \"md\",\n      radius: \"xl\",\n    },\n  },\n)\n\nexport interface PopoverSurfaceProps\n  extends React.ComponentProps<\"div\">,\n    VariantProps<typeof popoverSurfaceVariants> {\n  /** Merges the surface onto the immediate child instead of a div. */\n  asChild?: boolean\n}\n\n/**\n * A floating overlay surface: the popover-token card that hover cards,\n * pickers, inline dialogs, and quick-create style popups sit on. Purely\n * presentational — positioning, portals, and dismissal stay with the\n * consumer — with `asChild` to project the surface onto another element\n * such as a positioned content node.\n */\nfunction PopoverSurface({\n  className,\n  elevation,\n  radius,\n  asChild = false,\n  ...props\n}: PopoverSurfaceProps) {\n  const Comp = asChild ? Slot.Root : \"div\"\n  return (\n    <Comp\n      data-slot=\"popover-surface\"\n      className={cn(popoverSurfaceVariants({ elevation, radius }), className)}\n      {...props}\n    />\n  )\n}\n\nexport { PopoverSurface, popoverSurfaceVariants }\n",
+      "type": "registry:ui",
+      "target": "components/ui/popover-surface.tsx"
+    }
+  ],
+  "type": "registry:ui"
+}
