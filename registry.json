@@ -808,6 +808,48 @@
       ]
     },
     {
+      "name": "segmented-control",
+      "type": "registry:ui",
+      "title": "Segmented control",
+      "description": "A compact single-choice switcher: a bordered pill of pressed/unpressed buttons for view and scale toggles, with controlled or uncontrolled value state.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/segmented-control.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/segmented-control.tsx"
+        }
+      ]
+    },
+    {
+      "name": "gantt-chart",
+      "type": "registry:ui",
+      "title": "Gantt chart",
+      "description": "A project-plan timeline: a pinned task list beside a scrollable day/week/month timeline of bars, milestones, and roll-up summary brackets, with finish-to-start dependency arrows, a today marker, weekend shading, collapsible groups, and task rescheduling by drag, edge-drag resizing, or keyboard chords behind a confirmable move gate.",
+      "dependencies": [
+        "class-variance-authority",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/popover-surface",
+        "nessalabs/nessa_ui/segmented-control",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/gantt-chart.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/gantt-chart.tsx"
+        }
+      ]
+    },
+    {
       "name": "event-calendar",
       "type": "registry:ui",
       "title": "Event calendar",
