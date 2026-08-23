@@ -808,6 +808,28 @@
       ]
     },
     {
+      "name": "context-menu",
+      "type": "registry:ui",
+      "title": "Context menu",
+      "description": "A right-click menu on Nessa's popover surface: items with icons and keyboard shortcuts, groups and labels, nested submenus, checkbox and radio selection, and a destructive item variant, built on Radix context-menu primitives.",
+      "dependencies": [
+        "lucide-react",
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/popover-surface",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/context-menu.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/context-menu.tsx"
+        }
+      ]
+    },
+    {
       "name": "segmented-control",
       "type": "registry:ui",
       "title": "Segmented control",
