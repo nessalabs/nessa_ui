@@ -28,6 +28,7 @@ type FocusComponent =
   | "input"
   | "conversation-rail"
   | "event-calendar"
+  | "gantt-chart"
   | "file-diff-list"
   | "questionnaire"
   | "reference"
@@ -137,6 +138,15 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
   },
   {
     component: "event-calendar",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 5,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  {
+    component: "gantt-chart",
     layer: "outline",
     state: "focus-visible",
     className: "focus-visible:outline-ring",
@@ -261,6 +271,11 @@ export const focusGeometryClasses = Object.freeze([
   // an outset outline would be swallowed at the region edges.
   { component: "event-calendar", className: "focus-visible:outline-2", count: 5 },
   { component: "event-calendar", className: "focus-visible:-outline-offset-2", count: 5 },
+  // Every gantt-chart outline draws inset: the bars, collapse toggles, and
+  // the scroll region itself all sit inside the scrolling timeline, so an
+  // outset outline would be swallowed at the region edges.
+  { component: "gantt-chart", className: "focus-visible:outline-2", count: 5 },
+  { component: "gantt-chart", className: "focus-visible:-outline-offset-2", count: 5 },
   { component: "conversation-rail", className: "focus-visible:outline-2", count: 1 },
   { component: "conversation-rail", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "split-view/split-view-separator", className: "focus-visible:ring-2", count: 1 },
