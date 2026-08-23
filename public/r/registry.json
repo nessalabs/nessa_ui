@@ -704,6 +704,49 @@
       ]
     },
     {
+      "name": "json-tree",
+      "type": "registry:ui",
+      "title": "JSON Tree",
+      "description": "A structured JSON renderer: muted keys, emphasized values, real JSON punctuation, and optional fold toggles on every object and array. Unopinionated monospace surface with data-slot hooks so hosts can restyle it per surface.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/json-tree.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/json-tree.tsx"
+        }
+      ]
+    },
+    {
+      "name": "tool-approval",
+      "type": "registry:ui",
+      "title": "Tool Approval",
+      "description": "A tool-permission request card: header with icon, title, and description, an optional monospace command payload, and a decision row of Button-based actions with key-cap shortcut hints. One request renders docked above the composer, as a compact floating panel, or dropping from the display notch via the variant prop.",
+      "dependencies": [
+        "lucide-react",
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/json-tree",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/tool-approval.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/tool-approval.tsx"
+        }
+      ]
+    },
+    {
       "name": "reference",
       "type": "registry:ui",
       "title": "Reference",
