@@ -259,10 +259,27 @@
       ]
     },
     {
+      "name": "generating-surface",
+      "type": "registry:ui",
+      "title": "Generating Surface",
+      "description": "An ambient placeholder for content that takes a while to generate — drifting smoke and a shimmering status label reserve the space, then morph into the finished content when generation completes.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/generating-surface.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/generating-surface.tsx"
+        }
+      ]
+    },
+    {
       "name": "mermaid-diagram",
       "type": "registry:ui",
       "title": "Mermaid Diagram",
-      "description": "Mermaid diagrams \u2014 flowcharts, sequence diagrams, and every other Mermaid grammar \u2014 rendered to SVG with app-wide light and dark theming and a fullscreen pan-and-zoom viewer.",
+      "description": "Mermaid diagrams — flowcharts, sequence diagrams, and every other Mermaid grammar — rendered to SVG with app-wide light and dark theming and a fullscreen pan-and-zoom viewer.",
       "dependencies": [
         "lucide-react",
         "mermaid"
@@ -270,7 +287,8 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils",
-        "nessalabs/nessa_ui/code-block"
+        "nessalabs/nessa_ui/code-block",
+        "nessalabs/nessa_ui/generating-surface"
       ],
       "files": [
         {
