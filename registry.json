@@ -997,6 +997,90 @@
           "target": "components/ui/sidebar/sidebar-rail.tsx"
         }
       ]
+    },
+    {
+      "name": "workflow-canvas",
+      "type": "registry:ui",
+      "title": "WorkflowCanvas",
+      "description": "An infinite (or bounded) pan-and-zoom workflow canvas with draggable nodes that render any content, side handles for drawing connections, and edges that follow their endpoint nodes \u2014 built to stay responsive with thousands of nodes.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/workflow-canvas/index.ts",
+          "type": "registry:ui",
+          "target": "components/workflow-canvas/index.ts"
+        },
+        {
+          "path": "packages/react/src/components/workflow-canvas/workflow-canvas.tsx",
+          "type": "registry:ui",
+          "target": "components/workflow-canvas/workflow-canvas.tsx"
+        },
+        {
+          "path": "packages/react/src/components/workflow-canvas/workflow-canvas-node.tsx",
+          "type": "registry:ui",
+          "target": "components/workflow-canvas/workflow-canvas-node.tsx"
+        },
+        {
+          "path": "packages/react/src/components/workflow-canvas/workflow-canvas-edge.tsx",
+          "type": "registry:ui",
+          "target": "components/workflow-canvas/workflow-canvas-edge.tsx"
+        },
+        {
+          "path": "packages/react/src/components/workflow-canvas/workflow-canvas-context.ts",
+          "type": "registry:ui",
+          "target": "components/workflow-canvas/workflow-canvas-context.ts"
+        },
+        {
+          "path": "packages/react/src/components/workflow-canvas/workflow-canvas-math.ts",
+          "type": "registry:ui",
+          "target": "components/workflow-canvas/workflow-canvas-math.ts"
+        }
+      ]
+    },
+    {
+      "name": "kanban",
+      "type": "registry:ui",
+      "title": "Kanban",
+      "description": "A composable kanban board: columns of draggable cards with pointer and keyboard movement, a drop indicator marking the insertion point, settled moves reported through onCardMove, and screen-reader announcements for every step.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/kanban/index.ts",
+          "type": "registry:ui",
+          "target": "components/kanban/index.ts"
+        },
+        {
+          "path": "packages/react/src/components/kanban/kanban.tsx",
+          "type": "registry:ui",
+          "target": "components/kanban/kanban.tsx"
+        },
+        {
+          "path": "packages/react/src/components/kanban/kanban-column.tsx",
+          "type": "registry:ui",
+          "target": "components/kanban/kanban-column.tsx"
+        },
+        {
+          "path": "packages/react/src/components/kanban/kanban-card.tsx",
+          "type": "registry:ui",
+          "target": "components/kanban/kanban-card.tsx"
+        },
+        {
+          "path": "packages/react/src/components/kanban/kanban-context.ts",
+          "type": "registry:ui",
+          "target": "components/kanban/kanban-context.ts"
+        },
+        {
+          "path": "packages/react/src/components/kanban/kanban-math.ts",
+          "type": "registry:ui",
+          "target": "components/kanban/kanban-math.ts"
+        }
+      ]
     }
   ]
 }

@@ -19,7 +19,7 @@
     "dev": "pnpm --filter @nessa-ui/storybook dev",
     "storybook": "pnpm --filter @nessa-ui/storybook dev",
     "test": "pnpm --filter @nessa-ui/storybook test",
-    "test:unit": "tsx --test \"packages/react/src/lib/app-shell-layout/layout-model.test.ts\" \"packages/react/src/components/split-view/split-view-math.test.ts\"",
+    "test:unit": "tsx --test \"packages/react/src/lib/app-shell-layout/layout-model.test.ts\" \"packages/react/src/components/split-view/split-view-math.test.ts\" \"packages/react/src/components/workflow-canvas/workflow-canvas-math.test.ts\" \"packages/react/src/components/kanban/kanban-math.test.ts\"",
     "typecheck": "pnpm -r typecheck && pnpm typecheck:validation",
     "typecheck:validation": "tsc -p validation/tsconfig.json --noEmit",
     "validate": "tsx validation/run.ts --phase=source",
