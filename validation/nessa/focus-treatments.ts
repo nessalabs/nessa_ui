@@ -30,12 +30,16 @@ type FocusComponent =
   | "event-calendar"
   | "gantt-chart"
   | "file-diff-list"
+  | "kanban/kanban-card"
+  | "kanban/kanban-column"
   | "questionnaire"
   | "reference"
   | "json-tree"
   | "selection-tooltip"
   | "tool-approval"
   | "split-view/split-view-separator"
+  | "workflow-canvas/workflow-canvas"
+  | "workflow-canvas/workflow-canvas-node"
   | "app-shell/app-shell-dock"
   | (typeof composerFocusComponents)[number]["component"]
   | (typeof sidebarFocusComponents)[number]["component"]
@@ -172,6 +176,49 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
+  // The column drag handle sits in the column header, clear of any
+  // clipping region, so it keeps the standard outset outline.
+  {
+    component: "kanban/kanban-column",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // Kanban cards live inside scrollable column lists, so their outline
+  // draws inset like other scroll-region children.
+  {
+    component: "kanban/kanban-card",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The canvas viewport draws its outline inset because it clips its own
+  // content; the node and its connection handles float freely and keep the
+  // standard outset offset.
+  {
+    component: "workflow-canvas/workflow-canvas",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  {
+    component: "workflow-canvas/workflow-canvas-node",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 3,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
   {
     component: "json-tree",
     layer: "outline",
@@ -278,6 +325,14 @@ export const focusGeometryClasses = Object.freeze([
   { component: "gantt-chart", className: "focus-visible:-outline-offset-2", count: 5 },
   { component: "conversation-rail", className: "focus-visible:outline-2", count: 1 },
   { component: "conversation-rail", className: "focus-visible:outline-offset-2", count: 1 },
+  { component: "kanban/kanban-card", className: "focus-visible:outline-2", count: 1 },
+  { component: "kanban/kanban-column", className: "focus-visible:outline-2", count: 1 },
+  { component: "kanban/kanban-column", className: "focus-visible:outline-offset-2", count: 1 },
+  { component: "kanban/kanban-card", className: "focus-visible:-outline-offset-2", count: 1 },
+  { component: "workflow-canvas/workflow-canvas", className: "focus-visible:outline-2", count: 1 },
+  { component: "workflow-canvas/workflow-canvas", className: "focus-visible:-outline-offset-2", count: 1 },
+  { component: "workflow-canvas/workflow-canvas-node", className: "focus-visible:outline-2", count: 3 },
+  { component: "workflow-canvas/workflow-canvas-node", className: "focus-visible:outline-offset-2", count: 3 },
   { component: "split-view/split-view-separator", className: "focus-visible:ring-2", count: 1 },
   { component: "split-view/split-view-separator", className: "focus-visible:ring-offset-0", count: 1 },
   { component: "app-shell/app-shell-dock", className: "focus-visible:ring-2", count: 1 },

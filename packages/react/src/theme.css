@@ -121,4 +121,17 @@
   --radius-md: calc(var(--radius) * 0.875);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.5);
+  --animate-nessa-enter: nessa-enter var(--nessa-motion-duration-normal)
+    var(--nessa-motion-easing-standard) both;
+
+  /* Entrance for content that appears in place (palettes, callouts):
+     opacity plus the individual scale property, never transform, so a
+     positioned element's own translate stays untouched. The duration
+     token collapses to 0ms under reduced motion. */
+  @keyframes nessa-enter {
+    from {
+      opacity: 0;
+      scale: 0.96;
+    }
+  }
 }
