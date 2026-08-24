@@ -47,12 +47,63 @@ export {
   type EventCalendarToolbarProps,
   type EventCalendarView,
 } from "./components/event-calendar"
+export {
+  GanttChart,
+  GanttChartGrid,
+  GanttChartToolbar,
+  ganttChartDefaultLabels,
+  ganttChartTaskProgress,
+  ganttChartTaskSpan,
+  ganttChartToneVariants,
+  isMilestoneTask,
+  isSummaryTask,
+  type GanttChartGridProps,
+  type GanttChartKeyboardShortcut,
+  type GanttChartLabels,
+  type GanttChartMoveConfirmContext,
+  type GanttChartProps,
+  type GanttChartRange,
+  type GanttChartScale,
+  type GanttChartShortcutModifier,
+  type GanttChartShortcuts,
+  type GanttChartTask,
+  type GanttChartTaskRenderContext,
+  type GanttChartTone,
+  type GanttChartToolbarProps,
+} from "./components/gantt-chart"
 export { Input } from "./components/input"
+export {
+  SegmentedControl,
+  SegmentedControlOption,
+  type SegmentedControlOptionProps,
+  type SegmentedControlProps,
+} from "./components/segmented-control"
 export {
   PopoverSurface,
   popoverSurfaceVariants,
   type PopoverSurfaceProps,
 } from "./components/popover-surface"
+export {
+  ContextMenu,
+  ContextMenuCheckboxItem,
+  ContextMenuContent,
+  ContextMenuGroup,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuPortal,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+  type ContextMenuCheckboxItemProps,
+  type ContextMenuItemProps,
+  type ContextMenuLabelProps,
+  type ContextMenuSubTriggerProps,
+} from "./components/context-menu"
 export {
   CodeBlock,
   CodeBlockProvider,
