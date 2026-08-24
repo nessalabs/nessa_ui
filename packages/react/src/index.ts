@@ -11,6 +11,7 @@ export {
   CardHeader,
   CardTitle,
 } from "./components/card"
+export { Checkbox, type CheckboxProps } from "./components/checkbox"
 export {
   ConversationRail,
   ConversationRailItem,
@@ -23,6 +24,25 @@ export {
   type ConversationRailProps,
   type ConversationRailTriggerProps,
 } from "./components/conversation-rail"
+export {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+  type DropdownMenuContentProps,
+  type DropdownMenuItemProps,
+  type DropdownMenuSubTriggerProps,
+} from "./components/dropdown-menu"
 export {
   EventCalendar,
   EventCalendarGrid,
@@ -72,6 +92,16 @@ export {
   type GanttChartToolbarProps,
 } from "./components/gantt-chart"
 export { Input } from "./components/input"
+export {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  type PaginationLinkProps,
+} from "./components/pagination"
 export {
   SegmentedControl,
   SegmentedControlOption,
@@ -443,6 +473,41 @@ export {
   type SplitViewSeparatorProps,
   type SplitViewSize,
 } from "./components/split-view"
+export {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableEmpty,
+  TableFilterPanel,
+  TableFilterSelect,
+  TableFilterToggle,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TablePagination,
+  TableRow,
+  TableSearchField,
+  TableShell,
+  TableSortButton,
+  TableToolbar,
+  TableViewOptions,
+  tableControlVariants,
+  tableScrollbarClassName,
+  tablePaginationRange,
+  type TableEmptyProps,
+  type TableFilterOption,
+  type TableFilterSelectProps,
+  type TableFilterToggleProps,
+  type TableHeaderProps,
+  type TablePaginationProps,
+  type TableProps,
+  type TableSearchFieldProps,
+  type TableSortButtonProps,
+  type TableSortDirection,
+  type TableViewColumn,
+  type TableViewOptionsProps,
+} from "./components/table"
 export {
   AppShell,
   AppShellBody,

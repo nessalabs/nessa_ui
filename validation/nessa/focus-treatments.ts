@@ -37,6 +37,11 @@ type FocusComponent =
   | "json-tree"
   | "selection-tooltip"
   | "tool-approval"
+  | "checkbox"
+  | "dropdown-menu"
+  | "pagination"
+  | "table/table"
+  | "table/table-toolbar"
   | "split-view/split-view-separator"
   | "workflow-canvas/workflow-canvas"
   | "workflow-canvas/workflow-canvas-node"
@@ -238,6 +243,57 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     dark: { token: "--ring", opacity: 1 },
   },
   {
+    component: "table/table",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 2,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The three toolbar triggers share one `tableControlVariants` recipe, so
+  // the outline is declared — and counted — once.
+  {
+    component: "table/table-toolbar",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The box is a native input styled in place, like the questionnaire
+  // choice indicator; it takes the standard full-strength outline.
+  {
+    component: "checkbox",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The shared item recipe is referenced by the plain, checkbox, radio, and
+  // sub-trigger items.
+  {
+    component: "dropdown-menu",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 4,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  {
+    component: "pagination",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  {
     component: "split-view/split-view-separator",
     layer: "ring",
     state: "focus-visible",
@@ -333,6 +389,25 @@ export const focusGeometryClasses = Object.freeze([
   { component: "workflow-canvas/workflow-canvas", className: "focus-visible:-outline-offset-2", count: 1 },
   { component: "workflow-canvas/workflow-canvas-node", className: "focus-visible:outline-2", count: 3 },
   { component: "workflow-canvas/workflow-canvas-node", className: "focus-visible:outline-offset-2", count: 3 },
+  // The sort button sits in a padded header cell and keeps the outset
+  // offset; the scroll container is focusable so its off-screen rows and
+  // columns stay reachable, and draws inset because the shell clips its
+  // corners.
+  { component: "table/table", className: "focus-visible:outline-2", count: 2 },
+  { component: "table/table", className: "focus-visible:outline-offset-2", count: 1 },
+  { component: "table/table", className: "focus-visible:-outline-offset-2", count: 1 },
+  { component: "table/table-toolbar", className: "focus-visible:outline-2", count: 1 },
+  { component: "table/table-toolbar", className: "focus-visible:outline-offset-2", count: 1 },
+  { component: "checkbox", className: "focus-visible:outline-2", count: 1 },
+  { component: "checkbox", className: "focus-visible:outline-offset-2", count: 1 },
+  // Menu items draw inset: the content surface clips its overflow, so an
+  // outset outline would land on (or past) the padding edge.
+  { component: "dropdown-menu", className: "focus-visible:outline-2", count: 4 },
+  { component: "dropdown-menu", className: "focus-visible:-outline-offset-2", count: 4 },
+  // Page buttons routinely sit inside a clipping table shell, so their lone
+  // outline draws inset.
+  { component: "pagination", className: "focus-visible:outline-2", count: 1 },
+  { component: "pagination", className: "focus-visible:-outline-offset-2", count: 1 },
   { component: "split-view/split-view-separator", className: "focus-visible:ring-2", count: 1 },
   { component: "split-view/split-view-separator", className: "focus-visible:ring-offset-0", count: 1 },
   { component: "app-shell/app-shell-dock", className: "focus-visible:ring-2", count: 1 },

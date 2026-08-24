@@ -394,7 +394,10 @@ function QuestionnaireChoice({
           disabled={disabled}
           onChange={(event) => setSelected(value, event.target.checked)}
           className={cn(
-            "peer m-0 size-full cursor-pointer appearance-none border border-input bg-transparent shadow-xs outline-none transition-[border-color,background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] checked:border-primary checked:bg-primary/20 disabled:cursor-not-allowed motion-reduce:transition-none",
+            // The indicator's border is the only evidence an unselected
+            // choice is there, so it carries a boundary-strength tone rather
+            // than the fainter hairline used by fields that also have text.
+            "peer m-0 size-full cursor-pointer appearance-none border border-muted-foreground bg-transparent shadow-xs outline-none transition-[border-color,background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] checked:border-primary checked:bg-primary/20 disabled:cursor-not-allowed motion-reduce:transition-none",
             "focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
             multiple ? "rounded-xs" : "rounded-full",
             inputClassName,
