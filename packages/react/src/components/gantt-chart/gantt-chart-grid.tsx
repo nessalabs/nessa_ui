@@ -1,0 +1,1227 @@
+"use client"
+
+/** @responsibility The Gantt chart's scrollable body: the pinned task list, two-tier time header, task bars, milestones and summary brackets, dependency arrows, the drag and keyboard rescheduling gestures, and the move-confirmation slot. */
+
+import * as React from "react"
+import { ChevronRight } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+
+import { Button } from "../button"
+import { PopoverSurface } from "../popover-surface"
+import {
+  BAR_INSET,
+  CONFIRM_CARD_CLEARANCE_PX,
+  HEADER_HEIGHT,
+  MILESTONE_SIZE,
+  MOVE_THRESHOLD_PX,
+  PRIMARY_TIER_HEIGHT,
+  fineCells,
+  formatDayLabel,
+  ganttChartToneVariants,
+  monthCells,
+  useGanttChart,
+  yearCells,
+  type GanttChartLabels,
+  type GanttChartMoveConfirmContext,
+  type GanttChartTaskRenderContext,
+  type GanttRow,
+} from "./gantt-chart-context"
+import {
+  barShortcutHints,
+  matchesShortcut,
+  type GanttChartKeyboardShortcut,
+  type ResolvedShortcuts,
+} from "./gantt-chart-shortcuts"
+import {
+  addDays,
+  clamp,
+  dependencyEdges,
+  differenceInCalendarDays,
+  isWeekend,
+  startOfDay,
+  taskDependencies,
+  type GanttChartRange,
+  type GanttChartTask,
+} from "./gantt-chart-scheduling"
+
+/**
+ * Inset focus outline shared by the grid's interactive layers. Everything
+ * sits inside the scrolling timeline, so every outline draws inward where
+ * the overflow edges cannot swallow it. Kept in this module because a
+ * governed class surface must be readable where it is rendered.
+ */
+const insetFocusClassName =
+  "outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+
+/** Token-driven hover/selection transition shared by grid surfaces. */
+const surfaceTransitionClassName =
+  "transition-[background-color,color,border-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none"
+
+function rowLabel(
+  locale: string | undefined,
+  labels: GanttChartLabels,
+  shortcuts: ResolvedShortcuts,
+  row: GanttRow,
+) {
+  const start = formatDayLabel(locale, row.span.start)
+  const end = formatDayLabel(locale, addDays(row.span.end, -1))
+  let base: string
+  if (row.summary) {
+    base = labels.summary(row.task.name, start, end, row.leafCount)
+  } else if (row.milestone) {
+    base = labels.milestone(row.task.name, start)
+  } else {
+    base = labels.taskBar(row.task.name, start, end)
+  }
+  const progress =
+    row.progress !== undefined && !row.milestone
+      ? ` ${labels.taskProgress(Math.round(row.progress * 100))}.`
+      : ""
+  const hints = row.summary
+    ? ""
+    : barShortcutHints(shortcuts, labels, !row.milestone)
+  return `${base}.${progress}${hints}`
+}
+
+/** A drag in flight on one task bar. */
+interface MoveSession {
+  /**
+   * `move` relocates the whole task; the resize kinds drag one boundary
+   * while the opposite one stays fixed.
+   */
+  kind: "move" | "resize-start" | "resize-end"
+  task: GanttChartTask
+  /** Whole-task length in days, preserved through a move. */
+  durationDays: number
+  originX: number
+  /** Becomes true once the pointer travels past the drag threshold. */
+  started: boolean
+  targetStart: Date
+  targetEnd: Date
+}
+
+function TaskBar({
+  row,
+  moving,
+  onBeginDrag,
+  suppressClickRef,
+}: {
+  row: GanttRow
+  moving: boolean
+  onBeginDrag: (
+    kind: MoveSession["kind"],
+    pointerEvent: React.PointerEvent<Element>,
+    row: GanttRow,
+  ) => void
+  suppressClickRef: React.RefObject<boolean>
+}) {
+  const {
+    range,
+    dayWidth,
+    rowHeight,
+    locale,
+    labels,
+    shortcuts,
+    selectedTaskId,
+    selectTask,
+    onTaskSelect,
+    renderTask,
+    taskClassName,
+    pendingMove,
+    adjustMove,
+    promotePendingMove,
+    cancelPendingMove,
+    confirmMoves,
+  } = useGanttChart("GanttChartGrid")
+  const { task } = row
+  const tone = task.tone ?? "primary"
+  const selected = selectedTaskId === task.id
+  const surface: GanttChartTaskRenderContext["surface"] = row.summary
+    ? "summary"
+    : row.milestone
+      ? "milestone"
+      : "bar"
+  const renderContext: GanttChartTaskRenderContext = {
+    task,
+    surface,
+    selected,
+  }
+
+  const startOffset = differenceInCalendarDays(row.span.start, range.start)
+  const spanDays = differenceInCalendarDays(row.span.end, row.span.start)
+  const left = startOffset * dayWidth
+  const width = Math.max(spanDays * dayWidth, dayWidth)
+
+  const barPending = pendingMove?.task.id === task.id ? pendingMove : null
+  const interactive = !row.summary
+
+  const beginResize = (
+    kind: "resize-start" | "resize-end",
+    pointerEvent: React.PointerEvent<HTMLSpanElement>,
+  ) => {
+    if (pointerEvent.button !== 0) return
+    if (pointerEvent.pointerType === "touch") return
+    pointerEvent.stopPropagation()
+    try {
+      pointerEvent.currentTarget.setPointerCapture(pointerEvent.pointerId)
+    } catch {
+      // Synthetic pointer events in tests carry untracked pointer ids.
+    }
+    onBeginDrag(kind, pointerEvent, row)
+  }
+
+  /** Refocuses this task's bar after a commit re-renders it elsewhere. */
+  const refocusBar = (currentTarget: HTMLElement) => {
+    const grid = currentTarget.closest('[data-slot="gantt-chart-scroll"]')
+    window.setTimeout(() => {
+      grid
+        ?.querySelector<HTMLElement>(
+          `[data-task-id="${CSS.escape(task.id)}"]`,
+        )
+        ?.focus()
+    }, 0)
+  }
+
+  const handleKeyDown = (
+    keyEvent: React.KeyboardEvent<HTMLButtonElement>,
+  ) => {
+    if (!interactive) return
+    const base = barPending ?? {
+      start: startOfDay(task.start),
+      end: startOfDay(task.end),
+    }
+    const durationDays = differenceInCalendarDays(base.end, base.start)
+
+    const nudges: Array<[GanttChartKeyboardShortcut | undefined, number]> = [
+      [shortcuts.moveTaskLeft, -1],
+      [shortcuts.moveTaskRight, 1],
+    ]
+    for (const [shortcut, dayDelta] of nudges) {
+      if (!shortcut || !matchesShortcut(keyEvent, shortcut)) continue
+      if (shortcut.preventDefault !== false) keyEvent.preventDefault()
+      keyEvent.stopPropagation()
+      const start = addDays(base.start, dayDelta)
+      const end = addDays(base.end, dayDelta)
+      // A nudge only lands where the timeline can show the ghost.
+      if (start < range.start || end > range.end) return
+      adjustMove(task, start, end)
+      return
+    }
+
+    const resizes: Array<[GanttChartKeyboardShortcut | undefined, number]> = [
+      [shortcuts.resizeTaskLonger, 1],
+      [shortcuts.resizeTaskShorter, -1],
+    ]
+    for (const [shortcut, endDelta] of resizes) {
+      if (!shortcut || !matchesShortcut(keyEvent, shortcut)) continue
+      if (shortcut.preventDefault !== false) keyEvent.preventDefault()
+      keyEvent.stopPropagation()
+      // Milestones mark instants: they move, but never grow.
+      if (row.milestone) return
+      const nextDuration = durationDays + endDelta
+      if (nextDuration < 1) return
+      const end = addDays(base.start, nextDuration)
+      if (end > range.end) return
+      adjustMove(task, base.start, end)
+      return
+    }
+
+    if (!barPending) return
+    if (keyEvent.key === "Enter") {
+      keyEvent.preventDefault()
+      keyEvent.stopPropagation()
+      promotePendingMove()
+      // With confirmation on, the dialog takes focus (Enter again commits
+      // via its focused Move button); without it the commit re-renders
+      // the bar, which needs its focus restored.
+      if (!confirmMoves) refocusBar(keyEvent.currentTarget)
+    } else if (keyEvent.key === "Escape") {
+      keyEvent.stopPropagation()
+      cancelPendingMove()
+    }
+  }
+
+  const label = rowLabel(locale, labels, shortcuts, row)
+  const progressPercent =
+    row.progress !== undefined
+      ? Math.round(clamp(row.progress, 0, 1) * 100)
+      : null
+
+  // Summary brackets are derived roll-ups: activating one has no built-in
+  // effect, so it never takes the pressed/selected treatment — the click
+  // still reaches onTaskSelect for hosts that give it a meaning.
+  const selectable = !row.summary
+
+  const sharedButtonProps = {
+    type: "button" as const,
+    "data-task-id": task.id,
+    "data-tone": tone,
+    "data-moving": moving || undefined,
+    "data-selected": (selectable && selected) || undefined,
+    "aria-pressed": selectable ? selected : undefined,
+    "aria-label": label,
+    onKeyDown: handleKeyDown,
+    onBlur: () => {
+      if (barPending?.stage === "adjusting") cancelPendingMove()
+    },
+    onClick: (domEvent: React.MouseEvent<HTMLButtonElement>) => {
+      if (suppressClickRef.current) {
+        suppressClickRef.current = false
+        return
+      }
+      if (selectable) selectTask(task.id)
+      onTaskSelect?.(task, domEvent)
+    },
+  }
+
+  const beginMove = (pointerEvent: React.PointerEvent<HTMLButtonElement>) => {
+    if (!interactive) return
+    if (pointerEvent.button !== 0) return
+    if (pointerEvent.pointerType === "touch") return
+    try {
+      pointerEvent.currentTarget.setPointerCapture(pointerEvent.pointerId)
+    } catch {
+      // Synthetic pointer events in tests carry untracked pointer ids.
+    }
+    onBeginDrag("move", pointerEvent, row)
+  }
+
+  if (row.summary) {
+    return (
+      <button
+        {...sharedButtonProps}
+        data-slot="gantt-chart-summary"
+        className={cn(
+          "absolute inset-y-0 rounded-md",
+          surfaceTransitionClassName,
+          insetFocusClassName,
+          taskClassName?.(renderContext),
+        )}
+        style={{ left, width }}
+      >
+        {renderTask?.(renderContext) ?? (
+          <span
+            aria-hidden="true"
+            className="absolute inset-x-0 top-3 block h-1.5"
+          >
+            <span
+              className={cn(
+                "absolute inset-0 rounded-sm border-none",
+                ganttChartToneVariants({ tone }),
+              )}
+            />
+            <span
+              className={cn(
+                "absolute -bottom-1 left-0 size-2 rounded-[2px] border-none",
+                ganttChartToneVariants({ tone }),
+              )}
+            />
+            <span
+              className={cn(
+                "absolute -bottom-1 right-0 size-2 rounded-[2px] border-none",
+                ganttChartToneVariants({ tone }),
+              )}
+            />
+          </span>
+        )}
+      </button>
+    )
+  }
+
+  if (row.milestone) {
+    return (
+      <>
+        <button
+          {...sharedButtonProps}
+          data-slot="gantt-chart-milestone"
+          className={cn(
+            "absolute rotate-45 cursor-grab rounded-[3px]",
+            ganttChartToneVariants({ tone }),
+            surfaceTransitionClassName,
+            insetFocusClassName,
+            taskClassName?.(renderContext),
+            moving && "opacity-40",
+            selected &&
+              "ring-2 ring-ring ring-offset-1 ring-offset-background",
+          )}
+          style={{
+            left: left - MILESTONE_SIZE / 2,
+            top: (rowHeight - MILESTONE_SIZE) / 2,
+            width: MILESTONE_SIZE,
+            height: MILESTONE_SIZE,
+          }}
+          onPointerDown={beginMove}
+        >
+          {renderTask?.(renderContext)}
+        </button>
+        <span
+          aria-hidden="true"
+          data-slot="gantt-chart-milestone-name"
+          className="pointer-events-none absolute top-0 flex h-full max-w-48 items-center truncate text-xs font-medium text-foreground"
+          style={{ left: left + MILESTONE_SIZE }}
+        >
+          {task.name}
+        </span>
+      </>
+    )
+  }
+
+  return (
+    <button
+      {...sharedButtonProps}
+      data-slot="gantt-chart-bar"
+      className={cn(
+        "absolute flex cursor-grab items-center overflow-hidden rounded-md px-2 text-start text-xs font-medium leading-4 shadow-xs",
+        ganttChartToneVariants({ tone }),
+        surfaceTransitionClassName,
+        insetFocusClassName,
+        taskClassName?.(renderContext),
+        moving && "opacity-40",
+        selected && "ring-2 ring-ring ring-offset-1 ring-offset-background",
+      )}
+      style={{
+        left,
+        top: BAR_INSET,
+        height: rowHeight - BAR_INSET * 2,
+        width,
+      }}
+      onPointerDown={beginMove}
+    >
+      {progressPercent !== null ? (
+        // Progress draws as a slim current-color meter inside the bar, so
+        // the bar stays a single tone in both modes — never the two-tone
+        // done/remaining split that reads as white-on-white in dark.
+        <span
+          aria-hidden="true"
+          data-slot="gantt-chart-bar-progress"
+          className="absolute inset-x-2 bottom-[2px] h-[3px] overflow-hidden rounded-full bg-current/25"
+        >
+          <span
+            className="absolute inset-y-0 left-0 rounded-full bg-current/70"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </span>
+      ) : null}
+      <span className="relative z-10 flex w-full min-w-0 items-center pb-1">
+        {renderTask?.(renderContext) ?? (
+          <span className="w-full truncate">{task.name}</span>
+        )}
+      </span>
+      <span
+        aria-hidden="true"
+        data-slot="gantt-chart-bar-resize-start"
+        className="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize"
+        onPointerDown={(pointerEvent) =>
+          beginResize("resize-start", pointerEvent)
+        }
+      />
+      <span
+        aria-hidden="true"
+        data-slot="gantt-chart-bar-resize-end"
+        className="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize"
+        onPointerDown={(pointerEvent) =>
+          beginResize("resize-end", pointerEvent)
+        }
+      />
+    </button>
+  )
+}
+
+/**
+ * The built-in move-confirmation dialog: a compact popover-surface card
+ * naming the task and its proposed dates, with a focused Move button and
+ * a Keep escape hatch. Hosts replace it wholesale via `renderMoveConfirm`.
+ */
+function DefaultMoveConfirm({
+  context,
+}: {
+  context: GanttChartMoveConfirmContext
+}) {
+  const { locale, labels, moveDependents } = useGanttChart("GanttChartGrid")
+  const confirmRef = React.useRef<HTMLButtonElement>(null)
+
+  React.useEffect(() => {
+    confirmRef.current?.focus()
+  }, [])
+
+  const durationChanged =
+    differenceInCalendarDays(context.range.end, context.range.start) !==
+    differenceInCalendarDays(context.task.end, context.task.start)
+  const milestone =
+    context.range.start.getTime() === context.range.end.getTime()
+
+  return (
+    <PopoverSurface
+      role="dialog"
+      aria-label={
+        durationChanged ? labels.confirmResizeLabel : labels.confirmMoveLabel
+      }
+      data-slot="gantt-chart-move-confirm-card"
+      radius="lg"
+      className="flex w-64 flex-col gap-2 p-3"
+    >
+      <p className="text-xs font-medium">
+        {durationChanged
+          ? labels.confirmResizeTitle(context.task.name)
+          : labels.confirmMoveTitle(context.task.name)}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        {milestone
+          ? formatDayLabel(locale, context.range.start)
+          : `${formatDayLabel(locale, context.range.start)} – ${formatDayLabel(
+              locale,
+              addDays(context.range.end, -1),
+            )}`}
+      </p>
+      {moveDependents && context.dependentTaskIds.length ? (
+        <p className="text-xs text-muted-foreground">
+          {labels.cascadeNote(context.dependentTaskIds.length)}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        {moveDependents && context.dependentTaskIds.length ? (
+          // With the cascade option on and dependents in play, the choice
+          // is per move: take the chain along, or reschedule just this
+          // task. Hosts build their own version of this ask through
+          // renderMoveConfirm and confirm({ moveDependents }).
+          <>
+            <Button
+              ref={confirmRef}
+              size="sm"
+              className="h-7"
+              onClick={() => context.confirm({ moveDependents: true })}
+            >
+              {labels.moveAllAction}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7"
+              onClick={() => context.confirm({ moveDependents: false })}
+            >
+              {labels.moveOnlyAction}
+            </Button>
+          </>
+        ) : (
+          <Button
+            ref={confirmRef}
+            size="sm"
+            className="h-7"
+            onClick={() => context.confirm()}
+          >
+            {durationChanged ? labels.resizeAction : labels.moveAction}
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7"
+          onClick={context.cancel}
+        >
+          {labels.keepAction}
+        </Button>
+      </div>
+    </PopoverSurface>
+  )
+}
+
+/** Stub length before an arrow turns away from the bar it leaves. */
+const ARROW_STUB_PX = 8
+/** Gap left between an arrowhead's tip and the bar edge it points at. */
+const ARROW_GAP_PX = 5
+
+/**
+ * Routes one relation as an elbowed path. `exitDir` is the direction the
+ * arrow leaves the predecessor in and `enterDir` the direction it travels
+ * as it arrives, both taken from which edges the relation ties together —
+ * so the same router draws all four types, and the arrowhead's
+ * `orient="auto"` turns itself to match.
+ */
+export function dependencyPath({
+  fromX,
+  fromY,
+  toX,
+  toY,
+  exitDir,
+  enterDir,
+  rowHeight,
+}: {
+  fromX: number
+  fromY: number
+  toX: number
+  toY: number
+  exitDir: 1 | -1
+  enterDir: 1 | -1
+  rowHeight: number
+}) {
+  const endX = toX - enterDir * ARROW_GAP_PX
+  const outX = fromX + exitDir * ARROW_STUB_PX
+  const approachX = endX - enterDir * ARROW_STUB_PX
+  const hasRoom = enterDir === 1 ? outX <= approachX : outX >= approachX
+  if (hasRoom) {
+    // Out, across, and straight in.
+    return `M ${fromX} ${fromY} H ${outX} V ${toY} H ${endX}`
+  }
+  // The target sits behind the arrow's exit: run out, drop to the boundary
+  // between the two rows, travel back past the target, then come in.
+  const midY = fromY + (toY > fromY ? rowHeight / 2 : -rowHeight / 2)
+  return `M ${fromX} ${fromY} H ${outX} V ${midY} H ${approachX} V ${toY} H ${endX}`
+}
+
+/**
+ * Dependency arrows, drawn under the bars and routed by relation type.
+ * Arrows whose endpoint rows are hidden inside a collapsed summary simply
+ * stay off the canvas until the rows return. A relation the current dates
+ * violate draws dashed, and one on the critical path draws in the
+ * critical treatment while `showCriticalPath` is on.
+ */
+function DependencyLayer() {
+  const {
+    rows,
+    range,
+    dayWidth,
+    rowHeight,
+    labels,
+    criticalTaskIds,
+    showCriticalPath,
+    violationBySuccessor,
+    selectedDependency,
+    selectDependency,
+    onDependencySelect,
+  } = useGanttChart("GanttChartGrid")
+  // Instance-scoped marker ids so several charts on one page never collide.
+  const baseId = React.useId()
+  const markerId = `${baseId}-arrowhead`
+  const criticalMarkerId = `${baseId}-arrowhead-critical`
+  const rowIndexById = new Map(rows.map((row, index) => [row.task.id, index]))
+
+  /** The x of one edge of a row's shape, diamonds included. */
+  const edgeX = (row: GanttRow, edge: "start" | "finish") => {
+    const day = edge === "start" ? row.span.start : row.span.end
+    const x = differenceInCalendarDays(day, range.start) * dayWidth
+    if (!row.milestone) return x
+    return edge === "start" ? x - MILESTONE_SIZE / 2 : x + MILESTONE_SIZE / 2
+  }
+
+  const arrows: Array<{
+    key: string
+    d: string
+    predecessorId: string
+    successorId: string
+    label: string
+    violated: boolean
+    critical: boolean
+  }> = []
+
+  for (const row of rows) {
+    const toIndex = rowIndexById.get(row.task.id)
+    if (toIndex === undefined) continue
+    const violations = violationBySuccessor.get(row.task.id)
+    for (const dependency of taskDependencies(row.task)) {
+      const fromIndex = rowIndexById.get(dependency.taskId)
+      if (fromIndex === undefined) continue
+      const from = rows[fromIndex]
+      const { from: fromEdge, to: toEdge } = dependencyEdges(dependency.type)
+      const critical =
+        showCriticalPath &&
+        criticalTaskIds.has(dependency.taskId) &&
+        criticalTaskIds.has(row.task.id)
+      arrows.push({
+        key: `${dependency.taskId}->${row.task.id}-${dependency.type}`,
+        d: dependencyPath({
+          fromX: edgeX(from, fromEdge),
+          fromY: fromIndex * rowHeight + rowHeight / 2,
+          toX: edgeX(row, toEdge),
+          toY: toIndex * rowHeight + rowHeight / 2,
+          exitDir: fromEdge === "finish" ? 1 : -1,
+          enterDir: toEdge === "start" ? 1 : -1,
+          rowHeight,
+        }),
+        predecessorId: dependency.taskId,
+        successorId: row.task.id,
+        label: labels.dependency(
+          from.task.name,
+          row.task.name,
+          labels.dependencyType(dependency.type),
+          dependency.lagDays,
+        ),
+        violated: Boolean(violations?.has(dependency.taskId)),
+        critical,
+      })
+    }
+  }
+
+  if (!arrows.length) return null
+
+  return (
+    <svg
+      data-slot="gantt-chart-dependencies"
+      className="pointer-events-none absolute top-0 overflow-visible"
+      style={{
+        left: 0,
+        width: differenceInCalendarDays(range.end, range.start) * dayWidth,
+        height: rows.length * rowHeight,
+      }}
+    >
+      <defs>
+        {[
+          { id: markerId, className: "fill-muted-foreground" },
+          { id: criticalMarkerId, className: "fill-destructive" },
+        ].map((marker) => (
+          <marker
+            key={marker.id}
+            id={marker.id}
+            viewBox="0 0 6 6"
+            refX="5"
+            refY="3"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto"
+          >
+            <path d="M 0 0 L 6 3 L 0 6 Z" className={marker.className} />
+          </marker>
+        ))}
+      </defs>
+      {arrows.map((arrow) => {
+        const selected =
+          selectedDependency?.predecessorId === arrow.predecessorId &&
+          selectedDependency?.successorId === arrow.successorId
+        const attention = arrow.violated || arrow.critical
+        return (
+          <g
+            key={arrow.key}
+            data-slot="gantt-chart-dependency"
+            data-predecessor-id={arrow.predecessorId}
+            data-successor-id={arrow.successorId}
+            data-violated={arrow.violated || undefined}
+            data-critical={arrow.critical || undefined}
+            data-selected={selected || undefined}
+          >
+            <path
+              d={arrow.d}
+              fill="none"
+              strokeWidth="1.5"
+              strokeDasharray={arrow.violated ? "4 3" : undefined}
+              className={cn(
+                attention ? "stroke-destructive" : "stroke-muted-foreground",
+                selected && "stroke-[2.5]",
+              )}
+              markerEnd={`url(#${arrow.critical ? criticalMarkerId : markerId})`}
+            />
+            {/* A fat transparent copy makes the hairline easy to hit and
+                carries the button semantics; the drawn path stays thin. */}
+            <path
+              role="button"
+              tabIndex={0}
+              aria-label={arrow.label}
+              aria-pressed={selected}
+              d={arrow.d}
+              fill="none"
+              stroke="transparent"
+              strokeWidth="12"
+              className="pointer-events-stroke cursor-pointer outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+              onClick={() => {
+                selectDependency({
+                  predecessorId: arrow.predecessorId,
+                  successorId: arrow.successorId,
+                })
+                onDependencySelect?.({
+                  predecessorId: arrow.predecessorId,
+                  successorId: arrow.successorId,
+                })
+              }}
+              onKeyDown={(keyEvent) => {
+                if (keyEvent.key === "Enter" || keyEvent.key === " ") {
+                  keyEvent.preventDefault()
+                  selectDependency({
+                    predecessorId: arrow.predecessorId,
+                    successorId: arrow.successorId,
+                  })
+                }
+              }}
+            />
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+export interface GanttChartGridProps extends React.ComponentProps<"div"> {}
+
+/**
+ * The chart's scrollable body: the pinned task list, the two-tier time
+ * header, one lane per visible task, dependency arrows, weekend shading,
+ * and the today marker. Scrolls both axes inside a built-in height cap
+ * that hosts override with `className`.
+ */
+function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
+  const {
+    rows,
+    range,
+    totalDays,
+    dayWidth,
+    rowHeight,
+    taskListWidth,
+    scale,
+    now,
+    locale,
+    weekStartsOn,
+    labels,
+    collapsedIds,
+    toggleCollapsed,
+    moveDependents,
+    dependentIdsOf,
+    pendingMove,
+    requestMove,
+    confirmPendingMove,
+    cancelPendingMove,
+    renderMoveConfirm,
+    taskClassName,
+    scrollerRef,
+    scrollToDate,
+  } = useGanttChart("GanttChartGrid")
+
+  const timelineWidth = totalDays * dayWidth
+
+  // Initial position only: later date or scale changes keep the user's
+  // own scroll, with the Today button as the way back.
+  const initialScrollDone = React.useRef(false)
+  React.useEffect(() => {
+    if (initialScrollDone.current) return
+    initialScrollDone.current = true
+    scrollToDate(now)
+  }, [scrollToDate, now])
+
+  const [moveSession, setMoveSession] = React.useState<MoveSession | null>(
+    null,
+  )
+  const moveSessionRef = React.useRef(moveSession)
+  React.useEffect(() => {
+    moveSessionRef.current = moveSession
+  })
+  const suppressClickRef = React.useRef(false)
+
+  const beginDrag = (
+    kind: MoveSession["kind"],
+    pointerEvent: React.PointerEvent<Element>,
+    row: GanttRow,
+  ) => {
+    // One gesture owns the chart at a time; a second pointer cannot
+    // hijack and settle the first one's session.
+    if (moveSessionRef.current) return
+    setMoveSession({
+      kind,
+      task: row.task,
+      durationDays: differenceInCalendarDays(row.span.end, row.span.start),
+      originX: pointerEvent.clientX,
+      started: false,
+      targetStart: row.span.start,
+      targetEnd: row.span.end,
+    })
+  }
+
+  React.useEffect(() => {
+    if (!moveSession) return
+
+    const handleMove = (pointerEvent: PointerEvent) => {
+      const session = moveSessionRef.current
+      if (!session) return
+      if (pointerEvent.buttons === 0) {
+        setMoveSession(null)
+        return
+      }
+      const dx = pointerEvent.clientX - session.originX
+      const started = session.started || Math.abs(dx) > MOVE_THRESHOLD_PX
+      const dayDelta = Math.round(dx / dayWidth)
+      const baseStart = startOfDay(session.task.start)
+      const baseEnd = startOfDay(session.task.end)
+      let targetStart = baseStart
+      let targetEnd = baseEnd
+      if (session.kind === "move") {
+        targetStart = addDays(baseStart, dayDelta)
+        targetEnd = addDays(baseEnd, dayDelta)
+        const overflowLeft = differenceInCalendarDays(
+          range.start,
+          targetStart,
+        )
+        if (overflowLeft > 0) {
+          targetStart = addDays(targetStart, overflowLeft)
+          targetEnd = addDays(targetEnd, overflowLeft)
+        }
+        const overflowRight = differenceInCalendarDays(targetEnd, range.end)
+        if (overflowRight > 0) {
+          targetStart = addDays(targetStart, -overflowRight)
+          targetEnd = addDays(targetEnd, -overflowRight)
+        }
+      } else if (session.kind === "resize-end") {
+        const minEnd = addDays(baseStart, 1)
+        targetEnd = addDays(baseEnd, dayDelta)
+        if (targetEnd < minEnd) targetEnd = minEnd
+        if (targetEnd > range.end) targetEnd = range.end
+      } else {
+        const maxStart = addDays(baseEnd, -1)
+        targetStart = addDays(baseStart, dayDelta)
+        if (targetStart > maxStart) targetStart = maxStart
+        if (targetStart < range.start) targetStart = range.start
+      }
+      setMoveSession({ ...session, started, targetStart, targetEnd })
+    }
+
+    const settle = (commit: boolean) => {
+      const session = moveSessionRef.current
+      setMoveSession(null)
+      if (!session?.started) return
+      suppressClickRef.current = true
+      window.setTimeout(() => {
+        suppressClickRef.current = false
+      }, 0)
+      if (commit) {
+        requestMove(session.task, session.targetStart, session.targetEnd)
+      }
+    }
+
+    const handleUp = () => settle(true)
+    const handleCancel = () => settle(false)
+
+    window.addEventListener("pointermove", handleMove)
+    window.addEventListener("pointerup", handleUp)
+    window.addEventListener("pointercancel", handleCancel)
+    return () => {
+      window.removeEventListener("pointermove", handleMove)
+      window.removeEventListener("pointerup", handleUp)
+      window.removeEventListener("pointercancel", handleCancel)
+    }
+  }, [moveSession, dayWidth, range.start, range.end, requestMove])
+
+  const primaryCells =
+    scale === "month"
+      ? yearCells(range, locale)
+      : monthCells(range, locale, true)
+  const secondaryCells = fineCells(range, scale, locale, weekStartsOn)
+
+  const todayOffset = differenceInCalendarDays(now, range.start)
+  const todayVisible = todayOffset >= 0 && todayOffset < totalDays
+
+  const rowsHeight = rows.length * rowHeight
+
+  /** The ghost's proposed span while dragging or keyboard-adjusting. */
+  const ghostFor = (row: GanttRow): GanttChartRange | null => {
+    if (moveSession?.started && moveSession.task.id === row.task.id) {
+      return { start: moveSession.targetStart, end: moveSession.targetEnd }
+    }
+    if (pendingMove?.task.id === row.task.id) {
+      return { start: pendingMove.start, end: pendingMove.end }
+    }
+    return null
+  }
+
+  return (
+    <div
+      ref={scrollerRef}
+      data-slot="gantt-chart-scroll"
+      role="region"
+      aria-label={labels.timeline}
+      tabIndex={0}
+      className={cn(
+        "relative max-h-[480px] overflow-auto overscroll-contain",
+        insetFocusClassName,
+        className,
+      )}
+      {...props}
+    >
+      <div
+        data-slot="gantt-chart-canvas"
+        className="relative min-w-full"
+        style={{ width: taskListWidth + timelineWidth }}
+      >
+        <div
+          data-slot="gantt-chart-header"
+          className="sticky top-0 z-30 flex border-b border-border bg-background"
+          style={{ height: HEADER_HEIGHT }}
+        >
+          <div
+            className="sticky left-0 z-10 flex shrink-0 items-end border-r border-border bg-background px-3 pb-1 text-xs font-medium text-muted-foreground"
+            style={{ width: taskListWidth }}
+          >
+            {labels.taskListHeader}
+          </div>
+          <div
+            className="relative shrink-0"
+            style={{ width: timelineWidth }}
+            aria-hidden="true"
+          >
+            {primaryCells.map((cell) => (
+              <div
+                key={cell.key}
+                className="absolute top-0 flex items-center border-l border-border/60 px-2 text-xs font-medium text-muted-foreground"
+                style={{
+                  left: cell.offsetDays * dayWidth,
+                  width: cell.days * dayWidth,
+                  height: PRIMARY_TIER_HEIGHT,
+                }}
+              >
+                {/* Pinned within its own cell, so the label stays readable
+                    while any part of the month is in view. */}
+                <span
+                  className="sticky whitespace-nowrap"
+                  style={{ left: taskListWidth + 8 }}
+                >
+                  {cell.label}
+                </span>
+              </div>
+            ))}
+            {secondaryCells.map((cell) => (
+              <div
+                key={cell.key}
+                className="absolute bottom-0 flex items-center justify-center overflow-hidden border-l border-border/60 text-xs text-muted-foreground"
+                style={{
+                  left: cell.offsetDays * dayWidth,
+                  width: cell.days * dayWidth,
+                  height: HEADER_HEIGHT - PRIMARY_TIER_HEIGHT,
+                }}
+              >
+                <span className="truncate">{cell.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div data-slot="gantt-chart-body" className="relative">
+          <div
+            aria-hidden="true"
+            data-slot="gantt-chart-underlay"
+            className="pointer-events-none absolute top-0"
+            style={{
+              left: taskListWidth,
+              width: timelineWidth,
+              height: rowsHeight,
+            }}
+          >
+            {secondaryCells.map((cell) => (
+              <div
+                key={cell.key}
+                className="absolute inset-y-0 border-l border-border/40"
+                style={{
+                  left: cell.offsetDays * dayWidth,
+                  width: cell.days * dayWidth,
+                }}
+              />
+            ))}
+            {scale === "day"
+              ? Array.from({ length: totalDays }, (_, index) =>
+                  isWeekend(addDays(range.start, index)) ? (
+                    <div
+                      key={`weekend-${index}`}
+                      data-slot="gantt-chart-weekend"
+                      className="absolute inset-y-0 bg-muted/50"
+                      style={{ left: index * dayWidth, width: dayWidth }}
+                    />
+                  ) : null,
+                )
+              : null}
+            {todayVisible ? (
+              <div
+                data-slot="gantt-chart-today"
+                className="absolute inset-y-0 w-px bg-primary"
+                style={{ left: (todayOffset + 0.5) * dayWidth }}
+              />
+            ) : null}
+          </div>
+          <div className="absolute top-0" style={{ left: taskListWidth }}>
+            <DependencyLayer />
+          </div>
+          {rows.map((row) => {
+            const ghost = ghostFor(row)
+            const rowMoving = Boolean(
+              (moveSession?.started &&
+                moveSession.task.id === row.task.id) ||
+                pendingMove?.task.id === row.task.id,
+            )
+            const confirming =
+              pendingMove?.task.id === row.task.id &&
+              pendingMove.stage === "confirming"
+            const ghostLeft = ghost
+              ? differenceInCalendarDays(ghost.start, range.start) * dayWidth
+              : 0
+            const ghostWidth = ghost
+              ? Math.max(
+                  differenceInCalendarDays(ghost.end, ghost.start) * dayWidth,
+                  dayWidth,
+                )
+              : 0
+            const milestoneGhost =
+              ghost && ghost.start.getTime() === ghost.end.getTime()
+            return (
+              <div
+                key={row.task.id}
+                data-slot="gantt-chart-row"
+                data-summary={row.summary || undefined}
+                className="flex"
+                style={{ height: rowHeight }}
+              >
+                {/* The cell and the lane each own their bottom border: a
+                    border on the row itself is a 1px seam the opaque sticky
+                    cell cannot cover, and the dependency arrows bleed
+                    through it across the pinned column. */}
+                <div
+                  data-slot="gantt-chart-task-cell"
+                  className="sticky left-0 z-20 flex shrink-0 items-center gap-1 border-b border-r border-border/40 border-r-border bg-background pe-3 text-sm"
+                  style={{
+                    width: taskListWidth,
+                    paddingInlineStart: 8 + row.depth * 16,
+                  }}
+                >
+                  {row.summary ? (
+                    <button
+                      type="button"
+                      data-slot="gantt-chart-collapse-toggle"
+                      aria-expanded={!collapsedIds.has(row.task.id)}
+                      aria-label={
+                        collapsedIds.has(row.task.id)
+                          ? labels.expandGroup(row.task.name)
+                          : labels.collapseGroup(row.task.name)
+                      }
+                      title={
+                        collapsedIds.has(row.task.id)
+                          ? labels.expandGroup(row.task.name)
+                          : labels.collapseGroup(row.task.name)
+                      }
+                      className={cn(
+                        "flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                        surfaceTransitionClassName,
+                        insetFocusClassName,
+                      )}
+                      onClick={() => toggleCollapsed(row.task.id)}
+                    >
+                      <ChevronRight
+                        aria-hidden="true"
+                        className={cn(
+                          "size-3.5 transition-transform [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
+                          !collapsedIds.has(row.task.id) && "rotate-90",
+                        )}
+                      />
+                    </button>
+                  ) : (
+                    <span aria-hidden="true" className="size-5 shrink-0" />
+                  )}
+                  <span
+                    className={cn(
+                      "truncate",
+                      row.summary && "font-medium",
+                    )}
+                  >
+                    {row.task.name}
+                  </span>
+                </div>
+                <div
+                  data-slot="gantt-chart-lane"
+                  className="relative shrink-0 border-b border-border/40"
+                  style={{ width: timelineWidth }}
+                >
+                  <TaskBar
+                    row={row}
+                    moving={rowMoving}
+                    onBeginDrag={beginDrag}
+                    suppressClickRef={suppressClickRef}
+                  />
+                  {ghost ? (
+                    milestoneGhost ? (
+                      <div
+                        aria-hidden="true"
+                        data-slot="gantt-chart-ghost"
+                        className={cn(
+                          "pointer-events-none absolute z-30 rotate-45 rounded-[3px] ring-2 ring-ring",
+                          ganttChartToneVariants({
+                            tone: row.task.tone ?? "primary",
+                          }),
+                          taskClassName?.({
+                            task: row.task,
+                            surface: "milestone",
+                            selected: false,
+                          }),
+                        )}
+                        style={{
+                          left: ghostLeft - MILESTONE_SIZE / 2,
+                          top: (rowHeight - MILESTONE_SIZE) / 2,
+                          width: MILESTONE_SIZE,
+                          height: MILESTONE_SIZE,
+                        }}
+                      />
+                    ) : (
+                      <div
+                        aria-hidden="true"
+                        data-slot="gantt-chart-ghost"
+                        className={cn(
+                          "pointer-events-none absolute z-30 rounded-md ring-2 ring-ring",
+                          ganttChartToneVariants({
+                            tone: row.task.tone ?? "primary",
+                          }),
+                          taskClassName?.({
+                            task: row.task,
+                            surface: "bar",
+                            selected: false,
+                          }),
+                        )}
+                        style={{
+                          left: ghostLeft,
+                          top: BAR_INSET,
+                          height: rowHeight - BAR_INSET * 2,
+                          width: ghostWidth,
+                        }}
+                      />
+                    )
+                  ) : null}
+                  {confirming && pendingMove ? (
+                    <div
+                      data-slot="gantt-chart-move-confirm"
+                      className="absolute z-50"
+                      style={{
+                        left: clamp(
+                          ghostLeft,
+                          0,
+                          Math.max(
+                            timelineWidth - CONFIRM_CARD_CLEARANCE_PX,
+                            0,
+                          ),
+                        ),
+                        top: rowHeight - 2,
+                      }}
+                      onKeyDown={(keyEvent) => {
+                        if (keyEvent.key === "Escape") {
+                          keyEvent.stopPropagation()
+                          cancelPendingMove()
+                        }
+                      }}
+                    >
+                      {(renderMoveConfirm ?? ((context) => (
+                        <DefaultMoveConfirm context={context} />
+                      )))({
+                        task: pendingMove.task,
+                        range: {
+                          start: pendingMove.start,
+                          end: pendingMove.end,
+                        },
+                        dependentTaskIds:
+                          differenceInCalendarDays(
+                            pendingMove.end,
+                            pendingMove.task.end,
+                          ) !== 0
+                            ? dependentIdsOf(pendingMove.task.id)
+                            : [],
+                        confirm: confirmPendingMove,
+                        cancel: cancelPendingMove,
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export { GanttChartGrid }
