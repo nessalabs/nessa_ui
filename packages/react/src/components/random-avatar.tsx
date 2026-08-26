@@ -160,12 +160,32 @@ const DEFAULT_WASHES = Object.freeze([2, 5] as const)
 const CENTER = 50
 const RADIUS = 50
 
+/**
+ * Rounds a coordinate to a thousandth of the canvas before it can reach the
+ * DOM. `Math.sin` and `Math.cos` are not required to return the same bits on
+ * every implementation, and do not: a coordinate painted by Node during SSR
+ * and the same coordinate recomputed by the browser can differ in the last
+ * place, which React reports as a hydration mismatch on every avatar rendered
+ * on the server. Quantising also stops that difference being amplified — the
+ * rotation in `blobPath` subtracts two nearly equal terms, so a discrepancy
+ * of 1e-17 can surface in the third decimal of the result.
+ *
+ * A thousandth of a 100-unit canvas is a hundredth of a pixel on a 40px
+ * avatar, so nothing about the painting changes; the path strings simply get
+ * shorter. It is not a proof of agreement — two engines could still land
+ * either side of a rounding boundary — but it removes every difference large
+ * enough to be reachable in practice.
+ */
+function quantise(value: number): number {
+  return Math.round(value * 1000) / 1000
+}
+
 /** A point on the circle of `distance` around the centre, in degrees. */
 function polar(angle: number, distance: number): { x: number; y: number } {
   const radians = (angle * Math.PI) / 180
   return {
-    x: CENTER + Math.cos(radians) * distance,
-    y: CENTER + Math.sin(radians) * distance,
+    x: quantise(CENTER + Math.cos(radians) * distance),
+    y: quantise(CENTER + Math.sin(radians) * distance),
   }
 }
 
@@ -190,14 +210,14 @@ function blobPath(
     const x = Math.cos(angle) * reach
     const y = Math.sin(angle) * reach * squash
     return {
-      x: center.x + x * Math.cos(tilt) - y * Math.sin(tilt),
-      y: center.y + x * Math.sin(tilt) + y * Math.cos(tilt),
+      x: quantise(center.x + x * Math.cos(tilt) - y * Math.sin(tilt)),
+      y: quantise(center.y + x * Math.sin(tilt) + y * Math.cos(tilt)),
     }
   })
 
   const midpoint = (from: { x: number; y: number }, to: { x: number; y: number }) => ({
-    x: (from.x + to.x) / 2,
-    y: (from.y + to.y) / 2,
+    x: quantise((from.x + to.x) / 2),
+    y: quantise((from.y + to.y) / 2),
   })
 
   const first = midpoint(points[count - 1]!, points[0]!)
@@ -249,7 +269,10 @@ function paint(
     const spread = index === 0 ? 8 : 12 + random() * 18
     const drift = polar(random() * 360, anchor ? 6 : spread)
     const center = anchor
-      ? { x: anchor.x + drift.x - CENTER, y: anchor.y + drift.y - CENTER }
+      ? {
+          x: quantise(anchor.x + drift.x - CENTER),
+          y: quantise(anchor.y + drift.y - CENTER),
+        }
       : drift
     const radius = anchor
       ? (index === 0 ? 34 : 22 + random() * 10) * (0.9 + random() * 0.3)
