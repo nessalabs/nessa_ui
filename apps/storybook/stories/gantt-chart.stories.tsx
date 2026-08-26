@@ -6,7 +6,11 @@ import {
   GanttChart,
   GanttChartGrid,
   GanttChartToolbar,
+  Input,
+  PopoverSurface,
+  ganttChartDateColumns,
   type GanttChartProps,
+  type GanttChartQuickCreateContext,
   type GanttChartTask,
 } from "@nessa-ui/react"
 
@@ -26,8 +30,10 @@ function d(month: number, day: number) {
 /**
  * A believable release plan for the design system itself. Summary rows
  * derive their span and progress from their children (their own dates
- * are ignored), milestones are zero-duration, and `dependsOn` draws the
- * finish-to-start arrows.
+ * are ignored), milestones are zero-duration, and every relation the
+ * plan declares is satisfied by its dates — a plan that contradicts its
+ * own links draws them dashed, which the DependencyViolations story
+ * shows on purpose.
  */
 const demoTasks: GanttChartTask[] = [
   { id: "design", name: "Design", start: d(7, 3), end: d(7, 22) },
@@ -46,13 +52,15 @@ const demoTasks: GanttChartTask[] = [
     end: d(7, 22),
     progress: 0.75,
     parentId: "design",
-    dependsOn: ["discovery"],
+    dependsOn: [
+      { taskId: "discovery", type: "start-to-start", lagDays: 7 },
+    ],
   },
   {
     id: "design-review",
     name: "Design review",
-    start: d(7, 21),
-    end: d(7, 21),
+    start: d(7, 22),
+    end: d(7, 22),
     parentId: "design",
     dependsOn: ["visual-language"],
   },
@@ -60,8 +68,8 @@ const demoTasks: GanttChartTask[] = [
   {
     id: "primitives",
     name: "Primitives",
-    start: d(7, 17),
-    end: d(7, 29),
+    start: d(7, 22),
+    end: d(8, 3),
     progress: 0.6,
     parentId: "engineering",
     dependsOn: ["design-review"],
@@ -69,8 +77,8 @@ const demoTasks: GanttChartTask[] = [
   {
     id: "composites",
     name: "Composites",
-    start: d(7, 31),
-    end: d(8, 19),
+    start: d(8, 3),
+    end: d(8, 22),
     progress: 0.15,
     parentId: "engineering",
     dependsOn: ["primitives"],
@@ -78,8 +86,8 @@ const demoTasks: GanttChartTask[] = [
   {
     id: "code-freeze",
     name: "Code freeze",
-    start: d(8, 28),
-    end: d(8, 28),
+    start: d(8, 22),
+    end: d(8, 22),
     tone: "destructive",
     parentId: "engineering",
     dependsOn: ["composites"],
@@ -87,7 +95,7 @@ const demoTasks: GanttChartTask[] = [
   {
     id: "hardening",
     name: "Hardening & QA",
-    start: d(8, 21),
+    start: d(8, 22),
     end: d(9, 3),
     tone: "muted",
     parentId: "engineering",
@@ -105,8 +113,8 @@ const demoTasks: GanttChartTask[] = [
   {
     id: "beta",
     name: "Beta release",
-    start: d(9, 5),
-    end: d(9, 5),
+    start: d(9, 3),
+    end: d(9, 3),
     parentId: "launch",
     dependsOn: ["hardening"],
   },
@@ -228,7 +236,7 @@ export const MonthScale: Story = {
   render: () => <PlanChart defaultScale="month" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    // Composites spans Aug 31 – Sep 19 exclusive: 19 days × 4px.
+    // Composites spans Sep 3 – Sep 22 exclusive: 19 days × 4px.
     const bar = await canvas.findByRole("button", { name: /^Composites,/ })
     await expect(parseFloat(getComputedStyle(bar).width)).toBeCloseTo(76, 0)
   },
@@ -259,10 +267,10 @@ export const GroupCollapse: Story = {
       await expect(getComputedStyle(chevron).rotate).toBe("90deg")
     })
 
-    // Engineering rolls up Aug 17 – Oct 3 exclusive: 47 days × 12px.
+    // Engineering rolls up Aug 22 – Oct 3 exclusive: 42 days × 12px.
     const summary = canvas.getByRole("button", { name: /^Engineering,/ })
     await expect(parseFloat(getComputedStyle(summary).width)).toBeCloseTo(
-      47 * WEEK_SCALE_DAY_WIDTH,
+      42 * WEEK_SCALE_DAY_WIDTH,
       0,
     )
   },
@@ -501,6 +509,384 @@ export const DependentCascade: Story = {
     await userEvent.click(
       within(thirdDialog).getByRole("button", { name: "Keep" }),
     )
+  },
+}
+
+/** A small plan whose four links show one relation type each. */
+const relationTasks: GanttChartTask[] = [
+  { id: "spec", name: "Spec", start: d(7, 3), end: d(7, 10) },
+  {
+    id: "build",
+    name: "Build",
+    start: d(7, 10),
+    end: d(7, 21),
+    dependsOn: ["spec"],
+  },
+  {
+    id: "docs",
+    name: "Docs",
+    start: d(7, 10),
+    end: d(7, 17),
+    tone: "secondary",
+    dependsOn: [{ taskId: "build", type: "start-to-start" }],
+  },
+  {
+    id: "review",
+    name: "Review",
+    start: d(7, 17),
+    end: d(7, 21),
+    tone: "secondary",
+    dependsOn: [{ taskId: "build", type: "finish-to-finish" }],
+  },
+  {
+    id: "handover",
+    name: "Handover",
+    start: d(7, 24),
+    end: d(7, 28),
+    tone: "muted",
+    dependsOn: [{ taskId: "build", type: "finish-to-start", lagDays: 3 }],
+  },
+]
+
+/**
+ * A plan with one tight chain and one branch that has slack, so the
+ * critical path is worth looking at: Draft → Review → Sign-off run
+ * end-to-end into the launch, while Assets finishes early.
+ */
+const criticalPathTasks: GanttChartTask[] = [
+  { id: "draft", name: "Draft", start: d(7, 3), end: d(7, 12) },
+  {
+    id: "cp-review",
+    name: "Review",
+    start: d(7, 12),
+    end: d(7, 19),
+    dependsOn: ["draft"],
+  },
+  {
+    id: "assets",
+    name: "Assets",
+    start: d(7, 5),
+    end: d(7, 12),
+    tone: "secondary",
+  },
+  {
+    id: "signoff",
+    name: "Sign-off",
+    start: d(7, 19),
+    end: d(7, 24),
+    dependsOn: ["cp-review", { taskId: "assets", type: "finish-to-start" }],
+  },
+  {
+    id: "cp-launch",
+    name: "Launch",
+    start: d(7, 24),
+    end: d(7, 24),
+    dependsOn: ["signoff"],
+  },
+]
+
+export const DependencyTypes: Story = {
+  parameters: storyDocumentation(
+    "All four industry relation types on one plan, plus a lag. `dependsOn` takes a bare id as the finish-to-start shorthand or `{ taskId, type, lagDays }` for the rest, and each arrow leaves and arrives at the edges its relation names — so a start-to-start link runs left edge to left edge rather than pretending to be finish-to-start. The play test asserts one arrow per relation and reads their announcements.",
+  ),
+  render: () => (
+    <PlanChart defaultTasks={relationTasks} defaultScale="day" />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const arrows = canvasElement.querySelectorAll(
+      '[data-slot="gantt-chart-dependency"]',
+    )
+    await expect(arrows).toHaveLength(4)
+    await expect(
+      canvas.getByRole("button", { name: "Spec to Build, finish to start" }),
+    ).toBeInTheDocument()
+    await expect(
+      canvas.getByRole("button", { name: "Build to Docs, start to start" }),
+    ).toBeInTheDocument()
+    await expect(
+      canvas.getByRole("button", {
+        name: "Build to Review, finish to finish",
+      }),
+    ).toBeInTheDocument()
+    await expect(
+      canvas.getByRole("button", {
+        name: "Build to Handover, finish to start, 3 days lag",
+      }),
+    ).toBeInTheDocument()
+  },
+}
+
+export const CriticalPath: Story = {
+  parameters: storyDocumentation(
+    "Critical-path highlighting, on from the start here and toggled from the toolbar. Float is derived from the dependency graph — a task with none left cannot slip without pushing the plan's finish — so the chain that carries the finish takes the destructive treatment while everything with slack stays in its own tone. The play test asserts the toggle's pressed state, that a chain task is marked and a slack task is not, and that turning it off clears the marks.",
+  ),
+  render: () => (
+    <PlanChart
+      defaultTasks={criticalPathTasks}
+      defaultScale="day"
+      defaultShowCriticalPath
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const toggle = canvas.getByRole("button", { name: "Critical path" })
+    await expect(toggle).toHaveAttribute("aria-pressed", "true")
+
+    // Draft → Review → Sign-off → Launch runs without a gap, so no link in
+    // the chain can slip without moving the launch.
+    const onPath = canvas.getByRole("button", { name: /^Draft,/ })
+    await expect(onPath).toHaveAttribute("data-critical", "true")
+    await expect(onPath.getAttribute("aria-label")).toContain(
+      "On the critical path",
+    )
+    // Assets finishes a week before sign-off needs it: seven days of float.
+    await expect(
+      canvas.getByRole("button", { name: /^Assets,/ }),
+    ).not.toHaveAttribute("data-critical")
+
+    await userEvent.click(toggle)
+    await waitFor(async () => {
+      await expect(
+        canvas.getByRole("button", { name: /^Draft,/ }),
+      ).not.toHaveAttribute("data-critical")
+    })
+  },
+}
+
+export const DependencyLinking: Story = {
+  parameters: storyDocumentation(
+    "With `linkable`, every bar grows a link handle at each edge: drag one onto another task to draw a relation, or activate it and pick the target from the keyboard. Links that would close a loop are refused, so the target never lights up. Selecting an arrow and pressing Delete removes it. The play test draws a link with the keyboard path, asserts the new arrow exists, then selects and deletes it.",
+  ),
+  render: () => <PlanChart linkable />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+
+    // Keyboard path: activate a handle, then activate the target task.
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Link from the finish of Beta release" }),
+    )
+    await userEvent.click(canvas.getByRole("button", { name: /^Docs sprint,/ }))
+
+    const arrow = await canvas.findByRole("button", {
+      name: "Beta release to Docs sprint, finish to start",
+    })
+
+    // Selecting the arrow and pressing Delete takes the link back out.
+    await userEvent.click(arrow)
+    await expect(arrow).toHaveAttribute("aria-pressed", "true")
+    await userEvent.keyboard("{Delete}")
+    await waitFor(async () => {
+      await expect(
+        canvas.queryByRole("button", {
+          name: "Beta release to Docs sprint, finish to start",
+        }),
+      ).toBeNull()
+    })
+  },
+}
+
+/** The stories' quick-create card — a host composition, not part of the chart. */
+function QuickCreateCard({ context }: { context: GanttChartQuickCreateContext }) {
+  const [name, setName] = React.useState("")
+  const format = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  })
+  return (
+    <PopoverSurface
+      radius="lg"
+      role="dialog"
+      aria-label="Add task"
+      className="flex w-64 flex-col gap-2 p-3"
+    >
+      <p className="text-xs text-muted-foreground">
+        {format.format(context.range.start)} –{" "}
+        {format.format(new Date(context.range.end.getTime() - 86_400_000))}
+      </p>
+      <Input
+        autoFocus
+        aria-label="Task name"
+        placeholder="Task name"
+        className="h-7"
+        value={name}
+        onChange={(changeEvent) => setName(changeEvent.target.value)}
+        onKeyDown={(keyEvent) => {
+          if (keyEvent.key === "Enter") {
+            keyEvent.preventDefault()
+            context.createTask(name ? { name } : undefined)
+          }
+        }}
+      />
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          className="h-7"
+          onClick={() => context.createTask(name ? { name } : undefined)}
+        >
+          Add task
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7"
+          onClick={context.cancel}
+        >
+          Cancel
+        </Button>
+      </div>
+    </PopoverSurface>
+  )
+}
+
+export const QuickCreate: Story = {
+  parameters: storyDocumentation(
+    "Dragging across empty lane background proposes a new task's dates and opens the host's own quick-create card through `renderQuickCreate` — the chart owns the gesture, the highlight, placement and Escape, the host owns every pixel of the card and resolves it with `createTask`/`cancel`. A task drawn on a group's lane joins that group. The play test drags a range, names the task, and asserts it lands on the timeline with the dragged dates.",
+  ),
+  render: () => (
+    <PlanChart
+      defaultScale="day"
+      renderQuickCreate={(context) => <QuickCreateCard context={context} />}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const lane = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="gantt-chart-lane"][data-task-id="code-freeze"]',
+    ) as HTMLElement
+    const laneRect = lane.getBoundingClientRect()
+
+    fireEvent.pointerDown(lane, {
+      button: 0,
+      buttons: 1,
+      pointerId: 1,
+      clientX: laneRect.left + 200,
+      clientY: laneRect.top + 10,
+    })
+    fireEvent.pointerMove(window, {
+      buttons: 1,
+      pointerId: 1,
+      clientX: laneRect.left + 320,
+      clientY: laneRect.top + 10,
+    })
+    fireEvent.pointerUp(window, { pointerId: 1 })
+
+    const card = await canvas.findByRole("dialog", { name: "Add task" })
+    await userEvent.type(
+      within(card).getByRole("textbox", { name: "Task name" }),
+      "Release notes",
+    )
+    await userEvent.click(within(card).getByRole("button", { name: "Add task" }))
+
+    await canvas.findByRole("button", { name: /^Release notes,/ })
+    await expect(
+      canvas.queryByRole("dialog", { name: "Add task" }),
+    ).toBeNull()
+  },
+}
+
+export const TaskColumns: Story = {
+  parameters: storyDocumentation(
+    "The task list takes host-defined columns beside the name; `ganttChartDateColumns` covers the usual start/finish/duration trio, and any column can render whatever it likes from the task (here an owner read from `meta`). Summary rows show their rolled-up span, so the group's dates stay consistent with its children. The play test reads a leaf row's duration cell and a summary's rolled-up finish.",
+  ),
+  render: () => (
+    <PlanChart
+      taskListWidth={420}
+      columns={[
+        ...ganttChartDateColumns("en-US"),
+        {
+          key: "owner",
+          header: "Owner",
+          width: 72,
+          render: (task) => (task.meta?.owner as string) ?? "—",
+        },
+      ]}
+      defaultTasks={demoTasks.map((task) =>
+        task.id === "primitives"
+          ? { ...task, meta: { owner: "Ada" } }
+          : task.id === "composites"
+            ? { ...task, meta: { owner: "Lin" } }
+            : task,
+      )}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(
+      canvasElement.querySelector(
+        '[data-slot="gantt-chart-column-header"][data-column="owner"]',
+      )?.textContent,
+    ).toBe("Owner")
+    const rows = canvasElement.querySelectorAll(
+      '[data-slot="gantt-chart-row"]',
+    )
+    // Primitives runs Aug 22 – Sep 3 exclusive: 12 days, owned by Ada.
+    const primitivesRow = Array.from(rows).find((row) =>
+      row.textContent?.startsWith("Primitives"),
+    ) as HTMLElement
+    await expect(
+      primitivesRow.querySelector('[data-column="duration"]')?.textContent,
+    ).toBe("12")
+    await expect(
+      primitivesRow.querySelector('[data-column="owner"]')?.textContent,
+    ).toBe("Ada")
+    // The Engineering summary shows the union of its children, not its own.
+    const engineeringRow = Array.from(rows).find((row) =>
+      row.textContent?.startsWith("Engineering"),
+    ) as HTMLElement
+    await expect(
+      engineeringRow.querySelector('[data-column="start"]')?.textContent,
+    ).toBe("Aug 22")
+  },
+}
+
+export const DependencyViolations: Story = {
+  parameters: storyDocumentation(
+    "A relation the dates contradict draws dashed in the critical treatment, so a plan that has drifted out of sequence says so instead of drawing a confident arrow backwards. Here Build starts three days before Spec finishes. Nothing is auto-corrected — hosts read the same list through the exported `dependencyViolations` helper and decide what to do. The play test asserts the arrow renders dashed while a satisfied one does not.",
+  ),
+  render: () => (
+    <PlanChart
+      defaultScale="day"
+      defaultTasks={[
+        { id: "spec", name: "Spec", start: d(7, 3), end: d(7, 12) },
+        {
+          id: "build",
+          name: "Build",
+          start: d(7, 9),
+          end: d(7, 20),
+          dependsOn: ["spec"],
+        },
+        {
+          id: "ship",
+          name: "Ship",
+          start: d(7, 20),
+          end: d(7, 24),
+          tone: "secondary",
+          dependsOn: ["build"],
+        },
+      ]}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const violated = canvasElement.querySelector(
+      '[data-slot="gantt-chart-dependency"][data-violated="true"]',
+    ) as SVGGElement
+    await expect(violated).not.toBeNull()
+    await expect(violated.getAttribute("data-predecessor-id")).toBe("spec")
+    await expect(
+      getComputedStyle(violated.querySelector("path") as SVGPathElement)
+        .strokeDasharray,
+    ).not.toBe("none")
+
+    // The satisfied link beside it stays solid.
+    const satisfied = canvasElement.querySelector(
+      '[data-slot="gantt-chart-dependency"][data-predecessor-id="build"]',
+    ) as SVGGElement
+    await expect(satisfied).not.toHaveAttribute("data-violated")
+    await expect(
+      getComputedStyle(satisfied.querySelector("path") as SVGPathElement)
+        .strokeDasharray,
+    ).toBe("none")
   },
 }
 

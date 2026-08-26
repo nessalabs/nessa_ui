@@ -133,6 +133,15 @@ function TaskBar({
     promotePendingMove,
     cancelPendingMove,
     confirmMoves,
+    criticalTaskIds,
+    showCriticalPath,
+    linkable,
+    linkSession,
+    beginLink,
+    updateLink,
+    completeLink,
+    cancelLink,
+    canLinkTo,
   } = useGanttChart("GanttChartGrid")
   const { task } = row
   const tone = task.tone ?? "primary"
@@ -252,6 +261,12 @@ function TaskBar({
   // effect, so it never takes the pressed/selected treatment — the click
   // still reaches onTaskSelect for hosts that give it a meaning.
   const selectable = !row.summary
+  const critical = showCriticalPath && criticalTaskIds.has(task.id)
+  // While a link is looking for its target, every bar that could take it
+  // becomes a drop zone and the rest read as unavailable.
+  const linking = Boolean(linkSession)
+  const linkTarget = linking && canLinkTo(task.id)
+  const linkSource = linkSession?.predecessorId === task.id
 
   const sharedButtonProps = {
     type: "button" as const,
@@ -259,9 +274,33 @@ function TaskBar({
     "data-tone": tone,
     "data-moving": moving || undefined,
     "data-selected": (selectable && selected) || undefined,
+    "data-critical": critical || undefined,
+    "data-link-target": linkTarget || undefined,
     "aria-pressed": selectable ? selected : undefined,
-    "aria-label": label,
-    onKeyDown: handleKeyDown,
+    "aria-label": `${label}${critical ? labels.criticalTask : ""}`,
+    onKeyDown: (keyEvent: React.KeyboardEvent<HTMLButtonElement>) => {
+      // A link waiting for its target takes Enter before anything else.
+      if (linkSession?.keyboard && keyEvent.key === "Enter" && linkTarget) {
+        keyEvent.preventDefault()
+        keyEvent.stopPropagation()
+        completeLink(task.id)
+        return
+      }
+      if (linkSession && keyEvent.key === "Escape") {
+        keyEvent.stopPropagation()
+        cancelLink()
+        return
+      }
+      handleKeyDown(keyEvent)
+    },
+    onPointerEnter: () => {
+      if (linking) updateLink({ targetId: linkTarget ? task.id : null })
+    },
+    onPointerLeave: () => {
+      if (linking && linkSession?.targetId === task.id) {
+        updateLink({ targetId: null })
+      }
+    },
     onBlur: () => {
       if (barPending?.stage === "adjusting") cancelPendingMove()
     },
@@ -270,10 +309,94 @@ function TaskBar({
         suppressClickRef.current = false
         return
       }
+      if (linkSession?.keyboard) {
+        if (linkTarget) completeLink(task.id)
+        else cancelLink()
+        return
+      }
       if (selectable) selectTask(task.id)
       onTaskSelect?.(task, domEvent)
     },
   }
+
+  /**
+   * The two link handles, drawn just outside a bar's edges. They are real
+   * buttons so the gesture has a keyboard path: activating one opens a
+   * link that the next task activated closes.
+   */
+  const linkHandles =
+    linkable && !row.summary ? (
+      <>
+        {(["start", "finish"] as const).map((edge) => {
+          const anchor = row.milestone
+            ? left + (edge === "start" ? -MILESTONE_SIZE : MILESTONE_SIZE / 2)
+            : edge === "start"
+              ? left - 10
+              : left + width
+          return (
+            <button
+              key={edge}
+              type="button"
+              data-slot="gantt-chart-link-handle"
+              data-task-id={task.id}
+              data-edge={edge}
+              data-active={
+                (linkSource && linkSession?.fromEdge === edge) || undefined
+              }
+              aria-label={labels.linkFrom(
+                task.name,
+                edge === "start" ? labels.linkEdgeStart : labels.linkEdgeFinish,
+              )}
+              title={labels.linkFrom(
+                task.name,
+                edge === "start" ? labels.linkEdgeStart : labels.linkEdgeFinish,
+              )}
+              className={cn(
+                "absolute z-20 size-2.5 rounded-full border border-background bg-muted-foreground opacity-0 hover:bg-foreground",
+                "group-hover/lane:opacity-100 focus-visible:opacity-100 data-[active=true]:opacity-100",
+                surfaceTransitionClassName,
+                insetFocusClassName,
+              )}
+              style={{ left: anchor, top: rowHeight / 2 - 5 }}
+              onPointerDown={(pointerEvent) => {
+                if (pointerEvent.button !== 0) return
+                if (pointerEvent.pointerType === "touch") return
+                // No pointer capture: the drag needs enter/leave events on
+                // the bars it passes over to find its drop target.
+                pointerEvent.stopPropagation()
+                beginLink({
+                  predecessorId: task.id,
+                  fromEdge: edge,
+                  pointer: null,
+                  targetId: null,
+                  keyboard: false,
+                })
+              }}
+              onClick={(clickEvent) => {
+                clickEvent.stopPropagation()
+                // A plain activation (keyboard, or a click that never
+                // dragged) opens the link and waits for a target.
+                if (!linkSession) {
+                  beginLink({
+                    predecessorId: task.id,
+                    fromEdge: edge,
+                    pointer: null,
+                    targetId: null,
+                    keyboard: true,
+                  })
+                }
+              }}
+              onKeyDown={(keyEvent) => {
+                if (keyEvent.key === "Escape" && linkSession) {
+                  keyEvent.stopPropagation()
+                  cancelLink()
+                }
+              }}
+            />
+          )
+        })}
+      </>
+    ) : null
 
   const beginMove = (pointerEvent: React.PointerEvent<HTMLButtonElement>) => {
     if (!interactive) return
@@ -308,19 +431,25 @@ function TaskBar({
             <span
               className={cn(
                 "absolute inset-0 rounded-sm border-none",
-                ganttChartToneVariants({ tone }),
+                critical
+                  ? "bg-destructive"
+                  : ganttChartToneVariants({ tone }),
               )}
             />
             <span
               className={cn(
                 "absolute -bottom-1 left-0 size-2 rounded-[2px] border-none",
-                ganttChartToneVariants({ tone }),
+                critical
+                  ? "bg-destructive"
+                  : ganttChartToneVariants({ tone }),
               )}
             />
             <span
               className={cn(
                 "absolute -bottom-1 right-0 size-2 rounded-[2px] border-none",
-                ganttChartToneVariants({ tone }),
+                critical
+                  ? "bg-destructive"
+                  : ganttChartToneVariants({ tone }),
               )}
             />
           </span>
@@ -342,6 +471,9 @@ function TaskBar({
             insetFocusClassName,
             taskClassName?.(renderContext),
             moving && "opacity-40",
+            critical && "ring-2 ring-destructive ring-offset-1 ring-offset-background",
+            linkTarget && "ring-2 ring-ring ring-offset-2 ring-offset-background",
+            linking && !linkTarget && !linkSource && "opacity-40",
             selected &&
               "ring-2 ring-ring ring-offset-1 ring-offset-background",
           )}
@@ -363,12 +495,14 @@ function TaskBar({
         >
           {task.name}
         </span>
+        {linkHandles}
       </>
     )
   }
 
   return (
-    <button
+    <>
+      <button
       {...sharedButtonProps}
       data-slot="gantt-chart-bar"
       className={cn(
@@ -378,6 +512,9 @@ function TaskBar({
         insetFocusClassName,
         taskClassName?.(renderContext),
         moving && "opacity-40",
+        critical && "ring-2 ring-destructive ring-offset-1 ring-offset-background",
+        linkTarget && "ring-2 ring-ring ring-offset-2 ring-offset-background",
+        linking && !linkTarget && !linkSource && "opacity-40",
         selected && "ring-2 ring-ring ring-offset-1 ring-offset-background",
       )}
       style={{
@@ -424,7 +561,9 @@ function TaskBar({
           beginResize("resize-end", pointerEvent)
         }
       />
-    </button>
+      </button>
+      {linkHandles}
+    </>
   )
 }
 
@@ -546,6 +685,7 @@ export function dependencyPath({
   exitDir,
   enterDir,
   rowHeight,
+  gap = ARROW_GAP_PX,
 }: {
   fromX: number
   fromY: number
@@ -554,8 +694,10 @@ export function dependencyPath({
   exitDir: 1 | -1
   enterDir: 1 | -1
   rowHeight: number
+  /** Distance left between the arrow's tip and the edge it points at. */
+  gap?: number
 }) {
-  const endX = toX - enterDir * ARROW_GAP_PX
+  const endX = toX - enterDir * gap
   const outX = fromX + exitDir * ARROW_STUB_PX
   const approachX = endX - enterDir * ARROW_STUB_PX
   const hasRoom = enterDir === 1 ? outX <= approachX : outX >= approachX
@@ -720,7 +862,7 @@ function DependencyLayer() {
               fill="none"
               stroke="transparent"
               strokeWidth="12"
-              className="pointer-events-stroke cursor-pointer outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+              className="[pointer-events:stroke] cursor-pointer outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
               onClick={() => {
                 selectDependency({
                   predecessorId: arrow.predecessorId,
@@ -745,6 +887,117 @@ function DependencyLayer() {
         )
       })}
     </svg>
+  )
+}
+
+/**
+ * The line a pointer link drags behind it, from the handle it left to
+ * wherever the cursor is. Purely decorative — the drop itself is decided
+ * by whichever bar reported itself as the target.
+ */
+function LinkRubberBand() {
+  const { rows, range, dayWidth, rowHeight, linkSession } =
+    useGanttChart("GanttChartGrid")
+  if (!linkSession?.pointer) return null
+  const fromIndex = rows.findIndex(
+    (row) => row.task.id === linkSession.predecessorId,
+  )
+  if (fromIndex === -1) return null
+  const from = rows[fromIndex]
+  const day =
+    linkSession.fromEdge === "start" ? from.span.start : from.span.end
+  const fromX =
+    differenceInCalendarDays(day, range.start) * dayWidth +
+    (from.milestone
+      ? (linkSession.fromEdge === "start" ? -1 : 1) * (MILESTONE_SIZE / 2)
+      : 0)
+  const fromY = fromIndex * rowHeight + rowHeight / 2
+
+  return (
+    <svg
+      aria-hidden="true"
+      data-slot="gantt-chart-link-band"
+      className="pointer-events-none absolute top-0 overflow-visible"
+      style={{
+        left: 0,
+        width: differenceInCalendarDays(range.end, range.start) * dayWidth,
+        height: rows.length * rowHeight,
+      }}
+    >
+      <path
+        // Previewing with the same elbow router the committed arrow uses,
+        // so the drag shows the shape it is about to draw rather than a
+        // node-editor diagonal.
+        d={dependencyPath({
+          fromX,
+          fromY,
+          toX: linkSession.pointer.x,
+          toY: linkSession.pointer.y,
+          exitDir: linkSession.fromEdge === "finish" ? 1 : -1,
+          enterDir: linkSession.pointer.x >= fromX ? 1 : -1,
+          rowHeight,
+          gap: 0,
+        })}
+        fill="none"
+        strokeWidth="1.5"
+        strokeDasharray="4 3"
+        className="stroke-ring"
+      />
+      <circle
+        cx={linkSession.pointer.x}
+        cy={linkSession.pointer.y}
+        r="3"
+        className="fill-ring"
+      />
+    </svg>
+  )
+}
+
+/**
+ * Positions the host's quick-create UI at the open draft. The wrapper owns
+ * only geometry and dismissal — clamped into the timeline and closed on
+ * Escape — while the rendered content comes entirely from
+ * `renderQuickCreate`.
+ */
+function QuickCreateSlot({ rowIndex }: { rowIndex: number }) {
+  const {
+    range,
+    dayWidth,
+    rowHeight,
+    totalDays,
+    draft,
+    renderQuickCreate,
+    createFromDraft,
+    cancelDraft,
+  } = useGanttChart("GanttChartGrid")
+  if (!draft?.open || !renderQuickCreate) return null
+  const left = differenceInCalendarDays(draft.start, range.start) * dayWidth
+
+  return (
+    <div
+      data-slot="gantt-chart-quick-create"
+      className="absolute z-50"
+      style={{
+        left: clamp(
+          left,
+          0,
+          Math.max(totalDays * dayWidth - CONFIRM_CARD_CLEARANCE_PX, 0),
+        ),
+        top: rowIndex * rowHeight + rowHeight - 2,
+      }}
+      onKeyDown={(keyEvent) => {
+        if (keyEvent.key === "Escape") {
+          keyEvent.stopPropagation()
+          cancelDraft()
+        }
+      }}
+    >
+      {renderQuickCreate({
+        range: { start: draft.start, end: draft.end },
+        createTask: createFromDraft,
+        cancel: cancelDraft,
+      })}
+    </div>
   )
 }
 
@@ -781,9 +1034,63 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
     taskClassName,
     scrollerRef,
     scrollToDate,
+    linkSession,
+    updateLink,
+    completeLink,
+    cancelLink,
+    selectedDependency,
+    selectDependency,
+    deleteDependency,
+    linkable,
+    renderQuickCreate,
+    draft,
+    openDraft,
+    createFromDraft,
+    cancelDraft,
+    columns,
   } = useGanttChart("GanttChartGrid")
 
   const timelineWidth = totalDays * dayWidth
+  const canvasRef = React.useRef<HTMLDivElement>(null)
+
+  /** Pointer position in the canvas's own coordinates. */
+  const canvasPoint = React.useCallback((clientX: number, clientY: number) => {
+    const canvas = canvasRef.current
+    if (!canvas) return null
+    const rect = canvas.getBoundingClientRect()
+    return { x: clientX - rect.left - taskListWidth, y: clientY - rect.top }
+  }, [taskListWidth])
+
+  // A pointer-driven link tracks the cursor for its rubber band and
+  // settles on whichever bar reported itself as the target.
+  const linkSessionRef = React.useRef(linkSession)
+  React.useEffect(() => {
+    linkSessionRef.current = linkSession
+  })
+  const pointerLinking = Boolean(linkSession && !linkSession.keyboard)
+  React.useEffect(() => {
+    if (!pointerLinking) return
+
+    const handleMove = (pointerEvent: PointerEvent) => {
+      updateLink({
+        pointer: canvasPoint(pointerEvent.clientX, pointerEvent.clientY),
+      })
+    }
+    const handleUp = () => {
+      const session = linkSessionRef.current
+      if (session?.targetId) completeLink(session.targetId)
+      else cancelLink()
+    }
+
+    window.addEventListener("pointermove", handleMove)
+    window.addEventListener("pointerup", handleUp)
+    window.addEventListener("pointercancel", cancelLink)
+    return () => {
+      window.removeEventListener("pointermove", handleMove)
+      window.removeEventListener("pointerup", handleUp)
+      window.removeEventListener("pointercancel", cancelLink)
+    }
+  }, [pointerLinking, updateLink, completeLink, cancelLink, canvasPoint])
 
   // Initial position only: later date or scale changes keep the user's
   // own scroll, with the Today button as the way back.
@@ -793,6 +1100,81 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
     initialScrollDone.current = true
     scrollToDate(now)
   }, [scrollToDate, now])
+
+  // A drag across empty lane background proposes a new task's dates.
+  const [draftSession, setDraftSession] = React.useState<{
+    rowTaskId: string | null
+    anchorDay: number
+    startDay: number
+    endDay: number
+  } | null>(null)
+  const draftSessionRef = React.useRef(draftSession)
+  React.useEffect(() => {
+    draftSessionRef.current = draftSession
+  })
+
+  /** The day index under a client x, clamped into the rendered range. */
+  const dayIndexAt = React.useCallback(
+    (clientX: number) => {
+      const point = canvasPoint(clientX, 0)
+      if (!point) return 0
+      return clamp(Math.floor(point.x / dayWidth), 0, totalDays - 1)
+    },
+    [canvasPoint, dayWidth, totalDays],
+  )
+
+  const beginDraft = (
+    pointerEvent: React.PointerEvent<HTMLDivElement>,
+    row: GanttRow,
+  ) => {
+    const day = dayIndexAt(pointerEvent.clientX)
+    setDraftSession({
+      rowTaskId: row.task.id,
+      anchorDay: day,
+      startDay: day,
+      endDay: day + 1,
+    })
+  }
+
+  React.useEffect(() => {
+    if (!draftSession) return
+
+    const handleMove = (pointerEvent: PointerEvent) => {
+      const session = draftSessionRef.current
+      if (!session) return
+      if (pointerEvent.buttons === 0) {
+        setDraftSession(null)
+        return
+      }
+      const day = dayIndexAt(pointerEvent.clientX)
+      setDraftSession({
+        ...session,
+        startDay: Math.min(session.anchorDay, day),
+        endDay: Math.max(session.anchorDay, day) + 1,
+      })
+    }
+    const handleUp = () => {
+      const session = draftSessionRef.current
+      setDraftSession(null)
+      if (!session) return
+      openDraft({
+        rowTaskId: session.rowTaskId,
+        start: addDays(range.start, session.startDay),
+        end: addDays(range.start, session.endDay),
+        open: true,
+      })
+    }
+    const handleCancel = () => setDraftSession(null)
+
+    window.addEventListener("pointermove", handleMove)
+    window.addEventListener("pointerup", handleUp)
+    window.addEventListener("pointercancel", handleCancel)
+    return () => {
+      window.removeEventListener("pointermove", handleMove)
+      window.removeEventListener("pointerup", handleUp)
+      window.removeEventListener("pointercancel", handleCancel)
+    }
+  }, [draftSession, dayIndexAt, openDraft, range.start])
 
   const [moveSession, setMoveSession] = React.useState<MoveSession | null>(
     null,
@@ -929,9 +1311,34 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
         insetFocusClassName,
         className,
       )}
+      onKeyDown={(keyEvent) => {
+        if (keyEvent.key === "Escape") {
+          if (linkSession) {
+            keyEvent.stopPropagation()
+            cancelLink()
+          } else if (selectedDependency) {
+            keyEvent.stopPropagation()
+            selectDependency(null)
+          } else if (draft) {
+            keyEvent.stopPropagation()
+            cancelDraft()
+          }
+          return
+        }
+        if (
+          linkable &&
+          selectedDependency &&
+          (keyEvent.key === "Delete" || keyEvent.key === "Backspace")
+        ) {
+          keyEvent.preventDefault()
+          keyEvent.stopPropagation()
+          deleteDependency(selectedDependency)
+        }
+      }}
       {...props}
     >
       <div
+        ref={canvasRef}
         data-slot="gantt-chart-canvas"
         className="relative min-w-full"
         style={{ width: taskListWidth + timelineWidth }}
@@ -942,10 +1349,26 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
           style={{ height: HEADER_HEIGHT }}
         >
           <div
-            className="sticky left-0 z-10 flex shrink-0 items-end border-r border-border bg-background px-3 pb-1 text-xs font-medium text-muted-foreground"
+            className="sticky left-0 z-10 flex shrink-0 items-end gap-1 border-r border-border bg-background pe-3 ps-3 pb-1 text-xs font-medium text-muted-foreground"
             style={{ width: taskListWidth }}
           >
-            {labels.taskListHeader}
+            <span className="min-w-0 flex-1 truncate">
+              {labels.taskListHeader}
+            </span>
+            {columns.map((column) => (
+              <span
+                key={column.key}
+                data-slot="gantt-chart-column-header"
+                data-column={column.key}
+                className={cn(
+                  "shrink-0 truncate",
+                  column.align === "end" && "text-end",
+                )}
+                style={{ width: column.width }}
+              >
+                {column.header}
+              </span>
+            ))}
           </div>
           <div
             className="relative shrink-0"
@@ -1030,7 +1453,40 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
           </div>
           <div className="absolute top-0" style={{ left: taskListWidth }}>
             <DependencyLayer />
+            <LinkRubberBand />
           </div>
+          {draft?.open ? (
+            <div
+              className="absolute top-0"
+              style={{ left: taskListWidth }}
+            >
+              <QuickCreateSlot
+                rowIndex={Math.max(
+                  rows.findIndex((row) => row.task.id === draft.rowTaskId),
+                  0,
+                )}
+              />
+            </div>
+          ) : null}
+          {draftSession ? (
+            <div
+              aria-hidden="true"
+              data-slot="gantt-chart-draft"
+              className="pointer-events-none absolute z-30 rounded-md border-2 border-primary bg-primary/15"
+              style={{
+                left: taskListWidth + draftSession.startDay * dayWidth,
+                width:
+                  (draftSession.endDay - draftSession.startDay) * dayWidth,
+                top:
+                  rows.findIndex(
+                    (row) => row.task.id === draftSession.rowTaskId,
+                  ) *
+                    rowHeight +
+                  BAR_INSET,
+                height: rowHeight - BAR_INSET * 2,
+              }}
+            />
+          ) : null}
           {rows.map((row) => {
             const ghost = ghostFor(row)
             const rowMoving = Boolean(
@@ -1107,17 +1563,43 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
                   )}
                   <span
                     className={cn(
-                      "truncate",
+                      "min-w-0 flex-1 truncate",
                       row.summary && "font-medium",
                     )}
                   >
                     {row.task.name}
                   </span>
+                  {columns.map((column) => (
+                    <span
+                      key={column.key}
+                      data-slot="gantt-chart-task-cell-column"
+                      data-column={column.key}
+                      className={cn(
+                        "shrink-0 truncate text-xs tabular-nums text-muted-foreground",
+                        column.align === "end" && "text-end",
+                      )}
+                      style={{ width: column.width }}
+                    >
+                      {column.render(row.task, row)}
+                    </span>
+                  ))}
                 </div>
                 <div
                   data-slot="gantt-chart-lane"
-                  className="relative shrink-0 border-b border-border/40"
+                  data-task-id={row.task.id}
+                  className="group/lane relative shrink-0 border-b border-border/40"
                   style={{ width: timelineWidth }}
+                  onPointerDown={(pointerEvent) => {
+                    if (!renderQuickCreate) return
+                    if (pointerEvent.button !== 0) return
+                    if (pointerEvent.pointerType === "touch") return
+                    // Only bare lane background starts a draft; a press on a
+                    // bar, handle or ghost belongs to that gesture.
+                    if (pointerEvent.target !== pointerEvent.currentTarget) {
+                      return
+                    }
+                    beginDraft(pointerEvent, row)
+                  }}
                 >
                   <TaskBar
                     row={row}

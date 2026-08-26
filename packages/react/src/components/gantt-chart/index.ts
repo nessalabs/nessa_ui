@@ -2,13 +2,22 @@
 
 /** @responsibility Re-exports the public surface of the GanttChart component system. */
 
-export { GanttChart, GanttChartToolbar, type GanttChartProps, type GanttChartToolbarProps } from "./gantt-chart"
+export {
+  GanttChart,
+  GanttChartToolbar,
+  ganttChartDateColumns,
+  type GanttChartColumn,
+  type GanttChartProps,
+  type GanttChartToolbarProps,
+} from "./gantt-chart"
 export { GanttChartGrid, type GanttChartGridProps } from "./gantt-chart-grid"
 export {
   ganttChartDefaultLabels,
   ganttChartToneVariants,
+  type GanttChartDependencyRef,
   type GanttChartLabels,
   type GanttChartMoveConfirmContext,
+  type GanttChartQuickCreateContext,
   type GanttChartScale,
   type GanttChartTaskRenderContext,
 } from "./gantt-chart-context"

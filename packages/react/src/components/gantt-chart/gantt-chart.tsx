@@ -575,6 +575,9 @@ function GanttChart({
       // A relation that already exists is not offered a second time.
       const successor = tasks.find((task) => task.id === successorId)
       if (!successor) return false
+      // A summary's dates roll up from its children, so it has nothing of
+      // its own for a relation to constrain.
+      if (isSummaryTask(successor, tasks)) return false
       return !taskDependencies(successor).some(
         (dependency) => dependency.taskId === predecessorId,
       )
@@ -843,6 +846,8 @@ function GanttChartToolbar({
     labels,
     scrollToDate,
     pageTimeline,
+    showCriticalPath,
+    setShowCriticalPath,
   } = useGanttChart("GanttChartToolbar")
 
   return (
@@ -885,9 +890,18 @@ function GanttChartToolbar({
       >
         {formatRangeLabel(locale, range)}
       </p>
+      <Button
+        variant={showCriticalPath ? "secondary" : "ghost"}
+        size="sm"
+        className="ms-auto h-7"
+        data-slot="gantt-chart-critical-path-toggle"
+        aria-pressed={showCriticalPath}
+        onClick={() => setShowCriticalPath(!showCriticalPath)}
+      >
+        {labels.criticalPath}
+      </Button>
       <SegmentedControl
         aria-label={labels.scale}
-        className="ms-auto"
         value={scale}
         onValueChange={(next) => setScale(next as GanttChartScale)}
       >
