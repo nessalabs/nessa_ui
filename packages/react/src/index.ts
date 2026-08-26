@@ -627,4 +627,13 @@ export {
   type WorkflowCanvasViewport,
   type WorkflowCanvasViewportTrigger,
 } from "./components/workflow-canvas"
+export {
+  RandomAvatar,
+  randomAvatarHues,
+  randomAvatarTones,
+  type RandomAvatarGround,
+  type RandomAvatarProps,
+  type RandomAvatarTone,
+  type RandomAvatarToneRange,
+} from "./components/random-avatar"
 export { cn } from "./lib/utils"
