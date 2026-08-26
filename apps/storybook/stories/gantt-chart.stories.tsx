@@ -838,12 +838,22 @@ export const QuickCreate: Story = {
     })
     fireEvent.pointerUp(window, { pointerId: 1 })
 
+    // One-shot change + an immediately re-queried click: the dev canvas
+    // can abort and restart a play mid-run on a story's first visit
+    // (storybook module loading suspends), and a long userEvent.type
+    // window loses its keystrokes to the remount — which used to leave a
+    // ghost "(No name)" task behind. vitest never interleaves, but the
+    // story should hold up in both.
     const card = await canvas.findByRole("dialog", { name: "Add task" })
-    await userEvent.type(
+    fireEvent.change(
       within(card).getByRole("textbox", { name: "Task name" }),
-      "Release notes",
+      { target: { value: "Release notes" } },
     )
-    await userEvent.click(within(card).getByRole("button", { name: "Add task" }))
+    await userEvent.click(
+      within(
+        await canvas.findByRole("dialog", { name: "Add task" }),
+      ).getByRole("button", { name: "Add task" }),
+    )
 
     const created = await canvas.findByRole("button", {
       name: /^Release notes,/,
@@ -881,12 +891,14 @@ export const QuickCreate: Story = {
     const keyboardCard = await canvas.findByRole("dialog", {
       name: "Add task",
     })
-    await userEvent.type(
+    fireEvent.change(
       within(keyboardCard).getByRole("textbox", { name: "Task name" }),
-      "QA checklist",
+      { target: { value: "QA checklist" } },
     )
     await userEvent.click(
-      within(keyboardCard).getByRole("button", { name: "Add task" }),
+      within(
+        await canvas.findByRole("dialog", { name: "Add task" }),
+      ).getByRole("button", { name: "Add task" }),
     )
     const typed = await canvas.findByRole("button", {
       name: /^QA checklist,/,
