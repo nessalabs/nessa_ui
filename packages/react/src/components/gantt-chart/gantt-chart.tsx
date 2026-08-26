@@ -133,11 +133,12 @@ export interface GanttChartProps
    */
   confirmMoves?: boolean
   /**
-   * Whether a committed move or resize that shifts a task's finish also
-   * shifts every task that transitively depends on it (`dependsOn`,
-   * followed through the graph) by the same number of days — finish-to-
-   * start scheduling in its simplest push-and-pull form, in both
-   * directions. Off by default so dependency arrows stay purely visual.
+   * Whether a committed move or resize also carries the tasks that
+   * depend on it, following each relation from the predecessor edge that
+   * drives it — so a whole-task move slides the chain, an end-only resize
+   * pushes the finish-driven links, and a start-only resize pushes the
+   * start-driven ones. Off by default so dependency arrows stay purely
+   * visual.
    * While it is on, the built-in confirmation dialog turns the choice
    * per-move — "Move all" versus "Only this" — and either way a host's
    * own `renderMoveConfirm` UI can decide with
@@ -172,9 +173,11 @@ export interface GanttChartProps
     context: GanttChartTaskRenderContext,
   ) => string | undefined
   /**
-   * Whether bars carry link handles that draw a new dependency when
-   * dragged onto another task, and whether arrows can be selected and
-   * deleted. Off by default, so a read-only plan stays read-only.
+   * Whether the chart's dependency editing is available: bars carry link
+   * handles that draw a new relation when dragged onto another task, and
+   * arrows become focusable so they can be selected and deleted. Off by
+   * default, so a read-only plan stays read-only and its arrows add no
+   * tab stops.
    */
   linkable?: boolean
   /** Controlled critical-path highlighting. */
@@ -190,16 +193,21 @@ export interface GanttChartProps
   onDependencySelect?: (dependency: GanttChartDependencyRef) => void
   /**
    * The relation a new link is created with. Defaults to
-   * `"finish-to-start"` — hosts that let users pick a type resolve it
-   * here from the two tasks being joined.
+   * `"finish-to-start"` whichever handle the drag left from; hosts that
+   * want the industry edge mapping (a drag off the start handle making a
+   * start-to-start link, say) read `fromEdge` and return the type they
+   * want.
    */
-  dependencyTypeForNewLink?: (
-    predecessor: GanttChartTask,
-    successor: GanttChartTask,
-  ) => GanttChartDependencyType
+  dependencyTypeForNewLink?: (context: {
+    predecessor: GanttChartTask
+    successor: GanttChartTask
+    /** Which edge of the predecessor the link was drawn from. */
+    fromEdge: "start" | "finish"
+  }) => GanttChartDependencyType
   /**
    * Renders the host's own quick-create UI, positioned at a completed
-   * drag across an empty stretch of a lane. The chart owns the gesture,
+   * drag across an empty stretch of a lane. Pointer-only for now — there
+   * is no keyboard route to open a draft yet. The chart owns the gesture,
    * placement, Escape handling, and focus return; the host owns every
    * pixel of the card and resolves it through the context's
    * `createTask`/`cancel`. Omit to render nothing — the draft then just
@@ -453,6 +461,29 @@ function GanttChart({
     [tasks],
   )
 
+  /**
+   * The day each dependent slides by for a proposed move — the single
+   * derivation the commit applies and the confirmation UI reports, so the
+   * two can never disagree about what a cascade would touch.
+   */
+  const shiftsFor = React.useCallback(
+    (task: GanttChartTask, start: Date, end: Date) =>
+      cascadeShiftDays(
+        tasks,
+        task.id,
+        differenceInCalendarDays(start, task.start),
+        differenceInCalendarDays(end, task.end),
+      ),
+    [tasks],
+  )
+
+  const shiftedIdsFor = React.useCallback(
+    (move: { task: GanttChartTask; start: Date; end: Date }) => [
+      ...shiftsFor(move.task, move.start, move.end).keys(),
+    ],
+    [shiftsFor],
+  )
+
   const commitMove = (
     task: GanttChartTask,
     start: Date,
@@ -464,12 +495,7 @@ function GanttChart({
     // whole-task move slides the chain by one delta while an end-only
     // resize pushes just the links hanging off the finish.
     const shifts = cascade
-      ? cascadeShiftDays(
-          tasks,
-          task.id,
-          differenceInCalendarDays(start, task.start),
-          differenceInCalendarDays(end, task.end),
-        )
+      ? shiftsFor(task, start, end)
       : new Map<string, number>()
     const next = tasks.map((candidate) => {
       if (candidate.id === task.id) return moved
@@ -604,7 +630,11 @@ function GanttChart({
     const successor = tasks.find((task) => task.id === successorId)
     if (!predecessor || !successor) return
     const type =
-      dependencyTypeForNewLink?.(predecessor, successor) ?? "finish-to-start"
+      dependencyTypeForNewLink?.({
+        predecessor,
+        successor,
+        fromEdge: session.fromEdge,
+      }) ?? "finish-to-start"
     const next = tasks.map((task) =>
       task.id === successorId
         ? {
@@ -761,6 +791,7 @@ function GanttChart({
     taskClassName,
     moveDependents,
     dependentIdsOf,
+    shiftedIdsFor,
     pendingMove,
     requestMove,
     adjustMove,

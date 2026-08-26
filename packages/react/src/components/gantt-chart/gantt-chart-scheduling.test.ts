@@ -297,6 +297,24 @@ describe("ganttChartTaskFloatDays", () => {
     assert.equal(floats.get("a"), -2)
   })
 
+  test("passes a constraint on a summary down to its children", () => {
+    const tasks = [
+      task("group", 1, 2),
+      task("early", 1, 5, { parentId: "group" }),
+      task("late", 3, 7, { parentId: "group" }),
+      // Depends on the group, so the group's last child drives it.
+      task("after", 7, 12, { dependsOn: ["group"] }),
+    ]
+    const floats = ganttChartTaskFloatDays(tasks)
+    assert.equal(floats.get("late"), 0)
+    assert.equal(floats.get("group"), 0)
+    assert.equal(floats.get("early"), 2)
+    assert.deepEqual(
+      [...ganttChartCriticalTaskIds(tasks)].sort(),
+      ["after", "group", "late"],
+    )
+  })
+
   test("gives a summary the tightest float beneath it", () => {
     const tasks = [
       task("group", 1, 2),
@@ -307,6 +325,94 @@ describe("ganttChartTaskFloatDays", () => {
     const floats = ganttChartTaskFloatDays(tasks)
     assert.equal(floats.get("tight"), 0)
     assert.equal(floats.get("group"), 0)
+  })
+})
+
+describe("start-to-finish and finish-to-finish behaviour", () => {
+  test("a start-to-finish relation constrains the successor's finish", () => {
+    const predecessor = { start: day(5), end: day(9) }
+    // The successor may not finish before the predecessor starts.
+    assert.equal(
+      dependencyViolationDays(
+        predecessor,
+        { start: day(1), end: day(3) },
+        { taskId: "a", type: "start-to-finish", lagDays: 0 },
+      ),
+      2,
+    )
+    assert.equal(
+      dependencyViolationDays(
+        predecessor,
+        { start: day(1), end: day(6) },
+        { taskId: "a", type: "start-to-finish", lagDays: 0 },
+      ),
+      0,
+    )
+  })
+
+  test("a start-to-finish link cascades off the predecessor's start", () => {
+    const tasks = [
+      task("a", 5, 9),
+      task("b", 1, 6, {
+        dependsOn: [{ taskId: "a", type: "start-to-finish" }],
+      }),
+    ]
+    assert.equal(cascadeShiftDays(tasks, "a", 2, 0).get("b"), 2)
+    assert.equal(cascadeShiftDays(tasks, "a", 0, 2).has("b"), false)
+  })
+
+  test("float flows back through a finish-to-finish link", () => {
+    const tasks = [
+      task("a", 1, 5),
+      task("b", 1, 5, {
+        dependsOn: [{ taskId: "a", type: "finish-to-finish" }],
+      }),
+      task("last", 5, 9, { dependsOn: ["b"] }),
+    ]
+    const floats = ganttChartTaskFloatDays(tasks)
+    assert.equal(floats.get("a"), 0)
+    assert.equal(floats.get("b"), 0)
+  })
+
+  test("a negative lag lets the successor start early without violating", () => {
+    const predecessor = { start: day(1), end: day(10) }
+    assert.equal(
+      dependencyViolationDays(
+        predecessor,
+        { start: day(8), end: day(12) },
+        { taskId: "a", type: "finish-to-start", lagDays: -2 },
+      ),
+      0,
+    )
+    // One day earlier than the lead allows is still a violation.
+    assert.equal(
+      dependencyViolationDays(
+        predecessor,
+        { start: day(7), end: day(12) },
+        { taskId: "a", type: "finish-to-start", lagDays: -2 },
+      ),
+      1,
+    )
+  })
+
+  test("a milestone carries a chain like any other predecessor", () => {
+    const tasks = [
+      task("gate", 5, 5),
+      task("after", 5, 9, { dependsOn: ["gate"] }),
+    ]
+    assert.equal(cascadeShiftDays(tasks, "gate", 3, 3).get("after"), 3)
+    assert.equal(ganttChartTaskFloatDays(tasks).get("gate"), 0)
+  })
+
+  test("a shrinking resize pulls finish-driven dependents back", () => {
+    const tasks = [
+      task("a", 1, 9),
+      task("b", 9, 12, { dependsOn: ["a"] }),
+      task("c", 12, 14, { dependsOn: ["b"] }),
+    ]
+    const shifts = cascadeShiftDays(tasks, "a", 0, -3)
+    assert.equal(shifts.get("b"), -3)
+    assert.equal(shifts.get("c"), -3)
   })
 })
 

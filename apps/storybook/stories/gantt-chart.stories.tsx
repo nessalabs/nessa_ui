@@ -490,6 +490,24 @@ export const DependentCascade: Story = {
       )
     })
 
+    // A start-only resize that pushes a start-driven link must ask too:
+    // the dialog gate reads the same typed propagation the commit runs.
+    const startDriven = canvas.getByRole("button", {
+      name: /^Visual language,/,
+    })
+    startDriven.focus()
+    await userEvent.keyboard("{Shift>}{ArrowRight}{/Shift}")
+    await userEvent.keyboard("{Enter}")
+    const cascadeDialog = await canvas.findByRole("dialog", {
+      name: "Confirm move",
+    })
+    await expect(
+      within(cascadeDialog).getByRole("button", { name: "Move all" }),
+    ).toBeInTheDocument()
+    await userEvent.click(
+      within(cascadeDialog).getByRole("button", { name: "Keep" }),
+    )
+
     // With the option off, the dialog goes back to its plain Move.
     await userEvent.click(
       canvas.getByRole("button", { name: "Cascade dependents" }),
@@ -598,22 +616,52 @@ export const DependencyTypes: Story = {
       '[data-slot="gantt-chart-dependency"]',
     )
     await expect(arrows).toHaveLength(4)
+    // Read-only arrows announce as images: the relation still reaches
+    // assistive tech, but adds no tab stop.
     await expect(
-      canvas.getByRole("button", { name: "Spec to Build, finish to start" }),
+      canvas.getByRole("img", { name: "Spec to Build, finish to start" }),
     ).toBeInTheDocument()
     await expect(
-      canvas.getByRole("button", { name: "Build to Docs, start to start" }),
+      canvas.getByRole("img", { name: "Build to Docs, start to start" }),
     ).toBeInTheDocument()
     await expect(
-      canvas.getByRole("button", {
-        name: "Build to Review, finish to finish",
-      }),
+      canvas.getByRole("img", { name: "Build to Review, finish to finish" }),
     ).toBeInTheDocument()
     await expect(
-      canvas.getByRole("button", {
+      canvas.getByRole("img", {
         name: "Build to Handover, finish to start, 3 days lag",
       }),
     ).toBeInTheDocument()
+    await expect(
+      canvasElement.querySelectorAll(
+        '[data-slot="gantt-chart-dependencies"] [role="button"]',
+      ),
+    ).toHaveLength(0)
+
+    // Routing, not just labelling: each arrow has to leave and arrive at
+    // the edges its relation names, which the path's own endpoints show.
+    const endpoints = (predecessorId: string, successorId: string) => {
+      const path = canvasElement
+        .querySelector(
+          `[data-slot="gantt-chart-dependency"][data-predecessor-id="${predecessorId}"][data-successor-id="${successorId}"] path`,
+        )
+        ?.getAttribute("d") as string
+      const numbers = path.match(/-?\d+(\.\d+)?/g)?.map(Number) ?? []
+      return { fromX: numbers[0], toX: numbers[numbers.length - 1] }
+    }
+    const dayX = (monthDay: number) =>
+      ((d(7, monthDay).getTime() - d(6, 27).getTime()) / 86_400_000) * 40
+
+    // Finish-to-start leaves Spec's finish and arrives at Build's start.
+    const fs = endpoints("spec", "build")
+    await expect(fs.fromX).toBeCloseTo(dayX(10), 0)
+    // Start-to-start leaves Build's start, running back to Docs's start.
+    const ss = endpoints("build", "docs")
+    await expect(ss.fromX).toBeCloseTo(dayX(10), 0)
+    // Finish-to-finish leaves Build's finish and arrives at Review's finish.
+    const ff = endpoints("build", "review")
+    await expect(ff.fromX).toBeCloseTo(dayX(21), 0)
+    await expect(ff.toX).toBeGreaterThan(dayX(20))
   },
 }
 
@@ -640,6 +688,15 @@ export const CriticalPath: Story = {
     await expect(onPath.getAttribute("aria-label")).toContain(
       "On the critical path",
     )
+    // The house rule: prove a visual claim by computed style, since the
+    // class name exists whether or not Tailwind generated the rule.
+    const slack = canvas.getByRole("button", { name: /^Assets,/ })
+    await waitFor(async () => {
+      await expect(getComputedStyle(onPath).boxShadow).not.toBe("none")
+      await expect(getComputedStyle(onPath).boxShadow).not.toBe(
+        getComputedStyle(slack).boxShadow,
+      )
+    })
     // Assets finishes a week before sign-off needs it: seven days of float.
     await expect(
       canvas.getByRole("button", { name: /^Assets,/ }),
@@ -664,12 +721,16 @@ export const DependencyLinking: Story = {
 
     // Keyboard path: activate a handle, then activate the target task.
     await userEvent.click(
-      canvas.getByRole("button", { name: "Link from the finish of Beta release" }),
+      canvas.getByRole("button", {
+        name: "Link from the finish of Docs sprint",
+      }),
     )
-    await userEvent.click(canvas.getByRole("button", { name: /^Docs sprint,/ }))
+    await userEvent.click(
+      canvas.getByRole("button", { name: /^Beta release,/ }),
+    )
 
     const arrow = await canvas.findByRole("button", {
-      name: "Beta release to Docs sprint, finish to start",
+      name: "Docs sprint to Beta release, finish to start",
     })
 
     // Selecting the arrow and pressing Delete takes the link back out.
@@ -679,7 +740,7 @@ export const DependencyLinking: Story = {
     await waitFor(async () => {
       await expect(
         canvas.queryByRole("button", {
-          name: "Beta release to Docs sprint, finish to start",
+          name: "Docs sprint to Beta release, finish to start",
         }),
       ).toBeNull()
     })
@@ -778,10 +839,18 @@ export const QuickCreate: Story = {
     )
     await userEvent.click(within(card).getByRole("button", { name: "Add task" }))
 
-    await canvas.findByRole("button", { name: /^Release notes,/ })
+    const created = await canvas.findByRole("button", {
+      name: /^Release notes,/,
+    })
     await expect(
       canvas.queryByRole("dialog", { name: "Add task" }),
     ).toBeNull()
+    // The task lands on the dragged range, counted in whole days: a drag
+    // from inside day 5 to inside day 8 covers four days at 40px each.
+    await expect(parseFloat(getComputedStyle(created).width)).toBeCloseTo(
+      160,
+      0,
+    )
   },
 }
 

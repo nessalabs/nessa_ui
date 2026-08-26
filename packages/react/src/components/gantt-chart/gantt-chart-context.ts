@@ -50,10 +50,12 @@ export interface GanttChartMoveConfirmContext {
   task: GanttChartTask
   range: GanttChartRange
   /**
-   * Ids of the task's transitive dependents whenever the proposed dates
-   * change its finish (empty otherwise) — the tasks a cascading commit
-   * would shift, listed regardless of the `moveDependents` default so a
-   * host's own confirmation UI can offer the choice either way.
+   * Exactly the tasks a cascading commit would shift, derived from the
+   * proposed dates through each relation's own driving edge — so a
+   * start-only resize lists the start-driven links it pushes and an
+   * end-only one lists none of them. Listed regardless of the
+   * `moveDependents` default so a host's own confirmation UI can offer
+   * the choice either way; empty when nothing would follow.
    */
   dependentTaskIds: string[]
   /**
@@ -483,6 +485,12 @@ export interface GanttChartContextValue {
   moveDependents: boolean
   /** Transitive dependents of a task, in dependency-graph order. */
   dependentIdsOf: (taskId: string) => string[]
+  /** The tasks a proposed move would carry with it, cascade or not. */
+  shiftedIdsFor: (move: {
+    task: GanttChartTask
+    start: Date
+    end: Date
+  }) => string[]
   pendingMove: PendingMove | null
   requestMove: (task: GanttChartTask, start: Date, end: Date) => void
   adjustMove: (task: GanttChartTask, start: Date, end: Date) => void
@@ -545,6 +553,8 @@ export interface LinkSession {
   targetId: string | null
   /** True once a keyboard link is waiting for its target. */
   keyboard: boolean
+  /** The pointer that owns a dragged link; null for the keyboard path. */
+  pointerId: number | null
 }
 
 /** A drag across an empty lane, before the host resolves it. */

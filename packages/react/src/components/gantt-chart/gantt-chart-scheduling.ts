@@ -474,10 +474,11 @@ export function dependencyViolations(tasks: GanttChartTask[]) {
  *
  * The dates on a Gantt task are already scheduled, so this is a backward
  * pass only — a task with no successors may run to the plan's finish, and
- * anything feeding it inherits the latest finish its relations allow.
- * Float 0 (or less, when a relation is already violated) marks the
- * critical chain. Summary rows take the smallest float under them, and a
- * dependency cycle is treated as unconstrained rather than looping.
+ * anything feeding it inherits the latest finish its relations allow,
+ * including the ones sitting on the summaries above it. Float 0 (or less,
+ * when a relation is already violated) marks the critical chain. Summary
+ * rows take the smallest float under them, and a task caught in a
+ * dependency cycle is held to its own finish rather than looping.
  */
 export function ganttChartTaskFloatDays(tasks: GanttChartTask[]) {
   const spanById = new Map(
@@ -539,6 +540,27 @@ export function ganttChartTaskFloatDays(tasks: GanttChartTask[]) {
     return latest
   }
 
+  const byId = new Map(tasks.map((task) => [task.id, task]))
+
+  /**
+   * A leaf also inherits every constraint sitting on the summaries above
+   * it: a summary's finish is its latest child's, so a relation hanging
+   * off the group holds each child to the same date.
+   */
+  const inheritedLatestFinish = (task: GanttChartTask) => {
+    let latest = resolveLatestFinish(task)
+    const seen = new Set([task.id])
+    let parentId = task.parentId
+    while (parentId && !seen.has(parentId)) {
+      seen.add(parentId)
+      const parent = byId.get(parentId)
+      if (!parent) break
+      latest = Math.min(latest, resolveLatestFinish(parent))
+      parentId = parent.parentId
+    }
+    return latest
+  }
+
   const floats = new Map<string, number>()
   for (const task of tasks) {
     if (childrenOf.has(task.id)) continue
@@ -546,7 +568,7 @@ export function ganttChartTaskFloatDays(tasks: GanttChartTask[]) {
     floats.set(
       task.id,
       differenceInCalendarDays(
-        new Date(resolveLatestFinish(task)),
+        new Date(inheritedLatestFinish(task)),
         span.end,
       ),
     )

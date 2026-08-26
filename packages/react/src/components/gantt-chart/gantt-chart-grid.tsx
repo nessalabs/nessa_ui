@@ -94,6 +94,8 @@ interface MoveSession {
   task: GanttChartTask
   /** Whole-task length in days, preserved through a move. */
   durationDays: number
+  /** The pointer that owns this gesture; others are ignored. */
+  pointerId: number
   originX: number
   /** Becomes true once the pointer travels past the drag threshold. */
   started: boolean
@@ -370,6 +372,7 @@ function TaskBar({
                   pointer: null,
                   targetId: null,
                   keyboard: false,
+                  pointerId: pointerEvent.pointerId,
                 })
               }}
               onClick={(clickEvent) => {
@@ -383,6 +386,7 @@ function TaskBar({
                     pointer: null,
                     targetId: null,
                     keyboard: true,
+                    pointerId: null,
                   })
                 }
               }}
@@ -731,6 +735,7 @@ function DependencyLayer() {
     selectedDependency,
     selectDependency,
     onDependencySelect,
+    linkable,
   } = useGanttChart("GanttChartGrid")
   // Instance-scoped marker ids so several charts on one page never collide.
   const baseId = React.useId()
@@ -769,6 +774,7 @@ function DependencyLayer() {
         showCriticalPath &&
         criticalTaskIds.has(dependency.taskId) &&
         criticalTaskIds.has(row.task.id)
+      const violatedDays = violations?.get(dependency.taskId) ?? 0
       arrows.push({
         key: `${dependency.taskId}->${row.task.id}-${dependency.type}`,
         d: dependencyPath({
@@ -782,13 +788,18 @@ function DependencyLayer() {
         }),
         predecessorId: dependency.taskId,
         successorId: row.task.id,
-        label: labels.dependency(
-          from.task.name,
-          row.task.name,
-          labels.dependencyType(dependency.type),
-          dependency.lagDays,
-        ),
-        violated: Boolean(violations?.has(dependency.taskId)),
+        label: (() => {
+          const base = labels.dependency(
+            from.task.name,
+            row.task.name,
+            labels.dependencyType(dependency.type),
+            dependency.lagDays,
+          )
+          return violatedDays
+            ? `${base}.${labels.dependencyViolated(violatedDays)}`
+            : base
+        })(),
+        violated: violatedDays > 0,
         critical,
       })
     }
@@ -841,6 +852,8 @@ function DependencyLayer() {
             data-selected={selected || undefined}
           >
             <path
+              role={linkable ? undefined : "img"}
+              aria-label={linkable ? undefined : arrow.label}
               d={arrow.d}
               fill="none"
               strokeWidth="1.5"
@@ -852,7 +865,10 @@ function DependencyLayer() {
               markerEnd={`url(#${arrow.critical ? criticalMarkerId : markerId})`}
             />
             {/* A fat transparent copy makes the hairline easy to hit and
-                carries the button semantics; the drawn path stays thin. */}
+                carries the button semantics; the drawn path stays thin.
+                Only an editable chart offers it, so a read-only plan adds
+                no tab stops. */}
+            {linkable ? (
             <path
               role="button"
               tabIndex={0}
@@ -883,6 +899,7 @@ function DependencyLayer() {
                 }
               }}
             />
+            ) : null}
           </g>
         )
       })}
@@ -1025,7 +1042,7 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
     collapsedIds,
     toggleCollapsed,
     moveDependents,
-    dependentIdsOf,
+    shiftedIdsFor,
     pendingMove,
     requestMove,
     confirmPendingMove,
@@ -1072,23 +1089,36 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
     if (!pointerLinking) return
 
     const handleMove = (pointerEvent: PointerEvent) => {
+      if (pointerEvent.pointerId !== linkSessionRef.current?.pointerId) return
+      // A pointerup lost to an alt-tab or context menu would otherwise
+      // leave the band glued to the cursor for good.
+      if (pointerEvent.buttons === 0) {
+        cancelLink()
+        return
+      }
       updateLink({
         pointer: canvasPoint(pointerEvent.clientX, pointerEvent.clientY),
       })
     }
-    const handleUp = () => {
+    const ownsPointer = (pointerEvent: PointerEvent) =>
+      pointerEvent.pointerId === linkSessionRef.current?.pointerId
+    const handleUp = (pointerEvent: PointerEvent) => {
+      if (!ownsPointer(pointerEvent)) return
       const session = linkSessionRef.current
       if (session?.targetId) completeLink(session.targetId)
       else cancelLink()
     }
+    const handleCancel = (pointerEvent: PointerEvent) => {
+      if (ownsPointer(pointerEvent)) cancelLink()
+    }
 
     window.addEventListener("pointermove", handleMove)
     window.addEventListener("pointerup", handleUp)
-    window.addEventListener("pointercancel", cancelLink)
+    window.addEventListener("pointercancel", handleCancel)
     return () => {
       window.removeEventListener("pointermove", handleMove)
       window.removeEventListener("pointerup", handleUp)
-      window.removeEventListener("pointercancel", cancelLink)
+      window.removeEventListener("pointercancel", handleCancel)
     }
   }, [pointerLinking, updateLink, completeLink, cancelLink, canvasPoint])
 
@@ -1104,6 +1134,8 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
   // A drag across empty lane background proposes a new task's dates.
   const [draftSession, setDraftSession] = React.useState<{
     rowTaskId: string | null
+    /** The pointer that owns this gesture; others are ignored. */
+    pointerId: number
     anchorDay: number
     startDay: number
     endDay: number
@@ -1130,6 +1162,7 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
     const day = dayIndexAt(pointerEvent.clientX)
     setDraftSession({
       rowTaskId: row.task.id,
+      pointerId: pointerEvent.pointerId,
       anchorDay: day,
       startDay: day,
       endDay: day + 1,
@@ -1142,6 +1175,7 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
     const handleMove = (pointerEvent: PointerEvent) => {
       const session = draftSessionRef.current
       if (!session) return
+      if (pointerEvent.pointerId !== session.pointerId) return
       if (pointerEvent.buttons === 0) {
         setDraftSession(null)
         return
@@ -1153,10 +1187,10 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
         endDay: Math.max(session.anchorDay, day) + 1,
       })
     }
-    const handleUp = () => {
+    const handleUp = (pointerEvent: PointerEvent) => {
       const session = draftSessionRef.current
+      if (!session || pointerEvent.pointerId !== session.pointerId) return
       setDraftSession(null)
-      if (!session) return
       openDraft({
         rowTaskId: session.rowTaskId,
         start: addDays(range.start, session.startDay),
@@ -1164,7 +1198,11 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
         open: true,
       })
     }
-    const handleCancel = () => setDraftSession(null)
+    const handleCancel = (pointerEvent: PointerEvent) => {
+      if (pointerEvent.pointerId === draftSessionRef.current?.pointerId) {
+        setDraftSession(null)
+      }
+    }
 
     window.addEventListener("pointermove", handleMove)
     window.addEventListener("pointerup", handleUp)
@@ -1197,6 +1235,7 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
       kind,
       task: row.task,
       durationDays: differenceInCalendarDays(row.span.end, row.span.start),
+      pointerId: pointerEvent.pointerId,
       originX: pointerEvent.clientX,
       started: false,
       targetStart: row.span.start,
@@ -1210,6 +1249,7 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
     const handleMove = (pointerEvent: PointerEvent) => {
       const session = moveSessionRef.current
       if (!session) return
+      if (pointerEvent.pointerId !== session.pointerId) return
       if (pointerEvent.buttons === 0) {
         setMoveSession(null)
         return
@@ -1264,8 +1304,16 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
       }
     }
 
-    const handleUp = () => settle(true)
-    const handleCancel = () => settle(false)
+    const handleUp = (pointerEvent: PointerEvent) => {
+      if (pointerEvent.pointerId === moveSessionRef.current?.pointerId) {
+        settle(true)
+      }
+    }
+    const handleCancel = (pointerEvent: PointerEvent) => {
+      if (pointerEvent.pointerId === moveSessionRef.current?.pointerId) {
+        settle(false)
+      }
+    }
 
     window.addEventListener("pointermove", handleMove)
     window.addEventListener("pointerup", handleUp)
@@ -1454,6 +1502,18 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
           <div className="absolute top-0" style={{ left: taskListWidth }}>
             <DependencyLayer />
             <LinkRubberBand />
+          </div>
+          <div
+            data-slot="gantt-chart-link-status"
+            aria-live="polite"
+            className="sr-only"
+          >
+            {linkSession
+              ? labels.linkInProgress(
+                  rows.find((row) => row.task.id === linkSession.predecessorId)
+                    ?.task.name ?? "",
+                )
+              : ""}
           </div>
           {draft?.open ? (
             <div
@@ -1684,13 +1744,11 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
                           start: pendingMove.start,
                           end: pendingMove.end,
                         },
-                        dependentTaskIds:
-                          differenceInCalendarDays(
-                            pendingMove.end,
-                            pendingMove.task.end,
-                          ) !== 0
-                            ? dependentIdsOf(pendingMove.task.id)
-                            : [],
+                        // Asked from the same typed propagation the
+                        // commit runs, so a start-only resize that pushes
+                        // start-driven links still gets the choice, and an
+                        // end-only one never over-reports.
+                        dependentTaskIds: shiftedIdsFor(pendingMove),
                         confirm: confirmPendingMove,
                         cancel: cancelPendingMove,
                       })}
