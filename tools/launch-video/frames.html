@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Nessa UI — Components launch video frames</title>
+<style>
+  /* Geist variable fonts: the render script copies these next to this file. */
+  @font-face {
+    font-family: "Geist Variable";
+    font-style: normal;
+    font-display: block;
+    font-weight: 100 900;
+    src: url(./fonts/geist-latin-wght-normal.woff2) format("woff2");
+  }
+  @font-face {
+    font-family: "Geist Mono Variable";
+    font-style: normal;
+    font-display: block;
+    font-weight: 100 900;
+    src: url(./fonts/geist-mono-latin-wght-normal.woff2) format("woff2");
+  }
+
+  /* Nessa UI dark-theme tokens (packages/react/src/theme.css). */
+  :root {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.922 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --destructive: oklch(0.704 0.187 22.216);
+    --destructive-foreground: oklch(0.145 0 0);
+    --border: oklch(1 0 0 / 12%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.708 0 0);
+    --radius: 0.625rem;
+    --thinking-base: oklch(0.54 0.19 264);
+    --thinking-current: oklch(0.67 0.2 306);
+    --thinking-highlight: oklch(0.82 0.12 210);
+    --diff-addition: oklch(0.77 0.17 152);
+    --font-sans: "Geist Variable", "Geist", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, monospace;
+    --ease: cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 1920px; height: 1080px; overflow: hidden;
+    background: var(--background); color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .stage { position: absolute; inset: 0; }
+  .scene { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+
+  /* ---- shared animation plumbing: every element sets --d (delay) and --u (duration) ---- */
+  .rise    { opacity: 0; animation: rise    var(--u, .8s) var(--ease) var(--d, 0s) both; }
+  .fade    { opacity: 0; animation: fade    var(--u, .8s) var(--ease) var(--d, 0s) both; }
+  .fadeout { animation: fadeout var(--u, .5s) var(--ease) var(--d, 0s) both; }
+  @keyframes rise    { from { opacity: 0; transform: translateY(46px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fade    { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes fadeout { from { opacity: 1; } to { opacity: 0; } }
+
+  /* ambient dot grid + glow */
+  .grid-bg {
+    position: absolute; inset: -200px;
+    background-image: radial-gradient(oklch(1 0 0 / 7%) 1.5px, transparent 1.5px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(1200px 800px at 50% 46%, black 0%, transparent 78%);
+    -webkit-mask-image: radial-gradient(1200px 800px at 50% 46%, black 0%, transparent 78%);
+    animation: drift 32s linear 0s both;
+  }
+  @keyframes drift { from { transform: translate(0, 0); } to { transform: translate(-88px, -44px); } }
+  .glow {
+    position: absolute; left: 50%; top: 44%; width: 1500px; height: 900px;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(closest-side,
+      oklch(0.54 0.19 264 / 14%), oklch(0.67 0.2 306 / 7%) 45%, transparent 72%);
+    filter: blur(10px);
+    animation: breathe 29s var(--ease) 0s both;
+  }
+  @keyframes breathe {
+    0% { opacity: .5; } 18% { opacity: 1; } 40% { opacity: .65; }
+    62% { opacity: .95; } 100% { opacity: .55; }
+  }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 12px;
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 10px 22px; font-size: 24px; color: var(--muted-foreground);
+    background: oklch(1 0 0 / 4%);
+  }
+  .chip .dot {
+    width: 12px; height: 12px; border-radius: 999px;
+    background: linear-gradient(120deg, var(--thinking-base), var(--thinking-current), var(--thinking-highlight));
+  }
+
+  .wordmark { font-size: 150px; font-weight: 640; letter-spacing: -0.045em; line-height: 1; }
+  .wordmark .ui {
+    background: linear-gradient(115deg, var(--thinking-base), var(--thinking-current) 55%, var(--thinking-highlight));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .tagline { font-size: 40px; color: var(--muted-foreground); font-weight: 420; letter-spacing: -0.01em; }
+
+  .h2 { font-size: 84px; font-weight: 620; letter-spacing: -0.035em; line-height: 1.05; }
+  .sub { font-size: 32px; color: var(--muted-foreground); font-weight: 420; }
+
+  /* ---- component mocks ---- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    height: 64px; padding: 0 30px; border-radius: 14px;
+    font-size: 26px; font-weight: 540; letter-spacing: -0.01em;
+    border: 1px solid transparent; white-space: nowrap;
+  }
+  .btn-primary { background: var(--primary); color: var(--primary-foreground); }
+  .btn-secondary { background: var(--secondary); color: var(--secondary-foreground); }
+  .btn-outline { background: transparent; border-color: var(--input); color: var(--foreground); }
+  .btn-ghost { background: transparent; color: var(--muted-foreground); }
+  .btn-destructive { background: var(--destructive); color: var(--destructive-foreground); }
+  .press { animation: press .55s var(--ease) var(--d) both; }
+  @keyframes press {
+    0%, 100% { transform: scale(1); }
+    35% { transform: scale(0.955); }
+  }
+
+  .badge {
+    display: inline-flex; align-items: center; height: 44px; padding: 0 20px;
+    border-radius: 999px; font-size: 23px; font-weight: 520;
+    border: 1px solid var(--border); color: var(--foreground); background: oklch(1 0 0 / 5%);
+  }
+  .badge.solid { background: var(--primary); color: var(--primary-foreground); border-color: transparent; }
+  .badge.grad {
+    border-color: transparent; color: white;
+    background: linear-gradient(120deg, var(--thinking-base), var(--thinking-current));
+  }
+
+  .input {
+    display: flex; align-items: center; width: 460px; height: 66px;
+    border: 1px solid var(--input); border-radius: 14px; background: oklch(1 0 0 / 3%);
+    padding: 0 22px; font-size: 26px; color: var(--foreground); position: relative;
+  }
+  .input .ph { color: var(--muted-foreground); position: absolute; animation: fadeout .3s var(--ease) var(--d) both; }
+  .input .typed {
+    display: inline-block; overflow: hidden; white-space: nowrap;
+    max-width: 0; animation: typein var(--u) steps(var(--n)) var(--d) both;
+  }
+  @keyframes typein { from { max-width: 0; } to { max-width: calc(var(--n) * 1ch + 12px); } }
+  .input.focusing::after {
+    content: ""; position: absolute; inset: -5px; border-radius: 18px;
+    border: 3.5px solid var(--ring); opacity: 0;
+    animation: fade .3s var(--ease) var(--d) both;
+  }
+
+  .check-row { display: flex; align-items: center; gap: 18px; font-size: 26px; }
+  .checkbox {
+    width: 40px; height: 40px; border-radius: 10px; border: 2px solid var(--input);
+    display: grid; place-items: center; position: relative;
+  }
+  .checkbox .fill {
+    position: absolute; inset: -2px; border-radius: 10px; background: var(--primary);
+    opacity: 0; animation: fade .25s var(--ease) var(--d) both;
+  }
+  .checkbox svg { position: relative; z-index: 1; }
+  .checkbox .tick {
+    stroke: var(--primary-foreground); stroke-width: 3.2; fill: none;
+    stroke-linecap: round; stroke-linejoin: round;
+    stroke-dasharray: 30; stroke-dashoffset: 30;
+    animation: draw .4s var(--ease) calc(var(--d) + .12s) both;
+  }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+
+  .switch { width: 84px; height: 46px; border-radius: 999px; background: var(--secondary); position: relative; }
+  .switch .track-on {
+    position: absolute; inset: 0; border-radius: 999px; background: var(--primary);
+    opacity: 0; animation: fade .3s var(--ease) var(--d) both;
+  }
+  .switch .thumb {
+    position: absolute; top: 5px; left: 5px; width: 36px; height: 36px; border-radius: 999px;
+    background: var(--foreground); animation: thumbslide .35s var(--ease) var(--d) both;
+  }
+  @keyframes thumbslide { from { transform: translateX(0); background: var(--foreground); }
+                          to { transform: translateX(38px); background: var(--primary-foreground); } }
+
+  .segmented {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px;
+    background: var(--secondary); border-radius: 14px; position: relative; font-size: 24px;
+  }
+  .segmented .opt { position: relative; z-index: 1; padding: 12px 26px; color: var(--muted-foreground); font-weight: 500; }
+  .segmented .opt.first { color: var(--primary-foreground); animation: seg-out .4s var(--ease) var(--d) both; }
+  .segmented .opt.second { animation: seg-in .4s var(--ease) var(--d) both; }
+  @keyframes seg-out { to { color: var(--muted-foreground); } }
+  @keyframes seg-in  { to { color: var(--primary-foreground); } }
+  .segmented .thumb2 {
+    position: absolute; z-index: 0; top: 6px; bottom: 6px; left: 6px; width: 110px;
+    border-radius: 10px; background: var(--primary);
+    animation: seg-slide .4s var(--ease) var(--d) both;
+  }
+  @keyframes seg-slide { to { transform: translateX(112px); } }
+
+  .card {
+    width: 560px; border: 1px solid var(--border); border-radius: 20px;
+    background: var(--card); padding: 34px; display: flex; flex-direction: column; gap: 22px;
+  }
+  .card .title { font-size: 30px; font-weight: 580; letter-spacing: -0.02em; }
+  .card .desc { font-size: 24px; color: var(--muted-foreground); line-height: 1.5; }
+  .card .row { display: flex; gap: 14px; }
+
+  /* ---- scene 3: AI surfaces ---- */
+  .chat {
+    width: 880px; display: flex; flex-direction: column; gap: 26px;
+  }
+  .msg { display: flex; gap: 18px; align-items: flex-start; }
+  .msg .avatar {
+    width: 56px; height: 56px; border-radius: 999px; flex: none;
+    display: grid; place-items: center; font-size: 24px; font-weight: 600;
+  }
+  .avatar.user { background: var(--secondary); color: var(--foreground); }
+  .avatar.ai { background: linear-gradient(130deg, var(--thinking-base), var(--thinking-current)); color: white; }
+  .bubble {
+    border: 1px solid var(--border); background: oklch(1 0 0 / 4%);
+    border-radius: 18px; padding: 22px 28px; font-size: 27px; line-height: 1.5; max-width: 700px;
+  }
+  .msg.user .bubble { background: var(--secondary); border-color: transparent; }
+
+  .thinking {
+    font-size: 27px; font-weight: 520; letter-spacing: -0.01em;
+    background: linear-gradient(100deg,
+      var(--thinking-base) 0%, var(--thinking-current) 30%, var(--thinking-highlight) 50%,
+      var(--thinking-current) 70%, var(--thinking-base) 100%);
+    background-size: 220% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: shimmer 2.1s linear var(--d) 4 both;
+  }
+  @keyframes shimmer { from { background-position: 120% 0; } to { background-position: -100% 0; } }
+
+  .tool {
+    display: inline-flex; align-items: center; gap: 16px;
+    border: 1px solid var(--border); border-radius: 14px; background: oklch(1 0 0 / 3%);
+    padding: 16px 24px; font-family: var(--font-mono); font-size: 23px; color: var(--muted-foreground);
+    position: relative;
+  }
+  .tool .status { position: relative; width: 30px; height: 30px; flex: none; }
+  .tool .spinner {
+    position: absolute; inset: 0; border-radius: 999px;
+    border: 3.5px solid oklch(1 0 0 / 15%); border-top-color: var(--thinking-current);
+    animation: spin .8s linear var(--d) var(--spins, 3), fadeout .2s linear var(--d2) both;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .tool .done {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    color: var(--diff-addition); opacity: 0; animation: fade .25s var(--ease) var(--d2) both;
+  }
+
+  /* ---- scene 4: code panels ---- */
+  .panels { display: flex; gap: 44px; }
+  .panel {
+    width: 700px; border: 1px solid var(--border); border-radius: 20px; background: var(--card);
+    overflow: hidden;
+  }
+  .panel .bar {
+    display: flex; align-items: center; gap: 12px; padding: 20px 26px;
+    border-bottom: 1px solid var(--border); font-size: 23px; color: var(--muted-foreground);
+  }
+  .panel .bar .dots { display: flex; gap: 9px; margin-right: 8px; }
+  .panel .bar .dots i { width: 15px; height: 15px; border-radius: 999px; background: oklch(1 0 0 / 14%); }
+  .panel .body { padding: 30px 30px 34px; font-family: var(--font-mono); font-size: 25px; line-height: 1.9; }
+  .line { display: flex; white-space: pre; }
+  .line .prompt { color: var(--muted-foreground); margin-right: 14px; }
+  .line .cmd {
+    display: inline-block; overflow: hidden; white-space: pre;
+    max-width: 0; animation: typein var(--u) steps(var(--n)) var(--d) both;
+  }
+  .line .ok { color: var(--diff-addition); }
+  .kw { color: var(--thinking-highlight); } .str { color: var(--thinking-current); }
+  .caret {
+    display: inline-block; width: 13px; height: 30px; margin-left: 4px; vertical-align: -5px;
+    background: var(--foreground); animation: blink 1s steps(2) 0s 30;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .footer-note { font-size: 26px; color: var(--muted-foreground); }
+  .kbd {
+    font-family: var(--font-mono); font-size: 23px; border: 1px solid var(--border);
+    border-bottom-width: 3px; border-radius: 9px; padding: 4px 12px; color: var(--foreground);
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="grid-bg"></div>
+  <div class="glow"></div>
+
+  <!-- ============ SCENE 1 · 0.0s – 5.2s ============ -->
+  <div class="scene fadeout" style="--d: 4.7s; --u: .5s;">
+    <div style="display:flex; flex-direction:column; align-items:center; gap:44px;">
+      <div class="chip rise" style="--d:.4s; --u:.7s;"><span class="dot"></span>Introducing Components</div>
+      <div class="wordmark rise" style="--d:.75s; --u:.9s;">Nessa <span class="ui">UI</span></div>
+      <div class="tagline rise" style="--d:1.15s; --u:.9s;">The open design system for Nessa products.</div>
+    </div>
+  </div>
+
+  <!-- ============ SCENE 2 · 5.2s – 12.6s ============ -->
+  <div class="scene fade fadeout2" style="--d:5.2s; --u:.55s; opacity:0; animation: fade .55s var(--ease) 5.2s both, fadeout .5s var(--ease) 12.1s both;">
+    <div style="display:flex; align-items:center; gap:120px;">
+      <div style="width:640px; display:flex; flex-direction:column; gap:30px;">
+        <div class="h2 rise" style="--d:5.5s;">Every primitive,<br/>ready to ship.</div>
+        <div class="sub rise" style="--d:5.8s;">Accessible components built on the shadcn source model — themed by tokens, tested in Storybook.</div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:34px;">
+        <div class="rise" style="--d:6.1s; display:flex; gap:18px; align-items:center;">
+          <span class="btn btn-primary press" style="--d:8.1s;">Get started</span>
+          <span class="btn btn-secondary">Preview</span>
+          <span class="btn btn-outline">Docs</span>
+          <span class="btn btn-ghost">Skip</span>
+          <span class="btn btn-destructive">Delete</span>
+        </div>
+        <div class="rise" style="--d:6.35s; display:flex; gap:16px; align-items:center;">
+          <span class="badge solid">Stable</span>
+          <span class="badge">v2.4.0</span>
+          <span class="badge grad">New</span>
+          <div class="segmented" style="margin-left:14px;">
+            <span class="thumb2" style="--d:9.2s;"></span>
+            <span class="opt first" style="--d:9.2s;">Light</span>
+            <span class="opt second" style="--d:9.2s;">Dark</span>
+          </div>
+        </div>
+        <div class="rise" style="--d:6.6s; display:flex; gap:26px; align-items:center;">
+          <div class="input focusing" style="--d:7.2s;">
+            <span class="ph" style="--d:7.55s;">Search components…</span>
+            <span class="typed" style="--d:7.6s; --u:.9s; --n:12; font-family:var(--font-sans);">button, card</span>
+          </div>
+          <div class="check-row">
+            <span class="checkbox">
+              <span class="fill" style="--d:8.6s;"></span>
+              <svg width="24" height="24" viewBox="0 0 24 24"><path class="tick" style="--d:8.6s;" d="M4.5 12.5l5 5 10-11"/></svg>
+            </span>
+            Accessible
+          </div>
+          <div class="switch"><span class="track-on" style="--d:9.8s;"></span><span class="thumb" style="--d:9.8s;"></span></div>
+        </div>
+        <div class="card rise" style="--d:6.9s;">
+          <div class="title">Design tokens</div>
+          <div class="desc">Semantic color, radius, and motion tokens flow through every component in light and dark.</div>
+          <div class="row"><span class="badge">oklch</span><span class="badge">--radius</span><span class="badge">motion</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SCENE 3 · 12.6s – 19.4s ============ -->
+  <div class="scene" style="opacity:0; animation: fade .55s var(--ease) 12.6s both, fadeout .5s var(--ease) 18.9s both;">
+    <div style="display:flex; align-items:center; gap:130px;">
+      <div style="width:600px; display:flex; flex-direction:column; gap:30px;">
+        <div class="h2 rise" style="--d:12.9s;">Built for<br/>AI interfaces.</div>
+        <div class="sub rise" style="--d:13.2s;">Messages, thinking states, tool calls, diffs, and composers — the surfaces agentic products are made of.</div>
+      </div>
+      <div class="chat">
+        <div class="msg user rise" style="--d:13.5s;">
+          <div class="avatar user">S</div>
+          <div class="bubble">Ship the new onboarding flow to staging.</div>
+        </div>
+        <div class="rise" style="--d:14.2s; padding-left:74px;">
+          <span class="thinking" style="--d:14.3s;">Thinking through the deploy plan…</span>
+        </div>
+        <div class="rise" style="--d:15.3s; padding-left:74px;">
+          <span class="tool">
+            <span class="status">
+              <span class="spinner" style="--d:15.4s; --d2:17.3s; --spins: 3;"></span>
+              <span class="done" style="--d2:17.3s;">
+                <svg width="26" height="26" viewBox="0 0 24 24"><path d="M4.5 12.5l5 5 10-11" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+            </span>
+            pnpm&nbsp;build&nbsp;·&nbsp;deploy&nbsp;--target&nbsp;staging
+          </span>
+        </div>
+        <div class="msg ai rise" style="--d:17.6s;">
+          <div class="avatar ai">N</div>
+          <div class="bubble">Deployed to staging — 42 checks green. Preview is live.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SCENE 4 · 19.4s – 25.6s ============ -->
+  <div class="scene" style="opacity:0; animation: fade .55s var(--ease) 19.4s both, fadeout .5s var(--ease) 25.1s both;">
+    <div style="display:flex; flex-direction:column; align-items:center; gap:60px;">
+      <div style="text-align:center; display:flex; flex-direction:column; gap:22px;">
+        <div class="h2 rise" style="--d:19.7s;">Adopt it your way.</div>
+        <div class="sub rise" style="--d:19.95s;">One source of truth, two install paths.</div>
+      </div>
+      <div class="panels">
+        <div class="panel rise" style="--d:20.3s;">
+          <div class="bar"><span class="dots"><i></i><i></i><i></i></span>React package</div>
+          <div class="body">
+            <div class="line"><span class="prompt">$</span><span class="cmd" style="--d:21.0s; --u:1.3s; --n:24;">pnpm add @nessa-ui/react</span></div>
+            <div class="line fade" style="--d:22.5s; --u:.3s;"><span class="ok">✓ added 1 package in 2.1s</span></div>
+            <div class="line fade" style="--d:22.9s; --u:.3s;"><span><span class="kw">import</span> { Button } <span class="kw">from</span> <span class="str">"@nessa-ui/react"</span></span></div>
+          </div>
+        </div>
+        <div class="panel rise" style="--d:20.55s;">
+          <div class="bar"><span class="dots"><i></i><i></i><i></i></span>shadcn registry</div>
+          <div class="body">
+            <div class="line"><span class="prompt">$</span><span class="cmd" style="--d:21.4s; --u:1.5s; --n:28;">npx shadcn add @nessa/button</span></div>
+            <div class="line fade" style="--d:23.2s; --u:.3s;"><span class="ok">✓ button.tsx written to ui/</span></div>
+            <div class="line fade" style="--d:23.6s; --u:.3s;"><span style="color:var(--muted-foreground);">the source is yours to own</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SCENE 5 · 25.6s – 30.0s ============ -->
+  <div class="scene" style="opacity:0; animation: fade .6s var(--ease) 25.6s both, fadeout .8s var(--ease) 29.2s both;">
+    <div style="display:flex; flex-direction:column; align-items:center; gap:40px;">
+      <div class="wordmark rise" style="--d:25.9s; font-size:130px;">Nessa <span class="ui">UI</span></div>
+      <div class="tagline rise" style="--d:26.25s;">Components, tokens, and AI surfaces — open source.</div>
+      <div class="rise" style="--d:26.7s; display:flex; gap:22px; align-items:center;">
+        <span class="btn btn-primary">github.com/nessalabs/nessa_ui</span>
+        <span class="btn btn-outline">Storybook&nbsp;·&nbsp;<span style="font-family:var(--font-mono); font-size:23px;">./start.sh</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Total timeline length in seconds; read by the render script.
+  window.__DURATION__ = 30.0;
+
+  // Deterministic seek: pause every animation on the page and jump it to t.
+  window.__seek = (t) => {
+    for (const a of document.getAnimations()) {
+      a.pause();
+      a.currentTime = t * 1000;
+    }
+  };
+</script>
+</body>
+</html>
