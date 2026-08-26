@@ -1069,6 +1069,7 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
     cancelDraft,
     columns,
     setTaskListWidth,
+    lockScrollAxis,
   } = useGanttChart("GanttChartGrid")
 
   const timelineWidth = totalDays * dayWidth
@@ -1134,6 +1135,43 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
     initialScrollDone.current = true
     scrollToDate(now)
   }, [scrollToDate, now])
+
+  // React attaches onWheel passively, so taming the scroll takes a native
+  // non-passive listener on the scroller itself (the workflow-canvas
+  // precedent). Each gesture locks to its dominant axis on its first
+  // event and keeps it until a beat of stillness, so trackpad momentum
+  // cannot flip the chart between panning rows and panning the timeline.
+  React.useEffect(() => {
+    if (!lockScrollAxis) return
+    const scroller = scrollerRef.current
+    if (!scroller) return
+    let axis: "x" | "y" | null = null
+    let restTimer = 0
+    const handleWheel = (wheelEvent: WheelEvent) => {
+      // Pinch-zoom arrives as ctrl+wheel; that is not scrolling.
+      if (wheelEvent.ctrlKey) return
+      if (axis === null) {
+        axis =
+          Math.abs(wheelEvent.deltaX) > Math.abs(wheelEvent.deltaY)
+            ? "x"
+            : "y"
+      }
+      window.clearTimeout(restTimer)
+      restTimer = window.setTimeout(() => {
+        axis = null
+      }, 200)
+      wheelEvent.preventDefault()
+      // Line-mode deltas (Firefox wheel) arrive in rows, not pixels.
+      const step = wheelEvent.deltaMode === 1 ? 16 : 1
+      if (axis === "x") scroller.scrollLeft += wheelEvent.deltaX * step
+      else scroller.scrollTop += wheelEvent.deltaY * step
+    }
+    scroller.addEventListener("wheel", handleWheel, { passive: false })
+    return () => {
+      scroller.removeEventListener("wheel", handleWheel)
+      window.clearTimeout(restTimer)
+    }
+  }, [lockScrollAxis, scrollerRef])
 
   // The lanes' keyboard entry point: one roving tab stop, arrows to pick
   // days, Enter to open the host's card — the calendar's day-surface

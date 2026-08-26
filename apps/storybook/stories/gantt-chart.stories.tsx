@@ -211,7 +211,7 @@ export const ProjectPlan: Story = {
 
 export const DayScale: Story = {
   parameters: storyDocumentation(
-    "The day scale zooms each column to a single day and shades weekends. The play test asserts the weekend underlay actually paints (computed background, not class names) and that the scale switcher reports the day option pressed.",
+    "The day scale zooms each column to a single day and shades weekends. Wheel scrolling is axis-locked by default: each gesture commits to its dominant direction, so diagonal trackpad input pans either the rows or the timeline, never both at once (`lockScrollAxis={false}` restores free panning). The play test asserts the weekend underlay actually paints, and that a vertical-dominant wheel gesture with a sideways component moves scrollTop while scrollLeft stays put — and the reverse after the gesture rests.",
   ),
   render: () => <PlanChart defaultScale="day" />,
   play: async ({ canvasElement }) => {
@@ -226,6 +226,25 @@ export const DayScale: Story = {
     await expect(
       getComputedStyle(weekends[0]).backgroundColor,
     ).not.toBe("rgba(0, 0, 0, 0)")
+
+    // A diagonal wheel gesture pans only its dominant axis.
+    const scroller = canvas.getByRole("region", {
+      name: "Project timeline",
+    })
+    scroller.scrollTop = 0
+    const startLeft = scroller.scrollLeft
+    fireEvent.wheel(scroller, { deltaY: 24, deltaX: 9 })
+    fireEvent.wheel(scroller, { deltaY: 24, deltaX: 9 })
+    await expect(scroller.scrollTop).toBeGreaterThan(0)
+    await expect(scroller.scrollLeft).toBe(startLeft)
+
+    // After the gesture rests, a sideways-dominant one takes the other
+    // axis and leaves the rows alone.
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    const restedTop = scroller.scrollTop
+    fireEvent.wheel(scroller, { deltaX: -30, deltaY: 8 })
+    await expect(scroller.scrollLeft).toBe(startLeft - 30)
+    await expect(scroller.scrollTop).toBe(restedTop)
   },
 }
 

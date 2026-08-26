@@ -479,6 +479,7 @@ export interface GanttChartContextValue {
   rowHeight: number
   taskListWidth: number
   setTaskListWidth: (width: number) => void
+  lockScrollAxis: boolean
   scale: GanttChartScale
   setScale: (scale: GanttChartScale) => void
   now: Date

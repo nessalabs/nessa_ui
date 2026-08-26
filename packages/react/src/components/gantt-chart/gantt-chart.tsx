@@ -101,6 +101,13 @@ export interface GanttChartProps
   taskListWidth?: number
   /** Initial task-list width when uncontrolled. Defaults to 224. */
   defaultTaskListWidth?: number
+  /**
+   * Whether wheel scrolling pans one axis at a time: each gesture commits
+   * to its dominant direction, so diagonal input cannot drift the rows
+   * and the timeline together. On by default — pass false for free
+   * two-axis panning.
+   */
+  lockScrollAxis?: boolean
   /** Fires with the next width as the splitter drags or steps. */
   onTaskListWidthChange?: (width: number) => void
   /** Controlled ids of collapsed summary tasks. */
@@ -331,6 +338,7 @@ function GanttChart({
   taskListWidth: taskListWidthProp,
   defaultTaskListWidth = 224,
   onTaskListWidthChange,
+  lockScrollAxis = true,
   collapsedTaskIds: collapsedTaskIdsProp,
   defaultCollapsedTaskIds,
   onCollapsedTaskIdsChange,
@@ -805,6 +813,7 @@ function GanttChart({
     rowHeight,
     taskListWidth,
     setTaskListWidth,
+    lockScrollAxis,
     scale,
     setScale,
     now,
