@@ -605,10 +605,14 @@ const criticalPathTasks: GanttChartTask[] = [
 
 export const DependencyTypes: Story = {
   parameters: storyDocumentation(
-    "All four industry relation types on one plan, plus a lag. `dependsOn` takes a bare id as the finish-to-start shorthand or `{ taskId, type, lagDays }` for the rest, and each arrow leaves and arrives at the edges its relation names — so a start-to-start link runs left edge to left edge rather than pretending to be finish-to-start. The play test asserts one arrow per relation and reads their announcements.",
+    "All four industry relation types on one plan, plus a lag. `dependsOn` takes a bare id as the finish-to-start shorthand or `{ taskId, type, lagDays }` for the rest, and each arrow leaves and arrives at the edges its relation names — so a start-to-start link runs left edge to left edge rather than pretending to be finish-to-start. Shown with `linkable={false}`: a read-only plan's arrows announce as images and add no tab stops. The play test asserts one arrow per relation, reads their announcements, and verifies the routing by each path's own endpoints.",
   ),
   render: () => (
-    <PlanChart defaultTasks={relationTasks} defaultScale="day" />
+    <PlanChart
+      defaultTasks={relationTasks}
+      defaultScale="day"
+      linkable={false}
+    />
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
@@ -713,9 +717,9 @@ export const CriticalPath: Story = {
 
 export const DependencyLinking: Story = {
   parameters: storyDocumentation(
-    "With `linkable`, every bar grows a link handle at each edge: drag one onto another task to draw a relation, or activate it and pick the target from the keyboard. Links that would close a loop are refused, so the target never lights up. Selecting an arrow and pressing Delete removes it. The play test draws a link with the keyboard path, asserts the new arrow exists, then selects and deletes it.",
+    "Dependency editing is on by default: every bar grows a link handle at each edge — drag one onto another task to draw a relation, or activate it and pick the target from the keyboard. Links that would close a loop are refused, so the target never lights up. Selecting an arrow and pressing Delete removes it; `linkable={false}` turns all of it off for a read-only plan. The play test draws a link with the keyboard path, asserts the new arrow exists, then selects and deletes it.",
   ),
-  render: () => <PlanChart linkable />,
+  render: () => <PlanChart />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
 
@@ -1108,6 +1112,11 @@ export const LocalizedLabels: Story = {
         laneSelection: (name, start, end) =>
           `Ligne ${name}, du ${start} au ${end} sélectionné. Entrée pour ajouter.`,
         taskListSplitter: "Redimensionner la liste des tâches",
+        linkFrom: (name, edge) => `Lier depuis ${edge} de ${name}`,
+        linkEdgeStart: "le début",
+        linkEdgeFinish: "la fin",
+        linkInProgress: (name) =>
+          `Liaison depuis ${name}. Choisissez une tâche pour terminer, ou Échap pour annuler.`,
       }}
     />
   ),

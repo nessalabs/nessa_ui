@@ -186,9 +186,9 @@ export interface GanttChartProps
   /**
    * Whether the chart's dependency editing is available: bars carry link
    * handles that draw a new relation when dragged onto another task, and
-   * arrows become focusable so they can be selected and deleted. Off by
-   * default, so a read-only plan stays read-only and its arrows add no
-   * tab stops.
+   * arrows are focusable so they can be selected and deleted. On by
+   * default, like the rescheduling gestures; pass false for a read-only
+   * plan, whose arrows then announce as images and add no tab stops.
    */
   linkable?: boolean
   /** Controlled critical-path highlighting. */
@@ -346,7 +346,7 @@ function GanttChart({
   renderMoveConfirm,
   renderTask,
   taskClassName,
-  linkable = false,
+  linkable = true,
   showCriticalPath: showCriticalPathProp,
   defaultShowCriticalPath = false,
   onShowCriticalPathChange,
