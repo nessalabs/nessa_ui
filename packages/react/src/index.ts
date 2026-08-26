@@ -118,6 +118,12 @@ export {
   type PaginationLinkProps,
 } from "./components/pagination"
 export {
+  TimelineHeader,
+  TimelineHeaderCell,
+  type TimelineHeaderCellProps,
+  type TimelineHeaderProps,
+} from "./components/timeline-header"
+export {
   SegmentedControl,
   SegmentedControlOption,
   type SegmentedControlOptionProps,

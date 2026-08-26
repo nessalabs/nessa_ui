@@ -883,6 +883,23 @@
       ]
     },
     {
+      "name": "timeline-header",
+      "type": "registry:ui",
+      "title": "Timeline header",
+      "description": "The band a horizontal scale lives on: pixel-offset cells with hairline dividers, and labels that pin at a chosen inset while any part of their cell is in view — the GanttChart's two-tier time header, extracted for any horizontally scrolled surface.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/timeline-header.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/timeline-header.tsx"
+        }
+      ]
+    },
+    {
       "name": "gantt-chart",
       "type": "registry:ui",
       "title": "Gantt chart",
@@ -896,6 +913,7 @@
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/popover-surface",
         "nessalabs/nessa_ui/segmented-control",
+        "nessalabs/nessa_ui/timeline-header",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [

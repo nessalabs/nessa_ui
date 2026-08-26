@@ -10,6 +10,10 @@ import { cn } from "@/lib/utils"
 import { Button } from "../button"
 import { PopoverSurface } from "../popover-surface"
 import {
+  TimelineHeader,
+  TimelineHeaderCell,
+} from "../timeline-header"
+import {
   BAR_INSET,
   CONFIRM_CARD_CLEARANCE_PX,
   HEADER_HEIGHT,
@@ -356,7 +360,7 @@ function TaskBar({
                 edge === "start" ? labels.linkEdgeStart : labels.linkEdgeFinish,
               )}
               className={cn(
-                "absolute z-20 size-2.5 rounded-full border border-background bg-muted-foreground opacity-0 hover:bg-foreground",
+                "absolute z-10 size-2.5 rounded-full border border-background bg-muted-foreground opacity-0 hover:bg-foreground",
                 "group-hover/lane:opacity-100 focus-visible:opacity-100 data-[active=true]:opacity-100",
                 surfaceTransitionClassName,
                 insetFocusClassName,
@@ -995,7 +999,10 @@ function QuickCreateSlot({ rowIndex }: { rowIndex: number }) {
   return (
     <div
       data-slot="gantt-chart-quick-create"
-      className="absolute z-50"
+      // z-10 keeps the card above the bars but beneath the pinned task
+      // cells, so it slides under the sidebar like the rest of the
+      // timeline instead of painting over it.
+      className="absolute z-10"
       style={{
         left: clamp(
           left,
@@ -1546,45 +1553,37 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
               </span>
             ))}
           </div>
-          <div
-            className="relative shrink-0"
+          <TimelineHeader
+            className="shrink-0"
             style={{ width: timelineWidth }}
             aria-hidden="true"
           >
             {primaryCells.map((cell) => (
-              <div
+              <TimelineHeaderCell
                 key={cell.key}
-                className="absolute top-0 flex items-center border-l border-border/60 px-2 text-xs font-medium text-muted-foreground"
-                style={{
-                  left: cell.offsetDays * dayWidth,
-                  width: cell.days * dayWidth,
-                  height: PRIMARY_TIER_HEIGHT,
-                }}
+                start={cell.offsetDays * dayWidth}
+                width={cell.days * dayWidth}
+                // Pinned within its own cell, so the label stays readable
+                // while any part of the month is in view.
+                pinLabelInset={taskListWidth + 8}
+                className="top-0 px-2 font-medium"
+                style={{ height: PRIMARY_TIER_HEIGHT }}
               >
-                {/* Pinned within its own cell, so the label stays readable
-                    while any part of the month is in view. */}
-                <span
-                  className="sticky whitespace-nowrap"
-                  style={{ left: taskListWidth + 8 }}
-                >
-                  {cell.label}
-                </span>
-              </div>
+                {cell.label}
+              </TimelineHeaderCell>
             ))}
             {secondaryCells.map((cell) => (
-              <div
+              <TimelineHeaderCell
                 key={cell.key}
-                className="absolute bottom-0 flex items-center justify-center overflow-hidden border-l border-border/60 text-xs text-muted-foreground"
-                style={{
-                  left: cell.offsetDays * dayWidth,
-                  width: cell.days * dayWidth,
-                  height: HEADER_HEIGHT - PRIMARY_TIER_HEIGHT,
-                }}
+                start={cell.offsetDays * dayWidth}
+                width={cell.days * dayWidth}
+                className="bottom-0 justify-center"
+                style={{ height: HEADER_HEIGHT - PRIMARY_TIER_HEIGHT }}
               >
                 <span className="truncate">{cell.label}</span>
-              </div>
+              </TimelineHeaderCell>
             ))}
-          </div>
+          </TimelineHeader>
         </div>
         <div data-slot="gantt-chart-body" className="relative">
           <div
@@ -1684,7 +1683,7 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
               <div
                 aria-hidden="true"
                 data-slot="gantt-chart-draft"
-                className="pointer-events-none absolute z-30 rounded-md border-2 border-primary bg-primary/15"
+                className="pointer-events-none absolute z-10 rounded-md border-2 border-primary bg-primary/15"
                 style={{
                   left: taskListWidth + highlight.startDay * dayWidth,
                   width: (highlight.endDay - highlight.startDay) * dayWidth,
@@ -1850,7 +1849,7 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
                         aria-hidden="true"
                         data-slot="gantt-chart-ghost"
                         className={cn(
-                          "pointer-events-none absolute z-30 rotate-45 rounded-[3px] ring-2 ring-ring",
+                          "pointer-events-none absolute z-10 rotate-45 rounded-[3px] ring-2 ring-ring",
                           ganttChartToneVariants({
                             tone: row.task.tone ?? "primary",
                           }),
@@ -1872,7 +1871,7 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
                         aria-hidden="true"
                         data-slot="gantt-chart-ghost"
                         className={cn(
-                          "pointer-events-none absolute z-30 rounded-md ring-2 ring-ring",
+                          "pointer-events-none absolute z-10 rounded-md ring-2 ring-ring",
                           ganttChartToneVariants({
                             tone: row.task.tone ?? "primary",
                           }),
@@ -1894,7 +1893,7 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
                   {confirming && pendingMove ? (
                     <div
                       data-slot="gantt-chart-move-confirm"
-                      className="absolute z-50"
+                      className="absolute z-10"
                       style={{
                         left: clamp(
                           ghostLeft,
