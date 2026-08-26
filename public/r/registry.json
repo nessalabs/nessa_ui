@@ -1180,6 +1180,23 @@
           "target": "components/ui/table/table-pagination.tsx"
         }
       ]
+    },
+    {
+      "name": "random-avatar",
+      "type": "registry:ui",
+      "title": "Random avatar",
+      "description": "A deterministic generative avatar painted rather than drawn: translucent pools of pigment on tinted paper, bled and granulated by turbulence. Several seeds paint one group picture, an ink ground carries it onto dark surfaces, and it can bloom on mount or keep flooding while an agent works.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/random-avatar.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/random-avatar.tsx"
+        }
+      ]
     }
   ]
 }
