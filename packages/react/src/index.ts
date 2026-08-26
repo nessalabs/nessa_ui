@@ -810,3 +810,8 @@ export {
   type FileTextState,
 } from "./components/file-preview"
 export { cn } from "./lib/utils"
+export {
+  StatusDot,
+  statusDotVariants,
+  type StatusDotProps,
+} from "./components/status-dot"
