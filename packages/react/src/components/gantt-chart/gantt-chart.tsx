@@ -12,6 +12,8 @@ import { SegmentedControl, SegmentedControlOption } from "../segmented-control"
 import {
   GanttChartContext,
   SCALE_DAY_WIDTH,
+  TASK_LIST_MAX_WIDTH,
+  TASK_LIST_MIN_WIDTH,
   flattenTasks,
   ganttChartDefaultLabels,
   useGanttChart,
@@ -41,6 +43,7 @@ import {
   WEEK_LENGTH,
   addDays,
   cascadeShiftDays,
+  clamp,
   dependencyViolations,
   dependentTaskIds,
   differenceInCalendarDays,
@@ -90,8 +93,16 @@ export interface GanttChartProps
   weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6
   /** Rendered height of one task row in pixels. Defaults to 36. */
   rowHeight?: number
-  /** Width of the pinned task-list column in pixels. Defaults to 224. */
+  /**
+   * Controlled width of the pinned task-list column in pixels. The grid's
+   * splitter (and its arrow keys) resize it; leave uncontrolled via
+   * `defaultTaskListWidth` unless the host stores the width itself.
+   */
   taskListWidth?: number
+  /** Initial task-list width when uncontrolled. Defaults to 224. */
+  defaultTaskListWidth?: number
+  /** Fires with the next width as the splitter drags or steps. */
+  onTaskListWidthChange?: (width: number) => void
   /** Controlled ids of collapsed summary tasks. */
   collapsedTaskIds?: string[]
   /** Initial collapsed summaries when uncontrolled. */
@@ -206,8 +217,10 @@ export interface GanttChartProps
   }) => GanttChartDependencyType
   /**
    * Renders the host's own quick-create UI, positioned at a completed
-   * drag across an empty stretch of a lane. Pointer-only for now — there
-   * is no keyboard route to open a draft yet. The chart owns the gesture,
+   * drag across an empty stretch of a lane — or at the keyboard's
+   * selection: providing this prop makes each lane a focusable surface
+   * where arrow keys choose days (Shift extends) and Enter opens the
+   * card, the calendar's day-surface pattern laid on its side. The chart owns the gesture,
    * placement, Escape handling, and focus return; the host owns every
    * pixel of the card and resolves it through the context's
    * `createTask`/`cancel`. Omit to render nothing — the draft then just
@@ -315,7 +328,9 @@ function GanttChart({
   locale,
   weekStartsOn = 1,
   rowHeight = 36,
-  taskListWidth = 224,
+  taskListWidth: taskListWidthProp,
+  defaultTaskListWidth = 224,
+  onTaskListWidthChange,
   collapsedTaskIds: collapsedTaskIdsProp,
   defaultCollapsedTaskIds,
   onCollapsedTaskIdsChange,
@@ -349,6 +364,18 @@ function GanttChart({
     () => defaultTasks ?? [],
   )
   const tasks = tasksProp ?? uncontrolledTasks
+
+  const [uncontrolledTaskListWidth, setUncontrolledTaskListWidth] =
+    React.useState(defaultTaskListWidth)
+  const taskListWidth = taskListWidthProp ?? uncontrolledTaskListWidth
+  const setTaskListWidth = React.useCallback(
+    (width: number) => {
+      const next = clamp(width, TASK_LIST_MIN_WIDTH, TASK_LIST_MAX_WIDTH)
+      if (taskListWidthProp === undefined) setUncontrolledTaskListWidth(next)
+      onTaskListWidthChange?.(next)
+    },
+    [taskListWidthProp, onTaskListWidthChange],
+  )
 
   const [uncontrolledScale, setUncontrolledScale] =
     React.useState(defaultScale)
@@ -673,6 +700,8 @@ function GanttChart({
 
   const [draft, setDraft] = React.useState<DraftRange | null>(null)
 
+  const adjustDraft = (next: DraftRange) => setDraft(next)
+
   const openDraft = (next: DraftRange) => {
     setDraft(next)
     onSelectRange?.({ start: next.start, end: next.end })
@@ -775,6 +804,7 @@ function GanttChart({
     dayWidth,
     rowHeight,
     taskListWidth,
+    setTaskListWidth,
     scale,
     setScale,
     now,
@@ -820,6 +850,7 @@ function GanttChart({
     canLinkTo,
     renderQuickCreate,
     draft,
+    adjustDraft,
     openDraft,
     createFromDraft,
     cancelDraft,

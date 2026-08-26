@@ -802,7 +802,7 @@ function QuickCreateCard({ context }: { context: GanttChartQuickCreateContext })
 
 export const QuickCreate: Story = {
   parameters: storyDocumentation(
-    "Dragging across empty lane background proposes a new task's dates and opens the host's own quick-create card through `renderQuickCreate` — the chart owns the gesture, the highlight, placement and Escape, the host owns every pixel of the card and resolves it with `createTask`/`cancel`. A task drawn on a group's lane joins that group. The play test drags a range, names the task, and asserts it lands on the timeline with the dragged dates.",
+    "Dragging across empty lane background proposes a new task's dates and opens the host's own quick-create card through `renderQuickCreate` — the chart owns the gesture, the highlight, placement and Escape, the host owns every pixel of the card and resolves it with `createTask`/`cancel`. Providing the prop also gives every lane a keyboard surface: arrow keys choose days, Shift extends the selection, Enter opens the card. A task drawn on a group's lane joins that group. The play test exercises both paths and asserts each created task lands with its chosen dates by computed width.",
   ),
   render: () => (
     <PlanChart
@@ -812,8 +812,10 @@ export const QuickCreate: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
+    // The gesture lives on the lane's focusable surface, where a real
+    // pointer lands; the bare lane div underneath no longer listens.
     const lane = canvasElement.querySelector<HTMLElement>(
-      '[data-slot="gantt-chart-lane"][data-task-id="code-freeze"]',
+      '[data-slot="gantt-chart-lane"][data-task-id="code-freeze"] [data-slot="gantt-chart-lane-surface"]',
     ) as HTMLElement
     const laneRect = lane.getBoundingClientRect()
 
@@ -851,16 +853,55 @@ export const QuickCreate: Story = {
       160,
       0,
     )
+
+    // Keyboard path: the lane surface takes arrows for the days, Shift to
+    // extend, and Enter for the card.
+    const surface = canvas.getByRole("button", {
+      name: /^Add to the Docs sprint row/,
+    })
+    surface.focus()
+    await userEvent.keyboard("{ArrowRight}{ArrowRight}")
+    await userEvent.keyboard("{Shift>}{ArrowRight}{/Shift}")
+    await expect(surface.getAttribute("aria-label")).toContain(
+      "Docs sprint row, selected",
+    )
+    const highlight = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="gantt-chart-draft"]',
+    )
+    await expect(highlight).not.toBeNull()
+    await expect(
+      parseFloat(getComputedStyle(highlight as HTMLElement).width),
+    ).toBeCloseTo(80, 0)
+
+    await userEvent.keyboard("{Enter}")
+    const keyboardCard = await canvas.findByRole("dialog", {
+      name: "Add task",
+    })
+    await userEvent.type(
+      within(keyboardCard).getByRole("textbox", { name: "Task name" }),
+      "QA checklist",
+    )
+    await userEvent.click(
+      within(keyboardCard).getByRole("button", { name: "Add task" }),
+    )
+    const typed = await canvas.findByRole("button", {
+      name: /^QA checklist,/,
+    })
+    // Two days selected at the day scale's 40px each.
+    await expect(parseFloat(getComputedStyle(typed).width)).toBeCloseTo(
+      80,
+      0,
+    )
   },
 }
 
 export const TaskColumns: Story = {
   parameters: storyDocumentation(
-    "The task list takes host-defined columns beside the name; `ganttChartDateColumns` covers the usual start/finish/duration trio, and any column can render whatever it likes from the task (here an owner read from `meta`). Summary rows show their rolled-up span, so the group's dates stay consistent with its children. The play test reads a leaf row's duration cell and a summary's rolled-up finish.",
+    "The task list takes host-defined columns beside the name; `ganttChartDateColumns` covers the usual start/finish/duration trio, and any column can render whatever it likes from the task (here an owner read from `meta`). The hairline between the list and the timeline is a real window splitter — focusable, value-reporting, resizable by drag or arrow keys, following the SplitView separator's contract. The play test reads a leaf row's duration cell and a summary's rolled-up finish, then steps the splitter and asserts the pinned column's computed width followed.",
   ),
   render: () => (
     <PlanChart
-      taskListWidth={420}
+      defaultTaskListWidth={420}
       columns={[
         ...ganttChartDateColumns("en-US"),
         {
@@ -906,6 +947,31 @@ export const TaskColumns: Story = {
     await expect(
       engineeringRow.querySelector('[data-column="start"]')?.textContent,
     ).toBe("Aug 22")
+
+    // The splitter steps 16px per arrow and the pinned column follows.
+    const splitter = canvas.getByRole("separator", {
+      name: "Resize the task list",
+    })
+    await expect(splitter).toHaveAttribute("aria-valuenow", "420")
+    splitter.focus()
+    await userEvent.keyboard("{ArrowLeft}{ArrowLeft}")
+    await expect(splitter).toHaveAttribute("aria-valuenow", "388")
+    await waitFor(async () => {
+      const cell = canvasElement.querySelector(
+        '[data-slot="gantt-chart-task-cell"]',
+      ) as HTMLElement
+      await expect(parseFloat(getComputedStyle(cell).width)).toBeCloseTo(
+        388,
+        0,
+      )
+    })
+
+    // The pointer path uses capture on the splitter itself, and the very
+    // first move already applies — no committed-state lag.
+    fireEvent.pointerDown(splitter, { button: 0, pointerId: 7, clientX: 500 })
+    fireEvent.pointerMove(splitter, { pointerId: 7, clientX: 460 })
+    fireEvent.pointerUp(splitter, { pointerId: 7, clientX: 460 })
+    await expect(splitter).toHaveAttribute("aria-valuenow", "348")
   },
 }
 
@@ -1037,6 +1103,11 @@ export const LocalizedLabels: Story = {
           `Déplacer avec ${shortcuts}, puis Entrée pour valider.`,
         taskResizeHint: (shortcuts) =>
           `Redimensionner avec ${shortcuts}.`,
+        laneSchedule: (name) =>
+          `Ajouter à la ligne ${name}. Choisissez les jours avec les flèches, puis Entrée.`,
+        laneSelection: (name, start, end) =>
+          `Ligne ${name}, du ${start} au ${end} sélectionné. Entrée pour ajouter.`,
+        taskListSplitter: "Redimensionner la liste des tâches",
       }}
     />
   ),

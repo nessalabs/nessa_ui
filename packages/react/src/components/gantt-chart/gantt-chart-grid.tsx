@@ -16,6 +16,8 @@ import {
   MILESTONE_SIZE,
   MOVE_THRESHOLD_PX,
   PRIMARY_TIER_HEIGHT,
+  TASK_LIST_MAX_WIDTH,
+  TASK_LIST_MIN_WIDTH,
   fineCells,
   formatDayLabel,
   ganttChartToneVariants,
@@ -1061,10 +1063,12 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
     linkable,
     renderQuickCreate,
     draft,
+    adjustDraft,
     openDraft,
     createFromDraft,
     cancelDraft,
     columns,
+    setTaskListWidth,
   } = useGanttChart("GanttChartGrid")
 
   const timelineWidth = totalDays * dayWidth
@@ -1130,6 +1134,97 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
     initialScrollDone.current = true
     scrollToDate(now)
   }, [scrollToDate, now])
+
+  // The lanes' keyboard entry point: one roving tab stop, arrows to pick
+  // days, Enter to open the host's card — the calendar's day-surface
+  // pattern laid on its side. Only offered while quick-create exists.
+  const [focusedLane, setFocusedLane] = React.useState(0)
+  const activeLane = clamp(focusedLane, 0, Math.max(rows.length - 1, 0))
+
+  const focusLane = (index: number) => {
+    const surfaces = canvasRef.current?.querySelectorAll<HTMLElement>(
+      '[data-slot="gantt-chart-lane-surface"]',
+    )
+    surfaces?.[index]?.focus()
+  }
+
+  /** Today's day index, clamped into the range — the cursor's home. */
+  const homeDay = clamp(
+    differenceInCalendarDays(now, range.start),
+    0,
+    totalDays - 1,
+  )
+
+  const handleLaneKeyDown = (
+    keyEvent: React.KeyboardEvent<HTMLDivElement>,
+    row: GanttRow,
+    rowIndex: number,
+  ) => {
+    const rowDraft =
+      draft && !draft.open && draft.rowTaskId === row.task.id ? draft : null
+    const startDay = rowDraft
+      ? differenceInCalendarDays(rowDraft.start, range.start)
+      : null
+
+    if (keyEvent.key === "ArrowUp" || keyEvent.key === "ArrowDown") {
+      keyEvent.preventDefault()
+      const next = clamp(
+        rowIndex + (keyEvent.key === "ArrowDown" ? 1 : -1),
+        0,
+        rows.length - 1,
+      )
+      if (next !== rowIndex) {
+        setFocusedLane(next)
+        focusLane(next)
+      }
+      return
+    }
+    if (keyEvent.key === "ArrowLeft" || keyEvent.key === "ArrowRight") {
+      keyEvent.preventDefault()
+      const direction = keyEvent.key === "ArrowRight" ? 1 : -1
+      if (keyEvent.shiftKey && rowDraft && startDay !== null) {
+        // Shift grows or shrinks the selection's end, never below a day.
+        const days = differenceInCalendarDays(rowDraft.end, rowDraft.start)
+        const nextDays = clamp(days + direction, 1, totalDays - startDay)
+        adjustDraft({
+          ...rowDraft,
+          end: addDays(rowDraft.start, nextDays),
+        })
+        return
+      }
+      const nextStart =
+        startDay === null
+          ? homeDay
+          : clamp(startDay + direction, 0, totalDays - 1)
+      adjustDraft({
+        rowTaskId: row.task.id,
+        start: addDays(range.start, nextStart),
+        end: addDays(range.start, nextStart + 1),
+        open: false,
+      })
+      return
+    }
+    if (keyEvent.key === "Enter") {
+      keyEvent.preventDefault()
+      // Enter opens the card over the chosen days — or over today when
+      // pressed before any arrows moved the cursor.
+      openDraft(
+        rowDraft
+          ? { ...rowDraft, open: true }
+          : {
+              rowTaskId: row.task.id,
+              start: addDays(range.start, homeDay),
+              end: addDays(range.start, homeDay + 1),
+              open: true,
+            },
+      )
+      return
+    }
+    if (keyEvent.key === "Escape" && rowDraft) {
+      keyEvent.stopPropagation()
+      cancelDraft()
+    }
+  }
 
   // A drag across empty lane background proposes a new task's dates.
   const [draftSession, setDraftSession] = React.useState<{
@@ -1347,7 +1442,40 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
     return null
   }
 
+  // The task-list / timeline boundary follows the SplitView separator's
+  // window-splitter contract: focusable, value-reporting, resizable by
+  // pointer capture or arrow keys. It rides the wrapper (not the pinned
+  // cells), since the boundary never scrolls horizontally.
+  const [splitterSession, setSplitterSession] = React.useState<{
+    pointerId: number
+    originX: number
+    originWidth: number
+  } | null>(null)
+  // Mirrored in a ref so a move arriving before the state commit (the
+  // first frame of a drag, or a synthetic test dispatch) still applies.
+  const splitterSessionRef = React.useRef(splitterSession)
+
+  const handleSplitterKeyDown = (
+    keyEvent: React.KeyboardEvent<HTMLDivElement>,
+  ) => {
+    const steps: Record<string, number> = {
+      ArrowLeft: -16,
+      ArrowRight: 16,
+    }
+    if (keyEvent.key in steps) {
+      keyEvent.preventDefault()
+      setTaskListWidth(taskListWidth + steps[keyEvent.key])
+    } else if (keyEvent.key === "Home") {
+      keyEvent.preventDefault()
+      setTaskListWidth(TASK_LIST_MIN_WIDTH)
+    } else if (keyEvent.key === "End") {
+      keyEvent.preventDefault()
+      setTaskListWidth(TASK_LIST_MAX_WIDTH)
+    }
+  }
+
   return (
+    <div data-slot="gantt-chart-grid" className="relative">
     <div
       ref={scrollerRef}
       data-slot="gantt-chart-scroll"
@@ -1528,26 +1656,45 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
               />
             </div>
           ) : null}
-          {draftSession ? (
-            <div
-              aria-hidden="true"
-              data-slot="gantt-chart-draft"
-              className="pointer-events-none absolute z-30 rounded-md border-2 border-primary bg-primary/15"
-              style={{
-                left: taskListWidth + draftSession.startDay * dayWidth,
-                width:
-                  (draftSession.endDay - draftSession.startDay) * dayWidth,
-                top:
-                  rows.findIndex(
-                    (row) => row.task.id === draftSession.rowTaskId,
-                  ) *
-                    rowHeight +
-                  BAR_INSET,
-                height: rowHeight - BAR_INSET * 2,
-              }}
-            />
-          ) : null}
-          {rows.map((row) => {
+          {(() => {
+            // One highlight serves all three draft states: the live drag,
+            // a keyboard selection being adjusted, and an open card.
+            const highlight = draftSession
+              ? {
+                  rowTaskId: draftSession.rowTaskId,
+                  startDay: draftSession.startDay,
+                  endDay: draftSession.endDay,
+                }
+              : draft
+                ? {
+                    rowTaskId: draft.rowTaskId,
+                    startDay: differenceInCalendarDays(
+                      draft.start,
+                      range.start,
+                    ),
+                    endDay: differenceInCalendarDays(draft.end, range.start),
+                  }
+                : null
+            if (!highlight) return null
+            const rowIndex = rows.findIndex(
+              (row) => row.task.id === highlight.rowTaskId,
+            )
+            if (rowIndex === -1) return null
+            return (
+              <div
+                aria-hidden="true"
+                data-slot="gantt-chart-draft"
+                className="pointer-events-none absolute z-30 rounded-md border-2 border-primary bg-primary/15"
+                style={{
+                  left: taskListWidth + highlight.startDay * dayWidth,
+                  width: (highlight.endDay - highlight.startDay) * dayWidth,
+                  top: rowIndex * rowHeight + BAR_INSET,
+                  height: rowHeight - BAR_INSET * 2,
+                }}
+              />
+            )
+          })()}
+          {rows.map((row, rowIndex) => {
             const ghost = ghostFor(row)
             const rowMoving = Boolean(
               (moveSession?.started &&
@@ -1649,18 +1796,48 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
                   data-task-id={row.task.id}
                   className="group/lane relative shrink-0 border-b border-border/40"
                   style={{ width: timelineWidth }}
-                  onPointerDown={(pointerEvent) => {
-                    if (!renderQuickCreate) return
-                    if (pointerEvent.button !== 0) return
-                    if (pointerEvent.pointerType === "touch") return
-                    // Only bare lane background starts a draft; a press on a
-                    // bar, handle or ghost belongs to that gesture.
-                    if (pointerEvent.target !== pointerEvent.currentTarget) {
-                      return
-                    }
-                    beginDraft(pointerEvent, row)
-                  }}
                 >
+                  {renderQuickCreate ? (
+                    // The surface sits under the bars, so empty background
+                    // takes the drag and the keyboard while every press on
+                    // a bar, handle or ghost still belongs to that gesture.
+                    <div
+                      role="button"
+                      tabIndex={rowIndex === activeLane ? 0 : -1}
+                      data-slot="gantt-chart-lane-surface"
+                      aria-label={
+                        draft && !draft.open && draft.rowTaskId === row.task.id
+                          ? labels.laneSelection(
+                              row.task.name,
+                              formatDayLabel(locale, draft.start),
+                              formatDayLabel(locale, addDays(draft.end, -1)),
+                            )
+                          : labels.laneSchedule(row.task.name)
+                      }
+                      className={cn(
+                        "absolute inset-0 cursor-default",
+                        insetFocusClassName,
+                      )}
+                      onPointerDown={(pointerEvent) => {
+                        if (pointerEvent.button !== 0) return
+                        if (pointerEvent.pointerType === "touch") return
+                        beginDraft(pointerEvent, row)
+                      }}
+                      onKeyDown={(keyEvent) =>
+                        handleLaneKeyDown(keyEvent, row, rowIndex)
+                      }
+                      onFocus={() => setFocusedLane(rowIndex)}
+                      onBlur={() => {
+                        if (
+                          draft &&
+                          !draft.open &&
+                          draft.rowTaskId === row.task.id
+                        ) {
+                          cancelDraft()
+                        }
+                      }}
+                    />
+                  ) : null}
                   <TaskBar
                     row={row}
                     moving={rowMoving}
@@ -1760,6 +1937,67 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
           })}
         </div>
       </div>
+    </div>
+      <div
+        role="separator"
+        tabIndex={0}
+        data-slot="gantt-chart-splitter"
+        data-resizing={splitterSession ? true : undefined}
+        aria-label={labels.taskListSplitter}
+        aria-orientation="vertical"
+        aria-valuenow={Math.round(taskListWidth)}
+        aria-valuemin={TASK_LIST_MIN_WIDTH}
+        aria-valuemax={TASK_LIST_MAX_WIDTH}
+        className={cn(
+          "absolute inset-y-0 z-40 w-px cursor-col-resize touch-none select-none bg-border outline-none",
+          "after:absolute after:inset-y-0 after:-start-1 after:-end-1",
+          "hover:bg-ring/60 data-resizing:bg-ring",
+          "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0",
+        )}
+        style={{ left: taskListWidth - 1 }}
+        onPointerDown={(pointerEvent) => {
+          if (pointerEvent.button !== 0) return
+          try {
+            pointerEvent.currentTarget.setPointerCapture(
+              pointerEvent.pointerId,
+            )
+          } catch {
+            // Synthetic pointer events in tests carry untracked ids.
+          }
+          const session = {
+            pointerId: pointerEvent.pointerId,
+            originX: pointerEvent.clientX,
+            originWidth: taskListWidth,
+          }
+          splitterSessionRef.current = session
+          setSplitterSession(session)
+        }}
+        onPointerMove={(pointerEvent) => {
+          const session = splitterSessionRef.current
+          if (session?.pointerId !== pointerEvent.pointerId) return
+          setTaskListWidth(
+            session.originWidth +
+              (pointerEvent.clientX - session.originX),
+          )
+        }}
+        onPointerUp={(pointerEvent) => {
+          if (splitterSessionRef.current?.pointerId === pointerEvent.pointerId) {
+            splitterSessionRef.current = null
+            setSplitterSession(null)
+          }
+        }}
+        onPointerCancel={(pointerEvent) => {
+          if (splitterSessionRef.current?.pointerId === pointerEvent.pointerId) {
+            splitterSessionRef.current = null
+            setSplitterSession(null)
+          }
+        }}
+        onLostPointerCapture={() => {
+          splitterSessionRef.current = null
+          setSplitterSession(null)
+        }}
+        onKeyDown={handleSplitterKeyDown}
+      />
     </div>
   )
 }

@@ -168,6 +168,12 @@ export interface GanttChartLabels {
   linkEdgeFinish: string
   /** Announced while a link gesture is looking for its target. */
   linkInProgress: (taskName: string) => string
+  /** Announcement of an empty lane's keyboard quick-create surface. */
+  laneSchedule: (taskName: string) => string
+  /** Announcement of a lane holding an active draft selection. */
+  laneSelection: (taskName: string, start: string, end: string) => string
+  /** Accessible name of the task-list resize splitter. */
+  taskListSplitter: string
   /** Fragment marking a bar that sits on the critical path. */
   criticalTask: string
   /** Toolbar toggle that turns critical-path highlighting on and off. */
@@ -239,6 +245,11 @@ export const ganttChartDefaultLabels: GanttChartLabels = Object.freeze({
   linkEdgeFinish: "finish",
   linkInProgress: (taskName: string) =>
     `Linking from ${taskName}. Choose a task to finish the link, or press Escape to cancel.`,
+  laneSchedule: (taskName: string) =>
+    `Add to the ${taskName} row. Use arrow keys to choose days, then press Enter to add a task.`,
+  laneSelection: (taskName: string, start: string, end: string) =>
+    `${taskName} row, selected ${start} to ${end}. Press Enter to add a task.`,
+  taskListSplitter: "Resize the task list",
   criticalTask: " On the critical path.",
   criticalPath: "Critical path",
 })
@@ -277,6 +288,10 @@ export const SCALE_DAY_WIDTH: Record<GanttChartScale, number> = {
   week: 12,
   month: 4,
 }
+
+/** Bounds the splitter may move the task list between. */
+export const TASK_LIST_MIN_WIDTH = 120
+export const TASK_LIST_MAX_WIDTH = 560
 
 /** Height of the two-tier timeline header. */
 export const HEADER_HEIGHT = 44
@@ -463,6 +478,7 @@ export interface GanttChartContextValue {
   dayWidth: number
   rowHeight: number
   taskListWidth: number
+  setTaskListWidth: (width: number) => void
   scale: GanttChartScale
   setScale: (scale: GanttChartScale) => void
   now: Date
@@ -527,6 +543,8 @@ export interface GanttChartContextValue {
     context: GanttChartQuickCreateContext,
   ) => React.ReactNode
   draft: DraftRange | null
+  /** Repositions a keyboard draft without treating it as completed. */
+  adjustDraft: (draft: DraftRange) => void
   openDraft: (draft: DraftRange) => void
   createFromDraft: (
     details?: Partial<Omit<GanttChartTask, "id" | "start" | "end">>,
