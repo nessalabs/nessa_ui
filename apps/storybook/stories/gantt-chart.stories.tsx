@@ -134,7 +134,7 @@ function PlanChart(props: Partial<GanttChartProps>) {
     <GanttChart
       now={storyNow}
       defaultTasks={demoTasks}
-      className="w-[880px] max-w-full"
+      className="h-[540px] w-[880px] max-w-full"
       {...props}
     >
       <GanttChartToolbar />
@@ -231,14 +231,32 @@ export const DayScale: Story = {
 
 export const MonthScale: Story = {
   parameters: storyDocumentation(
-    "The month scale compresses the plan to a portfolio overview: month columns under a year tier. The play test asserts a known bar's computed width matches the scale's four pixels per day.",
+    "The month scale compresses the plan to a portfolio overview: month columns under a year tier. A short plan never huddles in a corner — when a scale's natural width comes up under the viewport, the days stretch to fill the host's box. The play test asserts the fit (the lane spans the viewport) and that bar widths keep their day-count proportions.",
   ),
   render: () => <PlanChart defaultScale="month" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    // Composites spans Sep 3 – Sep 22 exclusive: 19 days × 4px.
-    const bar = await canvas.findByRole("button", { name: /^Composites,/ })
-    await expect(parseFloat(getComputedStyle(bar).width)).toBeCloseTo(76, 0)
+    // The timeline fills the viewport rather than stopping at the
+    // scale's natural width (task list is the default 224px).
+    const scroller = canvas.getByRole("region", { name: "Project timeline" })
+    const lane = canvasElement.querySelector(
+      '[data-slot="gantt-chart-lane"]',
+    ) as HTMLElement
+    await waitFor(async () => {
+      await expect(
+        parseFloat(getComputedStyle(lane).width),
+      ).toBeGreaterThanOrEqual(scroller.clientWidth - 224 - 1)
+    })
+    // Widths keep their day-count proportions: Composites (19 days)
+    // against Primitives (12 days).
+    const composites = await canvas.findByRole("button", {
+      name: /^Composites,/,
+    })
+    const primitives = canvas.getByRole("button", { name: /^Primitives,/ })
+    await expect(
+      parseFloat(getComputedStyle(composites).width) /
+        parseFloat(getComputedStyle(primitives).width),
+    ).toBeCloseTo(19 / 12, 1)
   },
 }
 
@@ -252,6 +270,23 @@ export const GroupCollapse: Story = {
     await expect(
       canvas.queryByRole("button", { name: /^Docs sprint,/ }),
     ).toBeNull()
+
+    // With rows collapsed away, the host's box is taller than the rows:
+    // the filler carries the pinned column to the bottom, so the task
+    // list never falls short of its own frame.
+    const filler = canvasElement.querySelector(
+      '[data-slot="gantt-chart-filler"]',
+    ) as HTMLElement
+    await waitFor(async () => {
+      await expect(
+        parseFloat(getComputedStyle(filler).height),
+      ).toBeGreaterThan(20)
+    })
+    const fillerCell = filler.firstElementChild as HTMLElement
+    await expect(
+      getComputedStyle(fillerCell).backgroundColor,
+    ).not.toBe("rgba(0, 0, 0, 0)")
+    await expect(getComputedStyle(fillerCell).borderRightStyle).toBe("solid")
 
     const toggle = canvas.getByRole("button", { name: "Expand Launch" })
     await expect(toggle).toHaveAttribute("aria-expanded", "false")
@@ -413,7 +448,7 @@ function CascadeDemo() {
       now={storyNow}
       defaultTasks={demoTasks}
       moveDependents={moveDependents}
-      className="w-[880px] max-w-full"
+      className="h-[540px] w-[880px] max-w-full"
     >
       <GanttChartToolbar>
         <Button

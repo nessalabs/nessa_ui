@@ -463,7 +463,33 @@ function GanttChart({
     differenceInCalendarDays(range.end, range.start),
     1,
   )
-  const dayWidth = SCALE_DAY_WIDTH[scale]
+
+  // The host's box also rules the horizontal axis: when a scale's natural
+  // width comes up shorter than the viewport (a two-month plan at the
+  // month scale, say), the days stretch to fill it instead of huddling in
+  // a corner. Measured off the scroller so the splitter and window
+  // resizes re-fit live; the 1px guard keeps a scrollbar toggle from
+  // oscillating the measurement.
+  const [timelineViewport, setTimelineViewport] = React.useState(0)
+  React.useEffect(() => {
+    const scroller = scrollerRef.current
+    if (!scroller) return
+    const measure = () => {
+      const next = scroller.clientWidth - taskListWidth
+      setTimelineViewport((previous) =>
+        Math.abs(previous - next) > 1 ? next : previous,
+      )
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(scroller)
+    return () => observer.disconnect()
+  }, [taskListWidth])
+
+  const dayWidth =
+    timelineViewport > 0
+      ? Math.max(SCALE_DAY_WIDTH[scale], timelineViewport / totalDays)
+      : SCALE_DAY_WIDTH[scale]
 
   const rows = React.useMemo(
     () => flattenTasks(tasks, collapsedIds),
@@ -758,11 +784,11 @@ function GanttChart({
       const scroller = scrollerRef.current
       if (!scroller) return
       const offset =
-        differenceInCalendarDays(date, range.start) * SCALE_DAY_WIDTH[scale]
+        differenceInCalendarDays(date, range.start) * dayWidth
       const visibleTimeline = scroller.clientWidth - taskListWidth
       scroller.scrollLeft = Math.max(offset - visibleTimeline / 3, 0)
     },
-    [range.start, scale, taskListWidth],
+    [range.start, dayWidth, taskListWidth],
   )
 
   const pageTimeline = React.useCallback(
@@ -862,7 +888,7 @@ function GanttChart({
       <div
         data-slot="gantt-chart"
         className={cn(
-          "flex flex-col overflow-hidden rounded-xl border border-border bg-background font-sans text-foreground",
+          "flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-background font-sans text-foreground",
           className,
         )}
         onKeyDown={handleShortcuts}
