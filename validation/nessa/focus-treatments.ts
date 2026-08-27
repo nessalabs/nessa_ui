@@ -28,7 +28,7 @@ type FocusComponent =
   | "input"
   | "conversation-rail"
   | "event-calendar"
-  | "gantt-chart"
+  | "gantt-chart/gantt-chart-grid"
   | "file-diff-list"
   | "kanban/kanban-card"
   | "kanban/kanban-column"
@@ -155,11 +155,22 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     dark: { token: "--ring", opacity: 1 },
   },
   {
-    component: "gantt-chart",
+    component: "gantt-chart/gantt-chart-grid",
     layer: "outline",
     state: "focus-visible",
     className: "focus-visible:outline-ring",
-    count: 5,
+    count: 8,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The task-list splitter follows the SplitView separator's treatment:
+  // a full-strength ring with no offset, on the hairline itself.
+  {
+    component: "gantt-chart/gantt-chart-grid",
+    layer: "ring",
+    state: "focus-visible",
+    className: "focus-visible:ring-ring",
+    count: 1,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -377,8 +388,10 @@ export const focusGeometryClasses = Object.freeze([
   // Every gantt-chart outline draws inset: the bars, collapse toggles, and
   // the scroll region itself all sit inside the scrolling timeline, so an
   // outset outline would be swallowed at the region edges.
-  { component: "gantt-chart", className: "focus-visible:outline-2", count: 5 },
-  { component: "gantt-chart", className: "focus-visible:-outline-offset-2", count: 5 },
+  { component: "gantt-chart/gantt-chart-grid", className: "focus-visible:outline-2", count: 8 },
+  { component: "gantt-chart/gantt-chart-grid", className: "focus-visible:-outline-offset-2", count: 8 },
+  { component: "gantt-chart/gantt-chart-grid", className: "focus-visible:ring-2", count: 1 },
+  { component: "gantt-chart/gantt-chart-grid", className: "focus-visible:ring-offset-0", count: 1 },
   { component: "conversation-rail", className: "focus-visible:outline-2", count: 1 },
   { component: "conversation-rail", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "kanban/kanban-card", className: "focus-visible:outline-2", count: 1 },
