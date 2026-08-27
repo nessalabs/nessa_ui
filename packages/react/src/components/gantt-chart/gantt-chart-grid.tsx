@@ -1032,8 +1032,10 @@ export interface GanttChartGridProps extends React.ComponentProps<"div"> {}
 /**
  * The chart's scrollable body: the pinned task list, the two-tier time
  * header, one lane per visible task, dependency arrows, weekend shading,
- * and the today marker. Scrolls both axes inside a built-in height cap
- * that hosts override with `className`.
+ * and the today marker. Fills whatever box the host gives the chart —
+ * size the `GanttChart` (or a parent) and the grid takes the height left
+ * after the toolbar and scrolls both axes inside it; leave the chart
+ * unsized and it simply grows with its rows.
  */
 function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
   const {
@@ -1482,7 +1484,7 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
   }
 
   return (
-    <div data-slot="gantt-chart-grid" className="relative">
+    <div data-slot="gantt-chart-grid" className="relative min-h-0 flex-1">
     <div
       ref={scrollerRef}
       data-slot="gantt-chart-scroll"
@@ -1490,7 +1492,7 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
       aria-label={labels.timeline}
       tabIndex={0}
       className={cn(
-        "relative max-h-[480px] overflow-auto overscroll-contain",
+        "relative h-full overflow-auto overscroll-contain",
         insetFocusClassName,
         className,
       )}
@@ -1523,12 +1525,12 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
       <div
         ref={canvasRef}
         data-slot="gantt-chart-canvas"
-        className="relative min-w-full"
+        className="relative flex min-h-full min-w-full flex-col"
         style={{ width: taskListWidth + timelineWidth }}
       >
         <div
           data-slot="gantt-chart-header"
-          className="sticky top-0 z-30 flex border-b border-border bg-background"
+          className="sticky top-0 z-30 flex shrink-0 border-b border-border bg-background"
           style={{ height: HEADER_HEIGHT }}
         >
           <div
@@ -1585,16 +1587,12 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
             ))}
           </TimelineHeader>
         </div>
-        <div data-slot="gantt-chart-body" className="relative">
+        <div data-slot="gantt-chart-body" className="relative flex flex-1 flex-col">
           <div
             aria-hidden="true"
             data-slot="gantt-chart-underlay"
-            className="pointer-events-none absolute top-0"
-            style={{
-              left: taskListWidth,
-              width: timelineWidth,
-              height: rowsHeight,
-            }}
+            className="pointer-events-none absolute inset-y-0"
+            style={{ left: taskListWidth, width: timelineWidth }}
           >
             {secondaryCells.map((cell) => (
               <div
@@ -1719,7 +1717,7 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
                 key={row.task.id}
                 data-slot="gantt-chart-row"
                 data-summary={row.summary || undefined}
-                className="flex"
+                className="flex shrink-0"
                 style={{ height: rowHeight }}
               >
                 {/* The cell and the lane each own their bottom border: a
@@ -1934,6 +1932,20 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
               </div>
             )
           })}
+          {/* When the host's box is taller than the rows, the pinned
+              column and its divider keep going — an expanded chart never
+              shows the task list falling short of its own frame. */}
+          <div
+            aria-hidden="true"
+            data-slot="gantt-chart-filler"
+            className="flex min-h-0 flex-1"
+          >
+            <div
+              className="sticky left-0 z-20 shrink-0 border-r border-border bg-background"
+              style={{ width: taskListWidth }}
+            />
+            <div className="shrink-0" style={{ width: timelineWidth }} />
+          </div>
         </div>
       </div>
     </div>
