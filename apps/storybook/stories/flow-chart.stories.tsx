@@ -13,7 +13,7 @@ import {
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/FlowChart",
+  title: "Components/SankeyChart",
   component: FlowChart,
   tags: ["autodocs", "test"],
   parameters: {
