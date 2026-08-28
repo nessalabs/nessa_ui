@@ -5,7 +5,9 @@ import {
   Badge,
   Button,
   ClaudeStreamMapper,
+  CodexStreamMapper,
   claude,
+  codex,
   mapClaudeStream,
   JsonTree,
   Message,
@@ -18,6 +20,14 @@ import {
   MessageScrollerButton,
   MessageScrollerContent,
   MessageScrollerViewport,
+  FileDiffCard,
+  FileDiffCardHeader,
+  FileDiffCardHeading,
+  FileDiffCardIcon,
+  FileDiffCardTitle,
+  FileDiffList,
+  FileDiffListItem,
+  FileDiffPath,
   MermaidDiagram,
   RandomAvatar,
   SegmentedControl,
@@ -66,13 +76,71 @@ import tools from "./fixtures/agent-stream/tools.jsonl?raw"
 import websearch from "./fixtures/agent-stream/websearch.jsonl?raw"
 import workflow from "./fixtures/agent-stream/workflow.jsonl?raw"
 import workflowPhases from "./fixtures/agent-stream/workflow_phases.jsonl?raw"
+// The same scenario matrix recorded from `codex exec --json`.
+import codexDelegate from "./fixtures/agent-stream/codex/delegate.jsonl?raw"
+import codexFailing from "./fixtures/agent-stream/codex/failing.jsonl?raw"
+import codexPatch from "./fixtures/agent-stream/codex/patch.jsonl?raw"
+import codexPlan from "./fixtures/agent-stream/codex/plan.jsonl?raw"
+import codexPrinted from "./fixtures/agent-stream/codex/printed.jsonl?raw"
+import codexResumeOne from "./fixtures/agent-stream/codex/resume_turn1.jsonl?raw"
+import codexResumeTwo from "./fixtures/agent-stream/codex/resume_turn2.jsonl?raw"
+import codexTools from "./fixtures/agent-stream/codex/tools.jsonl?raw"
+import codexWebsearch from "./fixtures/agent-stream/codex/websearch.jsonl?raw"
 // The transcripts the *stream* refuses to carry, read back from the files
 // Claude Code writes under ~/.claude/projects. Keyed by the ids the stream does
 // give: a subagent by its `task_id`, a workflow agent by its `agentId`.
 import diskSubagent from "./fixtures/agent-stream/disk_subagent_a37fefefbc61e13e3.jsonl?raw"
 import diskWorkflowAgent from "./fixtures/agent-stream/disk_workflow_agent_a35ea63276cd501aa.jsonl?raw"
 
+type ProviderId = "claude" | "codex"
+
+/**
+ * What a provider is, and what it supports.
+ *
+ * The panes read `supports` rather than checking the id: a surface that a
+ * provider cannot fill should be absent, not empty, and asking "does this
+ * provider report capabilities" is a question a third provider answers for
+ * itself without this file learning its name.
+ */
+interface Provider {
+  readonly id: ProviderId
+  readonly label: string
+  readonly command: string
+  /** The provider's own mapper, behind the shared interface. */
+  readonly createMapper: () => { push(line: string): readonly AgentEvent[] }
+  readonly supports: {
+    /** Token-level previews. Claude streams; Codex, in this mode, does not. */
+    readonly streaming: boolean
+    /** A session advertisement worth building composer pickers from. */
+    readonly capabilities: boolean
+    /** Structured file edits rather than opaque file tool calls. */
+    readonly fileEdits: boolean
+    /** A phase-and-agent board for a fan-out. */
+    readonly workflowBoard: boolean
+    /** Delegated transcripts addressable on disk from ids the wire gave. */
+    readonly transcriptsOnDisk: boolean
+  }
+}
+
+const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
+  claude: {
+    id: "claude",
+    label: "Claude Code",
+    command: "claude -p --output-format stream-json --include-partial-messages",
+    createMapper: () => new ClaudeStreamMapper(),
+    supports: { streaming: true, capabilities: true, fileEdits: false, workflowBoard: true, transcriptsOnDisk: true },
+  },
+  codex: {
+    id: "codex",
+    label: "Codex",
+    command: "codex exec --json",
+    createMapper: () => new CodexStreamMapper(),
+    supports: { streaming: false, capabilities: false, fileEdits: true, workflowBoard: false, transcriptsOnDisk: true },
+  },
+}
+
 interface Capture {
+  readonly provider: ProviderId
   readonly id: string
   readonly label: string
   readonly blurb: string
@@ -87,15 +155,24 @@ interface Capture {
 }
 
 const CAPTURES: readonly Capture[] = [
-  { id: "printed", label: "Plain text", blurb: "One streamed message and nothing else — the delta path with no tools in the way.", prompt: "Print exactly: hello world. Do not use any tools.", source: printed },
-  { id: "tools", label: "Tools", blurb: "Write, read and a shell command: three calls, three results, one reasoning block.", prompt: "Create a file notes.txt containing three lines of text, then read it back, then run 'wc -l notes.txt'. Keep it brief.", source: tools },
-  { id: "todos", label: "Plan", blurb: "The incremental plan tools — TaskCreate and TaskUpdate — folded into one checklist.", prompt: "Use your todo list to plan and then do these three steps: create a.txt with 'a', create b.txt with 'b', then run 'ls *.txt'. Track each step in your todos.", source: todos },
-  { id: "subagent", label: "Subagent", blurb: "An Explore subagent, its own events filed under the call that spawned it.", prompt: "Use the Explore subagent to find out what files are in this directory, then tell me what it found in one line.", source: subagent },
-  { id: "workflow", label: "Workflow", blurb: "Three parallel agents behind one Workflow call: no inner transcripts, but a full phase-and-agent board with state, cost and results.", prompt: "Use a workflow to run three agents in parallel, each printing a different greeting (hello, hola, bonjour), then summarize what they returned. Keep it tiny.", source: workflow },
-  { id: "phases", label: "Multi-phase workflow", blurb: "Three phases, four agents. Every phase is declared up front, so the ones not reached yet render as pending rather than appearing late.", prompt: "Use a workflow with THREE phases: 'Greet' runs two agents in parallel (hello, hola); 'Translate' runs one (bonjour); 'Summarize' lists all three.", source: workflowPhases },
-  { id: "failing", label: "Failed tool", blurb: "A command that exits non-zero, with the wire's error framing stripped off.", prompt: "Run the command 'cat /nonexistent/definitely-missing-file' and then tell me what happened in one sentence.", source: failing },
-  { id: "websearch", label: "Web search", blurb: "Server-side tools, whose results arrive as structured blocks rather than text.", prompt: "Search the web for the current version of the TypeScript compiler and tell me in one line.", source: websearch },
-  { id: "resume", label: "Resume + model swap", blurb: "Two processes, one session id: a second init, and a model change derived from it.", prompt: "Remember the number 47. Create marker.txt containing it. Then, resumed on Haiku: what number did I ask you to remember?", source: `${resumeOne}\n${resumeTwo}` },
+  { provider: "claude", id: "printed", label: "Plain text", blurb: "One streamed message and nothing else — the delta path with no tools in the way.", prompt: "Print exactly: hello world. Do not use any tools.", source: printed },
+  { provider: "claude", id: "tools", label: "Tools", blurb: "Write, read and a shell command: three calls, three results, one reasoning block.", prompt: "Create a file notes.txt containing three lines of text, then read it back, then run 'wc -l notes.txt'. Keep it brief.", source: tools },
+  { provider: "claude", id: "todos", label: "Plan", blurb: "The incremental plan tools — TaskCreate and TaskUpdate — folded into one checklist.", prompt: "Use your todo list to plan and then do these three steps: create a.txt with 'a', create b.txt with 'b', then run 'ls *.txt'. Track each step in your todos.", source: todos },
+  { provider: "claude", id: "subagent", label: "Subagent", blurb: "An Explore subagent, its own events filed under the call that spawned it.", prompt: "Use the Explore subagent to find out what files are in this directory, then tell me what it found in one line.", source: subagent },
+  { provider: "claude", id: "workflow", label: "Workflow", blurb: "Three parallel agents behind one Workflow call: no inner transcripts, but a full phase-and-agent board with state, cost and results.", prompt: "Use a workflow to run three agents in parallel, each printing a different greeting (hello, hola, bonjour), then summarize what they returned. Keep it tiny.", source: workflow },
+  { provider: "claude", id: "phases", label: "Multi-phase workflow", blurb: "Three phases, four agents. Every phase is declared up front, so the ones not reached yet render as pending rather than appearing late.", prompt: "Use a workflow with THREE phases: 'Greet' runs two agents in parallel (hello, hola); 'Translate' runs one (bonjour); 'Summarize' lists all three.", source: workflowPhases },
+  { provider: "claude", id: "failing", label: "Failed tool", blurb: "A command that exits non-zero, with the wire's error framing stripped off.", prompt: "Run the command 'cat /nonexistent/definitely-missing-file' and then tell me what happened in one sentence.", source: failing },
+  { provider: "claude", id: "websearch", label: "Web search", blurb: "Server-side tools, whose results arrive as structured blocks rather than text.", prompt: "Search the web for the current version of the TypeScript compiler and tell me in one line.", source: websearch },
+  { provider: "claude", id: "resume", label: "Resume + model swap", blurb: "Two processes, one session id: a second init, and a model change derived from it.", prompt: "Remember the number 47. Create marker.txt containing it. Then, resumed on Haiku: what number did I ask you to remember?", source: `${resumeOne}\n${resumeTwo}` },
+  // ---------- Codex ----------
+  { provider: "codex", id: "codex-printed", label: "Plain text", blurb: "One committed message. Codex streams nothing in this mode, which is why live preview has to be optional rather than assumed.", prompt: "Reply with exactly: hello world. Do not run any commands.", source: codexPrinted },
+  { provider: "codex", id: "codex-tools", label: "Tools", blurb: "A file write and a shell command, each an item that opens and settles — the item id is the call id.", prompt: "Create notes.txt with three lines of text, read it back, then run 'wc -l notes.txt'.", source: codexTools },
+  { provider: "codex", id: "codex-plan", label: "Plan", blurb: "The plan republished whole as steps complete, with no step ids — position in the list is the identity.", prompt: "Plan and then do three steps: create a.txt, create b.txt, then run 'ls *.txt'. Track your progress.", source: codexPlan },
+  { provider: "codex", id: "codex-patch", label: "File changes", blurb: "Structured edits: which files changed and how. Claude Code reports the same work only as opaque tool calls.", prompt: "Create greet.py with a function that prints hello, then modify it to take a name argument.", source: codexPatch },
+  { provider: "codex", id: "codex-delegate", label: "Spawned agent", blurb: "A spawned agent writes nothing to this stream; its transcript lives under the receiver thread id.", prompt: "Use a subagent to print three greetings, then summarize.", source: codexDelegate },
+  { provider: "codex", id: "codex-failing", label: "Failed command", blurb: "A non-zero exit code, so failure is a fact the wire states rather than something inferred from prose.", prompt: "Run 'cat /nonexistent/definitely-missing-file' and tell me what happened.", source: codexFailing },
+  { provider: "codex", id: "codex-websearch", label: "Web search", blurb: "A search item, which opens and settles like any other call.", prompt: "Search the web for the current version of the TypeScript compiler.", source: codexWebsearch },
+  { provider: "codex", id: "codex-resume", label: "Resume", blurb: "Two processes, one thread id — a resume is no more visible here than it is on Claude.", prompt: "Remember the number 47… then, resumed: what number did I ask you to remember?", source: `${codexResumeOne}\n${codexResumeTwo}` },
 ]
 
 const LINES = new Map(CAPTURES.map((capture) => [capture.id, capture.source.split("\n").filter((line) => line.trim().length > 0)]))
@@ -126,11 +203,45 @@ interface LiveState {
  * rebuilds, because that is the one case where the accumulated state describes
  * something that is no longer true.
  */
+/**
+ * What this provider can and cannot report.
+ *
+ * Shown rather than hidden because the differences are the interesting part:
+ * a surface missing for Codex is missing because the wire does not carry it,
+ * and a reader comparing the two should be able to see that without opening
+ * the raw pane.
+ */
+function ProviderSupport({ provider }: { provider: Provider }) {
+  const features = [
+    ["streams tokens", provider.supports.streaming],
+    ["session capabilities", provider.supports.capabilities],
+    ["structured file edits", provider.supports.fileEdits],
+    ["workflow board", provider.supports.workflowBoard],
+    ["transcripts on disk", provider.supports.transcriptsOnDisk],
+  ] as const
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="provider-support">
+      <code className="text-muted-foreground">{provider.command}</code>
+      {features.map(([label, supported]) => (
+        <Badge key={label} variant={supported ? "secondary" : "outline"} className={supported ? "" : "opacity-60"}>
+          {supported ? label : `no ${label}`}
+        </Badge>
+      ))}
+    </div>
+  )
+}
+
+/** Which provider a capture came from. */
+function providerOf(captureId: string): ProviderId {
+  return CAPTURES.find((entry) => entry.id === captureId)?.provider ?? "claude"
+}
+
 function useLiveTranscript(captureId: string, count: number, live: boolean): LiveState {
   const state = React.useRef<{
     captureId: string
     count: number
-    mapper: ClaudeStreamMapper
+    mapper: { push(line: string): readonly AgentEvent[] }
     builder: TranscriptBuilder
     buffers: Map<string, string>
     events: AgentEvent[]
@@ -143,7 +254,7 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
     current = {
       captureId,
       count: 0,
-      mapper: new ClaudeStreamMapper(),
+      mapper: PROVIDERS[providerOf(captureId)].createMapper(),
       builder: new TranscriptBuilder(),
       buffers: new Map(),
       events: [],
@@ -152,14 +263,21 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
     state.current = current
   }
 
-  for (let index = current.count; index < count; index += 1) {
-    const mapped = current.mapper.push(lines[index]!)
+  // Clamped to the capture that is actually loaded. `count` is state and the
+  // capture can change under it — switching provider mid-playback leaves the
+  // previous capture's line count in place for a render, and reading past the
+  // end of the new one hands the mapper an undefined line.
+  const target = Math.min(count, lines.length)
+  for (let index = current.count; index < target; index += 1) {
+    const line = lines[index]
+    if (line === undefined) break
+    const mapped = current.mapper.push(line)
     current.produced.push(mapped.length)
     current.events.push(...mapped)
     current.builder.push(mapped)
     applyDeltas(mapped, current.buffers)
   }
-  current.count = count
+  current.count = target
 
   return {
     events: current.events,
@@ -521,13 +639,58 @@ function WorkRow({ item, transcript, previews }: { item: WorkItem; transcript: T
       </Message>
     )
   }
+  if (payload.type === "file_edits") {
+    // A provider that reports edits as structure gets the design system's own
+    // changed-file surface; one that does not simply never emits this, and the
+    // row is absent rather than empty.
+    if (payload.edits.length === 0) return null
+    return (
+      <FileDiffCard defaultExpanded itemCount={payload.edits.length} data-testid="file-edits">
+        <FileDiffCardHeader>
+          <FileDiffCardIcon>
+            <EditIcon />
+          </FileDiffCardIcon>
+          <FileDiffCardHeading>
+            <FileDiffCardTitle>
+              {`Changed ${payload.edits.length} file${payload.edits.length === 1 ? "" : "s"}`}
+            </FileDiffCardTitle>
+          </FileDiffCardHeading>
+        </FileDiffCardHeader>
+        <FileDiffList aria-label="Changed files">
+          {payload.edits.map((edit) => (
+            <FileDiffListItem key={edit.path}>
+              <FileDiffPath path={edit.path} />
+              <Badge variant="outline" className="ml-auto">
+                {edit.change}
+              </Badge>
+            </FileDiffListItem>
+          ))}
+        </FileDiffList>
+      </FileDiffCard>
+    )
+  }
   if (payload.type === "error") {
     return <p className="text-destructive text-xs">{payload.message}</p>
   }
   return null
 }
 
-function TranscriptView({ transcript, previews, prompt }: { transcript: Transcript; previews: DeltaBuffers; prompt: string }) {
+/** A field a provider left unset, so the surface can omit it rather than print a placeholder. */
+function known(value: string | null | undefined): string | null {
+  return value === undefined || value === null || value === "" || value === "unknown" ? null : value
+}
+
+function TranscriptView({
+  transcript,
+  previews,
+  prompt,
+  provider,
+}: {
+  transcript: Transcript
+  previews: DeltaBuffers
+  prompt: string
+  provider: Provider
+}) {
   const session = transcript.session
   // A model change is the one session-level shift the stream actually proves;
   // "resumed" is not on the wire at all, so nothing here claims it.
@@ -536,8 +699,12 @@ function TranscriptView({ transcript, previews, prompt }: { transcript: Transcri
   return (
     <div className="flex h-full flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge>{session?.model ?? "no session yet"}</Badge>
-        {session === null ? null : <Badge variant="secondary">{session.permissionMode}</Badge>}
+        {/* Codex's thread line names no model or sandbox, so those badges are
+            absent rather than reading "unknown" — the provider did not say. */}
+        <Badge>{session === null ? "no session yet" : known(session.model) ?? provider.label}</Badge>
+        {known(session?.permissionMode) === null ? null : (
+          <Badge variant="secondary">{session!.permissionMode}</Badge>
+        )}
         {transcript.sessions.length > 1 ? <Badge variant="outline">{transcript.sessions.length} inits</Badge> : null}
         {modelSwap === null ? null : <Badge variant="outline">{`model → ${modelSwap}`}</Badge>}
         {transcript.usage === null ? null : (
@@ -861,12 +1028,20 @@ function InspectorView({
   onCloseTranscript: () => void
 }) {
   const [pane, setPane] = React.useState<"raw" | "events" | "capabilities">("raw")
-  const capabilities = React.useMemo(() => claude.sessionCapabilities(events), [events])
+  const provider = PROVIDERS[providerOf(captureId)]
+  // Only Claude advertises its commands, skills and servers; asking Codex's
+  // events for them would answer null, and a pane that is always empty is
+  // worse than a pane that is absent.
+  const capabilities = React.useMemo(
+    () => (provider.supports.capabilities ? claude.sessionCapabilities(events) : null),
+    [events, provider],
+  )
   const [selected, setSelected] = React.useState(0)
   const lines = (LINES.get(captureId) ?? []).slice(0, count)
   const line = lines[Math.min(selected, Math.max(lines.length - 1, 0))]
   const decoded = line === undefined ? null : (JSON.parse(line) as unknown)
   const selectedEvent = events[Math.min(selected, Math.max(events.length - 1, 0))]
+  const shownPane = pane === "capabilities" && !provider.supports.capabilities ? "raw" : pane
 
   // An opened transcript takes the panel over: it is a different conversation,
   // not another view of this one.
@@ -877,14 +1052,16 @@ function InspectorView({
       <SegmentedControl aria-label="Inspector pane" value={pane} onValueChange={(value) => setPane(value as "raw" | "events" | "capabilities")}>
         <SegmentedControlOption value="raw">Raw wire ({lines.length})</SegmentedControlOption>
         <SegmentedControlOption value="events">Events ({events.length})</SegmentedControlOption>
-        <SegmentedControlOption value="capabilities">Capabilities</SegmentedControlOption>
+        {provider.supports.capabilities ? (
+          <SegmentedControlOption value="capabilities">Capabilities</SegmentedControlOption>
+        ) : null}
       </SegmentedControl>
 
-      {pane === "capabilities" ? (
+      {shownPane === "capabilities" ? (
         <div className="min-h-0 flex-1 overflow-auto">
           <CapabilitiesView capabilities={capabilities} />
         </div>
-      ) : pane === "raw" ? (
+      ) : shownPane === "raw" ? (
         <div className="flex min-h-0 flex-1 flex-col gap-2">
           <ul className="border-border h-40 shrink-0 overflow-auto rounded-xl border p-1 font-mono text-xs" data-testid="raw-lines">
             {lines.map((entry, index) => {
@@ -908,7 +1085,10 @@ function InspectorView({
             })}
           </ul>
           <p className="text-muted-foreground text-xs">
-            {`→ n is how many events the line produced. ${produced.filter((entry) => entry === 0).length} of ${produced.length} produce none: message_start is the mapper's join key, message_stop and message_delta repeat what result carries, signature_delta signs a thinking block, and a steady-state rate limit has nothing to act on.`}
+            {`→ n is how many events the line produced. ${produced.filter((entry) => entry === 0).length} of ${produced.length} produce none: `}
+            {provider.id === "claude"
+              ? "message_start is the mapper's join key, message_stop and message_delta repeat what result carries, signature_delta signs a thinking block, and a steady-state rate limit has nothing to act on."
+              : "turn.started is a bare marker, and an item that is reported whole on completion says nothing when it opens."}
           </p>
           <div className="border-border min-h-0 flex-1 overflow-auto rounded-xl border p-3">
             {decoded === null ? null : <JsonTree value={decoded} collapsible defaultExpandedDepth={2} />}
@@ -1017,6 +1197,16 @@ function OpenedTranscript({ ref_, onClose }: { ref_: claude.TranscriptRef; onClo
 
 function Explorer({ initialCapture = "tools", autoplay = false }: { initialCapture?: string; autoplay?: boolean }) {
   const [captureId, setCaptureId] = React.useState(initialCapture)
+  const provider = PROVIDERS[providerOf(captureId)]
+  const captures = CAPTURES.filter((entry) => entry.provider === provider.id)
+
+  // Switching provider lands on that provider's first capture, so the two
+  // sides are compared on the same scenario rather than on whatever the old
+  // selection happened to be.
+  const switchProvider = (next: string) => {
+    const first = CAPTURES.find((entry) => entry.provider === next)
+    if (first !== undefined) setCaptureId(first.id)
+  }
   const lines = LINES.get(captureId) ?? []
   const [count, setCount] = React.useState(autoplay ? 0 : lines.length)
   const [playing, setPlaying] = React.useState(autoplay)
@@ -1065,8 +1255,15 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
     <OpenTranscript.Provider value={setOpened}>
     <div className="border-border bg-background flex h-[42rem] w-full flex-col gap-3 rounded-3xl border p-4">
       <div className="flex flex-wrap items-center gap-2">
+        <SegmentedControl aria-label="Provider" value={provider.id} onValueChange={switchProvider}>
+          {Object.values(PROVIDERS).map((entry) => (
+            <SegmentedControlOption key={entry.id} value={entry.id}>
+              {entry.label}
+            </SegmentedControlOption>
+          ))}
+        </SegmentedControl>
         <SegmentedControl aria-label="Capture" value={captureId} onValueChange={setCaptureId}>
-          {CAPTURES.map((entry) => (
+          {captures.map((entry) => (
             <SegmentedControlOption key={entry.id} value={entry.id}>
               {entry.label}
             </SegmentedControlOption>
@@ -1088,10 +1285,16 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
         </div>
       </div>
       <p className="text-muted-foreground text-xs">{capture?.blurb}</p>
+      <ProviderSupport provider={provider} />
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="border-border min-h-0 overflow-hidden rounded-2xl border p-3">
-          <TranscriptView transcript={transcript} previews={previews} prompt={capture?.prompt ?? ""} />
+          <TranscriptView
+            transcript={transcript}
+            previews={previews}
+            prompt={capture?.prompt ?? ""}
+            provider={provider}
+          />
         </div>
         <div className="border-border min-h-0 rounded-2xl border p-3">
           <InspectorView
@@ -1321,6 +1524,34 @@ const FLOW = `sequenceDiagram
     Note over Build: the turn closes and is assembled<br/>once, never recomputed
     Build->>UI: snapshot
 `
+
+export const Providers: Story = {
+  parameters: storyDocumentation(
+    "The same views over a different agent. Switching provider swaps only the wire module and the mapper — the transcript, the tool rows, the plan and the raw inspector are the shared layer, unchanged. What differs is what each wire can say: the strip under the captures names it, and a surface a provider cannot fill is absent rather than empty. Codex reports structured file changes, which Claude Code does not; Claude advertises its commands, skills and MCP servers, which Codex does not.",
+  ),
+  args: { initialCapture: "codex-patch" },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+
+    // Codex reports which files changed and how, so the changed-file surface
+    // is present…
+    await waitFor(async () => {
+      await expect(canvas.getByTestId("file-edits")).toBeInTheDocument()
+    })
+    // …and the capabilities pane, which needs a session advertisement Codex
+    // does not send, is absent rather than empty.
+    await expect(canvas.queryByRole("button", { name: "Capabilities" })).toBeNull()
+
+    // Switching provider lands on that provider's own captures and restores
+    // the surfaces its wire supports.
+    await userEvent.click(canvas.getByRole("button", { name: "Claude Code" }))
+    await waitFor(async () => {
+      await expect(canvas.getByRole("button", { name: "Capabilities" })).toBeInTheDocument()
+    })
+    await expect(canvas.queryByTestId("file-edits")).toBeNull()
+    await expect(canvas.getByTestId("provider-support")).toHaveTextContent("streams tokens")
+  },
+}
 
 export const Architecture: Story = {
   parameters: storyDocumentation(

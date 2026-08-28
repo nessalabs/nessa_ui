@@ -18,7 +18,7 @@ change; the sources below are always current, and this is not.**
 | What is in an event? | `events.ts` — the contract, with every payload variant documented |
 | How do I actually use it? | `agent-stream.test.ts` — executable examples against real captures |
 | Why is the wire like this? | [docs/architecture/agent-stream-parsers.md](../../docs/architecture/agent-stream-parsers.md) |
-| What does the data look like? | `apps/storybook/stories/fixtures/agent-stream/*.jsonl` |
+| What does the data look like? | `apps/storybook/stories/fixtures/agent-stream/*.jsonl`, and `codex/` beside it |
 | What does it look like rendered? | Storybook → Composites → AgentStream |
 
 ## The shape of the thing
@@ -96,7 +96,9 @@ nothing, with the reason), and a mapper implementing the shared mapper
 interface. Export it namespaced, never flat — two star-exports sharing a name
 silently elide the symbol.
 
-`claude/` is the worked example. Copy its shape, not its vocabulary.
+`claude/` and `codex/` are two worked examples. Copy their shape, not their
+vocabulary — and read both before assuming a rule generalizes: what looks like
+a property of agents is often a property of the one you started with.
 
 Three contracts are enforced by `pnpm validate`, so the check will tell you if
 you drift: no TypeScript enums for wire vocabularies (an enum is nominal and

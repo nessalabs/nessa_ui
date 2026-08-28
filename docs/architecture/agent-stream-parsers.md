@@ -41,8 +41,18 @@ lib/agent-stream/
     tools.ts       Claude's tool names → ToolKind           ← provider
     capabilities.ts  Claude's init → pickers                ← provider
     store.ts       Claude Code's on-disk layout             ← provider
-  codex/           ← a second harness is a folder, nothing else moves
+  codex/
+    wire.ts        Codex's line shapes + vocabularies       ← provider
+    mapping.ts     Codex's kinds → contract kinds, as data  ← provider
+    mapper.ts      CodexStreamMapper                        ← provider
 ```
+
+Two providers now exist, which is what turns the layering from a claim into a
+measurement. Adding Codex cost **one** addition to the shared contract —
+`file_edits`, for a capability Claude Code does not have — and nothing else
+moved: the fold, the grouping, the delta machinery and every component are
+reused untouched, and a test asserts the shared fold accepts Codex events with
+no provider knowledge at all.
 
 The Storybook story is a demo, not a shipped component.
 
@@ -338,6 +348,13 @@ which is the disk's version of the agent path.
 runs in a browser as readily as in a host process. Reading the files is the
 host's job (Node, Tauri, Electron); parsing what comes back is `mapClaudeStream`,
 same as always.
+
+Codex has the same disk story with a different shape: a spawned agent writes
+nothing to the parent stream and is addressed by a *receiver thread id*, whose
+rollout file uses a third vocabulary — `{type: response_item | event_msg |
+session_meta, payload}` — that neither the live stream nor Claude's disk
+transcripts share. "The same parser reads what comes back" is a Claude
+property, not a general one.
 
 **This changes what a UI can promise.** The stream alone supports "watch a
 subagent, read its report". With the store, both a subagent and a workflow agent

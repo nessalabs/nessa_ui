@@ -149,6 +149,7 @@ export const RENDERS: ReadonlySet<string> = new Set([
   "assistant_text",
   "reasoning",
   "tool_call_started",
+  "file_edits",
   "error",
   "context_compacted",
   "rate_limited",
