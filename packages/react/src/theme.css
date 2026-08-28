@@ -28,6 +28,29 @@
   --radius: 0.625rem;
   --nessa-font-sans: "Geist Variable", "Geist", ui-sans-serif, system-ui, sans-serif;
   --nessa-font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, monospace;
+  /* Coordinated typography levels: each level is a size, an unitless
+     line-height ratio, and a tracking contract, never a lone font size. */
+  --nessa-font-size-1: 0.6875rem;
+  --nessa-font-size-2: 0.75rem;
+  --nessa-font-size-3: 0.8125rem;
+  --nessa-font-size-4: 0.875rem;
+  --nessa-font-size-5: 1rem;
+  --nessa-font-size-6: 1.125rem;
+  --nessa-font-size-7: 1.25rem;
+  --nessa-line-height-1: 1.454545;
+  --nessa-line-height-2: 1.333333;
+  --nessa-line-height-3: 1.538462;
+  --nessa-line-height-4: 1.428571;
+  --nessa-line-height-5: 1.5;
+  --nessa-line-height-6: 1.555556;
+  --nessa-line-height-7: 1.4;
+  --nessa-letter-spacing-1: 0em;
+  --nessa-letter-spacing-2: 0em;
+  --nessa-letter-spacing-3: 0em;
+  --nessa-letter-spacing-4: 0em;
+  --nessa-letter-spacing-5: 0em;
+  --nessa-letter-spacing-6: 0em;
+  --nessa-letter-spacing-7: 0em;
   --nessa-motion-duration-instant: 0ms;
   --nessa-motion-duration-fast: 120ms;
   --nessa-motion-duration-normal: 200ms;
@@ -80,6 +103,70 @@
   --nessa-diff-deletion: oklch(0.7 0.19 25);
   --nessa-invalid-ring: color-mix(in oklab, var(--destructive) 40%, transparent);
   --nessa-diff-dark-addition: oklch(0.6222 0.1661 146.22);
+}
+
+/* Constrained UI scale. The private factor keeps nested scopes and consumer
+   baseline overrides composable without a selector cross-product: a scope
+   that does not set the attribute inherits the active factor, while every
+   scope recomputes its aliases locally. */
+:where(:root, [data-nessa-root]) {
+  --_nessa-scale-factor: 1;
+}
+
+:where([data-nessa-scale="90"]) {
+  --_nessa-scale-factor: 0.9;
+}
+
+:where([data-nessa-scale="95"]) {
+  --_nessa-scale-factor: 0.95;
+}
+
+:where([data-nessa-scale="100"]) {
+  --_nessa-scale-factor: 1;
+}
+
+:where([data-nessa-scale="105"]) {
+  --_nessa-scale-factor: 1.05;
+}
+
+:where([data-nessa-scale="110"]) {
+  --_nessa-scale-factor: 1.1;
+}
+
+:where(
+  :root,
+  [data-nessa-root],
+  [data-nessa-theme],
+  [data-nessa-scale]
+) {
+  --_nessa-font-size-1:
+    calc(var(--nessa-font-size-1) * var(--_nessa-scale-factor));
+  --_nessa-font-size-2:
+    calc(var(--nessa-font-size-2) * var(--_nessa-scale-factor));
+  --_nessa-font-size-3:
+    calc(var(--nessa-font-size-3) * var(--_nessa-scale-factor));
+  --_nessa-font-size-4:
+    calc(var(--nessa-font-size-4) * var(--_nessa-scale-factor));
+  --_nessa-font-size-5:
+    calc(var(--nessa-font-size-5) * var(--_nessa-scale-factor));
+  --_nessa-font-size-6:
+    calc(var(--nessa-font-size-6) * var(--_nessa-scale-factor));
+  --_nessa-font-size-7:
+    calc(var(--nessa-font-size-7) * var(--_nessa-scale-factor));
+  --_nessa-line-height-1: var(--nessa-line-height-1);
+  --_nessa-line-height-2: var(--nessa-line-height-2);
+  --_nessa-line-height-3: var(--nessa-line-height-3);
+  --_nessa-line-height-4: var(--nessa-line-height-4);
+  --_nessa-line-height-5: var(--nessa-line-height-5);
+  --_nessa-line-height-6: var(--nessa-line-height-6);
+  --_nessa-line-height-7: var(--nessa-line-height-7);
+  --_nessa-letter-spacing-1: var(--nessa-letter-spacing-1);
+  --_nessa-letter-spacing-2: var(--nessa-letter-spacing-2);
+  --_nessa-letter-spacing-3: var(--nessa-letter-spacing-3);
+  --_nessa-letter-spacing-4: var(--nessa-letter-spacing-4);
+  --_nessa-letter-spacing-5: var(--nessa-letter-spacing-5);
+  --_nessa-letter-spacing-6: var(--nessa-letter-spacing-6);
+  --_nessa-letter-spacing-7: var(--nessa-letter-spacing-7);
 }
 
 @media (prefers-reduced-motion: reduce) {

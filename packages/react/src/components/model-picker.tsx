@@ -154,9 +154,9 @@ function ModelPickerRow({ group, model, selected }: ModelPickerRowProps) {
         {model.icon ?? group.icon}
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-sm font-medium">{model.label}</span>
+        <span className="block truncate nessa-text-4 font-medium">{model.label}</span>
         {model.description ? (
-          <span className="block truncate text-xs text-muted-foreground">
+          <span className="block truncate nessa-text-2 text-muted-foreground">
             {model.description}
           </span>
         ) : null}
@@ -433,7 +433,7 @@ function ModelPicker({
               : "Choose model"
           )}
           className={cn(
-            "inline-flex h-9 min-w-9 max-w-72 shrink items-center gap-1.5 rounded-full px-3 font-sans text-sm font-medium text-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50",
+            "inline-flex h-9 min-w-9 max-w-72 shrink items-center gap-1.5 rounded-full px-3 font-sans nessa-text-4 font-medium text-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50",
             className,
           )}
         >
@@ -523,7 +523,7 @@ function ModelPicker({
                         handleProviderNavigation(event, group.id)
                       }
                       className={cn(
-                        "inline-flex h-8 min-w-8 shrink-0 items-center justify-center gap-1.5 overflow-hidden rounded-lg px-2.5 font-sans text-xs font-medium text-muted-foreground outline-none transition-[color,background-color,box-shadow] hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-45",
+                        "inline-flex h-8 min-w-8 shrink-0 items-center justify-center gap-1.5 overflow-hidden rounded-lg px-2.5 font-sans nessa-text-2 font-medium text-muted-foreground outline-none transition-[color,background-color,box-shadow] hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-45",
                         selected && "bg-background text-foreground shadow-xs",
                       )}
                     >

@@ -794,7 +794,7 @@ function ModelThinkingControl({
             className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-0 transition-[opacity,filter] [transition-duration:var(--nessa-motion-duration-normal)] [transition-timing-function:var(--nessa-motion-easing-emphasized)] data-[active=true]:opacity-100 motion-reduce:transition-none [background:radial-gradient(circle_at_78%_12%,color-mix(in_oklab,var(--nessa-thinking-fill-current)_13%,transparent),transparent_62%)] [box-shadow:0_0_1rem_color-mix(in_oklab,var(--nessa-thinking-fill-current)_10%,transparent)]"
           />
           <div className="relative z-10 flex min-h-8 items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-1 text-sm font-medium">
+            <div className="flex min-w-0 items-center gap-1 nessa-text-4 font-medium">
               <span data-slot="model-thinking-level-label" className="truncate">
                 {selected?.label}
               </span>

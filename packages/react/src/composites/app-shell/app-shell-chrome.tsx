@@ -72,7 +72,7 @@ function AppShellStatusBar({
     <div
       data-slot="app-shell-status-bar"
       className={cn(
-        "flex h-8 shrink-0 items-center gap-2 border-t border-border px-3 text-xs text-muted-foreground",
+        "flex h-8 shrink-0 items-center gap-2 border-t border-border px-3 nessa-text-2 text-muted-foreground",
         className,
       )}
       {...props}
