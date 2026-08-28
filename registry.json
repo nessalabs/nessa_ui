@@ -1370,6 +1370,33 @@
       ]
     },
     {
+      "name": "flow-chart",
+      "type": "registry:ui",
+      "title": "Flow chart",
+      "description": "A flow (Sankey) diagram: node bars in columns joined by ribbons whose thickness is proportional to the flow they carry. Bars take soft tints from a built-in palette (overridable per node or disableable to a neutral wash); ribbons color by source, target, or a source-to-target gradient. Four alignments (justify, left, right, center), optional d3-style barycenter iterations that reorder columns to untangle crossings, and horizontal or vertical orientation. It fills the host's box on both axes, lays out any number of stages via longest-path columns, tolerates and reports partial mid-stream data, floats host-supplied hover detail beside the pointer, and makes every ribbon a keyboard-focusable button with hover isolation and multi-selectable links.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/flow-chart/index.ts",
+          "type": "registry:ui",
+          "target": "components/ui/flow-chart/index.ts"
+        },
+        {
+          "path": "packages/react/src/components/flow-chart/flow-chart.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/flow-chart/flow-chart.tsx"
+        },
+        {
+          "path": "packages/react/src/components/flow-chart/flow-chart-layout.ts",
+          "type": "registry:ui",
+          "target": "components/ui/flow-chart/flow-chart-layout.ts"
+        }
+      ]
+    },
+    {
       "name": "random-avatar",
       "type": "registry:ui",
       "title": "Random avatar",
