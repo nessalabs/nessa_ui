@@ -4,12 +4,23 @@
 
 export {
   detectFileKind,
+  fileExtension,
+  filePreviewAudioExtensions,
+  filePreviewCsvExtensions,
+  filePreviewDocxExtensions,
   filePreviewImageExtensions,
+  filePreviewJsonExtensions,
+  filePreviewMarkdownExtensions,
   filePreviewPdfExtensions,
+  filePreviewPptxExtensions,
+  filePreviewTextExtensions,
+  filePreviewVideoExtensions,
+  filePreviewXlsxExtensions,
   formatFileSize,
   type FilePreviewFile,
   type FilePreviewKind,
 } from "./file-kind"
+export { delimiterFor, parseDelimitedText } from "./delimited-text"
 export {
   useFilePreviewContext,
   type FilePreviewContextValue,
@@ -29,6 +40,13 @@ export {
   FilePreviewFallback,
   type FilePreviewFallbackProps,
 } from "./file-preview-fallback"
+export { FilePreviewAudio } from "./file-preview-audio"
+export { FilePreviewCsv } from "./file-preview-csv"
 export { FilePreviewImage } from "./file-preview-image"
+export { FilePreviewJson } from "./file-preview-json"
+export { FilePreviewMarkdown } from "./file-preview-markdown"
 export { FilePreviewPdf } from "./file-preview-pdf"
+export { FilePreviewText } from "./file-preview-text"
+export { FilePreviewVideo } from "./file-preview-video"
 export { defaultFilePreviewRenderers } from "./file-preview-renderers"
+export { useFileText, type FileTextState } from "./use-file-text"

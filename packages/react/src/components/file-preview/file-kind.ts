@@ -4,11 +4,26 @@
  */
 
 /**
- * The preview strategies FilePreview ships with. Consumers can register
- * renderers for additional kinds (e.g. "video") without widening this union;
- * the renderer map accepts arbitrary string keys.
+ * The file kinds FilePreview detects. Every kind except the Office trio has a
+ * built-in renderer; docx/xlsx/pptx are detection-only (browsers cannot render
+ * Office formats natively) so they reach the fallback with the right identity,
+ * and apps with a conversion pipeline register their own renderer for them.
+ * Consumers can also register renderers for entirely new kinds without
+ * widening this union; the renderer map accepts arbitrary string keys.
  */
-export type FilePreviewKind = "image" | "pdf" | "unknown"
+export type FilePreviewKind =
+  | "image"
+  | "pdf"
+  | "video"
+  | "audio"
+  | "markdown"
+  | "json"
+  | "csv"
+  | "text"
+  | "docx"
+  | "xlsx"
+  | "pptx"
+  | "unknown"
 
 /** A file source described by URL plus optional display metadata. */
 export interface FilePreviewFile {
@@ -39,11 +54,122 @@ export const filePreviewImageExtensions: readonly string[] = [
 /** Extensions treated as PDFs, lowercase without the dot. */
 export const filePreviewPdfExtensions: readonly string[] = ["pdf"]
 
+/** Extensions treated as video, lowercase without the dot. */
+export const filePreviewVideoExtensions: readonly string[] = [
+  "m4v",
+  "mov",
+  "mp4",
+  "ogv",
+  "webm",
+]
+
+/** Extensions treated as audio, lowercase without the dot. */
+export const filePreviewAudioExtensions: readonly string[] = [
+  "aac",
+  "flac",
+  "m4a",
+  "mp3",
+  "oga",
+  "ogg",
+  "opus",
+  "wav",
+]
+
+/** Extensions treated as Markdown, lowercase without the dot. */
+export const filePreviewMarkdownExtensions: readonly string[] = [
+  "markdown",
+  "md",
+  "mdx",
+]
+
+/** Extensions treated as JSON, lowercase without the dot. */
+export const filePreviewJsonExtensions: readonly string[] = [
+  "geojson",
+  "json",
+]
+
+/** Extensions treated as delimited tables, lowercase without the dot. */
+export const filePreviewCsvExtensions: readonly string[] = ["csv", "tsv"]
+
+/**
+ * Extensions treated as plain text or code, lowercase without the dot. The
+ * text renderer passes the extension to CodeBlock as the language, so code
+ * files get syntax highlighting for free.
+ */
+export const filePreviewTextExtensions: readonly string[] = [
+  "c",
+  "cjs",
+  "cpp",
+  "css",
+  "go",
+  "h",
+  "hpp",
+  "html",
+  "ini",
+  "java",
+  "js",
+  "jsx",
+  "log",
+  "mjs",
+  "py",
+  "rb",
+  "rs",
+  "sh",
+  "sql",
+  "swift",
+  "toml",
+  "ts",
+  "tsx",
+  "txt",
+  "xml",
+  "yaml",
+  "yml",
+]
+
+/** Word-processor extensions (detection-only; no built-in renderer). */
+export const filePreviewDocxExtensions: readonly string[] = ["doc", "docx"]
+/** Spreadsheet extensions (detection-only; no built-in renderer). */
+export const filePreviewXlsxExtensions: readonly string[] = ["xls", "xlsx"]
+/** Presentation extensions (detection-only; no built-in renderer). */
+export const filePreviewPptxExtensions: readonly string[] = [
+  "pps",
+  "ppt",
+  "pptx",
+]
+
+const officeMimeKinds: Readonly<Record<string, FilePreviewKind>> = {
+  "application/msword": "docx",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    "docx",
+  "application/vnd.ms-excel": "xlsx",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "application/vnd.ms-powerpoint": "pptx",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+    "pptx",
+}
+
 function kindFromMimeType(mimeType: string): FilePreviewKind {
   // Strip parameters ("application/pdf; version=1.7") before matching.
   const normalized = mimeType.split(";", 1)[0].trim().toLowerCase()
   if (normalized.startsWith("image/")) return "image"
   if (normalized === "application/pdf") return "pdf"
+  if (normalized.startsWith("video/")) return "video"
+  if (normalized.startsWith("audio/")) return "audio"
+  if (normalized === "text/markdown") return "markdown"
+  if (normalized === "application/json" || normalized.endsWith("+json"))
+    return "json"
+  if (
+    normalized === "text/csv" ||
+    normalized === "text/tab-separated-values"
+  )
+    return "csv"
+  if (officeMimeKinds[normalized]) return officeMimeKinds[normalized]
+  if (
+    normalized.startsWith("text/") ||
+    normalized === "application/xml" ||
+    normalized === "application/javascript"
+  )
+    return "text"
   return "unknown"
 }
 
@@ -61,10 +187,46 @@ function extensionOf(value: string): string | null {
   return segment.slice(dot + 1).toLowerCase()
 }
 
+// Ordered specific-first: markdown/json/csv extensions must resolve to their
+// own kinds before the broad text table gets a say.
+const extensionKindTables: readonly (readonly [
+  readonly string[],
+  FilePreviewKind,
+])[] = [
+  [filePreviewImageExtensions, "image"],
+  [filePreviewPdfExtensions, "pdf"],
+  [filePreviewVideoExtensions, "video"],
+  [filePreviewAudioExtensions, "audio"],
+  [filePreviewMarkdownExtensions, "markdown"],
+  [filePreviewJsonExtensions, "json"],
+  [filePreviewCsvExtensions, "csv"],
+  [filePreviewDocxExtensions, "docx"],
+  [filePreviewXlsxExtensions, "xlsx"],
+  [filePreviewPptxExtensions, "pptx"],
+  [filePreviewTextExtensions, "text"],
+]
+
 function kindFromExtension(extension: string): FilePreviewKind {
-  if (filePreviewImageExtensions.includes(extension)) return "image"
-  if (filePreviewPdfExtensions.includes(extension)) return "pdf"
+  for (const [table, kind] of extensionKindTables) {
+    if (table.includes(extension)) return kind
+  }
   return "unknown"
+}
+
+/**
+ * The extension of a file's name (preferred) or src pathname, lowercase —
+ * what the text renderer hands CodeBlock as the language.
+ */
+export function fileExtension(input: {
+  name?: string
+  src?: string
+}): string | null {
+  for (const candidate of [input.name, input.src]) {
+    if (!candidate || candidate.startsWith("data:")) continue
+    const extension = extensionOf(candidate)
+    if (extension) return extension
+  }
+  return null
 }
 
 /**

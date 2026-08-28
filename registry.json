@@ -1390,13 +1390,17 @@
       "name": "file-preview",
       "type": "registry:ui",
       "title": "File preview",
-      "description": "A composable file previewer that delegates each file type to a renderer registry: images through a script-inert img element with loading and error states, PDFs through the browser's built-in viewer with a download fallback, and unknown kinds through a fallback surface. Consumers extend or override renderers per kind without library changes.",
+      "description": "A composable file previewer that delegates each file type to a renderer registry: images, PDFs via the browser's built-in viewer, video and audio via native elements, Markdown through MessageMarkdown, JSON through JsonTree, CSV/TSV through the Table kit, text and code through CodeBlock, and unknown kinds through a fallback surface. Office formats are detected but detection-only; consumers extend or override renderers per kind without library changes.",
       "dependencies": [
         "lucide-react"
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
-        "nessalabs/nessa_ui/utils"
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/code-block",
+        "nessalabs/nessa_ui/json-tree",
+        "nessalabs/nessa_ui/message-markdown",
+        "nessalabs/nessa_ui/table"
       ],
       "files": [
         {
@@ -1438,6 +1442,51 @@
           "path": "packages/react/src/components/file-preview/file-preview-renderers.ts",
           "type": "registry:ui",
           "target": "components/ui/file-preview/file-preview-renderers.ts"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/delimited-text.ts",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/delimited-text.ts"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/use-file-text.ts",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/use-file-text.ts"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-loading.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-loading.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-video.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-video.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-audio.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-audio.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-text.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-text.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-markdown.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-markdown.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-json.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-json.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-csv.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-csv.tsx"
         }
       ]
     }

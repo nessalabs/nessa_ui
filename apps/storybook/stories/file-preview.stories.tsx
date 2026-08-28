@@ -215,3 +215,158 @@ export const ComposedParts: Story = {
     await waitFor(() => expect(image).toBeVisible())
   },
 }
+
+const sampleMarkdown = `# Release notes
+
+Version **2.4** ships the renderer registry.
+
+- Images and PDFs
+- CSV tables
+`
+const markdownSrc = `data:text/markdown;utf8,${encodeURIComponent(sampleMarkdown)}`
+
+const sampleJson = JSON.stringify({ name: "nessa", stable: true, downloads: 4821 })
+const jsonSrc = `data:application/json;utf8,${encodeURIComponent(sampleJson)}`
+
+const sampleCsv = `city,country,population
+Kathmandu,Nepal,845767
+Reykjavik,Iceland,139875`
+const csvSrc = `data:text/csv;utf8,${encodeURIComponent(sampleCsv)}`
+
+const sampleCode = `export function greet(name: string): string {
+  return \`hello \${name}\`
+}`
+const codeSrc = `data:text/plain;utf8,${encodeURIComponent(sampleCode)}`
+
+export const MarkdownPreview: Story = {
+  parameters: storyDocumentation(
+    "Markdown files delegate to the library's own MessageMarkdown renderer, so previews match how markdown looks everywhere else in the app.",
+  ),
+  render: () => (
+    <FilePreview
+      file={{ src: markdownSrc, name: "RELEASE.md", mimeType: "text/markdown" }}
+      className="h-96 w-[28rem]"
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await waitFor(async () => {
+      await expect(
+        canvas.getByRole("heading", { name: "Release notes" }),
+      ).toBeVisible()
+    })
+    const root = canvasElement.querySelector('[data-slot="file-preview"]')
+    await expect(root).toHaveAttribute("data-kind", "markdown")
+  },
+}
+
+export const JsonPreview: Story = {
+  parameters: storyDocumentation(
+    "JSON files parse and delegate to JsonTree; contents that fail to parse still show as raw text through CodeBlock instead of erroring out.",
+  ),
+  render: () => (
+    <FilePreview
+      file={{ src: jsonSrc, name: "package.json" }}
+      className="h-96 w-[28rem]"
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await waitFor(async () => {
+      await expect(canvas.getByText(/nessa/)).toBeVisible()
+    })
+    await expect(
+      canvasElement.querySelector('[data-slot="file-preview-json"]'),
+    ).not.toBeNull()
+  },
+}
+
+export const CsvPreview: Story = {
+  parameters: storyDocumentation(
+    "CSV and TSV files parse through a small RFC 4180 parser and delegate to the Table kit, with the first row as a sticky header.",
+  ),
+  render: () => (
+    <FilePreview
+      file={{ src: csvSrc, name: "cities.csv" }}
+      className="h-96 w-[32rem]"
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await waitFor(async () => {
+      await expect(
+        canvas.getByRole("columnheader", { name: "population" }),
+      ).toBeVisible()
+    })
+    await expect(canvas.getByRole("cell", { name: "Kathmandu" })).toBeVisible()
+  },
+}
+
+export const CodePreview: Story = {
+  parameters: storyDocumentation(
+    "Text and code files delegate to CodeBlock with the file extension as the language, so code previews get syntax highlighting for free.",
+  ),
+  render: () => (
+    <FilePreview
+      file={{ src: codeSrc, name: "greet.ts" }}
+      className="h-96 w-[28rem]"
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    // The code draws inside Pierre's <diffs-container> shadow root and
+    // highlighting is async, so wait and read the shadow text directly.
+    await waitFor(
+      async () => {
+        const shadowText = canvasElement
+          .querySelector('[data-slot="file-preview-text"]')
+          ?.querySelector("diffs-container")?.shadowRoot?.textContent
+        await expect(shadowText).toContain("greet")
+      },
+      { timeout: 5000 },
+    )
+    const root = canvasElement.querySelector('[data-slot="file-preview"]')
+    await expect(root).toHaveAttribute("data-kind", "text")
+  },
+}
+
+export const AudioPreview: Story = {
+  parameters: storyDocumentation(
+    "Audio files delegate playback to the browser's native audio element with its built-in controls.",
+  ),
+  render: () => (
+    <FilePreview
+      file={{
+        // A minimal silent WAV so the native element loads instead of
+        // tripping the error fallback.
+        src: "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=",
+        name: "interview.wav",
+        size: 4_100_000,
+      }}
+      className="h-72 w-[28rem]"
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const audio = canvasElement.querySelector("audio")
+    await expect(audio).not.toBeNull()
+    await expect(audio).toHaveAttribute("controls")
+    await expect(audio).toHaveAttribute("aria-label", "interview.wav")
+  },
+}
+
+export const OfficeFallback: Story = {
+  parameters: storyDocumentation(
+    "Office formats (docx, xlsx, pptx) are detected but detection-only: browsers cannot render them natively, so they reach the fallback with the right identity, and apps with a conversion pipeline register their own renderer for those kinds.",
+  ),
+  render: () => (
+    <FilePreview
+      file={{ src: "/files/report.docx", name: "report.docx", size: 240_000 }}
+      className="h-72 w-[28rem]"
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByText("No preview available")).toBeVisible()
+    const root = canvasElement.querySelector('[data-slot="file-preview"]')
+    await expect(root).toHaveAttribute("data-kind", "docx")
+  },
+}
