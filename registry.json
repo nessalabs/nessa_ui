@@ -1083,6 +1083,27 @@
       ]
     },
     {
+      "name": "tabs",
+      "type": "registry:ui",
+      "title": "Tabs",
+      "description": "An accessible tab list and its panels: roving focus with arrow, Home and End keys, horizontal or vertical orientation, automatic or manual activation, and underline or pill presentation.",
+      "dependencies": [
+        "class-variance-authority",
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/tabs.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/tabs.tsx"
+        }
+      ]
+    },
+    {
       "name": "segmented-control",
       "type": "registry:ui",
       "title": "Segmented control",
@@ -1197,6 +1218,7 @@
       "description": "A composable application sidebar with controlled collapse state and keyboard support.",
       "dependencies": [
         "class-variance-authority",
+        "lucide-react",
         "radix-ui"
       ],
       "registryDependencies": [

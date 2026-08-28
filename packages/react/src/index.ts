@@ -128,6 +128,16 @@ export {
   type TimelineHeaderProps,
 } from "./components/timeline-header"
 export {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  tabsListVariants,
+  type TabsContentProps,
+  type TabsListProps,
+  type TabsTriggerProps,
+} from "./components/tabs"
+export {
   SegmentedControl,
   SegmentedControlOption,
   type SegmentedControlOptionProps,
