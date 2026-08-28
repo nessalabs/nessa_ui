@@ -104,7 +104,7 @@ function ChatTabs({
               className={cn(
                 "relative inline-flex max-w-56 shrink-0 items-center rounded-full border transition-[background-color,border-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
                 active
-                  ? "border-[#0071e3]/45 bg-[#0071e3]/10"
+                  ? "border-(--nessa-chat-accent)/45 bg-(--nessa-chat-accent)/10"
                   : cn(
                       // The whole pill — title and close together — takes
                       // the hover wash as one control.
@@ -173,7 +173,7 @@ function ChatTabs({
                   <span
                     data-slot="chat-tab-loading"
                     aria-hidden="true"
-                    className="size-[7px] shrink-0 rounded-full bg-[#0071e3] shadow-[0_0_8px] shadow-[#0071e3]/50"
+                    className="size-[7px] shrink-0 rounded-full bg-(--nessa-chat-accent) shadow-[0_0_8px] shadow-(color:--nessa-chat-accent)/50"
                   />
                 ) : null}
                 {badgeCount > 0 ? (

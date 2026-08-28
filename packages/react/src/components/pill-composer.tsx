@@ -37,11 +37,11 @@ function cssDurationInMilliseconds(value: string, fallback: number) {
  * One revolution of iridescence: a long transparent stretch, a soft
  * spectral tail that brightens toward the direction of travel, and a crisp
  * near-white head that cuts off sharply so the light reads as led rather
- * than smeared. Fixed spectral colors, not theme tokens — the effect is a
- * light source and should look identical over light and dark surfaces.
+ * than smeared. The stops are the --nessa-chat-rim-* tokens, which hold
+ * the same values in both themes — the effect is a light source.
  */
-const pillComposerRimGradient =
-  "conic-gradient(from 0deg, transparent 0deg, transparent 190deg, rgba(94, 234, 212, 0) 190deg, rgba(94, 234, 212, 0.75) 252deg, rgba(96, 165, 250, 0.9) 288deg, rgba(196, 181, 253, 0.95) 318deg, rgba(244, 114, 182, 1) 342deg, rgba(255, 255, 255, 1) 356deg, transparent 360deg)"
+const pillComposerRimSpinnerClassName =
+  "absolute left-1/2 top-1/2 aspect-square w-[200%] -translate-x-1/2 -translate-y-1/2 bg-[conic-gradient(from_0deg,transparent_0deg,transparent_190deg,var(--nessa-chat-rim-0)_190deg,var(--nessa-chat-rim-1)_252deg,var(--nessa-chat-rim-2)_288deg,var(--nessa-chat-rim-3)_318deg,var(--nessa-chat-rim-4)_342deg,var(--nessa-chat-rim-head)_356deg,transparent_360deg)]"
 
 /** Masks a full-bleed layer down to an edge band `inset` pixels deep. */
 function rimBandMask(inset: number): React.CSSProperties {
@@ -57,20 +57,8 @@ function rimBandMask(inset: number): React.CSSProperties {
   }
 }
 
-/**
- * Covers the layer with a rotatable square large enough that spinning it
- * never exposes a corner: twice the pill's width exceeds the diagonal of
- * any wider-than-tall pill.
- */
-const rimSpinnerStyle: React.CSSProperties = {
-  position: "absolute",
-  left: "50%",
-  top: "50%",
-  width: "200%",
-  aspectRatio: "1",
-  translate: "-50% -50%",
-  backgroundImage: pillComposerRimGradient,
-}
+// The spinner square is twice the pill's width, so rotating it never
+// exposes a corner on any wider-than-tall pill.
 
 /**
  * The traveling-light overlay: a thin crisp gradient band on the pill's
@@ -128,7 +116,7 @@ function PillComposerRim({ active }: { active: boolean }) {
       >
         <span
           ref={glowSpinRef}
-          style={{ ...rimSpinnerStyle, filter: "blur(6px)", opacity: 0.35 }}
+          className={cn(pillComposerRimSpinnerClassName, "blur-[6px] opacity-35")}
         />
       </span>
       <span
@@ -136,7 +124,7 @@ function PillComposerRim({ active }: { active: boolean }) {
         className="absolute inset-0 overflow-hidden rounded-[inherit]"
         style={rimBandMask(2)}
       >
-        <span ref={ringSpinRef} style={rimSpinnerStyle} />
+        <span ref={ringSpinRef} className={pillComposerRimSpinnerClassName} />
       </span>
     </span>
   )

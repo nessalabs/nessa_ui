@@ -219,12 +219,10 @@ function ChatBubble({
     // The badge protrudes 12px above the bubble; reserve that room so it
     // never overlaps the previous message.
     reaction != null && "mt-3",
-    // The sent blue is deliberately literal, not a theme token: like the
-    // rim gradient it is iMessage's identity and must not restyle per
-    // theme. #0071e3 is the closest iMessage-family blue that holds 4.5:1
-    // against white text.
+    // The sent blue is the fixed chat identity: --nessa-chat-accent holds
+    // the same value in both themes, and #0071e3 keeps 4.5:1 with white.
     tone === "sent"
-      ? "bg-[#0071e3] text-white"
+      ? "bg-(--nessa-chat-accent) text-white"
       : "bg-accent text-accent-foreground",
     className,
   )
@@ -381,7 +379,7 @@ function ChatReactionPicker({
           onClick={() => onSelect(option.emoji)}
           className={cn(
             "flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 font-sans nessa-text-6",
-            value === option.emoji && "bg-[#0071e3]",
+            value === option.emoji && "bg-(--nessa-chat-accent)",
             chatBubblesFocusClassName,
           )}
         >
@@ -588,6 +586,8 @@ function ChatAttachmentStack({
       >
         {tiles
           .map((tile, index) => (
+            /* Paint order handles the stack: the fan renders back-to-front,
+               so the front tile paints last and needs no z-index. */
             <span
               key={index}
               className={cn(
@@ -595,7 +595,6 @@ function ChatAttachmentStack({
                 index === 1 && "translate-x-1.5 -translate-y-1.5 rotate-2",
                 index === 2 && "translate-x-3 -translate-y-3 rotate-[4deg]",
               )}
-              style={{ zIndex: tiles.length - index }}
             >
               {tile}
             </span>

@@ -84,7 +84,14 @@
       "nessa-diff-addition": "oklch(0.5 0.137 150)",
       "nessa-diff-deletion": "oklch(0.55 0.19 27)",
       "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 20%, transparent)",
-      "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)"
+      "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)",
+      "nessa-chat-accent": "#0071e3",
+      "nessa-chat-rim-0": "rgba(94, 234, 212, 0)",
+      "nessa-chat-rim-1": "rgba(94, 234, 212, 0.75)",
+      "nessa-chat-rim-2": "rgba(96, 165, 250, 0.9)",
+      "nessa-chat-rim-3": "rgba(196, 181, 253, 0.95)",
+      "nessa-chat-rim-4": "rgba(244, 114, 182, 1)",
+      "nessa-chat-rim-head": "#ffffff"
     },
     "dark": {
       "background": "oklch(0.145 0 0)",
@@ -119,7 +126,14 @@
       "nessa-diff-addition": "oklch(0.77 0.17 152)",
       "nessa-diff-deletion": "oklch(0.7 0.19 25)",
       "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 40%, transparent)",
-      "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)"
+      "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)",
+      "nessa-chat-accent": "#0071e3",
+      "nessa-chat-rim-0": "rgba(94, 234, 212, 0)",
+      "nessa-chat-rim-1": "rgba(94, 234, 212, 0.75)",
+      "nessa-chat-rim-2": "rgba(96, 165, 250, 0.9)",
+      "nessa-chat-rim-3": "rgba(196, 181, 253, 0.95)",
+      "nessa-chat-rim-4": "rgba(244, 114, 182, 1)",
+      "nessa-chat-rim-head": "#ffffff"
     }
   },
   "css": {
