@@ -259,3 +259,22 @@ test("a call's input is its arguments, not the whole line", () => {
   assert.equal("status" in input, false)
   assert.ok("command" in input || "changes" in input)
 })
+
+test("a search reports what was searched, and only once it settles", () => {
+  const events = mapCodexStream(capture("websearch"))
+  const call = events.find((event) => event.payload.type === "tool_call_started")
+  assert.notEqual(call, undefined)
+  assert.equal(call!.payload.type === "tool_call_started" ? call!.payload.kind : null, "web")
+  // The started item's `query` is empty — Codex fills it on completion — so the
+  // row's label cannot name the search, and pretending otherwise would mean
+  // inventing it.
+  assert.equal(call!.payload.type === "tool_call_started" ? call!.payload.title : null, "web search")
+
+  const settled = events.find((event) => event.payload.type === "tool_call_completed")
+  const result = settled?.payload.type === "tool_call_completed" ? settled.payload.result : null
+  assert.notEqual(result, null)
+  // No results are reported, so `text` — which means output — stays empty, and
+  // the query lives where a detail view can read it.
+  assert.equal(result!.text, "")
+  assert.match(JSON.stringify(result!.structured), /TypeScript/)
+})

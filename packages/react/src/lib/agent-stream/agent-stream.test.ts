@@ -1001,3 +1001,95 @@ test("the skill's frontmatter is the shape a skill loader reads", () => {
   const description = /^description: (.+)$/m.exec(frontmatter!)?.[1]
   assert.ok((description?.length ?? 0) > 80, "the description must say when to use the skill, not just what it is")
 })
+
+test("a tool result made only of non-text blocks keeps its content in the sidecar", () => {
+  // `ToolSearch` answers with `tool_reference` blocks and no prose, so
+  // flattening to text gives an empty string — correct, and the reason a
+  // consumer must read `structured` rather than assume `text` carries
+  // everything a call returned.
+  const transcript = buildTranscript(mapClaudeStream(capture("websearch")))
+  const results = [...transcript.resultByCallId.values()]
+  const blocksOnly = results.filter((result) => result.text === "")
+  assert.ok(blocksOnly.length > 0, "this capture contains a result with no text blocks")
+  for (const result of blocksOnly) {
+    assert.notEqual(result.structured, null, "the sidecar is where such a result survives")
+    assert.equal(result.isError, false)
+  }
+
+  // And the search itself does return prose, so the two shapes coexist in one
+  // capture — which is why the flattening cannot assume either.
+  assert.ok(results.some((result) => result.text.includes("Web search results")))
+})
+
+test("reasoning reaches the transcript as its own kind, even when its text is withheld", () => {
+  const events = mapClaudeStream(capture("tools"))
+  const reasoning = events.filter((event) => event.payload.type === "reasoning")
+  assert.ok(reasoning.length > 0)
+  for (const event of reasoning) {
+    const payload = event.payload as { type: "reasoning"; text: string; block: unknown }
+    // Empty on purpose, and the common case: the model signs a thinking block
+    // without disclosing it, so the event says reasoning *happened* while
+    // carrying nothing to read. A consumer must render that as a step rather
+    // than assume text.
+    assert.equal(typeof payload.text, "string")
+    // The block ref is still there, so a streamed preview is superseded the
+    // same way prose is.
+    assert.notEqual(payload.block, null)
+  }
+
+  // Where a model does disclose it, the text arrives on the same payload.
+  const disclosed = mapClaudeStream(capture("resume_turn2")).filter((event) => event.payload.type === "reasoning")
+  assert.ok(disclosed.some((event) => (event.payload as { text: string }).text.length > 0))
+  // And it is not also emitted as assistant text, which would print the
+  // agent's private reasoning as its answer.
+  const answers = events.filter((event) => event.payload.type === "assistant_text")
+  const reasoningText = new Set(reasoning.map((event) => (event.payload as { text: string }).text))
+  assert.ok(answers.every((event) => !reasoningText.has((event.payload as { text: string }).text)))
+})
+
+test("the session's own reports carry what a status surface needs", () => {
+  // These are the lines that say what the agent is doing between turns. None
+  // of them draws a transcript row, which is why they are easy to leave
+  // half-mapped — a sweep that only checks they parse would not notice.
+  const events = mapClaudeStream(capture("todos"))
+
+  const hooks = events.flatMap((event) => (event.payload.type === "hook" ? [event.payload] : []))
+  assert.ok(hooks.length > 0)
+  assert.ok(hooks.some((hook) => hook.phase === "started"))
+  assert.ok(hooks.some((hook) => hook.phase === "finished" && hook.name.length > 0))
+
+  const status = events.flatMap((event) => (event.payload.type === "status_changed" ? [event.payload] : []))
+  assert.ok(status.some((entry) => entry.status !== null))
+
+  const thinking = events.flatMap((event) => (event.payload.type === "thinking_progress" ? [event.payload] : []))
+  assert.ok(thinking.length > 0)
+  assert.ok(thinking.every((entry) => entry.tokens >= 0))
+  // The estimate grows while a block is produced; a counter that never moved
+  // would be a figure nobody could use.
+  assert.ok(Math.max(...thinking.map((entry) => entry.tokens)) > Math.min(...thinking.map((entry) => entry.tokens)))
+
+  const summary = events.flatMap((event) => (event.payload.type === "post_turn_summary" ? [event.payload] : []))
+  assert.ok(summary.every((entry) => entry.detail.length > 0))
+})
+
+test("background tasks are republished whole, which is half of whether a session is idle", () => {
+  const events = mapClaudeStream(capture("workflow"))
+  const sets = events.flatMap((event) =>
+    event.payload.type === "background_tasks_changed" ? [event.payload.tasks] : [],
+  )
+  assert.ok(sets.length > 1, "the set is republished on every change")
+  // A turn's result can land while tasks are still open, so an empty set is a
+  // meaningful state rather than an absence — it is what says the work drained.
+  assert.ok(sets.some((tasks) => tasks.length > 0))
+  assert.ok(sets.some((tasks) => tasks.length === 0))
+  for (const tasks of sets) {
+    for (const task of tasks) assert.ok(task.taskId.length > 0 && task.description.length > 0)
+  }
+})
+
+test("an activity line names what the agent is doing right now", () => {
+  const events = mapClaudeStream(capture("subagent"))
+  const activity = events.flatMap((event) => (event.payload.type === "activity" ? [event.payload.detail] : []))
+  assert.ok(activity.length > 0)
+  assert.ok(activity.every((detail) => detail.length > 0), "an activity with no detail is dropped, not emitted blank")
+})

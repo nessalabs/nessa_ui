@@ -139,6 +139,12 @@ function readResult(itemType: string, item: Record<string, JsonValue>): ToolResu
       images: [],
     }
   }
+  if (itemType === CodexItemType.WebSearch) {
+    // The wire reports no results for a search — only what was searched, and
+    // only on completion (the started item's `query` is empty). That is not
+    // output, so it stays out of `text` and goes where a drawer can show it.
+    return { text: "", isError: failed, structured: { query: item.query ?? null }, images: [] }
+  }
   return { text: "", isError: failed, structured: null, images: [] }
 }
 
