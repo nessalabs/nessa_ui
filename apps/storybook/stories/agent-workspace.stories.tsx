@@ -19,6 +19,7 @@ import {
   MessageThread,
   MessageThreadReplies,
   MessageThreadSummary,
+  SectionedListbox,
   Sidebar,
   SidebarCollapsible,
   SidebarContent,
@@ -30,12 +31,15 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarProvider,
+  SplitView,
+  SplitViewPanel,
+  SplitViewSeparator,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "@nessa-ui/react"
-import { GitBranch, Hash, Lock, Plus } from "lucide-react"
+import { GitBranch, Hash, Lock, Pin, Plus } from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"
 
@@ -46,7 +50,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A Slack-shaped workspace assembled entirely from shipped Nessa primitives, to show the pattern is reachable without a bespoke layout: sections and channels in the Sidebar, a channel's agent sessions as a collapsible nested menu with per-session worktree icons, Tabs as the drawers that reorganize those sessions, and the Message thread kit plus ChatComposer as the channel body. Nothing here is a new component — it is Sidebar, Tabs, Message and ChatComposer composed.",
+          "A Slack-shaped agent workspace assembled entirely from shipped Nessa primitives, at the scale a real one reaches. The left rail stays bounded — sections and channels, plus at most a few pinned sessions per channel — because a rail that lists every session runs out of vertical space the moment you spin up more agents. Every session in a channel instead lives in a channel-scoped second column: Tabs as drawers across the top, a SectionedListbox grouping what the drawer leaves under sticky status headers, and the selected session's thread beside it behind a draggable SplitView separator. Nothing here is a new component.",
       },
     },
   },
@@ -54,166 +58,184 @@ const meta = {
 
 export default meta
 
-interface SessionSummary {
+type SessionStatus = "running" | "archived"
+
+interface AgentSession {
   id: string
+  channelId: string
   label: string
   worktree: string
-  drawer: "running" | "review" | "archived"
+  agent: string
+  updated: string
+  status: SessionStatus
+  pinned?: boolean
 }
 
-const channels: {
-  id: string
-  name: string
-  private?: boolean
-  sessions: SessionSummary[]
-}[] = [
+const channels = [
+  { id: "eng-sidebar", name: "eng-sidebar" },
+  { id: "eng-tabs", name: "eng-tabs" },
+  { id: "release", name: "release", private: true },
+] as const
+
+const sessions: AgentSession[] = [
   {
-    id: "eng-sidebar",
-    name: "eng-sidebar",
-    sessions: [
-      {
-        id: "s1",
-        label: "Nested guides + collapsible menu",
-        worktree: "sidebar-nested-components",
-        drawer: "running",
-      },
-      {
-        id: "s2",
-        label: "Trailing alignment audit",
-        worktree: "trailing-band-fix",
-        drawer: "review",
-      },
-    ],
+    id: "s1",
+    channelId: "eng-sidebar",
+    label: "Nested guides + collapsible menu",
+    worktree: "sidebar-nested-components",
+    agent: "Opus 5",
+    updated: "2m",
+    status: "running",
+    pinned: true,
   },
   {
-    id: "eng-tabs",
-    name: "eng-tabs",
-    sessions: [
-      {
-        id: "s3",
-        label: "Port tablist to Radix",
-        worktree: "tabs-primitive",
-        drawer: "running",
-      },
-      {
-        id: "s4",
-        label: "Segmented vs tabs audit",
-        worktree: "tabs-audit",
-        drawer: "archived",
-      },
-    ],
+    id: "s2",
+    channelId: "eng-sidebar",
+    label: "Trailing alignment audit",
+    worktree: "trailing-band-fix",
+    agent: "Sonnet 5",
+    updated: "9m",
+    status: "running",
+    pinned: true,
   },
   {
-    id: "release",
-    name: "release",
-    private: true,
-    sessions: [
-      {
-        id: "s5",
-        label: "Cut 0.4.0",
-        worktree: "release-0-4-0",
-        drawer: "review",
-      },
-    ],
+    id: "s3",
+    channelId: "eng-sidebar",
+    label: "RTL sweep for the guide rail",
+    worktree: "guides-rtl",
+    agent: "Haiku 4.5",
+    updated: "24m",
+    status: "running",
+  },
+  {
+    id: "s4",
+    channelId: "eng-sidebar",
+    label: "Focus ledger reconciliation",
+    worktree: "focus-ledger",
+    agent: "Opus 5",
+    updated: "1h",
+    status: "archived",
+  },
+  {
+    id: "s5",
+    channelId: "eng-sidebar",
+    label: "Drop stale sync commit",
+    worktree: "rebase-mainline",
+    agent: "Sonnet 5",
+    updated: "3h",
+    status: "archived",
+  },
+  {
+    id: "s6",
+    channelId: "eng-tabs",
+    label: "Port tablist to Radix",
+    worktree: "tabs-primitive",
+    agent: "Opus 5",
+    updated: "6m",
+    status: "running",
+    pinned: true,
+  },
+  {
+    id: "s7",
+    channelId: "eng-tabs",
+    label: "Segmented vs tabs audit",
+    worktree: "tabs-audit",
+    agent: "Haiku 4.5",
+    updated: "2h",
+    status: "archived",
+  },
+  {
+    id: "s8",
+    channelId: "release",
+    label: "Cut 0.4.0",
+    worktree: "release-0-4-0",
+    agent: "Opus 5",
+    updated: "18m",
+    status: "running",
+    pinned: true,
   },
 ]
 
-const drawerLabels = {
+const statusOrder: SessionStatus[] = ["running", "archived"]
+const statusLabels: Record<SessionStatus, string> = {
   running: "Running",
-  review: "Needs review",
   archived: "Archived",
-} as const
-
-function SessionList({ sessions }: { sessions: SessionSummary[] }) {
-  if (sessions.length === 0) {
-    return (
-      <p className="p-4 nessa-text-4 text-muted-foreground">
-        No sessions in this drawer.
-      </p>
-    )
-  }
-
-  return (
-    <ul className="flex list-none flex-col gap-1 p-2">
-      {sessions.map((session) => (
-        <li key={session.id}>
-          <div className="flex min-w-0 items-center gap-2.5 rounded-lg px-2.5 py-2">
-            <GitBranch aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate nessa-text-4">
-              {session.label}
-            </span>
-            <span className="shrink-0 nessa-text-2 text-muted-foreground">
-              {session.worktree}
-            </span>
-          </div>
-        </li>
-      ))}
-    </ul>
-  )
 }
 
-function AgentWorkspaceDemo() {
-  const [activeChannelId, setActiveChannelId] = React.useState("eng-sidebar")
-  const [openChannelId, setOpenChannelId] = React.useState<string | null>(
-    "eng-sidebar",
-  )
-  const [drawer, setDrawer] = React.useState("all")
-  const [repliesOpen, setRepliesOpen] = React.useState(false)
-  const [draft, setDraft] = React.useState("")
-
-  const activeChannel =
-    channels.find((channel) => channel.id === activeChannelId) ?? channels[0]
-  const allSessions = channels.flatMap((channel) => channel.sessions)
-  const countFor = (key: SessionSummary["drawer"]) =>
-    allSessions.filter((session) => session.drawer === key).length
-
+function ChannelRail({
+  activeChannelId,
+  onSelectChannel,
+  openChannelId,
+  onOpenChannel,
+  onSelectSession,
+}: {
+  activeChannelId: string
+  onSelectChannel: (id: string) => void
+  openChannelId: string | null
+  onOpenChannel: (id: string | null) => void
+  onSelectSession: (id: string) => void
+}) {
   return (
-    <SidebarProvider className="h-[32rem] min-h-[32rem]">
-      <Sidebar
-        collapsible={SidebarCollapsible.None}
-        // The sidebar is `h-svh` by default; inside a fixed-height demo frame
-        // it has to take the frame's height instead.
-        className="h-full border-e border-sidebar-border"
-        aria-label="Workspace navigation"
-      >
-        <SidebarHeader>
-          <SidebarMenu>
-            <SidebarMenuItem description="3 channels · 5 sessions">
-              Nessa Labs
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>Channels</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {channels.map((channel) => (
+    <Sidebar
+      collapsible={SidebarCollapsible.None}
+      // The sidebar is `h-svh` by default; inside a fixed-height demo frame
+      // it takes the frame's height instead.
+      className="h-full border-e border-sidebar-border"
+      aria-label="Workspace navigation"
+    >
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem description={`${sessions.length} sessions running`}>
+            Nessa Labs
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Channels</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {channels.map((channel) => {
+                // Only pinned sessions are allowed into the rail. The rail's
+                // height is the scarce resource, so what it shows has to stay
+                // bounded no matter how many sessions a channel accumulates.
+                const pinned = sessions.filter(
+                  (session) => session.channelId === channel.id && session.pinned,
+                )
+                const total = sessions.filter(
+                  (session) => session.channelId === channel.id,
+                ).length
+
+                return (
                   <SidebarMenuItem
                     key={channel.id}
                     collapsible="chevron"
-                    collapsibleLabel={`Toggle ${channel.name} sessions`}
+                    collapsibleLabel={`Toggle pinned sessions in ${channel.name}`}
                     open={openChannelId === channel.id}
                     onOpenChange={(next) =>
-                      setOpenChannelId(next ? channel.id : null)
+                      onOpenChannel(next ? channel.id : null)
                     }
-                    icon={channel.private ? <Lock /> : <Hash />}
+                    icon={"private" in channel && channel.private ? <Lock /> : <Hash />}
                     isActive={channel.id === activeChannelId}
                     aria-current={
                       channel.id === activeChannelId ? "page" : undefined
                     }
-                    onClick={() => setActiveChannelId(channel.id)}
-                    badge={String(channel.sessions.length)}
+                    onClick={() => onSelectChannel(channel.id)}
+                    badge={String(total)}
                     submenu={
                       <SidebarMenu nested guides>
-                        {channel.sessions.map((session) => (
-                          // Child rows take the same `icon` slot as any other
-                          // row — here the worktree each session runs in.
+                        {pinned.map((session) => (
+                          // Child rows use the same `icon` slot as any other
+                          // row — here the worktree the session runs in.
                           <SidebarMenuItem
                             key={session.id}
                             size="sm"
                             icon={<GitBranch />}
-                            tooltip={session.label}
+                            tooltip={`${session.label} · ${session.worktree}`}
+                            onClick={() => {
+                              onSelectChannel(session.channelId)
+                              onSelectSession(session.id)
+                            }}
                           >
                             {session.label}
                           </SidebarMenuItem>
@@ -223,134 +245,296 @@ function AgentWorkspaceDemo() {
                   >
                     {channel.name}
                   </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
-      </Sidebar>
+                )
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+    </Sidebar>
+  )
+}
+
+function SessionRow({
+  session,
+  selected,
+}: {
+  session: AgentSession
+  selected: boolean
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <div className="flex min-w-0 items-center gap-2">
+        <span
+          className={cnLabel(selected)}
+          data-testid={`session-label-${session.id}`}
+        >
+          {session.label}
+        </span>
+        <span className="ms-auto shrink-0 nessa-text-2 text-muted-foreground">
+          {session.updated}
+        </span>
+      </div>
+      <span className="flex min-w-0 items-center gap-1.5 nessa-text-2 text-muted-foreground">
+        <GitBranch aria-hidden="true" className="size-3 shrink-0" />
+        <span className="truncate">{session.worktree}</span>
+        <span aria-hidden="true">·</span>
+        <span className="shrink-0">{session.agent}</span>
+      </span>
+    </div>
+  )
+}
+
+function cnLabel(selected: boolean) {
+  return selected
+    ? "min-w-0 truncate nessa-text-4 font-medium"
+    : "min-w-0 truncate nessa-text-4"
+}
+
+function SessionThread({ session }: { session: AgentSession }) {
+  const [repliesOpen, setRepliesOpen] = React.useState(false)
+
+  // Reset the disclosure whenever a different session opens, so the pane
+  // never shows the previous session's expansion state.
+  React.useEffect(() => {
+    setRepliesOpen(false)
+  }, [session.id])
+
+  return (
+    <MessageScroller className="h-full">
+      <MessageScrollerViewport>
+        <MessageScrollerContent className="gap-4 p-4">
+          <Message from="assistant">
+            <MessageAvatar fallback="OP" alt={session.agent} />
+            <MessageContent>
+              <MessageHeader>{session.agent} · 9:12</MessageHeader>
+              <MessageBubble variant="plain">
+                Working in <code>{session.worktree}</code> on {session.label}.
+              </MessageBubble>
+            </MessageContent>
+          </Message>
+          <MessageThread>
+            <Message from="user" align="start">
+              <MessageAvatar fallback="SP" alt="Saurav" />
+              <MessageContent>
+                <MessageHeader>Saurav · 9:20</MessageHeader>
+                <MessageBubble variant="plain">
+                  How is this one going?
+                </MessageBubble>
+              </MessageContent>
+            </Message>
+            <MessageThreadSummary
+              aria-expanded={repliesOpen}
+              onClick={() => setRepliesOpen((current) => !current)}
+              label={repliesOpen ? "Hide 1 reply" : "1 reply"}
+              meta={repliesOpen ? undefined : `Last reply ${session.updated} ago`}
+              action={repliesOpen ? null : "View thread"}
+            >
+              <MessageAvatar fallback="OP" alt={session.agent} />
+            </MessageThreadSummary>
+            {repliesOpen && (
+              <MessageThreadReplies>
+                <Message from="assistant">
+                  <MessageAvatar fallback="OP" alt={session.agent} />
+                  <MessageContent>
+                    <MessageHeader>{session.agent} · 9:21</MessageHeader>
+                    <MessageBubble variant="plain">
+                      {statusLabels[session.status]} — last update{" "}
+                      {session.updated} ago.
+                    </MessageBubble>
+                  </MessageContent>
+                </Message>
+              </MessageThreadReplies>
+            )}
+          </MessageThread>
+        </MessageScrollerContent>
+      </MessageScrollerViewport>
+    </MessageScroller>
+  )
+}
+
+function AgentWorkspaceDemo() {
+  const [activeChannelId, setActiveChannelId] = React.useState("eng-sidebar")
+  const [openChannelId, setOpenChannelId] = React.useState<string | null>(
+    "eng-sidebar",
+  )
+  const [drawer, setDrawer] = React.useState<"all" | SessionStatus>("all")
+  const [selectedSessionId, setSelectedSessionId] = React.useState("s1")
+  const [draft, setDraft] = React.useState("")
+
+  // Changing channel returns to the full drawer: the drawer that was open
+  // may hold nothing in the new channel, and landing on an empty list reads
+  // as a broken channel rather than an empty filter.
+  const selectChannel = React.useCallback((id: string) => {
+    setActiveChannelId(id)
+    setDrawer("all")
+  }, [])
+
+  const activeChannel =
+    channels.find((channel) => channel.id === activeChannelId) ?? channels[0]
+  const channelSessions = sessions.filter(
+    (session) => session.channelId === activeChannelId,
+  )
+  const drawerSessions =
+    drawer === "all"
+      ? channelSessions
+      : channelSessions.filter((session) => session.status === drawer)
+
+  // Sticky status headers carry the grouping the rail needs once a channel
+  // holds more sessions than fit on screen; empty groups are dropped so the
+  // headers never outnumber the rows.
+  const listSections = statusOrder
+    .map((status) => ({
+      id: status,
+      label: statusLabels[status],
+      items: drawerSessions.filter((session) => session.status === status),
+    }))
+    .filter((section) => section.items.length > 0)
+
+  const selectedSession =
+    sessions.find((session) => session.id === selectedSessionId) ?? sessions[0]
+  const countFor = (status: SessionStatus) =>
+    channelSessions.filter((session) => session.status === status).length
+
+  return (
+    <SidebarProvider className="h-[34rem] min-h-[34rem]">
+      <ChannelRail
+        activeChannelId={activeChannelId}
+        onSelectChannel={selectChannel}
+        openChannelId={openChannelId}
+        onOpenChannel={setOpenChannelId}
+        onSelectSession={setSelectedSessionId}
+      />
 
       <SidebarInset className="min-w-0">
         <header className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
           <Hash aria-hidden="true" className="size-4 text-muted-foreground" />
           <h2 className="nessa-text-5 font-medium">{activeChannel.name}</h2>
           <span className="nessa-text-2 text-muted-foreground">
-            {activeChannel.sessions.length} agent sessions
+            {channelSessions.length} agent sessions
           </span>
         </header>
 
-        <Tabs
-          value={drawer}
-          onValueChange={setDrawer}
-          className="min-h-0 flex-1 gap-0"
-        >
-          <TabsList aria-label="Session drawers" className="px-4">
-            <TabsTrigger value="all" badge={String(allSessions.length)}>
-              All
-            </TabsTrigger>
-            {(
-              Object.keys(drawerLabels) as (keyof typeof drawerLabels)[]
-            ).map((key) => (
-              <TabsTrigger key={key} value={key} badge={String(countFor(key))}>
-                {drawerLabels[key]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          <TabsContent value="all" className="min-h-0 overflow-hidden">
-            <MessageScroller className="h-full">
-              <MessageScrollerViewport>
-                <MessageScrollerContent className="gap-4 p-4">
-                  <Message from="assistant">
-                    <MessageAvatar fallback="OP" alt="Opus 5" />
-                    <MessageContent>
-                      <MessageHeader>Opus 5 · 9:12</MessageHeader>
-                      <MessageBubble variant="plain">
-                        Spine now runs the full row height, so the branch
-                        guides read as one line.
-                      </MessageBubble>
-                    </MessageContent>
-                  </Message>
-                  <MessageThread>
-                    <Message from="user" align="start">
-                      <MessageAvatar fallback="SP" alt="Saurav" />
-                      <MessageContent>
-                        <MessageHeader>Saurav · 9:20</MessageHeader>
-                        <MessageBubble variant="plain">
-                          Can the child rows carry worktree icons too?
-                        </MessageBubble>
-                      </MessageContent>
-                    </Message>
-                    <MessageThreadSummary
-                      aria-expanded={repliesOpen}
-                      onClick={() => setRepliesOpen((current) => !current)}
-                      label={repliesOpen ? "Hide 1 reply" : "1 reply"}
-                      meta={repliesOpen ? undefined : "Last reply at 9:21"}
-                      action={repliesOpen ? null : "View thread"}
-                    >
-                      <MessageAvatar fallback="OP" alt="Opus 5" />
-                    </MessageThreadSummary>
-                    {repliesOpen && (
-                      <MessageThreadReplies>
-                        <Message from="assistant">
-                          <MessageAvatar fallback="OP" alt="Opus 5" />
-                          <MessageContent>
-                            <MessageHeader>Opus 5 · 9:21</MessageHeader>
-                            <MessageBubble variant="plain">
-                              They already can — `icon` is on every row,
-                              nested or not.
-                            </MessageBubble>
-                          </MessageContent>
-                        </Message>
-                      </MessageThreadReplies>
-                    )}
-                  </MessageThread>
-                </MessageScrollerContent>
-              </MessageScrollerViewport>
-            </MessageScroller>
-          </TabsContent>
-
-          {(Object.keys(drawerLabels) as (keyof typeof drawerLabels)[]).map(
-            (key) => (
-              <TabsContent
-                key={key}
-                value={key}
-                className="min-h-0 overflow-auto"
+        <SplitView className="min-h-0 flex-1">
+          <SplitViewPanel id="workspace-sessions" defaultSize={38} minSize={24}>
+            <div className="flex h-full min-h-0 flex-col border-e border-border">
+              {/* The drawers scope the rail, so the left sidebar never has to
+                  grow a row per session. */}
+              <Tabs
+                value={drawer}
+                onValueChange={(next) =>
+                  setDrawer(next as "all" | SessionStatus)
+                }
+                className="min-h-0 flex-1 gap-0"
               >
-                <SessionList
-                  sessions={allSessions.filter(
-                    (session) => session.drawer === key,
-                  )}
-                />
-              </TabsContent>
-            ),
-          )}
-        </Tabs>
+                <TabsList
+                  aria-label="Session drawers"
+                  className="shrink-0 px-3"
+                >
+                  <TabsTrigger
+                    value="all"
+                    badge={String(channelSessions.length)}
+                  >
+                    All
+                  </TabsTrigger>
+                  {statusOrder.map((status) => (
+                    <TabsTrigger
+                      key={status}
+                      value={status}
+                      badge={String(countFor(status))}
+                    >
+                      {statusLabels[status]}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+                {/* Each drawer is a real panel, so a tab controls something
+                    that exists. One shared region behind a tablist would
+                    leave every tab's `aria-controls` dangling — that shape is
+                    a filter, and a filter is SegmentedControl's job. */}
+                {(["all", ...statusOrder] as const).map((key) => (
+                  <TabsContent
+                    key={key}
+                    value={key}
+                    className="min-h-0 flex-1 overflow-hidden p-2"
+                  >
+                    <SectionedListbox
+                      listLabel={`Agent sessions in ${activeChannel.name}`}
+                      sections={listSections}
+                      getItemId={(session) => session.id}
+                      value={selectedSessionId}
+                      onValueChange={(value) => setSelectedSessionId(value)}
+                      emptyMessage="No sessions in this drawer."
+                      className="h-full"
+                      // The listbox dresses for a popover by default. Inline
+                      // in a rail it should read like the sidebar rows across
+                      // the divider: same inset, radius and accent wash.
+                      sectionLabelClassName="bg-background px-2.5 py-1.5 nessa-text-2 font-medium text-muted-foreground"
+                      optionClassName="min-h-9 rounded-lg px-2.5 py-1.5 hover:bg-accent data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground"
+                      renderItem={(session, state) => (
+                        <SessionRow
+                          session={session}
+                          selected={state.selected}
+                        />
+                      )}
+                    />
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </div>
+          </SplitViewPanel>
 
-        <div className="shrink-0 p-3">
-          <ChatComposer
-            onSubmit={(event) => {
-              event.preventDefault()
-              setDraft("")
-            }}
-          >
-            <ChatComposerInput
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              placeholder={`Message #${activeChannel.name}`}
-            />
-            <ChatComposerFooter>
-              <ChatComposerActions>
-                <ChatComposerAction aria-label="Add attachment">
-                  <Plus aria-hidden="true" />
-                </ChatComposerAction>
-              </ChatComposerActions>
-              <ChatComposerActions className="justify-end">
-                <ChatComposerSubmit disabled={draft.trim().length === 0} />
-              </ChatComposerActions>
-            </ChatComposerFooter>
-          </ChatComposer>
-        </div>
+          <SplitViewSeparator />
+
+          <SplitViewPanel id="workspace-thread" defaultSize={62} minSize={35}>
+            <div className="flex h-full min-h-0 flex-col">
+              <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5">
+                {selectedSession.pinned ? (
+                  <Pin
+                    aria-hidden="true"
+                    className="size-3.5 text-muted-foreground"
+                  />
+                ) : null}
+                <h3 className="min-w-0 truncate nessa-text-4 font-medium">
+                  {selectedSession.label}
+                </h3>
+                <span className="ms-auto shrink-0 nessa-text-2 text-muted-foreground">
+                  {selectedSession.worktree}
+                </span>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <SessionThread session={selectedSession} />
+              </div>
+
+              <div className="shrink-0 p-3">
+                <ChatComposer
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    setDraft("")
+                  }}
+                >
+                  <ChatComposerInput
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    placeholder={`Reply to ${selectedSession.agent}`}
+                  />
+                  <ChatComposerFooter>
+                    <ChatComposerActions>
+                      <ChatComposerAction aria-label="Add attachment">
+                        <Plus aria-hidden="true" />
+                      </ChatComposerAction>
+                    </ChatComposerActions>
+                    <ChatComposerActions className="justify-end">
+                      <ChatComposerSubmit
+                        disabled={draft.trim().length === 0}
+                      />
+                    </ChatComposerActions>
+                  </ChatComposerFooter>
+                </ChatComposer>
+              </div>
+            </div>
+          </SplitViewPanel>
+        </SplitView>
       </SidebarInset>
     </SidebarProvider>
   )
@@ -358,46 +542,67 @@ function AgentWorkspaceDemo() {
 
 export const SlackStyleWorkspace: StoryObj = {
   parameters: storyDocumentation(
-    "Sections and channels live in the Sidebar; each channel discloses its agent sessions as a nested menu with branch guides, and every child row carries the worktree it runs in through the same `icon` slot a top-level row uses. The tab strip above the channel body is a real tablist that reorganizes those sessions into drawers, and the body itself is the Message thread kit over a MessageScroller with a ChatComposer beneath.",
+    "Three columns, each holding what it can hold at scale. The left rail keeps only sections, channels and each channel's pinned sessions, so its height stays bounded however many agents are running — the channel's full session list lives in its own column, scoped by Tabs drawers and grouped under the SectionedListbox's sticky status headers with roving focus across group boundaries. A SplitView separator lets the rail and the thread trade width. Selecting a session, from either the pinned rail or the list, swaps the thread beside it.",
   ),
   render: () => <AgentWorkspaceDemo />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
 
-    // Channels disclose their sessions, and each child row has its worktree
-    // icon — the icon slot works at any depth.
-    const sessionRow = canvas.getByRole("button", {
-      name: "Nested guides + collapsible menu",
+    // The left rail lists only pinned sessions, not every session in the
+    // channel — that is what keeps its height bounded.
+    const nav = canvas.getByRole("complementary", {
+      name: "Workspace navigation",
     })
-    await expect(sessionRow.querySelector("svg")).not.toBeNull()
-
-    // The channel row still navigates while its own chevron discloses.
-    const toggle = canvas.getByRole("button", {
-      name: "Toggle eng-tabs sessions",
-    })
-    await expect(toggle).toHaveAttribute("aria-expanded", "false")
-    await userEvent.click(toggle)
-    await expect(toggle).toHaveAttribute("aria-expanded", "true")
+    const navScope = within(nav)
     await expect(
-      canvas.getByRole("button", { name: "Port tablist to Radix" }),
+      navScope.getByRole("button", { name: /^Nested guides \+ collapsible menu/ }),
+    ).toBeVisible()
+    // Every session, pinned or not, is in the channel's own column. Each
+    // drawer is its own panel, so the list is re-queried after every switch
+    // rather than held across one.
+    const listIn = (channel: string) =>
+      canvas.getByRole("listbox", { name: `Agent sessions in ${channel}` })
+    await expect(
+      within(listIn("eng-sidebar")).getAllByRole("option"),
+    ).toHaveLength(5)
+    // Sticky status headers group them.
+    await expect(listIn("eng-sidebar")).toHaveTextContent("Running")
+    await expect(listIn("eng-sidebar")).toHaveTextContent("Archived")
+
+    // The drawers scope the list without touching the left rail.
+    await userEvent.click(canvas.getByRole("tab", { name: /Archived/ }))
+    await expect(
+      within(listIn("eng-sidebar")).getAllByRole("option"),
+    ).toHaveLength(2)
+    await expect(listIn("eng-sidebar")).not.toHaveTextContent(
+      "RTL sweep for the guide rail",
+    )
+    await expect(
+      navScope.queryByRole("button", { name: /^RTL sweep for the guide rail/ }),
+    ).toBeNull()
+
+    // Selecting a session swaps the thread beside it.
+    await userEvent.click(
+      within(listIn("eng-sidebar")).getByRole("option", {
+        name: /Focus ledger reconciliation/,
+      }),
+    )
+    await expect(
+      canvas.getByRole("heading", { name: "Focus ledger reconciliation" }),
     ).toBeVisible()
 
-    // The drawers are a real tablist over the same sessions.
-    const drawers = canvas.getByRole("tablist", { name: "Session drawers" })
-    await expect(drawers).toBeInTheDocument()
-    await userEvent.click(canvas.getByRole("tab", { name: /Needs review/ }))
-    const panel = canvas.getByRole("tabpanel")
-    await expect(panel).toHaveTextContent("Trailing alignment audit")
-    await expect(panel).toHaveTextContent("Cut 0.4.0")
-    await expect(panel).not.toHaveTextContent("Port tablist to Radix")
-
-    // The channel body threads like Slack.
-    await userEvent.click(canvas.getByRole("tab", { name: /All/ }))
-    const summary = canvas.getByRole("button", { name: /1 reply/ })
-    await expect(summary).toHaveAttribute("aria-expanded", "false")
-    await userEvent.click(summary)
+    // A pinned row in the left rail selects the same way.
+    await userEvent.click(
+      navScope.getByRole("button", { name: /^Nested guides \+ collapsible menu/ }),
+    )
     await expect(
-      canvas.getByText(/icon` is on every row/),
+      canvas.getByRole("heading", { name: "Nested guides + collapsible menu" }),
     ).toBeVisible()
+
+    // Switching channel rescopes the column, and the drawer counts with it.
+    await userEvent.click(navScope.getByRole("button", { name: "release" }))
+    await expect(
+      canvas.getByRole("listbox", { name: "Agent sessions in release" }),
+    ).toBeInTheDocument()
   },
 }

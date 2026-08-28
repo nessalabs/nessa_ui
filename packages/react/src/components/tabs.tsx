@@ -54,12 +54,17 @@ const tabsListVariants = cva(
         // compiles to two nested ancestors, and there is only one list.
         underline: [
           "gap-4 border-border data-[orientation=horizontal]:border-b data-[orientation=vertical]:gap-1 data-[orientation=vertical]:border-e",
+          // A horizontal strip scrolls rather than crushing its tabs: the
+          // tabs keep their natural width and the strip overflows, so a
+          // narrow column gets a scrollable strip instead of a cramped one.
+          "data-[orientation=horizontal]:overflow-x-auto data-[orientation=horizontal]:[&>[data-slot=tabs-trigger]]:shrink-0",
           "[&>[data-slot=tabs-trigger]]:min-h-9 [&>[data-slot=tabs-trigger]]:px-0.5",
           "[&>[data-slot=tabs-trigger]]:after:absolute [&>[data-slot=tabs-trigger]]:after:bg-transparent [&>[data-slot=tabs-trigger]]:after:transition-colors [&>[data-slot=tabs-trigger]]:after:content-['']",
-          // The selected tab overdraws the strip's rule, inset by the rule's
-          // own width so the two meet exactly instead of doubling.
+          // The selected tab's indicator sits on the strip's rule rather
+          // than overhanging it: a scrolling strip clips both axes, and a
+          // negative offset would be the part that gets cut.
           "[&>[data-slot=tabs-trigger][data-state=active]]:after:bg-foreground",
-          "data-[orientation=horizontal]:[&>[data-slot=tabs-trigger]]:after:inset-x-0 data-[orientation=horizontal]:[&>[data-slot=tabs-trigger]]:after:-bottom-px data-[orientation=horizontal]:[&>[data-slot=tabs-trigger]]:after:h-0.5",
+          "data-[orientation=horizontal]:[&>[data-slot=tabs-trigger]]:after:inset-x-0 data-[orientation=horizontal]:[&>[data-slot=tabs-trigger]]:after:bottom-0 data-[orientation=horizontal]:[&>[data-slot=tabs-trigger]]:after:h-0.5",
           "data-[orientation=vertical]:[&>[data-slot=tabs-trigger]]:justify-start data-[orientation=vertical]:[&>[data-slot=tabs-trigger]]:px-2.5 data-[orientation=vertical]:[&>[data-slot=tabs-trigger]]:after:inset-y-0 data-[orientation=vertical]:[&>[data-slot=tabs-trigger]]:after:-end-px data-[orientation=vertical]:[&>[data-slot=tabs-trigger]]:after:w-0.5",
         ],
         pill: [
@@ -151,10 +156,13 @@ function TabsTrigger({
         <span className="col-start-1 row-start-1 truncate group-data-[state=active]/tabs-trigger:font-medium">
           {children}
         </span>
-        {/* Reserves the selected weight's width so the strip never reflows. */}
+        {/* Reserves the selected weight's width so the strip never reflows.
+            It truncates like the visible copy: left untruncated it sizes the
+            grid cell from the full text, and a tab that has to shrink then
+            spills its label over its neighbours instead of clipping. */}
         <span
           aria-hidden="true"
-          className="invisible col-start-1 row-start-1 font-medium"
+          className="invisible col-start-1 row-start-1 truncate font-medium"
         >
           {children}
         </span>
