@@ -350,7 +350,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "iMessage-style transcript primitives that compose with PillComposer: ChatMessage aligns a sent or received column and springs in on mount; ChatBubble is the colored bubble (a real button when it carries an onSelect action such as reply); ChatMessageQuote and ChatMessageReceipt add reply context and delivery state; ChatTypingIndicator pulses while the agent responds; and ChatAttachmentTile, ChatAttachmentStack, and ChatAttachmentViewer give every attachment kind one square-tile language — fanned into a one-direction stack when collapsed and filling the chat frame as a grid when opened.",
+          "iMessage-style transcript primitives that compose with PillComposer: ChatMessage aligns a sent or received column and springs in on mount; ChatBubble is the colored bubble (a real button when it carries an onSelect action such as reply); ChatMessageQuote and ChatMessageReceipt add reply context and delivery state; ChatTypingIndicator pulses while the agent responds; ChatReactionPicker (with the exported chatReactionOptions) is the iMessage tapback row, cascading in per emoji and composing into ContextMenu hosts as keyboard-reachable menu items; and ChatAttachmentTile, ChatAttachmentStack, and ChatAttachmentViewer give every attachment kind one square-tile language — fanned into a one-direction stack when collapsed and filling the chat frame as a grid when opened.",
       },
     },
   },

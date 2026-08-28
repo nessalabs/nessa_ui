@@ -9,7 +9,6 @@ import {
   ChatAttachmentViewer,
   ChatBubble,
   ChatComposerAction,
-  ChatComposerAttachment,
   ChatComposerAttachments,
   ChatComposerInput,
   ChatComposerTrigger,
@@ -798,9 +797,16 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
           inputRef.current?.focus()
         }}
       />
+      {/* The tabpanel wrapper honors ChatTabs' aria-controls contract; the
+          log region lives inside it. */}
       <div
         id={`chat-tab-panel-${activeTabId}`}
         aria-labelledby={`chat-tab-${activeTabId}`}
+        role="tabpanel"
+        className="flex min-h-0 flex-1 flex-col"
+      >
+      <div
+        aria-label="Conversation"
         role="log"
         className="flex min-h-0 flex-1 flex-col justify-end gap-2 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
@@ -845,6 +851,7 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
         {generating && !messages.some((message) => message.streaming) ? (
           <ChatTypingIndicator label="Assistant is typing" />
         ) : null}
+      </div>
       </div>
       {viewerAttachments ? (
         <ChatAttachmentViewer
@@ -1132,7 +1139,6 @@ function GeneratingExample() {
   )
 }
 
-/** Shows the ChatComposer attachment primitives composing inside the pill. */
 /**
  * The voice control in isolation: hold-to-record streams a transcription
  * only while held (pulsing waveform, red tint), right-click opens the

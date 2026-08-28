@@ -94,7 +94,10 @@ function ChatMessage({
   const ref = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => {
     const node = ref.current
-    if (!node || !animateIn || reducedMotion) return
+    if (!node || !animateIn || typeof node.animate !== "function") return
+    // Read the live preference here rather than the captured render value:
+    // the hydration render reports the server snapshot.
+    if (window.matchMedia(reducedMotionQuery).matches) return
     const duration = cssDurationInMilliseconds(
       getComputedStyle(node).getPropertyValue("--nessa-motion-duration-normal"),
       260,
@@ -238,6 +241,13 @@ function ChatBubble({
         clearLongPress()
       },
     ),
+    // Touch long-press ends in pointercancel, not pointerup — without this
+    // the stale timer could fire and the pressed flag would stick.
+    onPointerCancel: (event: React.PointerEvent<HTMLElement>) => {
+      void event
+      pointerPressedRef.current = false
+      clearLongPress()
+    },
   }
   const reactionBadge = reaction ? (
     <span
@@ -376,7 +386,8 @@ function ChatReactionPicker({
   const ref = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => {
     const node = ref.current
-    if (!node || reducedMotion) return
+    if (!node || typeof node.animate !== "function") return
+    if (window.matchMedia(reducedMotionQuery).matches) return
     // The iMessage tapback entrance: the pill pops in, then each emoji
     // springs up in a quick left-to-right cascade with a small overshoot.
     const animations = [
@@ -461,6 +472,7 @@ function ChatTypingIndicator({
   React.useEffect(() => {
     const node = ref.current
     if (!node || reducedMotion) return
+    if (typeof node.animate !== "function") return
     const dots = Array.from(node.querySelectorAll("[data-slot=chat-typing-dot]"))
     const animations = dots.map((dot, index) =>
       dot.animate(
@@ -684,7 +696,8 @@ function ChatAttachmentViewer({
   const ref = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => {
     const node = ref.current
-    if (!node || reducedMotion) return
+    if (!node || typeof node.animate !== "function") return
+    if (window.matchMedia(reducedMotionQuery).matches) return
     const duration = cssDurationInMilliseconds(
       getComputedStyle(node).getPropertyValue("--nessa-motion-duration-fast"),
       160,
@@ -698,6 +711,14 @@ function ChatAttachmentViewer({
     // The fade runs once, on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  // The close callback is read through a ref so the focus-management
+  // effect can run once on mount: hosts pass inline closures, and keying
+  // the effect on their identity would re-capture the opener and yank
+  // focus back to the first button on every parent render.
+  const onCloseRef = React.useRef(onClose)
+  React.useEffect(() => {
+    onCloseRef.current = onClose
+  })
   React.useEffect(() => {
     const node = ref.current
     const ownerDocument = node?.ownerDocument
@@ -719,7 +740,7 @@ function ChatAttachmentViewer({
       if (event.key === "Escape") {
         event.preventDefault()
         event.stopPropagation()
-        onClose()
+        onCloseRef.current()
         return
       }
       if (event.key !== "Tab") return
@@ -743,7 +764,9 @@ function ChatAttachmentViewer({
       })
       opener?.focus()
     }
-  }, [onClose])
+    // Mount-once by design; onClose flows through onCloseRef.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   return (
     <div
       ref={ref}

@@ -2,7 +2,7 @@
   "$schema": "https://ui.shadcn.com/schema/registry-item.json",
   "name": "chat-tabs",
   "title": "Chat Tabs",
-  "description": "The floating chat window's tab strip: pill tabs on a scrolling tablist with primary-tinted active state, busy dots, attention badges, per-tab close controls, a new-tab button, and roving arrow-key navigation.",
+  "description": "The floating chat window's tab strip: pill tabs on a scrolling tablist with chat-accent-tinted active state, busy dots, attention badges, per-tab close controls, a new-tab button, and roving arrow-key navigation.",
   "dependencies": [
     "lucide-react"
   ],

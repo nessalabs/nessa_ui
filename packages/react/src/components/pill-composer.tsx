@@ -84,13 +84,27 @@ function PillComposerRim({
 }) {
   const reducedMotion = useReducedMotion()
   const [present, setPresent] = React.useState(false)
+  const wrapperRef = React.useRef<HTMLSpanElement>(null)
   const ringSpinRef = React.useRef<HTMLSpanElement>(null)
   const glowSpinRef = React.useRef<HTMLSpanElement>(null)
 
   React.useEffect(() => {
     // With reduced motion the opacity transition is suppressed, so no
     // transitionend will retire the presence flag; mirror `active` directly.
-    if (active || reducedMotion) setPresent(active)
+    if (active || reducedMotion) {
+      setPresent(active)
+      return
+    }
+    // A fade-out with a zeroed duration token never fires transitionend
+    // either — retire the flag immediately, matching the spin effect's
+    // zero-duration guards.
+    const node = wrapperRef.current
+    if (!node) return
+    const duration = cssDurationInMilliseconds(
+      getComputedStyle(node).transitionDuration,
+      0,
+    )
+    if (duration === 0) setPresent(false)
   }, [active, reducedMotion])
 
   const spinning = present && !reducedMotion
@@ -103,6 +117,7 @@ function PillComposerRim({
       3200,
     )
     if (ambient === 0) return
+    if (typeof ring.animate !== "function") return
     const spin = [{ rotate: "0deg" }, { rotate: "360deg" }]
     const animations: Animation[] = []
     if (variant === "orbit") {
@@ -173,11 +188,18 @@ function PillComposerRim({
 
   return (
     <span
+      ref={wrapperRef}
       aria-hidden="true"
       data-slot="pill-composer-rim"
       data-active={active || undefined}
       data-variant={variant}
       onTransitionEnd={(event) => {
+        if (event.target === event.currentTarget && !active) setPresent(false)
+      }}
+      onTransitionCancel={(event) => {
+        // A fade-out interrupted by display:none (hidden panel, switched
+        // tab) cancels instead of ending — retire the flag so the infinite
+        // spin animations do not run forever on an invisible overlay.
         if (event.target === event.currentTarget && !active) setPresent(false)
       }}
       className="pointer-events-none absolute -inset-px z-10 rounded-[inherit] opacity-0 transition-opacity [transition-duration:var(--nessa-motion-duration-normal)] [transition-timing-function:var(--nessa-motion-easing-standard)] data-[active]:opacity-100 motion-reduce:transition-none"

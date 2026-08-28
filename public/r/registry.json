@@ -773,7 +773,7 @@
       "name": "chat-bubbles",
       "type": "registry:ui",
       "title": "Chat Bubbles",
-      "description": "iMessage-style transcript primitives: aligned message columns with spring-in bubbles, reply quotes, delivery receipts, a pulsing typing indicator, and square attachment tiles with a fanned stack and a full-surface grid viewer.",
+      "description": "iMessage-style transcript primitives: aligned message columns with spring-in bubbles, reply quotes, delivery receipts, a pulsing typing indicator, the tapback reaction row with per-emoji cascade, and square attachment tiles with a fanned stack and a full-surface grid viewer.",
       "dependencies": [
         "lucide-react"
       ],
@@ -794,7 +794,7 @@
       "name": "chat-tabs",
       "type": "registry:ui",
       "title": "Chat Tabs",
-      "description": "The floating chat window's tab strip: pill tabs on a scrolling tablist with primary-tinted active state, busy dots, attention badges, per-tab close controls, a new-tab button, and roving arrow-key navigation.",
+      "description": "The floating chat window's tab strip: pill tabs on a scrolling tablist with chat-accent-tinted active state, busy dots, attention badges, per-tab close controls, a new-tab button, and roving arrow-key navigation.",
       "dependencies": [
         "lucide-react"
       ],
