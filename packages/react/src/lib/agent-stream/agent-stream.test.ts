@@ -20,6 +20,7 @@ import { TranscriptBuilder } from "./builder"
 import { ClaudeStreamMapper, mapClaudeStream } from "./claude/mapper"
 import { applyDeltas, buildTranscript, isToolGroup, previewOf } from "./transcript"
 import { ClaudeSystemSubtype, ClaudeWireType, parseWireLines } from "./claude/wire"
+import { asRecord } from "./json"
 
 const FIXTURES = fileURLToPath(new URL("../../../../../apps/storybook/stories/fixtures/agent-stream/", import.meta.url))
 
@@ -1092,4 +1093,96 @@ test("an activity line names what the agent is doing right now", () => {
   const activity = events.flatMap((event) => (event.payload.type === "activity" ? [event.payload.detail] : []))
   assert.ok(activity.length > 0)
   assert.ok(activity.every((detail) => detail.length > 0), "an activity with no detail is dropped, not emitted blank")
+})
+
+/**
+ * Approvals are the one part of the wire that is a conversation rather than a
+ * broadcast: the harness blocks, asks, and will not proceed until answered.
+ * These two captures are real runs against a sandbox whose settings escalate
+ * Bash, recorded once answering allow and once answering deny.
+ */
+test("an approval ask carries everything needed to answer it", () => {
+  const events = mapClaudeStream(capture("approval_allow"))
+  const asks = events.flatMap((event) => (event.payload.type === "permission_requested" ? [event.payload] : []))
+  assert.equal(asks.length, 1)
+  const [ask] = asks
+  // The id is what an answer is addressed to, and the call id is what ties the
+  // ask to the tool row already on screen.
+  assert.ok(ask.requestId.length > 0)
+  assert.ok(ask.callId.startsWith("toolu_"))
+  assert.equal(ask.toolName, "Bash")
+  // Without the input there is nothing to approve: this is the text a person
+  // reads before deciding.
+  assert.equal(asRecord(ask.input).command, "echo approved-and-ran")
+  // The harness says why it escalated. It sends `decision_reason_type`, not
+  // `decision_reason` — reading the documented name alone returned null here,
+  // which is exactly the kind of thing only a capture catches.
+  assert.equal(ask.reason, "rule")
+  assert.equal(ask.displayName, "Bash")
+  assert.ok((ask.description ?? "").length > 0)
+})
+
+test("a decision records which way it went, not merely that it happened", () => {
+  for (const [name, expected] of [["approval_allow", "allow"], ["approval_deny", "deny"]] as const) {
+    const events = mapClaudeStream(capture(name))
+    const asks = events.flatMap((event) => (event.payload.type === "permission_requested" ? [event.payload] : []))
+    const decisions = events.flatMap((event) => (event.payload.type === "permission_decided" ? [event.payload] : []))
+    assert.equal(decisions.length, 1, name)
+    assert.equal(decisions[0].decision, expected, name)
+    // Every ask is retired by a decision addressed to it. A pending ask with no
+    // matching id is a stuck session, so the join has to hold.
+    assert.equal(decisions[0].requestId, asks[0].requestId, name)
+    // Control frames carry no timestamp of their own — both directions of the
+    // ask arrive with a null `ts`. Ordering here rests on `seq` alone, which is
+    // why `seq` and not time is the ordering key.
+    const control = events.filter((event) => event.payload.type === "permission_requested" || event.payload.type === "permission_decided")
+    assert.ok(control.every((event) => event.ts === null), name)
+    assert.ok(control[0].seq < control[1].seq, name)
+  }
+})
+
+test("a refusal reaches the model as a failed tool result, and the turn still succeeds", () => {
+  const events = mapClaudeStream(capture("approval_deny"))
+  const ask = events.flatMap((event) => (event.payload.type === "permission_requested" ? [event.payload] : []))[0]
+  const decision = events.flatMap((event) => (event.payload.type === "permission_decided" ? [event.payload] : []))[0]
+  // The reason given for the refusal is not decoration: it is handed to the
+  // model verbatim as the tool's error text, which is how the agent knows to
+  // stop rather than retry.
+  assert.equal(decision.message, "The operator declined this command.")
+  const failed = events.flatMap((event) =>
+    event.payload.type === "tool_call_completed" && event.payload.result.isError ? [event.payload.result] : [],
+  )
+  assert.equal(failed.length, 1)
+  assert.equal(failed[0].text, decision.message)
+
+  // A refused tool is not a failed run. The result line reports success, and
+  // the refusal is recorded separately — drawing the turn as an error here
+  // would be wrong.
+  const result = events.flatMap((event) => (event.payload.type === "turn_completed" ? [event.payload] : []))[0]
+  assert.equal(result.status, "completed")
+  // The refusal is reported on the result too, which is what lets a transcript
+  // rebuilt from the result alone still show that something was declined.
+  assert.equal(result.permissionDenials.length, 1)
+  const [denial] = result.permissionDenials
+  assert.equal(denial.toolName, "Bash")
+  // Reported under the same call id the ask used, so the two join up.
+  assert.equal(denial.callId, ask.callId)
+  assert.equal(asRecord(denial.input).command, "echo approved-and-ran")
+
+  // And the transcript ends with the agent explaining the refusal rather than
+  // with a dangling call.
+  const transcript = buildTranscript(events)
+  const last = transcript.turns[transcript.turns.length - 1]
+  assert.equal(last.toolCalls, 1)
+  assert.ok((last.finalText ?? "").includes("declined"))
+})
+
+test("the allowed run reaches the same place by the other road", () => {
+  const events = mapClaudeStream(capture("approval_allow"))
+  const results = events.flatMap((event) => (event.payload.type === "tool_call_completed" ? [event.payload.result] : []))
+  assert.equal(results.length, 1)
+  assert.equal(results[0].isError, false)
+  assert.equal(results[0].text, "approved-and-ran")
+  const finished = events.flatMap((event) => (event.payload.type === "turn_completed" ? [event.payload] : []))[0]
+  assert.equal(finished.permissionDenials.length, 0)
 })

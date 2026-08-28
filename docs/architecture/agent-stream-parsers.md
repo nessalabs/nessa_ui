@@ -147,8 +147,9 @@ Four kinds of line arrive interleaved on one stdout:
    `terminal_reason`, `permission_denials` and a per-model usage breakdown.
 
 Plus `rate_limit_event`, and — only when the child was spawned with
-`--permission-prompt-tool stdio` — `control_request`, the one inbound line that
-**blocks the agent until answered**.
+`--permission-prompt-tool stdio` — `control_request`, the one line that
+**blocks the agent until answered** on stdin. It is the sole duplex exchange on
+an otherwise one-way wire.
 
 ### The stream is not one event per line, and must not be
 
@@ -498,7 +499,39 @@ plan, a subagent, a workflow, a web search, and a resume with a different model.
 Those eight are what the checked-in fixtures cover, and each one broke something
 in the parser that the others did not.
 
-Two shapes remain uncaptured and are therefore unimplemented rather than
-guessed: `control_request` permission prompts (they need
-`--permission-prompt-tool stdio`) and `compact_boundary`. Capture before
-modelling.
+One shape remains uncaptured and is therefore unimplemented rather than
+guessed: `compact_boundary`. Capture before modelling.
+
+Approvals were the last of these, and are now captured twice — once answered
+allow, once answered deny. Getting them to happen at all took an explicit rule
+in the sandbox's own settings:
+
+```json
+{ "permissions": { "ask": ["Bash(*)", "WebFetch(*)"], "defaultMode": "default" } }
+```
+
+Without an `ask` rule nothing escalates, which is why earlier attempts recorded
+nothing no matter which permission mode was used. The capture immediately
+corrected two things that had been written from the documented shape:
+
+- The ask names its reason `decision_reason_type` (`"rule"` here), not
+  `decision_reason`. Reading the documented name alone returned null.
+- The reply's `behavior` — `allow` or `deny` — was not being read at all, so a
+  decision recorded only that it had happened. A consumer cannot draw a
+  refusal it cannot see.
+
+What the exchange looks like, and what a consumer needs from it:
+
+| Fact | Where it lands |
+| --- | --- |
+| The ask, with the exact input to be approved | `permission_requested` |
+| Why the harness escalated | `reason` — `"rule"` |
+| The answer, and its direction | `permission_decided.decision` |
+| The refusal's stated reason | becomes the tool result's error text, verbatim |
+| Refusals over the whole turn | `turn_completed.permissionDenials` |
+
+Two consequences worth designing for. A declined tool is **not** a failed turn:
+the result still reports success, and the agent explains itself in prose. And
+neither control frame carries a timestamp, so ordering an approval against the
+surrounding stream rests on `seq` alone — which is the reason `seq` and not `ts`
+is the ordering key.

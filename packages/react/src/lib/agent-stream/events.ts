@@ -263,7 +263,12 @@ export type AgentEventPayload =
       readonly usage: Usage | null
       readonly durationMs: number | null
       readonly numTurns: number | null
-      readonly permissionDenials: readonly JsonValue[]
+      /**
+       * What the operator refused during the turn. Present and empty on a
+       * clean run, so an empty list means "nothing was refused" rather than
+       * "the harness does not report refusals".
+       */
+      readonly permissionDenials: readonly PermissionDenial[]
     }
   // ---------- conversation ----------
   | { readonly type: "user_message"; readonly text: string; readonly synthetic: boolean }
@@ -367,10 +372,27 @@ export type AgentEventPayload =
       readonly requestId: string
       readonly callId: string
       readonly toolName: string
+      /** What the tool would run with. The ask is worth nothing without it. */
       readonly input: JsonValue
+      /** Why the harness escalated — a settings rule, a mode, a hook. */
       readonly reason: string | null
+      /** The harness's own label for the tool, when it differs from the name. */
+      readonly displayName: string | null
+      /** The agent's one-line account of what it is about to do. */
+      readonly description: string | null
     }
-  | { readonly type: "permission_decided"; readonly requestId: string }
+  | {
+      readonly type: "permission_decided"
+      readonly requestId: string
+      /**
+       * Which way it went. Null when the answer came back in a shape we could
+       * not read — the ask is retired either way, but a consumer must not draw
+       * an unknown answer as an approval.
+       */
+      readonly decision: "allow" | "deny" | null
+      /** The reason given for a refusal, which becomes the tool's error text. */
+      readonly message: string | null
+    }
   | { readonly type: "permission_denied"; readonly callId: string; readonly toolName: string; readonly message: string }
   // ---------- fallbacks ----------
   | { readonly type: "error"; readonly message: string }
@@ -396,6 +418,17 @@ export type AgentEventPayload =
  * literal. The values are the literals themselves, so the two are
  * interchangeable and both survive JSON.
  */
+/**
+ * A tool the operator refused, as summarised on the turn's own result. It
+ * repeats what the ask already said, which is what lets a consumer show a
+ * refusal on a transcript replayed from the result alone.
+ */
+export interface PermissionDenial {
+  readonly toolName: string
+  readonly callId: string
+  readonly input: JsonValue
+}
+
 export const AgentEventType = Object.freeze({
   SessionStarted: "session_started",
   ModelChanged: "model_changed",

@@ -16,7 +16,7 @@ import type {
   WorkflowPhaseProgress,
 } from "../events"
 import { claudePlanStatus, claudeTaskKind } from "./mapping"
-import { asNumber, asObject, asRecord, asString, asStrings } from "../json"
+import { asArray, asNumber, asObject, asOneOf, asRecord, asString, asStrings } from "../json"
 import { toolKind, toolTitle } from "./tools"
 import type {
   JsonValue,
@@ -284,7 +284,13 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
             callId: asString(request.tool_use_id) ?? "",
             toolName: asString(request.tool_name) ?? "",
             input: request.input ?? null,
-            reason: asString(request.decision_reason),
+            // The wire names this `decision_reason_type` ("rule", "mode", ...).
+            // `decision_reason` is accepted too because older builds sent it,
+            // and a null reason would quietly turn a rule-driven ask into an
+            // unexplained one.
+            reason: asString(request.decision_reason_type) ?? asString(request.decision_reason),
+            displayName: asString(request.display_name),
+            description: asString(request.description),
           },
           sessionId,
           path,
@@ -292,8 +298,22 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
           raw,
         )
       }
-      case ClaudeWireType.ControlResponse:
-        return this.wrap({ type: "permission_decided", requestId: asString(asRecord(asRecord(raw).response).request_id) ?? "" }, sessionId, path, ts, raw)
+      case ClaudeWireType.ControlResponse: {
+        const envelope = asRecord(asRecord(raw).response)
+        const answer = asRecord(envelope.response)
+        return this.wrap(
+          {
+            type: "permission_decided",
+            requestId: asString(envelope.request_id) ?? "",
+            decision: asOneOf(answer.behavior, ["allow", "deny"] as const),
+            message: asString(answer.message),
+          },
+          sessionId,
+          path,
+          ts,
+          raw,
+        )
+      }
       default:
         return this.wrap({ type: "unknown", wireType: event.type, subtype: asString(asRecord(raw).subtype) }, sessionId, path, ts, raw)
     }
@@ -756,7 +776,14 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
         usage: normalizeUsage(line.usage, asNumber(line.total_cost_usd)),
         durationMs: asNumber(line.duration_ms),
         numTurns: asNumber(line.num_turns),
-        permissionDenials: Array.isArray(line.permission_denials) ? line.permission_denials : [],
+        permissionDenials: asArray(line.permission_denials).map((entry) => {
+          const denial = asRecord(entry)
+          return {
+            toolName: asString(denial.tool_name) ?? "",
+            callId: asString(denial.tool_use_id) ?? "",
+            input: denial.tool_input ?? null,
+          }
+        }),
       },
       sessionId,
       path,

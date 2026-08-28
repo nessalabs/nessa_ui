@@ -71,6 +71,8 @@ import { storyDocumentation } from "./story-documentation"
 // directory. Everything below is parsed from these bytes — nothing in this file
 // is authored transcript data.
 import failing from "./fixtures/agent-stream/failing.jsonl?raw"
+import approvalAllow from "./fixtures/agent-stream/approval_allow.jsonl?raw"
+import approvalDeny from "./fixtures/agent-stream/approval_deny.jsonl?raw"
 import printed from "./fixtures/agent-stream/printed.jsonl?raw"
 import resumeOne from "./fixtures/agent-stream/resume_turn1.jsonl?raw"
 import resumeTwo from "./fixtures/agent-stream/resume_turn2.jsonl?raw"
@@ -225,6 +227,8 @@ const CAPTURES: readonly Capture[] = [
   { provider: "claude", id: "phases", label: "Multi-phase workflow", blurb: "Three phases, four agents. Every phase is declared up front, so the ones not reached yet render as pending rather than appearing late.", prompt: "Use a workflow with THREE phases: 'Greet' runs two agents in parallel (hello, hola); 'Translate' runs one (bonjour); 'Summarize' lists all three.", source: workflowPhases },
   { provider: "claude", id: "failing", label: "Failed tool", blurb: "A command that exits non-zero, with the wire's error framing stripped off.", prompt: "Run the command 'cat /nonexistent/definitely-missing-file' and then tell me what happened in one sentence.", source: failing },
   { provider: "claude", id: "websearch", label: "Web search", blurb: "Server-side tools, whose results arrive as structured blocks rather than text.", prompt: "Search the web for the current version of the TypeScript compiler and tell me in one line.", source: websearch },
+  { provider: "claude", id: "approval-allow", label: "Approval — allowed", blurb: "The one place the wire is a conversation: the harness stops and asks, and nothing moves until an answer is written back. Recorded against a sandbox whose settings escalate the shell.", prompt: "Run the shell command `echo approved-and-ran` using the Bash tool, then tell me its output. (Answered: allow)", source: approvalAllow },
+  { provider: "claude", id: "approval-deny", label: "Approval — refused", blurb: "The same ask, answered no. The refusal text becomes the tool's error, and the turn still completes — a declined tool is not a failed run.", prompt: "The same prompt, answered: deny.", source: approvalDeny },
   { provider: "claude", id: "resume", label: "Resume + model swap", blurb: "Two processes, one session id: a second init, and a model change derived from it.", prompt: "Remember the number 47. Create marker.txt containing it. Then, resumed on Haiku: what number did I ask you to remember?", source: `${resumeOne}\n${resumeTwo}` },
   // ---------- Codex ----------
   { provider: "codex", id: "codex-printed", label: "Plain text", blurb: "One committed message. Codex streams nothing in this mode, which is why live preview has to be optional rather than assumed.", prompt: "Reply with exactly: hello world. Do not run any commands.", source: codexPrinted },

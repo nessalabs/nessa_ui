@@ -69,6 +69,10 @@ memoize on the revision counter the snapshot carries, not on object identity.
   path; each further element is the tool call that spawned the next level down.
 - **Never invent data to fill a field.** Usage counters are nullable precisely
   so a provider that reports only a total cannot claim zero input tokens.
+- **An approval is a conversation, not a broadcast.** One line asks and blocks;
+  the answer goes back on the input stream. Record which way it was answered —
+  a decision that says only "answered" cannot be drawn. A refused tool fails,
+  but the turn does not.
 
 ## Delegated work has three visibility levels
 
@@ -115,3 +119,11 @@ claude -p --output-format stream-json --include-partial-messages --verbose \
 Put the prompt **before** `--allowed-tools`; the flag is variadic and swallows
 it otherwise. Design against captures, never against remembered field names —
 the wire moves, and a fixture is what tells you where it moved to.
+
+To capture an approval, the sandbox needs a settings file that escalates
+something, or nothing will ever ask. Run with `--input-format stream-json` and
+`--permission-prompt-tool stdio`, then write the answer back on stdin.
+
+```json
+{ "permissions": { "ask": ["Bash(*)"], "defaultMode": "default" } }
+```

@@ -183,11 +183,11 @@ export const CLAUDE_EVENT_MAPPING: Readonly<Record<ClaudeWireKind, ClaudeMapping
   // ---------- asks ----------
   [`${ClaudeWireType.ControlRequest}/can_use_tool`]: {
     emits: [AgentEventType.PermissionRequested],
-    note: "the one inbound line: the harness blocks until it is answered",
+    note: "the one duplex exchange: the harness blocks until it is answered, and the reply is written back on stdin",
   },
   [ClaudeWireType.ControlResponse]: {
     emits: [AgentEventType.PermissionDecided],
-    note: "retires a pending ask",
+    note: "retires a pending ask and records which way it went; neither direction carries a timestamp",
   },
 })
 
