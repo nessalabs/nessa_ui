@@ -485,12 +485,26 @@ export const NestedMenuGuides: StoryObj<NestedMenuGuidesStoryArgs> = {
 
     // Every row draws the elbow; only a row with a row after it draws the
     // trunk that carries the line on to the next elbow.
+    const guideColor = getComputedStyle(guidedMenu).getPropertyValue(
+      "--nessa-sidebar-guide-color",
+    )
     for (const row of rows) {
       const elbow = getComputedStyle(row, "::before")
       await expect(elbow.content).not.toBe("none")
-      await expect(elbow.borderBottomStyle).toBe("solid")
-      await expect(elbow.borderLeftStyle).toBe("solid")
+      // Width and colour, not style: preflight sets `border: 0 solid` on
+      // every pseudo-element, so asserting the style passes even with the
+      // elbow's border utilities deleted and nothing rendered.
+      await expect(Number.parseFloat(elbow.borderBottomWidth)).toBeGreaterThan(0)
+      await expect(Number.parseFloat(elbow.borderLeftWidth)).toBeGreaterThan(0)
+      await expect(elbow.borderBottomColor).not.toBe("rgba(0, 0, 0, 0)")
+      await expect(elbow.borderBottomColor).toBe(elbow.borderLeftColor)
+      await expect(guideColor.trim()).not.toBe("")
     }
+
+    // The spine is painted, not just positioned.
+    const paintedSpine = getComputedStyle(rows[0], "::after")
+    await expect(paintedSpine.backgroundColor).not.toBe("rgba(0, 0, 0, 0)")
+    await expect(Number.parseFloat(paintedSpine.width)).toBeGreaterThan(0)
     await expect(getComputedStyle(rows[0], "::after").content).not.toBe("none")
     await expect(getComputedStyle(rows[1], "::after").content).toBe("none")
 
@@ -682,33 +696,67 @@ export const TrailingAction: StoryObj = {
     const canvas = within(canvasElement)
     const first = canvas.getByRole("button", { name: "Settings for eng-sidebar" })
     const second = canvas.getByRole("button", { name: "Settings for eng-tabs" })
+    const firstRow = first.closest<HTMLElement>(
+      '[data-slot="sidebar-menu-item"]',
+    )!
     const opacityOf = (element: HTMLElement) =>
       Number.parseFloat(getComputedStyle(element.parentElement!).opacity)
 
     if (!matchMedia("(hover: hover) and (pointer: fine)").matches) {
-      // Without a fine pointer there is nothing to reveal on: both actions
-      // stay present, which is what keeps them reachable by touch.
+      // Without a fine pointer there is nothing to reveal on: both halves
+      // stay present, which keeps the action reachable by touch. They must
+      // then sit side by side — sharing one grid cell would print the badge
+      // through the action.
       await expect(opacityOf(first)).toBe(1)
       await expect(opacityOf(second)).toBe(1)
+      const touchBadge = firstRow.querySelector<HTMLElement>(
+        '[data-slot="sidebar-menu-item-badge"]',
+      )!
+      await expect(getComputedStyle(touchBadge).opacity).toBe("1")
+      await expect(
+        touchBadge.getBoundingClientRect().right,
+      ).toBeLessThanOrEqual(first.getBoundingClientRect().left + 0.5)
       return
     }
 
-    // Both actions rest hidden; the counts hold the trailing cell.
+    // Both actions rest hidden; the counts hold the trailing cell, and the
+    // two share it rather than sitting side by side.
     await expect(opacityOf(first)).toBe(0)
     await expect(opacityOf(second)).toBe(0)
+    const badge = firstRow.querySelector<HTMLElement>(
+      '[data-slot="sidebar-menu-item-badge"]',
+    )!
+    await expect(getComputedStyle(badge).opacity).toBe("1")
+    await expect(badge.getBoundingClientRect().left).toBeCloseTo(
+      first.parentElement!.getBoundingClientRect().left,
+      0,
+    )
 
-    // The regression this guards: clicking a row leaves focus inside it, and
-    // a :focus-within reveal would keep that row's action showing while the
-    // pointer moved on to another row. Keyed off :focus-visible, a mouse
-    // click reveals nothing.
-    await userEvent.click(canvas.getByRole("button", { name: "eng-sidebar" }))
-    await expect(opacityOf(first)).toBe(0)
-    await expect(opacityOf(second)).toBe(0)
+    // The reveal must key off :focus-visible, not :focus-within — a mouse
+    // click leaves focus inside the row it clicked, and :focus-within would
+    // keep that row revealed while the pointer moved to another row.
+    //
+    // This is asserted as a class contract rather than behaviourally on
+    // purpose: in this runner userEvent.click grants :focus-visible (probed —
+    // `row.matches(":focus-visible")` is true after a click), so the two
+    // selectors are behaviourally indistinguishable here and any click-based
+    // assertion would pass against both. The class assertion fails if the
+    // selector regresses; a real browser does the discriminating.
+    const reveal = first.parentElement!
+    await expect(reveal.className).toContain(
+      "group-has-[:focus-visible]/menu-item:opacity-100",
+    )
+    await expect(reveal.className).not.toContain("group-focus-within")
+    await expect(badge.className).not.toContain("group-focus-within")
 
-    // Keyboard focus still reveals, and only for the row that holds it.
+    // Keyboard focus reveals the action and retires the badge — the swap, in
+    // both directions, on the row that holds focus and only that row.
     first.focus()
     await waitFor(async () => {
       await expect(opacityOf(first)).toBe(1)
+    })
+    await waitFor(async () => {
+      await expect(getComputedStyle(badge).opacity).toBe("0")
     })
     await expect(opacityOf(second)).toBe(0)
   },

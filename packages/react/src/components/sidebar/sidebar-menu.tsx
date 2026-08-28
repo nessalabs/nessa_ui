@@ -124,6 +124,16 @@ const sidebarMenuRevealClassName =
 const sidebarMenuSwapRestClassName =
   "transition-opacity [@media(hover:hover)_and_(pointer:fine)]:group-has-[:focus-visible]/menu-item:opacity-0 [@media(hover:hover)_and_(pointer:fine)]:group-hover/menu-item:opacity-0"
 
+/**
+ * The swap's container. Only a fine pointer has a hover state to reveal on,
+ * so only there do the two halves share a cell. On a coarse pointer nothing
+ * hides either half, and stacking them would print the badge through the
+ * action — they sit side by side instead, which is also how the non-swap
+ * arrangement degrades.
+ */
+const sidebarMenuSwapClassName =
+  "flex items-center gap-1 [@media(hover:hover)_and_(pointer:fine)]:grid [@media(hover:hover)_and_(pointer:fine)]:place-items-center"
+
 /** The badge's own presentation, shared by both trailing arrangements. */
 const sidebarMenuBadgeClassName =
   "pointer-events-none inline-flex min-w-6 items-center justify-center nessa-text-2 font-medium tabular-nums text-sidebar-foreground/60 group-has-data-[active=true]/menu-item:text-sidebar-accent-foreground"
@@ -188,7 +198,11 @@ interface SidebarMenuItemProps
    */
   isActive?: boolean
   /**
-   * Hides trailing content until hover or focus when a fine pointer is available.
+   * Reveals trailing content on hover or keyboard focus when a fine pointer
+   * is available. With a `badge` also present the two share one cell and
+   * swap, so revealing the action costs neither width nor the row's resting
+   * count; without one the trailing region simply fades in. A coarse pointer
+   * has nothing to reveal on, so trailing content stays present there.
    * @defaultValue false
    */
   showTrailingOnHover?: boolean
@@ -202,7 +216,12 @@ interface SidebarMenuItemProps
    * without a `submenu`.
    */
   collapsible?: "row" | "chevron"
-  /** Accessible name for a `"chevron"` disclosure control. */
+  /**
+   * Accessible name for a `"chevron"` disclosure control. Name it for the row
+   * it belongs to: a list of rows sharing one label produces a list of
+   * identically-named buttons that a screen reader cannot tell apart.
+   * Required whenever `collapsible` is `"chevron"`.
+   */
   collapsibleLabel?: string
   /** Open state of a collapsible `submenu`, for host-controlled disclosure. */
   open?: boolean
@@ -418,10 +437,19 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
   return (
     <li
       data-slot="sidebar-menu-item"
-      data-has-trailing={hasTrailing || undefined}
       data-state={isCollapsible ? (open ? "open" : "closed") : undefined}
-      className={cn("group/menu-item relative min-w-0", containerClassName)}
+      className={cn("relative min-w-0", containerClassName)}
     >
+      {/* The row's own scope. `group/menu-item` compiles to a descendant
+          match, so a submenu nested inside the scope would let a child row's
+          hover or focus drive the parent's reveal, swap and trailing pad —
+          the parent swapping its badge for its action while the pointer is
+          two rows away. The submenu stays outside this element. */}
+      <div
+        data-slot="sidebar-menu-item-row"
+        data-has-trailing={hasTrailing || undefined}
+        className="group/menu-item relative min-w-0"
+      >
       {isCollapsible && collapsible === "chevron" ? (
         <button
           type="button"
@@ -452,12 +480,12 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
           )}
         >
           {swapsBadge ? (
-            <span className="grid place-items-center">
+            <span className={sidebarMenuSwapClassName}>
               <span
                 data-slot="sidebar-menu-item-badge"
                 className={cn(
                   sidebarMenuBadgeClassName,
-                  "col-start-1 row-start-1",
+                  "[@media(hover:hover)_and_(pointer:fine)]:col-start-1 [@media(hover:hover)_and_(pointer:fine)]:row-start-1",
                   sidebarMenuSwapRestClassName,
                 )}
               >
@@ -465,7 +493,7 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
               </span>
               <span
                 className={cn(
-                  "col-start-1 row-start-1 flex items-center gap-0.5 transition-opacity",
+                  "flex items-center gap-0.5 transition-opacity [@media(hover:hover)_and_(pointer:fine)]:col-start-1 [@media(hover:hover)_and_(pointer:fine)]:row-start-1",
                   sidebarMenuRevealClassName,
                 )}
               >
@@ -487,6 +515,7 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
           )}
         </div>
       ) : null}
+      </div>
       {isCollapsible ? (
         // The wrapper always renders so `aria-controls` always names a real
         // element; `hidden` closes it without discarding the subtree's own
@@ -535,6 +564,7 @@ function SidebarMenuAction({
     <Comp
       type={asChild ? undefined : "button"}
       data-slot="sidebar-menu-action"
+      data-sidebar="menu-action"
       className={cn(
         "inline-flex size-6 shrink-0 appearance-none items-center justify-center rounded-md border-0 bg-transparent p-0 text-sidebar-foreground/70 outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring disabled:pointer-events-none disabled:opacity-50 [&>svg]:size-3.5 [&>svg]:shrink-0",
         className,

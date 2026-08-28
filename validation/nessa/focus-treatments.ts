@@ -396,8 +396,12 @@ export const focusGeometryClasses = Object.freeze([
   { component: "input", className: "focus-visible:ring-[3px]" },
   { component: "questionnaire", className: "focus-visible:outline-2", count: 1 },
   { component: "questionnaire", className: "focus-visible:outline-offset-2", count: 1 },
+  // The tab's outline draws inset: a horizontal strip scrolls, which clips
+  // both axes, so an outset ring would be cut off at top and bottom. The
+  // panel is not in that strip and keeps the standard outset offset.
   { component: "tabs", className: "focus-visible:outline-2", count: 2 },
-  { component: "tabs", className: "focus-visible:outline-offset-2", count: 2 },
+  { component: "tabs", className: "focus-visible:-outline-offset-2", count: 1 },
+  { component: "tabs", className: "focus-visible:outline-offset-2", count: 1 },
   ...composerFocusComponents.flatMap(({ component, count }) => [
     { component, className: "focus-visible:outline-2", count },
     { component, className: "focus-visible:outline-offset-2", count },

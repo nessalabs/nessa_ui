@@ -72,6 +72,24 @@ export const Underline: Story = {
       inbox.getAttribute("id"),
     )
 
+    // The icon and badge slots render, and the icon stays out of the name.
+    await expect(inbox.querySelector("svg")).not.toBeNull()
+    await expect(
+      inbox.querySelector('[data-slot="tabs-trigger-badge"]')!.textContent,
+    ).toBe("12")
+    // The icon is decorative: its wrapper carries aria-hidden, so the tab's
+    // name stays the label plus its count.
+    await expect(inbox.querySelector("svg")!.parentElement).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    )
+
+    // A horizontal strip scrolls rather than crushing its tabs.
+    await expect(getComputedStyle(list).overflowX).toBe("auto")
+    for (const tab of canvas.getAllByRole("tab")) {
+      await expect(getComputedStyle(tab).flexShrink).toBe("0")
+    }
+
     // Roving focus: once focus is in the list it is a single tab stop, so
     // Tab leaves the strip rather than walking every tab in it.
     // Radix moves the tab stop from a focus handler, so it lands a render
@@ -128,11 +146,18 @@ export const Pill: Story = {
     const files = canvas.getByRole("tab", { name: "Files" })
     await userEvent.click(files)
     await expect(files).toHaveAttribute("aria-selected", "true")
-    // The selected chip paints a surface; the rest stay transparent.
+    // The selected chip paints the accent surface and the rest stay
+    // transparent — asserted against the token, not merely against a
+    // sibling, which `hover:bg-accent` alone could satisfy.
     const pins = canvas.getByRole("tab", { name: "Pins" })
+    const accent = getComputedStyle(canvasElement.ownerDocument.body)
+      .getPropertyValue("--color-accent")
+      .trim()
+    await expect(accent).not.toBe("")
     await expect(getComputedStyle(files).backgroundColor).not.toBe(
-      getComputedStyle(pins).backgroundColor,
+      "rgba(0, 0, 0, 0)",
     )
+    await expect(getComputedStyle(pins).backgroundColor).toBe("rgba(0, 0, 0, 0)")
   },
 }
 
@@ -182,6 +207,17 @@ export const VerticalManualActivation: Story = {
     await expect(incidents).toHaveAttribute("aria-selected", "true")
     await expect(canvas.getByRole("tabpanel")).toHaveTextContent(
       "Live incidents.",
+    )
+
+    // Space commits as well, which the description claims.
+    await userEvent.keyboard("{ArrowDown}")
+    const releases = canvas.getByRole("tab", { name: "Releases" })
+    await expect(releases).toHaveFocus()
+    await expect(releases).toHaveAttribute("aria-selected", "false")
+    await userEvent.keyboard(" ")
+    await expect(releases).toHaveAttribute("aria-selected", "true")
+    await expect(canvas.getByRole("tabpanel")).toHaveTextContent(
+      "Release notes.",
     )
   },
 }

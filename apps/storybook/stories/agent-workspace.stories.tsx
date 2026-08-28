@@ -46,6 +46,7 @@ import { storyDocumentation } from "./story-documentation"
 
 const meta = {
   title: "Composites/AgentWorkspace",
+  tags: ["autodocs", "test"],
   parameters: {
     layout: "fullscreen",
     docs: {
@@ -185,11 +186,14 @@ function ChannelRail({
       aria-label="Workspace navigation"
     >
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem description={`${sessions.length} sessions running`}>
-            Nessa Labs
-          </SidebarMenuItem>
-        </SidebarMenu>
+        {/* A heading, not a row: SidebarMenuItem renders a real button, and
+            a title with nothing to activate would be a dead tab stop. */}
+        <div className="flex flex-col gap-0.5 px-2.5 py-1.5">
+          <h2 className="nessa-text-4 font-medium">Nessa Labs</h2>
+          <p className="nessa-text-2 text-sidebar-foreground/60">
+            {sessions.length} sessions running
+          </p>
+        </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -278,7 +282,7 @@ function SessionRow({
     <div className="flex min-w-0 flex-col gap-0.5">
       <div className="flex min-w-0 items-center gap-2">
         <span
-          className={cnLabel(selected)}
+          className={`min-w-0 truncate nessa-text-4${selected ? " font-medium" : ""}`}
           data-testid={`session-label-${session.id}`}
         >
           {session.label}
@@ -295,12 +299,6 @@ function SessionRow({
       </span>
     </div>
   )
-}
-
-function cnLabel(selected: boolean) {
-  return selected
-    ? "min-w-0 truncate nessa-text-4 font-medium"
-    : "min-w-0 truncate nessa-text-4"
 }
 
 function SessionThread({ session }: { session: AgentSession }) {
@@ -387,21 +385,27 @@ function AgentWorkspaceDemo() {
   const channelSessions = sessions.filter(
     (session) => session.channelId === activeChannelId,
   )
-  const drawerSessions =
-    drawer === "all"
-      ? channelSessions
-      : channelSessions.filter((session) => session.status === drawer)
+  // Each drawer derives its own sections, so a panel holds that drawer's
+  // content rather than the selected drawer's. Rendering the same derived
+  // list into every panel would be one shared region wearing three panels —
+  // the filter shape this deliberately is not.
+  const sectionsFor = (drawerKey: "all" | SessionStatus) => {
+    const inDrawer =
+      drawerKey === "all"
+        ? channelSessions
+        : channelSessions.filter((session) => session.status === drawerKey)
 
-  // Sticky status headers carry the grouping the rail needs once a channel
-  // holds more sessions than fit on screen; empty groups are dropped so the
-  // headers never outnumber the rows.
-  const listSections = statusOrder
-    .map((status) => ({
-      id: status,
-      label: statusLabels[status],
-      items: drawerSessions.filter((session) => session.status === status),
-    }))
-    .filter((section) => section.items.length > 0)
+    // Sticky status headers carry the grouping the rail needs once a channel
+    // holds more sessions than fit on screen; empty groups are dropped so the
+    // headers never outnumber the rows.
+    return statusOrder
+      .map((status) => ({
+        id: status,
+        label: statusLabels[status],
+        items: inDrawer.filter((session) => session.status === status),
+      }))
+      .filter((section) => section.items.length > 0)
+  }
 
   const selectedSession =
     sessions.find((session) => session.id === selectedSessionId) ?? sessions[0]
@@ -468,7 +472,7 @@ function AgentWorkspaceDemo() {
                   >
                     <SectionedListbox
                       listLabel={`Agent sessions in ${activeChannel.name}`}
-                      sections={listSections}
+                      sections={sectionsFor(key)}
                       getItemId={(session) => session.id}
                       value={selectedSessionId}
                       onValueChange={(value) => setSelectedSessionId(value)}
@@ -570,11 +574,58 @@ export const SlackStyleWorkspace: StoryObj = {
     // options that will hang off it. It shares a cell with the session count
     // and reveals on hover, so it costs the row no width — but it stays a
     // real control, reachable and named without a pointer.
+    const settingsFor = (channel: string) =>
+      navScope.getByRole("button", { name: `Channel settings for ${channel}` })
     for (const channel of ["eng-sidebar", "eng-tabs", "release"]) {
-      await expect(
-        navScope.getByRole("button", { name: `Channel settings for ${channel}` }),
-      ).toBeInTheDocument()
+      // Named and focusable — `toBeInTheDocument` after a `getByRole` would
+      // be tautological, and an opacity-0 control passes it regardless.
+      const control = settingsFor(channel)
+      control.focus()
+      await expect(control).toHaveFocus()
     }
+    ;(document.activeElement as HTMLElement | null)?.blur()
+
+    // A row's hover/focus scope must not contain its submenu. `group/*`
+    // compiles to a descendant match, so a nested row inside the scope would
+    // drive the parent's trailing pad, reveal and badge swap.
+    const pinnedRow = navScope.getByRole("button", {
+      name: /^Nested guides \+ collapsible menu/,
+    })
+    await expect(
+      Number.parseFloat(getComputedStyle(pinnedRow).paddingInlineEnd),
+    ).toBeLessThan(64)
+    const parentRow = pinnedRow
+      .closest<HTMLElement>('[data-slot="sidebar-menu-item"]')!
+      .parentElement!.closest<HTMLElement>('[data-slot="sidebar-menu-item"]')!
+    const parentBadge = parentRow.querySelector<HTMLElement>(
+      '[data-slot="sidebar-menu-item-badge"]',
+    )!
+    pinnedRow.focus()
+    await expect(getComputedStyle(parentBadge).opacity).toBe("1")
+    pinnedRow.blur()
+
+    // The channel discloses its pinned sessions, and the guides are drawn.
+    const nestedList = parentRow.querySelector<HTMLElement>(
+      '[data-slot="sidebar-menu"][data-guides="true"]',
+    )!
+    const firstNested = nestedList.querySelector<HTMLElement>(
+      ':scope > [data-slot="sidebar-menu-item"]',
+    )!
+    await expect(
+      Number.parseFloat(getComputedStyle(firstNested, "::before").borderLeftWidth),
+    ).toBeGreaterThan(0)
+
+    // The channel row's disclosure is host-controlled.
+    const disclosure = navScope.getByRole("button", {
+      name: "Toggle pinned sessions in eng-sidebar",
+    })
+    await expect(disclosure).toHaveAttribute("aria-expanded", "true")
+    await userEvent.click(disclosure)
+    await expect(disclosure).toHaveAttribute("aria-expanded", "false")
+    await expect(
+      navScope.queryByRole("button", { name: /^Nested guides/ }),
+    ).toBeNull()
+    await userEvent.click(disclosure)
 
     // Every session, pinned or not, is in the channel's own column. Each
     // drawer is its own panel, so the list is re-queried after every switch
@@ -621,7 +672,9 @@ export const SlackStyleWorkspace: StoryObj = {
     // Switching channel rescopes the column, and the drawer counts with it.
     await userEvent.click(navScope.getByRole("button", { name: "release" }))
     await expect(
-      canvas.getByRole("listbox", { name: "Agent sessions in release" }),
-    ).toBeInTheDocument()
+      within(
+        canvas.getByRole("listbox", { name: "Agent sessions in release" }),
+      ).getAllByRole("option"),
+    ).toHaveLength(1)
   },
 }

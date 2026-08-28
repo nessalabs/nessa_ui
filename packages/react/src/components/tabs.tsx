@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils"
 
 /** @responsibility Provides an accessible tab list and its associated panels. */
 
+export type TabsProps = React.ComponentProps<typeof TabsPrimitive.Root>
+
 /**
  * The tabs root: owns the selected value and the orientation its list and
  * panels share.
@@ -21,10 +23,7 @@ import { cn } from "@/lib/utils"
  * @param props - Radix tabs root properties.
  * @returns A flex container scoping the tab list and panels.
  */
-function Tabs({
-  className,
-  ...props
-}: React.ComponentProps<typeof TabsPrimitive.Root>) {
+function Tabs({ className, ...props }: TabsProps) {
   return (
     <TabsPrimitive.Root
       data-slot="tabs"
@@ -43,6 +42,9 @@ function Tabs({
  * @param options - Variant and optional class-name selections.
  * @returns The composed class-name string for a tab list.
  */
+/** The presentation a `TabsList` falls back to, shared by cva and the DOM attribute. */
+const defaultTabsListVariant = "underline" as const
+
 const tabsListVariants = cva(
   "flex min-w-0 shrink-0 items-stretch data-[orientation=vertical]:flex-col data-[orientation=vertical]:items-stretch",
   {
@@ -60,23 +62,24 @@ const tabsListVariants = cva(
           "data-[orientation=horizontal]:overflow-x-auto data-[orientation=horizontal]:[&>[data-slot=tabs-trigger]]:shrink-0",
           "[&>[data-slot=tabs-trigger]]:min-h-9 [&>[data-slot=tabs-trigger]]:px-0.5",
           "[&>[data-slot=tabs-trigger]]:after:absolute [&>[data-slot=tabs-trigger]]:after:bg-transparent [&>[data-slot=tabs-trigger]]:after:transition-colors [&>[data-slot=tabs-trigger]]:after:content-['']",
-          // The selected tab's indicator sits on the strip's rule rather
-          // than overhanging it: a scrolling strip clips both axes, and a
-          // negative offset would be the part that gets cut.
+          // The indicator draws inside the trigger's box, immediately above
+          // the strip's rule: a scrolling strip clips both axes, so an
+          // overhang would be the part that gets cut.
           "[&>[data-slot=tabs-trigger][data-state=active]]:after:bg-foreground",
           "data-[orientation=horizontal]:[&>[data-slot=tabs-trigger]]:after:inset-x-0 data-[orientation=horizontal]:[&>[data-slot=tabs-trigger]]:after:bottom-0 data-[orientation=horizontal]:[&>[data-slot=tabs-trigger]]:after:h-0.5",
           "data-[orientation=vertical]:[&>[data-slot=tabs-trigger]]:justify-start data-[orientation=vertical]:[&>[data-slot=tabs-trigger]]:px-2.5 data-[orientation=vertical]:[&>[data-slot=tabs-trigger]]:after:inset-y-0 data-[orientation=vertical]:[&>[data-slot=tabs-trigger]]:after:-end-px data-[orientation=vertical]:[&>[data-slot=tabs-trigger]]:after:w-0.5",
         ],
         pill: [
           "gap-0.5 rounded-lg border border-border p-0.5",
-          "[&>[data-slot=tabs-trigger]]:min-h-8 [&>[data-slot=tabs-trigger]]:flex-1 [&>[data-slot=tabs-trigger]]:rounded-md [&>[data-slot=tabs-trigger]]:px-2.5",
+          "[&>[data-slot=tabs-trigger]]:min-h-8 [&>[data-slot=tabs-trigger]]:rounded-md [&>[data-slot=tabs-trigger]]:px-2.5",
+          "data-[orientation=horizontal]:[&>[data-slot=tabs-trigger]]:flex-1",
           "[&>[data-slot=tabs-trigger]]:hover:bg-accent",
           "[&>[data-slot=tabs-trigger][data-state=active]]:bg-accent [&>[data-slot=tabs-trigger][data-state=active]]:text-accent-foreground",
         ],
       },
     },
     defaultVariants: {
-      variant: "underline",
+      variant: defaultTabsListVariant,
     },
   },
 )
@@ -99,7 +102,7 @@ function TabsList({ className, variant, ...props }: TabsListProps) {
   return (
     <TabsPrimitive.List
       data-slot="tabs-list"
-      data-variant={variant ?? "underline"}
+      data-variant={variant ?? defaultTabsListVariant}
       className={cn(tabsListVariants({ variant }), className)}
       {...props}
     />
@@ -107,7 +110,7 @@ function TabsList({ className, variant, ...props }: TabsListProps) {
 }
 
 export interface TabsTriggerProps
-  extends React.ComponentProps<typeof TabsPrimitive.Trigger> {
+  extends Omit<React.ComponentProps<typeof TabsPrimitive.Trigger>, "asChild"> {
   /** Decorative leading content displayed before the label. */
   icon?: React.ReactNode
   /** Compact count or status displayed after the label. */
@@ -117,6 +120,10 @@ export interface TabsTriggerProps
 /**
  * One tab. Renders its label, an optional leading `icon`, and an optional
  * trailing `badge` such as an unread count.
+ *
+ * `asChild` is deliberately not part of this surface: the tab renders its
+ * icon, label and badge as separate children, and Radix's `Slot` accepts
+ * exactly one.
  *
  * The label is wrapped so its selected weight can be reserved at rest: the
  * bold text is rendered invisibly in the same grid cell, which stops the
@@ -136,7 +143,7 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "group/tabs-trigger relative inline-flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap border-0 bg-transparent font-sans nessa-text-4 font-normal text-muted-foreground outline-none transition-[color,background-color,box-shadow] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 data-[state=active]:text-foreground",
+        "group/tabs-trigger relative inline-flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap border-0 bg-transparent font-sans nessa-text-4 font-normal text-muted-foreground outline-none transition-[color,background-color,box-shadow] hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 data-[state=active]:text-foreground",
         className,
       )}
       {...props}
