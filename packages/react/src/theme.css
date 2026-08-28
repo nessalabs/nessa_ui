@@ -249,6 +249,70 @@
   --_nessa-letter-spacing-7: var(--nessa-letter-spacing-7);
 }
 
+/* Constrained UI scale. The private factor keeps nested scopes and consumer
+   baseline overrides composable without a selector cross-product: a scope
+   that does not set the attribute inherits the active factor, while every
+   scope recomputes its aliases locally. */
+:where(:root, [data-nessa-root]) {
+  --_nessa-scale-factor: 1;
+}
+
+:where([data-nessa-scale="90"]) {
+  --_nessa-scale-factor: 0.9;
+}
+
+:where([data-nessa-scale="95"]) {
+  --_nessa-scale-factor: 0.95;
+}
+
+:where([data-nessa-scale="100"]) {
+  --_nessa-scale-factor: 1;
+}
+
+:where([data-nessa-scale="105"]) {
+  --_nessa-scale-factor: 1.05;
+}
+
+:where([data-nessa-scale="110"]) {
+  --_nessa-scale-factor: 1.1;
+}
+
+:where(
+  :root,
+  [data-nessa-root],
+  [data-nessa-theme],
+  [data-nessa-scale]
+) {
+  --_nessa-font-size-1:
+    calc(var(--nessa-font-size-1) * var(--_nessa-scale-factor));
+  --_nessa-font-size-2:
+    calc(var(--nessa-font-size-2) * var(--_nessa-scale-factor));
+  --_nessa-font-size-3:
+    calc(var(--nessa-font-size-3) * var(--_nessa-scale-factor));
+  --_nessa-font-size-4:
+    calc(var(--nessa-font-size-4) * var(--_nessa-scale-factor));
+  --_nessa-font-size-5:
+    calc(var(--nessa-font-size-5) * var(--_nessa-scale-factor));
+  --_nessa-font-size-6:
+    calc(var(--nessa-font-size-6) * var(--_nessa-scale-factor));
+  --_nessa-font-size-7:
+    calc(var(--nessa-font-size-7) * var(--_nessa-scale-factor));
+  --_nessa-line-height-1: var(--nessa-line-height-1);
+  --_nessa-line-height-2: var(--nessa-line-height-2);
+  --_nessa-line-height-3: var(--nessa-line-height-3);
+  --_nessa-line-height-4: var(--nessa-line-height-4);
+  --_nessa-line-height-5: var(--nessa-line-height-5);
+  --_nessa-line-height-6: var(--nessa-line-height-6);
+  --_nessa-line-height-7: var(--nessa-line-height-7);
+  --_nessa-letter-spacing-1: var(--nessa-letter-spacing-1);
+  --_nessa-letter-spacing-2: var(--nessa-letter-spacing-2);
+  --_nessa-letter-spacing-3: var(--nessa-letter-spacing-3);
+  --_nessa-letter-spacing-4: var(--nessa-letter-spacing-4);
+  --_nessa-letter-spacing-5: var(--nessa-letter-spacing-5);
+  --_nessa-letter-spacing-6: var(--nessa-letter-spacing-6);
+  --_nessa-letter-spacing-7: var(--nessa-letter-spacing-7);
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root,
   :where([data-nessa-root], [data-nessa-theme], [data-nessa-scale]) {
