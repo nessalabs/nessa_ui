@@ -62,6 +62,13 @@
   --nessa-thinking-fill-current: oklch(0.68 0.2 304);
   --nessa-thinking-fill-highlight: oklch(0.86 0.11 214);
   --nessa-fast-mode-active: oklch(0.57 0.22 300);
+  --nessa-chat-accent: #0071e3;
+  --nessa-chat-rim-0: rgba(245, 158, 11, 0.06);
+  --nessa-chat-rim-1: rgba(245, 158, 11, 0.22);
+  --nessa-chat-rim-2: rgba(236, 72, 153, 0.42);
+  --nessa-chat-rim-3: rgba(168, 85, 247, 0.62);
+  --nessa-chat-rim-4: rgba(56, 189, 248, 0.85);
+  --nessa-chat-rim-head: #ffffff;
   --nessa-diff-addition: oklch(0.5 0.137 150);
   --nessa-diff-deletion: oklch(0.55 0.19 27);
   --nessa-invalid-ring: color-mix(in oklab, var(--destructive) 20%, transparent);
@@ -99,6 +106,13 @@
   --nessa-thinking-fill-current: oklch(0.67 0.2 306);
   --nessa-thinking-fill-highlight: oklch(0.82 0.12 210);
   --nessa-fast-mode-active: oklch(0.72 0.185 306);
+  --nessa-chat-accent: #0071e3;
+  --nessa-chat-rim-0: rgba(245, 158, 11, 0.06);
+  --nessa-chat-rim-1: rgba(245, 158, 11, 0.22);
+  --nessa-chat-rim-2: rgba(236, 72, 153, 0.42);
+  --nessa-chat-rim-3: rgba(168, 85, 247, 0.62);
+  --nessa-chat-rim-4: rgba(56, 189, 248, 0.85);
+  --nessa-chat-rim-head: #ffffff;
   --nessa-diff-addition: oklch(0.77 0.17 152);
   --nessa-diff-deletion: oklch(0.7 0.19 25);
   --nessa-invalid-ring: color-mix(in oklab, var(--destructive) 40%, transparent);
