@@ -40,8 +40,16 @@ function cssDurationInMilliseconds(value: string, fallback: number) {
  * around, faintest just behind the head's sharp cutoff. The stops are the
  * --nessa-chat-rim-* tokens, identical in both themes — a light source.
  */
-const pillComposerRimSpinnerClassName =
-  "absolute left-1/2 top-1/2 aspect-square w-[200%] -translate-x-1/2 -translate-y-1/2 bg-[conic-gradient(from_0deg,var(--nessa-chat-rim-0)_0deg,var(--nessa-chat-rim-1)_90deg,var(--nessa-chat-rim-2)_180deg,var(--nessa-chat-rim-3)_260deg,var(--nessa-chat-rim-4)_320deg,var(--nessa-chat-rim-head)_356deg,transparent_360deg)]"
+const pillComposerRimSpinnerBaseClassName =
+  "absolute left-1/2 top-1/2 aspect-square w-[200%] -translate-x-1/2 -translate-y-1/2"
+
+/** The full-wrap trail: the spectrum decays around the whole revolution. */
+const pillComposerRimTrailClassName =
+  "bg-[conic-gradient(from_0deg,var(--nessa-chat-rim-0)_0deg,var(--nessa-chat-rim-1)_90deg,var(--nessa-chat-rim-2)_180deg,var(--nessa-chat-rim-3)_260deg,var(--nessa-chat-rim-4)_320deg,var(--nessa-chat-rim-head)_356deg,transparent_360deg)]"
+
+/** The comet: a compact bright dart, the rest of the rim dark behind it. */
+const pillComposerRimCometClassName =
+  "bg-[conic-gradient(from_0deg,transparent_0deg,transparent_280deg,var(--nessa-chat-rim-3)_280deg,var(--nessa-chat-rim-4)_330deg,var(--nessa-chat-rim-head)_356deg,transparent_360deg)]"
 
 /** Masks a full-bleed layer down to an edge band `inset` pixels deep. */
 function rimBandMask(inset: number): React.CSSProperties {
@@ -67,10 +75,11 @@ export type PillComposerRimVariant = "orbit" | "comet" | "pulse" | "aurora"
  * rim, plus a blurred copy bleeding a few pixels inward as a soft glow —
  * nothing renders outside the pill. It fades in and out with `active` and
  * keeps animating until the fade-out finishes, so toggling reads as the
- * light dimming, not stopping. The motion itself comes in variants:
- * `orbit` revolves the trail at constant speed, `comet` laps faster with
- * an eased surge each revolution, `pulse` holds still and breathes, and
- * `aurora` revolves while the whole spectrum slowly cycles hue.
+ * light dimming, not stopping. The motion itself comes in structurally
+ * distinct variants: `orbit` revolves the full decaying trail, `comet`
+ * laps a compact bright dart around an otherwise dark rim, `pulse` holds
+ * the lit rim still and breathes, and `aurora` never revolves — the
+ * full-wrap spectrum morphs hue in place under a slow intensity wave.
  */
 function PillComposerRim({
   active,
@@ -102,11 +111,17 @@ function PillComposerRim({
     if (ambient === 0) return
     const spin = [{ rotate: "0deg" }, { rotate: "360deg" }]
     const animations: Animation[] = []
-    if (variant !== "pulse") {
-      const duration = variant === "comet" ? ambient * 0.55 : ambient
-      const easing =
-        variant === "comet" ? "cubic-bezier(0.6, 0.15, 0.4, 0.85)" : "linear"
-      const options = { duration, easing, iterations: Infinity }
+    if (variant === "orbit") {
+      const options = { duration: ambient, easing: "linear", iterations: Infinity }
+      animations.push(ring.animate(spin, options), glow.animate(spin, options))
+    }
+    if (variant === "comet") {
+      // A compact dart lapping fast — most of the rim stays dark behind it.
+      const options = {
+        duration: ambient * 0.45,
+        easing: "linear",
+        iterations: Infinity,
+      }
       animations.push(ring.animate(spin, options), glow.animate(spin, options))
     }
     if (variant === "pulse") {
@@ -127,15 +142,22 @@ function PillComposerRim({
       )
     }
     if (variant === "aurora") {
-      const options = {
-        duration: ambient * 1.6,
+      // No revolution at all: the full-wrap spectrum stays put while its
+      // hues cycle and the intensity waves — colors morphing in place.
+      const hueOptions = {
+        duration: ambient * 1.2,
         easing: "linear",
+        iterations: Infinity,
+      }
+      const waveOptions = {
+        duration: ambient,
+        easing: "ease-in-out",
         iterations: Infinity,
       }
       animations.push(
         ring.animate(
           [{ filter: "hue-rotate(0deg)" }, { filter: "hue-rotate(360deg)" }],
-          options,
+          hueOptions,
         ),
         // The glow's blur rides along in the keyframes: animating `filter`
         // replaces the class value for the animation's duration.
@@ -144,7 +166,11 @@ function PillComposerRim({
             { filter: "blur(6px) hue-rotate(0deg)" },
             { filter: "blur(6px) hue-rotate(360deg)" },
           ],
-          options,
+          hueOptions,
+        ),
+        ring.animate(
+          [{ opacity: 1 }, { opacity: 0.65 }, { opacity: 1 }],
+          waveOptions,
         ),
       )
     }
@@ -169,7 +195,13 @@ function PillComposerRim({
       >
         <span
           ref={glowSpinRef}
-          className={cn(pillComposerRimSpinnerClassName, "blur-[6px] opacity-35")}
+          className={cn(
+            pillComposerRimSpinnerBaseClassName,
+            variant === "comet"
+              ? pillComposerRimCometClassName
+              : pillComposerRimTrailClassName,
+            "blur-[6px] opacity-35",
+          )}
         />
       </span>
       <span
@@ -177,7 +209,15 @@ function PillComposerRim({
         className="absolute inset-0 overflow-hidden rounded-[inherit]"
         style={rimBandMask(2)}
       >
-        <span ref={ringSpinRef} className={pillComposerRimSpinnerClassName} />
+        <span
+          ref={ringSpinRef}
+          className={cn(
+            pillComposerRimSpinnerBaseClassName,
+            variant === "comet"
+              ? pillComposerRimCometClassName
+              : pillComposerRimTrailClassName,
+          )}
+        />
       </span>
     </span>
   )
