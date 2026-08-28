@@ -684,6 +684,7 @@ export {
   type FlowChartNodeContext,
   type FlowChartProps,
   type FlowChartLayout,
+  type FlowChartLayoutIssue,
   type FlowChartLayoutLink,
   type FlowChartLayoutNode,
   type FlowChartLayoutOptions,

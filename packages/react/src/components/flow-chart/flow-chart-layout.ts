@@ -74,6 +74,21 @@ export interface FlowChartLayoutLink {
   thickness: number
 }
 
+/**
+ * A data problem the layout tolerated instead of failing on. Transient
+ * while data streams in; whatever remains once the stream settles is a
+ * real data error the host should surface.
+ */
+export interface FlowChartLayoutIssue {
+  kind: "unknown-endpoint" | "self-link" | "duplicate-node" | "cycle"
+  /** Human-readable summary of what was dropped or repaired. */
+  message: string
+  /** Index into the input `links` array, for link-scoped issues. */
+  linkIndex?: number
+  /** Offending node id, for node-scoped issues. */
+  nodeId?: string
+}
+
 /** The computed diagram geometry. */
 export interface FlowChartLayout {
   nodes: FlowChartLayoutNode[]
@@ -81,6 +96,11 @@ export interface FlowChartLayout {
   columnCount: number
   /** Sum of node values per column, in column order. */
   columnTotals: number[]
+  /**
+   * Everything the layout dropped or repaired to render this frame —
+   * empty when the data was fully consistent.
+   */
+  issues: FlowChartLayoutIssue[]
 }
 
 interface NodeState {
@@ -93,35 +113,27 @@ interface NodeState {
 }
 
 /**
- * Longest-path column assignment over the link graph. Throws on links that
- * reference unknown nodes and on cycles — both are data errors a host must
- * fix, not states to render.
+ * Longest-path column assignment over the link graph. Tolerant by design so
+ * the chart survives partial, mid-stream data: callers pass pre-sanitized
+ * nodes and links, and nodes trapped in a cycle fall back to one
+ * deterministic input-order pass instead of failing.
  */
 function assignColumns(
   nodes: readonly FlowChartNodeInput[],
   links: readonly FlowChartLinkInput[],
+  issues: FlowChartLayoutIssue[],
 ): Map<string, number> {
-  const known = new Set(nodes.map((node) => node.id))
-  if (known.size !== nodes.length) {
-    throw new Error("FlowChart: duplicate node id")
-  }
   const outgoing = new Map<string, string[]>()
+  const incoming = new Map<string, string[]>()
   const indegree = new Map<string, number>()
   for (const node of nodes) {
     outgoing.set(node.id, [])
+    incoming.set(node.id, [])
     indegree.set(node.id, 0)
   }
   for (const link of links) {
-    if (!known.has(link.source) || !known.has(link.target)) {
-      throw new Error(
-        `FlowChart: link ${link.source} → ${link.target} references an unknown node`,
-      )
-    }
-    if (link.source === link.target) {
-      throw new Error(`FlowChart: link ${link.source} targets itself`)
-    }
-    if (link.value <= 0) continue
     outgoing.get(link.source)!.push(link.target)
+    incoming.get(link.target)!.push(link.source)
     indegree.set(link.target, indegree.get(link.target)! + 1)
   }
 
@@ -133,20 +145,37 @@ function assignColumns(
       queue.push(node.id)
     }
   }
-  let visited = 0
   while (queue.length > 0) {
     const id = queue.shift()!
-    visited += 1
     const depth = columns.get(id)!
     for (const next of outgoing.get(id)!) {
+      // A node still waiting on cyclic predecessors keeps the deepest
+      // column its resolved predecessors imply.
       columns.set(next, Math.max(columns.get(next) ?? 0, depth + 1))
       const remaining = indegree.get(next)! - 1
       indegree.set(next, remaining)
       if (remaining === 0) queue.push(next)
     }
   }
-  if (visited !== nodes.length) {
-    throw new Error("FlowChart: the links form a cycle")
+  // Nodes inside a cycle never drain from Kahn's queue. Place each in one
+  // input-order pass after its already-placed predecessors — deterministic,
+  // and the ribbons that close the loop simply flow backwards.
+  const placed = new Set(columns.keys())
+  for (const node of nodes) {
+    if (placed.has(node.id)) continue
+    issues.push({
+      kind: "cycle",
+      nodeId: node.id,
+      message: `node ${node.id} sits in a cycle; placed by input order`,
+    })
+    let depth = 0
+    for (const previous of incoming.get(node.id)!) {
+      if (placed.has(previous)) {
+        depth = Math.max(depth, (columns.get(previous) ?? 0) + 1)
+      }
+    }
+    columns.set(node.id, depth)
+    placed.add(node.id)
   }
   return columns
 }
@@ -158,12 +187,53 @@ function assignColumns(
  * the slack shared evenly between its gaps.
  */
 export function computeFlowChartLayout(options: FlowChartLayoutOptions): FlowChartLayout {
-  const { nodes, links, nodeWidth, nodeGap } = options
+  const { links, nodeWidth, nodeGap } = options
   const width = Math.max(options.width, nodeWidth)
   const height = Math.max(options.height, 0)
   const align = options.align ?? "justify"
 
-  const columns = assignColumns(nodes, links)
+  // Tolerate partial, mid-stream data instead of failing: duplicate node
+  // ids keep their first occurrence, and links that are non-positive,
+  // self-referential, or waiting on a node that has not arrived yet are
+  // simply not laid out this frame.
+  const issues: FlowChartLayoutIssue[] = []
+  const seen = new Set<string>()
+  const nodes: FlowChartNodeInput[] = []
+  for (const node of options.nodes) {
+    if (seen.has(node.id)) {
+      issues.push({
+        kind: "duplicate-node",
+        nodeId: node.id,
+        message: `node ${node.id} appears more than once; kept the first`,
+      })
+      continue
+    }
+    seen.add(node.id)
+    nodes.push(node)
+  }
+  const activeLinks: Array<FlowChartLinkInput & { index: number }> = []
+  links.forEach((link, index) => {
+    if (link.value <= 0) return
+    if (link.source === link.target) {
+      issues.push({
+        kind: "self-link",
+        linkIndex: index,
+        message: `link ${link.source} targets itself; dropped`,
+      })
+      return
+    }
+    if (!seen.has(link.source) || !seen.has(link.target)) {
+      issues.push({
+        kind: "unknown-endpoint",
+        linkIndex: index,
+        message: `link ${link.source} → ${link.target} references a node not (yet) present; dropped`,
+      })
+      return
+    }
+    activeLinks.push({ ...link, index })
+  })
+
+  const columns = assignColumns(nodes, activeLinks, issues)
 
   const states = new Map<string, NodeState>()
   nodes.forEach((node, order) => {
@@ -176,9 +246,6 @@ export function computeFlowChartLayout(options: FlowChartLayoutOptions): FlowCha
       value: 0,
     })
   })
-  const activeLinks = links
-    .map((link, index) => ({ ...link, index }))
-    .filter((link) => link.value > 0)
   for (const link of activeLinks) {
     states.get(link.source)!.outValue += link.value
     states.get(link.target)!.inValue += link.value
@@ -296,6 +363,7 @@ export function computeFlowChartLayout(options: FlowChartLayoutOptions): FlowCha
     links: layoutLinks,
     columnCount,
     columnTotals,
+    issues,
   }
 }
 

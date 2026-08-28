@@ -14,6 +14,7 @@ export {
   flowChartRibbonPath,
   type FlowChartAlign,
   type FlowChartLayout,
+  type FlowChartLayoutIssue,
   type FlowChartLayoutLink,
   type FlowChartLayoutNode,
   type FlowChartLayoutOptions,

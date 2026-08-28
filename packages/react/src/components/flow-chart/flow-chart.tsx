@@ -11,6 +11,7 @@ import {
   flowChartRibbonPath,
   type FlowChartAlign,
   type FlowChartLayout,
+  type FlowChartLayoutIssue,
   type FlowChartLayoutLink,
   type FlowChartLayoutNode,
 } from "./flow-chart-layout"
@@ -112,6 +113,14 @@ export interface FlowChartProps
    * particular hover.
    */
   renderHoverDetail?: (hover: FlowChartHoverContext) => React.ReactNode
+  /**
+   * Called whenever the set of tolerated data problems changes — dropped
+   * links waiting on absent nodes, duplicate nodes, cycle repairs. While
+   * data streams in, transient issues come and go; once the stream
+   * settles, an empty array is the definitive "everything rendered"
+   * signal and anything else is a data error worth surfacing.
+   */
+  onLayoutIssues?: (issues: FlowChartLayoutIssue[]) => void
   /** Controlled selected link ids; empty for no selection. */
   selectedLinkIds?: readonly string[]
   /** Initial selection when uncontrolled. */
@@ -170,7 +179,9 @@ function useMeasuredBox(ref: React.RefObject<HTMLElement | null>) {
 
 const RIBBON_CLASSES = cn(
   "cursor-pointer fill-[var(--nessa-flow-chart-color,var(--muted-foreground))] opacity-15 outline-none",
-  "transition-opacity [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
+  // `d` is a transitionable presentation attribute, so streamed data
+  // updates morph ribbons instead of snapping them.
+  "transition-[opacity,d] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
   "hover:opacity-35",
   "data-[emphasis=active]:opacity-55 data-[emphasis=dim]:opacity-[0.06] data-[emphasis=dim]:hover:opacity-25",
   // Tinted ribbons run a stronger ramp: the dilute pigments read paler
@@ -182,7 +193,7 @@ const RIBBON_CLASSES = cn(
 
 const BAR_CLASSES = cn(
   "fill-[var(--nessa-flow-chart-color,var(--muted-foreground))] opacity-45",
-  "transition-opacity [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
+  "transition-[opacity,x,y,width,height] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
   "data-[emphasis=active]:fill-[var(--nessa-flow-chart-color,var(--foreground))] data-[emphasis=active]:opacity-100 data-[emphasis=dim]:opacity-30",
   "data-[tinted=true]:opacity-95 data-[tinted=true]:data-[emphasis=active]:opacity-100 data-[tinted=true]:data-[emphasis=dim]:opacity-40",
 )
@@ -190,7 +201,7 @@ const BAR_CLASSES = cn(
 const LABEL_CLASSES = cn(
   "pointer-events-none absolute flex -translate-y-1/2 flex-col justify-center",
   "nessa-text-3 leading-tight text-muted-foreground",
-  "transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
+  "transition-[color,top,left] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
   "data-[emphasis=active]:font-medium data-[emphasis=active]:text-foreground",
 )
 
@@ -219,6 +230,7 @@ function FlowChart({
   palette = flowChartPalette,
   onHoveredLinkChange,
   renderHoverDetail,
+  onLayoutIssues,
   selectedLinkIds,
   defaultSelectedLinkIds,
   onSelectedLinksChange,
@@ -258,6 +270,21 @@ function FlowChart({
       align,
     })
   }, [box, nodes, links, nodeWidth, nodeGap, align])
+
+  // Report tolerated data problems whenever their set changes — including
+  // the change back to none, which is the "stream rendered cleanly" signal.
+  const onLayoutIssuesRef = React.useRef(onLayoutIssues)
+  onLayoutIssuesRef.current = onLayoutIssues
+  const issuesKey = layout
+    ? layout.issues.map((issue) => issue.message).join("\n")
+    : null
+  React.useEffect(() => {
+    if (issuesKey === null || !layout) return
+    onLayoutIssuesRef.current?.(layout.issues)
+    // The layout object changes identity every resize; only a changed
+    // issue set should re-notify.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [issuesKey])
 
   // Nodes cycle through the palette in input order; a node's own color
   // always wins.

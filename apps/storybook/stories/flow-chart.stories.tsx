@@ -3,7 +3,9 @@ import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, fireEvent, waitFor, within } from "storybook/test"
 import { userEvent } from "storybook/test"
 import {
+  Button,
   FlowChart,
+  type FlowChartLayoutIssue,
   type FlowChartLink,
   type FlowChartNode,
 } from "@nessa-ui/react"
@@ -223,6 +225,105 @@ export const MultiStage: Story = {
       ),
     )
     expect(columns.size).toBe(3)
+  },
+}
+
+/**
+ * Cumulative reveal counts simulating an agent emitting the budget flow.
+ * Several frames carry links whose target node has not arrived yet — the
+ * chart holds them back until the node lands instead of failing.
+ */
+const STREAM_STEPS: ReadonlyArray<{ nodes: number; links: number }> = [
+  { nodes: 2, links: 1 },
+  { nodes: 4, links: 2 },
+  { nodes: 5, links: 4 },
+  { nodes: 7, links: 7 },
+  { nodes: 9, links: 9 },
+  { nodes: 9, links: 11 },
+]
+
+function StreamingFlowChart() {
+  const [step, setStep] = React.useState(0)
+  const [run, setRun] = React.useState(0)
+  const [issues, setIssues] = React.useState<FlowChartLayoutIssue[] | null>(
+    null,
+  )
+  React.useEffect(() => {
+    setStep(0)
+    const timer = setInterval(() => {
+      setStep((previous) => {
+        if (previous >= STREAM_STEPS.length - 1) {
+          clearInterval(timer)
+          return previous
+        }
+        return previous + 1
+      })
+    }, 600)
+    return () => clearInterval(timer)
+  }, [run])
+  const frame = STREAM_STEPS[step]
+  const settled = step >= STREAM_STEPS.length - 1
+  const status = !settled
+    ? `Streaming — ${frame.links} of ${BUDGET_LINKS.length} flows in${
+        issues && issues.length > 0
+          ? `, ${issues.length} waiting on data`
+          : ""
+      }`
+    : issues && issues.length === 0
+      ? "Stream complete — every flow rendered, data consistent"
+      : `Stream complete with ${issues?.length ?? 0} data issue(s)`
+  return (
+    <div className="flex h-[480px] w-full max-w-3xl flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <p
+          data-testid="stream-status"
+          role="status"
+          className="nessa-text-2 text-muted-foreground"
+        >
+          {status}
+        </p>
+        <Button variant="outline" size="sm" onClick={() => setRun(run + 1)}>
+          Replay stream
+        </Button>
+      </div>
+      <div className="min-h-0 flex-1">
+        <FlowChart
+          nodes={BUDGET_NODES.slice(0, frame.nodes)}
+          links={BUDGET_LINKS.slice(0, frame.links)}
+          formatValue={euros}
+          onLayoutIssues={setIssues}
+          aria-label="Budget flow streaming in"
+        />
+      </div>
+    </div>
+  )
+}
+
+export const StreamedData: Story = {
+  parameters: storyDocumentation(
+    "The chart under an agent streaming its data: nodes and links arrive over a few seconds, with some frames carrying links whose endpoint has not landed yet — those simply wait instead of crashing the render, duplicate nodes keep their first occurrence, and even a transient cycle would place deterministically. Each new frame morphs the existing bars, ribbons, and labels to their new geometry (token-duration transitions; reduced motion snaps). `onLayoutIssues` reports what each frame tolerated, so once the stream settles an empty set is the definitive success signal — the status line above the chart says so. The play test waits out the stream and asserts every flow arrived and the data verified clean.",
+  ),
+  args: { nodes: BUDGET_NODES, links: BUDGET_LINKS },
+  render: () => <StreamingFlowChart />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await canvas.findByRole("button", { name: "Replay stream" })
+    await waitFor(
+      () =>
+        expect(
+          canvasElement.querySelectorAll('[data-slot="flow-chart-link"]')
+            .length,
+        ).toBe(11),
+      { timeout: 8000 },
+    )
+    expect(
+      canvasElement.querySelectorAll('[data-slot="flow-chart-node"]').length,
+    ).toBe(9)
+    await waitFor(() =>
+      expect(canvas.getByTestId("stream-status").textContent).toContain(
+        "data consistent",
+      ),
+    )
   },
 }
 

@@ -113,32 +113,59 @@ describe("computeFlowChartLayout", () => {
     assert.ok(Math.abs(a.y - (300 - a.height) / 2) < 1e-9)
   })
 
-  it("rejects unknown endpoints, self links, duplicate ids, and cycles", () => {
-    assert.throws(() =>
-      computeFlowChartLayout({
-        ...BASE,
-        links: [{ source: "a", target: "ghost", value: 1 }],
-      }),
+  it("tolerates partial mid-stream data: unknown endpoints, self links, duplicates", () => {
+    // A link whose endpoint has not arrived yet is skipped this frame.
+    const partial = computeFlowChartLayout({
+      ...BASE,
+      links: [
+        { source: "a", target: "x", value: 2 },
+        { source: "a", target: "ghost", value: 1 },
+        { source: "a", target: "a", value: 1 },
+      ],
+    })
+    assert.equal(partial.links.length, 1)
+    assert.equal(partial.links[0].target, "x")
+    assert.deepEqual(
+      partial.issues.map((issue) => issue.kind).sort(),
+      ["self-link", "unknown-endpoint"],
     )
-    assert.throws(() =>
-      computeFlowChartLayout({
-        ...BASE,
-        links: [{ source: "a", target: "a", value: 1 }],
-      }),
+    assert.equal(
+      partial.issues.find((issue) => issue.kind === "unknown-endpoint")!
+        .linkIndex,
+      1,
     )
-    assert.throws(() =>
-      computeFlowChartLayout({ ...BASE, nodes: [...BASE.nodes, { id: "a" }] }),
-    )
-    assert.throws(() =>
-      computeFlowChartLayout({
-        ...BASE,
-        links: [
-          { source: "a", target: "x", value: 1 },
-          { source: "x", target: "b", value: 1 },
-          { source: "b", target: "a", value: 1 },
-        ],
-      }),
-    )
+    // Duplicate node ids keep their first occurrence.
+    const deduped = computeFlowChartLayout({
+      ...BASE,
+      nodes: [...BASE.nodes, { id: "a" }],
+    })
+    assert.equal(deduped.nodes.length, BASE.nodes.length)
+    assert.equal(deduped.issues[0].kind, "duplicate-node")
+    // Fully consistent data reports no issues — the success signal.
+    assert.deepEqual(computeFlowChartLayout(BASE).issues, [])
+  })
+
+  it("breaks cycles deterministically instead of failing", () => {
+    const layout = computeFlowChartLayout({
+      ...BASE,
+      links: [
+        { source: "a", target: "x", value: 1 },
+        { source: "x", target: "b", value: 1 },
+        { source: "b", target: "a", value: 1 },
+      ],
+    })
+    assert.equal(layout.links.length, 3)
+    for (const node of layout.nodes) {
+      assert.ok(Number.isFinite(node.x) && Number.isFinite(node.y))
+    }
+    // Input-order placement (nodes arrive a, b, x): a and b lead with no
+    // placed predecessors; x follows its placed predecessor a.
+    const column = (id: string) =>
+      layout.nodes.find((node) => node.id === id)!.column
+    assert.equal(column("a"), 0)
+    assert.equal(column("b"), 0)
+    assert.equal(column("x"), 1)
+    assert.ok(layout.issues.some((issue) => issue.kind === "cycle"))
   })
 
   it("survives a zero-height box without NaN geometry", () => {
