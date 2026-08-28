@@ -337,6 +337,36 @@ export {
   type ChatComposerEditorProps,
 } from "./components/chat-composer-editor"
 export {
+  ChatAttachmentStack,
+  ChatAttachmentTile,
+  ChatAttachmentViewer,
+  ChatBubble,
+  ChatMessage,
+  ChatMessageQuote,
+  ChatMessageReceipt,
+  ChatReactionPicker,
+  ChatTypingIndicator,
+  type ChatAttachmentStackProps,
+  type ChatAttachmentTileProps,
+  type ChatAttachmentViewerProps,
+  type ChatBubbleProps,
+  type ChatMessageProps,
+  type ChatMessageTone,
+  type ChatReactionOption,
+  type ChatReactionPickerProps,
+  type ChatTypingIndicatorProps,
+} from "./components/chat-bubbles"
+export {
+  ChatTabs,
+  type ChatTabItem,
+  type ChatTabsProps,
+} from "./components/chat-tabs"
+export {
+  PillComposer,
+  PillComposerRow,
+  type PillComposerProps,
+} from "./components/pill-composer"
+export {
   DiffStat,
   FileDiffCard,
   FileDiffCardActions,

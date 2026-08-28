@@ -10,7 +10,8 @@
   "registryDependencies": [
     "nessalabs/nessa_ui/nessa-base",
     "nessalabs/nessa_ui/utils",
-    "nessalabs/nessa_ui/code-block"
+    "nessalabs/nessa_ui/code-block",
+    "nessalabs/nessa_ui/generating-surface"
   ],
   "files": [
     {

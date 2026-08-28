@@ -424,7 +424,7 @@
       "name": "generating-surface",
       "type": "registry:ui",
       "title": "Generating Surface",
-      "description": "An ambient placeholder for content that takes a while to generate — drifting smoke and a shimmering status label reserve the space, then morph into the finished content when generation completes.",
+      "description": "An ambient placeholder for content that takes a while to generate \u2014 drifting smoke and a shimmering status label reserve the space, then morph into the finished content when generation completes.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -441,7 +441,7 @@
       "name": "mermaid-diagram",
       "type": "registry:ui",
       "title": "Mermaid Diagram",
-      "description": "Mermaid diagrams — flowcharts, sequence diagrams, and every other Mermaid grammar — rendered to SVG with app-wide light and dark theming and a fullscreen pan-and-zoom viewer.",
+      "description": "Mermaid diagrams \u2014 flowcharts, sequence diagrams, and every other Mermaid grammar \u2014 rendered to SVG with app-wide light and dark theming and a fullscreen pan-and-zoom viewer.",
       "dependencies": [
         "lucide-react",
         "mermaid"
@@ -756,6 +756,47 @@
       ]
     },
     {
+      "name": "chat-bubbles",
+      "type": "registry:ui",
+      "title": "Chat Bubbles",
+      "description": "iMessage-style transcript primitives: aligned message columns with spring-in bubbles, reply quotes, delivery receipts, a pulsing typing indicator, and square attachment tiles with a fanned stack and a full-surface grid viewer.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/chat-bubbles.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/chat-bubbles.tsx"
+        }
+      ]
+    },
+    {
+      "name": "chat-tabs",
+      "type": "registry:ui",
+      "title": "Chat Tabs",
+      "description": "The floating chat window's tab strip: pill tabs on a scrolling tablist with primary-tinted active state, busy dots, attention badges, per-tab close controls, a new-tab button, and roving arrow-key navigation.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/chat-tabs.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/chat-tabs.tsx"
+        }
+      ]
+    },
+    {
       "name": "chat-composer",
       "type": "registry:ui",
       "title": "Chat Composer",
@@ -773,6 +814,24 @@
           "path": "packages/react/src/components/chat-composer.tsx",
           "type": "registry:ui",
           "target": "components/ui/chat-composer.tsx"
+        }
+      ]
+    },
+    {
+      "name": "pill-composer",
+      "type": "registry:ui",
+      "title": "Pill Composer",
+      "description": "A compact pill-shaped chat composer that hosts the ChatComposer input, attachment, action, and trigger primitives in a single row, with an iridescent traveling-light rim that fades in while the agent works.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/chat-composer",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/pill-composer.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/pill-composer.tsx"
         }
       ]
     },
@@ -1031,7 +1090,7 @@
       "name": "timeline-header",
       "type": "registry:ui",
       "title": "Timeline header",
-      "description": "The band a horizontal scale lives on: pixel-offset cells with hairline dividers, and labels that pin at a chosen inset while any part of their cell is in view — the GanttChart's two-tier time header, extracted for any horizontally scrolled surface.",
+      "description": "The band a horizontal scale lives on: pixel-offset cells with hairline dividers, and labels that pin at a chosen inset while any part of their cell is in view \u2014 the GanttChart's two-tier time header, extracted for any horizontally scrolled surface.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -1207,7 +1266,7 @@
       "name": "workflow-canvas",
       "type": "registry:ui",
       "title": "WorkflowCanvas",
-      "description": "An infinite (or bounded) pan-and-zoom workflow canvas with draggable nodes that render any content, side handles for drawing connections, and edges that follow their endpoint nodes — built to stay responsive with thousands of nodes.",
+      "description": "An infinite (or bounded) pan-and-zoom workflow canvas with draggable nodes that render any content, side handles for drawing connections, and edges that follow their endpoint nodes \u2014 built to stay responsive with thousands of nodes.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
