@@ -1495,10 +1495,13 @@ export const Playground: Story = {
     await expect(
       canvas.getByRole("button", { name: "Start voice input" }),
     ).toBeInTheDocument()
+    // Settle before asserting the end state: the rim's fade is a Web
+    // Animation, and polling its computed opacity inside `waitFor`'s default
+    // one-second window samples a frame still converging on a loaded runner.
+    await waitForSettledAnimations(canvasElement)
     await waitFor(() => {
       expect(getComputedStyle(rim).opacity).toBe("0")
     })
-    await waitForSettledAnimations(canvasElement)
     await expect(
       canvas.getByText("Delivered"),
     ).toBeInTheDocument()
@@ -1556,10 +1559,12 @@ export const Playground: Story = {
       },
       { timeout: 4000 },
     )
+    // Same ordering as above: the fade has to finish before its landing
+    // value can be asserted, or a slow runner reads a mid-fade frame.
+    await waitForSettledAnimations(canvasElement)
     await waitFor(() => {
       expect(getComputedStyle(rim).opacity).toBe("0")
     })
-    await waitForSettledAnimations(canvasElement)
     await userEvent.type(input, "/mod")
     await userEvent.click(await body.findByRole("option", { name: /model/ }))
     await expect(input).toHaveValue("")
@@ -1700,15 +1705,15 @@ export const Generating: Story = {
     await userEvent.click(
       canvas.getByRole("button", { name: "Stop generating" }),
     )
-    await waitFor(() => {
-      expect(getComputedStyle(rim).opacity).toBe("0")
-    })
+    // The rim's own animations have to drain before its resting opacity is
+    // meaningful; asserting first samples the fade mid-flight.
     await waitFor(
       () => {
         expect(rim.getAnimations({ subtree: true })).toHaveLength(0)
       },
       { timeout: 4000 },
     )
+    await expect(getComputedStyle(rim).opacity).toBe("0")
   },
 }
 
