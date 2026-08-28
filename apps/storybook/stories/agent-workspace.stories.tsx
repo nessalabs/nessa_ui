@@ -29,6 +29,7 @@ import {
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuItem,
   SidebarProvider,
   SplitView,
@@ -221,22 +222,17 @@ function ChannelRail({
                       channel.id === activeChannelId ? "page" : undefined
                     }
                     onClick={() => onSelectChannel(channel.id)}
+                    // The count rests in the trailing cell and the action
+                    // takes its place on hover or keyboard focus — the
+                    // component owns the swap.
+                    badge={String(total)}
+                    showTrailingOnHover
                     trailing={
-                      <span className="grid place-items-center">
-                        <span
-                          aria-hidden="true"
-                          className="pointer-events-none col-start-1 row-start-1 nessa-text-2 font-medium tabular-nums text-sidebar-foreground/60 transition-opacity [@media(hover:hover)_and_(pointer:fine)]:group-hover/menu-item:opacity-0 [@media(hover:hover)_and_(pointer:fine)]:group-focus-within/menu-item:opacity-0"
-                        >
-                          {total}
-                        </span>
-                        <button
-                          type="button"
-                          aria-label={`Channel settings for ${channel.name}`}
-                          className="col-start-1 row-start-1 inline-flex size-6 appearance-none items-center justify-center rounded-md border-0 bg-transparent p-0 text-sidebar-foreground/70 outline-none transition-opacity hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring [@media(hover:hover)_and_(pointer:fine)]:opacity-0 [@media(hover:hover)_and_(pointer:fine)]:group-focus-within/menu-item:opacity-100 [@media(hover:hover)_and_(pointer:fine)]:group-hover/menu-item:opacity-100"
-                        >
-                          <Settings aria-hidden="true" className="size-3.5" />
-                        </button>
-                      </span>
+                      <SidebarMenuAction
+                        aria-label={`Channel settings for ${channel.name}`}
+                      >
+                        <Settings aria-hidden="true" />
+                      </SidebarMenuAction>
                     }
                     submenu={
                       <SidebarMenu nested guides>

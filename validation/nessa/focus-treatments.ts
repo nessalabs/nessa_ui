@@ -1,7 +1,8 @@
 const sidebarFocusComponents = Object.freeze([
   { component: "sidebar/sidebar-group", count: 1 },
-  // The row control and, on a collapsible row, its separate disclosure.
-  { component: "sidebar/sidebar-menu", count: 2 },
+  // The row control, a collapsible row's separate disclosure, and the
+  // trailing action control.
+  { component: "sidebar/sidebar-menu", count: 3 },
   { component: "sidebar/sidebar-trigger", count: 1 },
 ] as const)
 

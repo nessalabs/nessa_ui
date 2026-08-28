@@ -28,9 +28,11 @@ export {
 } from "./sidebar-group"
 export {
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuItem,
   SidebarMenuSkeleton,
   sidebarMenuItemVariants,
+  type SidebarMenuActionProps,
   type SidebarMenuItemProps,
   type SidebarMenuProps,
   type SidebarMenuSkeletonProps,

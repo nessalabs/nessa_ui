@@ -110,6 +110,25 @@ function SidebarMenu({
 // Composite row
 
 /**
+ * Reveal treatment for trailing content that only appears on hover.
+ *
+ * Keyboard focus reveals through `:focus-visible`, not `:focus-within`: a
+ * mouse click leaves focus inside the row it clicked, and `:focus-within`
+ * would keep that row's trailing revealed while the pointer is over a
+ * different row — two rows showing their actions at once.
+ */
+const sidebarMenuRevealClassName =
+  "[@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:opacity-0 [@media(hover:hover)_and_(pointer:fine)]:group-has-[:focus-visible]/menu-item:pointer-events-auto [@media(hover:hover)_and_(pointer:fine)]:group-has-[:focus-visible]/menu-item:opacity-100 [@media(hover:hover)_and_(pointer:fine)]:group-hover/menu-item:pointer-events-auto [@media(hover:hover)_and_(pointer:fine)]:group-hover/menu-item:opacity-100"
+
+/** The resting half of a badge/trailing swap: present until the row is engaged. */
+const sidebarMenuSwapRestClassName =
+  "transition-opacity [@media(hover:hover)_and_(pointer:fine)]:group-has-[:focus-visible]/menu-item:opacity-0 [@media(hover:hover)_and_(pointer:fine)]:group-hover/menu-item:opacity-0"
+
+/** The badge's own presentation, shared by both trailing arrangements. */
+const sidebarMenuBadgeClassName =
+  "pointer-events-none inline-flex min-w-6 items-center justify-center nessa-text-2 font-medium tabular-nums text-sidebar-foreground/60 group-has-data-[active=true]/menu-item:text-sidebar-accent-foreground"
+
+/**
  * Creates the class names for a supported Sidebar menu-item presentation.
  *
  * @param options - Variant, size, inset, and optional class-name selections.
@@ -298,6 +317,11 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
       ? children.props.children
       : children
   const hasTrailing = Boolean(badge || trailing)
+  // A row with both a badge and hover-revealed trailing swaps one for the
+  // other in a single cell rather than hiding the badge along with the
+  // action: the count is the row's resting information, and revealing an
+  // action should not cost the reader that.
+  const swapsBadge = showTrailingOnHover && Boolean(badge) && Boolean(trailing)
   // The trailing region is a band as tall as the row's own first line, so
   // its content centres against the row whatever height that content is —
   // a 14px spinner and a 28px icon button both land on the row's midline.
@@ -424,19 +448,43 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
           className={cn(
             "absolute end-1 top-0 z-10 flex items-center gap-0.5 group-data-[nested=true]/menu:h-8 group-data-[state=collapsed]/sidebar:hidden",
             trailingBandClassName,
-            showTrailingOnHover &&
-              "[@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:opacity-0 [@media(hover:hover)_and_(pointer:fine)]:group-focus-within/menu-item:pointer-events-auto [@media(hover:hover)_and_(pointer:fine)]:group-focus-within/menu-item:opacity-100 [@media(hover:hover)_and_(pointer:fine)]:group-hover/menu-item:pointer-events-auto [@media(hover:hover)_and_(pointer:fine)]:group-hover/menu-item:opacity-100",
+            showTrailingOnHover && !swapsBadge && sidebarMenuRevealClassName,
           )}
         >
-          {badge ? (
-            <span
-              data-slot="sidebar-menu-item-badge"
-              className="pointer-events-none inline-flex min-w-6 items-center justify-center nessa-text-2 font-medium tabular-nums text-sidebar-foreground/60 group-has-data-[active=true]/menu-item:text-sidebar-accent-foreground"
-            >
-              {badge}
+          {swapsBadge ? (
+            <span className="grid place-items-center">
+              <span
+                data-slot="sidebar-menu-item-badge"
+                className={cn(
+                  sidebarMenuBadgeClassName,
+                  "col-start-1 row-start-1",
+                  sidebarMenuSwapRestClassName,
+                )}
+              >
+                {badge}
+              </span>
+              <span
+                className={cn(
+                  "col-start-1 row-start-1 flex items-center gap-0.5 transition-opacity",
+                  sidebarMenuRevealClassName,
+                )}
+              >
+                {trailing}
+              </span>
             </span>
-          ) : null}
-          {trailing}
+          ) : (
+            <>
+              {badge ? (
+                <span
+                  data-slot="sidebar-menu-item-badge"
+                  className={sidebarMenuBadgeClassName}
+                >
+                  {badge}
+                </span>
+              ) : null}
+              {trailing}
+            </>
+          )}
         </div>
       ) : null}
       {isCollapsible ? (
@@ -456,6 +504,45 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
     </li>
   )
 })
+
+/** Properties accepted by a trailing action control on a Sidebar row. */
+interface SidebarMenuActionProps extends React.ComponentProps<"button"> {
+  /**
+   * Merges control behavior and styling into the single child element, for a
+   * menu or dialog trigger that must own the rendered control.
+   * @defaultValue false
+   */
+  asChild?: boolean
+}
+
+/**
+ * An icon control for a Sidebar row's trailing region — row settings, a
+ * kebab menu, a dismiss. Give it an `aria-label`: it is icon-only, and it
+ * sits beside the row's own control rather than inside it, so it needs its
+ * own name.
+ *
+ * @param props - Native button properties and whether to merge into a child.
+ * @returns A compact control styled for the Sidebar's trailing region.
+ */
+function SidebarMenuAction({
+  asChild = false,
+  className,
+  ...props
+}: SidebarMenuActionProps) {
+  const Comp = asChild ? Slot.Root : "button"
+
+  return (
+    <Comp
+      type={asChild ? undefined : "button"}
+      data-slot="sidebar-menu-action"
+      className={cn(
+        "inline-flex size-6 shrink-0 appearance-none items-center justify-center rounded-md border-0 bg-transparent p-0 text-sidebar-foreground/70 outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring disabled:pointer-events-none disabled:opacity-50 [&>svg]:size-3.5 [&>svg]:shrink-0",
+        className,
+      )}
+      {...props}
+    />
+  )
+}
 
 // Loading row
 
@@ -524,9 +611,11 @@ function SidebarMenuSkeleton({
 
 export {
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuItem,
   SidebarMenuSkeleton,
   sidebarMenuItemVariants,
+  type SidebarMenuActionProps,
   type SidebarMenuItemProps,
   type SidebarMenuProps,
   type SidebarMenuSkeletonProps,

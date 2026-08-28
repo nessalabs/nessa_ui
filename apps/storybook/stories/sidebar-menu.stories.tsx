@@ -13,12 +13,13 @@ import {
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuItem,
   SidebarMenuSkeleton,
   SidebarProvider,
   SidebarTrigger,
 } from "@nessa-ui/react"
-import { Folder, LoaderCircle, MoreHorizontal } from "lucide-react"
+import { Folder, LoaderCircle, MoreHorizontal, Settings } from "lucide-react"
 
 import { SidebarToggleIcon } from "./icons/sidebar-toggle-icon"
 import {
@@ -39,6 +40,8 @@ const menuDescriptions = {
     "Nested navigation reuses SidebarMenu and SidebarMenuItem, preserving valid ul/li structure without a second submenu component family.",
   NestedMenuGuides:
     "The guides variant of a nested SidebarMenu draws decorative branch lines from the parent row to each child, terminating in an elbow on the last row. Guides are presentation only: hierarchy stays in the nested list structure, and the logical-start offset retunes through --nessa-sidebar-guide-inset.",
+  TrailingAction:
+    "SidebarMenuAction is the trailing icon control on a row — settings, a kebab menu, a dismiss. Paired with a badge and showTrailingOnHover the two share one cell and swap, so revealing the action costs the reader neither width nor the row's resting count. The reveal answers hover and keyboard focus only: :focus-within would keep the row you last clicked revealed while you hover another, showing two rows' actions at once.",
   CollapsibleSubmenu:
     "A submenu becomes a disclosure through the collapsible prop. In row mode the parent row is the disclosure button; in chevron mode a separate control at the logical start toggles it so the row itself stays free to navigate. Open state is uncontrolled through defaultOpen or host-controlled through open and onOpenChange.",
 } as const
@@ -648,5 +651,65 @@ export const CollapsibleSubmenu: StoryObj = {
       if (previousDir === null) root.removeAttribute("dir")
       else root.setAttribute("dir", previousDir)
     }
+  },
+}
+
+
+export const TrailingAction: StoryObj = {
+  parameters: storyDocumentation(menuDescriptions.TrailingAction),
+  render: () => (
+    <MenuPrimitiveFrame description={menuDescriptions.TrailingAction}>
+      <SidebarMenu>
+        {["eng-sidebar", "eng-tabs"].map((channel, index) => (
+          <SidebarMenuItem
+            key={channel}
+            icon={<Folder />}
+            badge={String(index === 0 ? 5 : 2)}
+            showTrailingOnHover
+            trailing={
+              <SidebarMenuAction aria-label={`Settings for ${channel}`}>
+                <Settings aria-hidden="true" />
+              </SidebarMenuAction>
+            }
+          >
+            {channel}
+          </SidebarMenuItem>
+        ))}
+      </SidebarMenu>
+    </MenuPrimitiveFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const first = canvas.getByRole("button", { name: "Settings for eng-sidebar" })
+    const second = canvas.getByRole("button", { name: "Settings for eng-tabs" })
+    const opacityOf = (element: HTMLElement) =>
+      Number.parseFloat(getComputedStyle(element.parentElement!).opacity)
+
+    if (!matchMedia("(hover: hover) and (pointer: fine)").matches) {
+      // Without a fine pointer there is nothing to reveal on: both actions
+      // stay present, which is what keeps them reachable by touch.
+      await expect(opacityOf(first)).toBe(1)
+      await expect(opacityOf(second)).toBe(1)
+      return
+    }
+
+    // Both actions rest hidden; the counts hold the trailing cell.
+    await expect(opacityOf(first)).toBe(0)
+    await expect(opacityOf(second)).toBe(0)
+
+    // The regression this guards: clicking a row leaves focus inside it, and
+    // a :focus-within reveal would keep that row's action showing while the
+    // pointer moved on to another row. Keyed off :focus-visible, a mouse
+    // click reveals nothing.
+    await userEvent.click(canvas.getByRole("button", { name: "eng-sidebar" }))
+    await expect(opacityOf(first)).toBe(0)
+    await expect(opacityOf(second)).toBe(0)
+
+    // Keyboard focus still reveals, and only for the row that holds it.
+    first.focus()
+    await waitFor(async () => {
+      await expect(opacityOf(first)).toBe(1)
+    })
+    await expect(opacityOf(second)).toBe(0)
   },
 }

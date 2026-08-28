@@ -57,6 +57,7 @@ try {
     "components-sidebar-primitives-menu--nested-menu",
     "components-sidebar-primitives-menu--nested-menu-guides",
     "components-sidebar-primitives-menu--collapsible-submenu",
+    "components-sidebar-primitives-menu--trailing-action",
     "components-sidebar-compositions--documentation",
     "components-sidebar-compositions--rich-chat-row",
     "components-sidebar-compositions--nested-navigation",
