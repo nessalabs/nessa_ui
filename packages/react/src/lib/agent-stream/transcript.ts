@@ -140,16 +140,16 @@ export const GROUP_MIN = 2
  * has to be kept in step — a rule nothing enforces and everything eventually
  * breaks.
  *
- * `plan_updated` is deliberately absent: the plan draws in its own surface, not
- * as a row in the work list, so counting it would both overstate a collapse and
- * split a run of plan-tool calls down the middle.
+ * `plan_updated` and `file_edits` are deliberately absent: both draw in their
+ * own surface rather than as a row in the work list — the plan in its panel, the
+ * changed files as one summary at the end of the turn — so counting either
+ * would both overstate a collapse and split a run of calls down the middle.
  */
 export const RENDERS: ReadonlySet<string> = new Set([
   "user_message",
   "assistant_text",
   "reasoning",
   "tool_call_started",
-  "file_edits",
   "error",
   "context_compacted",
   "rate_limited",

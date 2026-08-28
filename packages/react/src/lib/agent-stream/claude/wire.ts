@@ -221,13 +221,125 @@ export interface WireTaskUsage {
   readonly duration_ms?: number
 }
 
+/** What one `system/init` advertises: the whole session, as the CLI sees it. */
+export interface WireInitEvent {
+  readonly type: "system"
+  readonly subtype: "init"
+  readonly session_id: string
+  readonly cwd: string
+  readonly model: string
+  readonly tools: readonly string[]
+  readonly slash_commands?: readonly string[]
+  readonly terminal_slash_commands?: readonly string[]
+  readonly skills?: readonly string[]
+  readonly agents?: readonly string[]
+  readonly mcp_servers?: readonly { readonly name: string; readonly status: string }[]
+  readonly plugins?: readonly { readonly name: string; readonly version?: string; readonly source?: string }[]
+  readonly permissionMode?: string
+  readonly output_style?: string
+  readonly claude_code_version?: string
+}
+
+/** A delegated run beginning: a subagent, a workflow, or a backgrounded shell. */
+export interface WireTaskStartedEvent {
+  readonly type: "system"
+  readonly subtype: "task_started"
+  readonly task_id: string
+  readonly tool_use_id: string
+  readonly task_type: string
+  readonly description?: string
+  readonly subagent_type?: string
+  readonly workflow_name?: string
+  readonly prompt?: string
+}
+
+/**
+ * A delegated run's live status.
+ *
+ * `workflow_progress` rides only some of these, and is the only window into a
+ * workflow's agents — they write nothing else to the stream.
+ */
+export interface WireTaskProgressEvent {
+  readonly type: "system"
+  readonly subtype: "task_progress"
+  readonly task_id: string
+  readonly tool_use_id: string
+  readonly description?: string
+  readonly last_tool_name?: string
+  readonly usage?: { readonly total_tokens?: number; readonly tool_uses?: number; readonly duration_ms?: number }
+  readonly workflow_progress?: readonly JsonValue[]
+}
+
+/** A delegated run finishing, with where its output was written. */
+export interface WireTaskNotificationEvent {
+  readonly type: "system"
+  readonly subtype: "task_notification"
+  readonly task_id: string
+  readonly tool_use_id?: string
+  readonly status?: string
+  readonly summary?: string
+  readonly output_file?: string
+}
+
+/** The seam a compaction left, and what it cost. */
+export interface WireCompactBoundaryEvent {
+  readonly type: "system"
+  readonly subtype: "compact_boundary"
+  readonly compact_metadata?: {
+    readonly trigger?: string
+    readonly pre_tokens?: number
+    readonly post_tokens?: number
+  }
+}
+
+/** A call refused without ever being asked about. */
+export interface WirePermissionDeniedEvent {
+  readonly type: "system"
+  readonly subtype: "permission_denied"
+  readonly tool_name: string
+  readonly tool_use_id: string
+  readonly message?: string
+}
+
+/** A hook running. `hook_response` adds the outcome. */
+export interface WireHookEvent {
+  readonly type: "system"
+  readonly subtype: "hook_started" | "hook_response"
+  readonly hook_name?: string
+  readonly hook_event?: string
+  readonly outcome?: string
+  readonly exit_code?: number
+}
+
+/** A system line this build does not model. Open on purpose: the CLI adds subtypes. */
+export interface WireUnknownSystemEvent {
+  readonly type: "system"
+  readonly subtype: string
+  readonly [key: string]: JsonValue | undefined
+}
+
+/** Everything the `system` channel can carry. */
+export type WireSystemEvent =
+  | WireInitEvent
+  | WireTaskStartedEvent
+  | WireTaskProgressEvent
+  | WireTaskNotificationEvent
+  | WireCompactBoundaryEvent
+  | WirePermissionDeniedEvent
+  | WireHookEvent
+  | WireUnknownSystemEvent
+
 /**
  * One decoded line. Every arm keeps the fields this library reads and tolerates
  * the rest: the CLI adds keys and whole subtypes between releases, and a parser
  * that fails a line over an unknown field loses content it could have shown.
+ *
+ * These shapes describe the wire; they do not police it. A declared type is a
+ * claim about bytes, not a check on them, so the mapper reads every field
+ * through the shared readers rather than trusting the declaration.
  */
 export type WireEvent =
-  | { readonly type: "system"; readonly subtype: string; readonly [key: string]: JsonValue | undefined }
+  | WireSystemEvent
   | {
       readonly type: "stream_event"
       readonly event: WireStreamFrame

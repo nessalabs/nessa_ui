@@ -46,6 +46,7 @@ import {
   type DelegatedRun,
   type PlanStep,
   type DeltaBuffers,
+  type FileEdit,
   type ToolKind,
   type WorkflowAgentProgress,
   type Transcript,
@@ -86,6 +87,8 @@ import codexResumeOne from "./fixtures/agent-stream/codex/resume_turn1.jsonl?raw
 import codexResumeTwo from "./fixtures/agent-stream/codex/resume_turn2.jsonl?raw"
 import codexTools from "./fixtures/agent-stream/codex/tools.jsonl?raw"
 import codexWebsearch from "./fixtures/agent-stream/codex/websearch.jsonl?raw"
+// What the interactive app-server answers that the one-way stream never sends.
+import codexAppServerCapabilities from "./fixtures/agent-stream/codex/appserver_capabilities.json"
 // The transcripts the *stream* refuses to carry, read back from the files
 // Claude Code writes under ~/.claude/projects. Keyed by the ids the stream does
 // give: a subagent by its `task_id`, a workflow agent by its `agentId`.
@@ -102,12 +105,32 @@ type ProviderId = "claude" | "codex"
  * provider report capabilities" is a question a third provider answers for
  * itself without this file learning its name.
  */
+interface Transport {
+  readonly id: string
+  readonly label: string
+  readonly command: string
+  readonly interactive: boolean
+  readonly supports: {
+    readonly capabilities: boolean
+    readonly approvals: boolean
+    readonly steering: boolean
+  }
+  readonly note: string
+}
+
 interface Provider {
   readonly id: ProviderId
   readonly label: string
   readonly command: string
   /** The provider's own mapper, behind the shared interface. */
   readonly createMapper: () => { push(line: string): readonly AgentEvent[] }
+  /**
+   * How you reach this agent. A provider can speak more than one, and they do
+   * not carry the same things — Codex's one-way stream and its interactive
+   * app-server differ enough that a reader comparing them should see which is
+   * which rather than a single blurred answer.
+   */
+  readonly transports: readonly Transport[]
   readonly supports: {
     /** Token-level previews. Claude streams; Codex, in this mode, does not. */
     readonly streaming: boolean
@@ -127,6 +150,24 @@ const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
     id: "claude",
     label: "Claude Code",
     command: "claude -p --output-format stream-json --include-partial-messages",
+    transports: [
+      {
+        id: "stream",
+        label: "stream-json",
+        command: "claude -p --output-format stream-json",
+        interactive: false,
+        supports: { capabilities: true, approvals: false, steering: false },
+        note: "One-way. The opening line advertises the whole session, so pickers can be built from the stream alone.",
+      },
+      {
+        id: "pipe",
+        label: "stream-json, both ways",
+        command: "claude -p --input-format stream-json --output-format stream-json",
+        interactive: true,
+        supports: { capabilities: true, approvals: true, steering: true },
+        note: "The same stream with stdin open: prompts and steering go in, control requests answer approvals and change model or permission mode mid-turn.",
+      },
+    ],
     createMapper: () => new ClaudeStreamMapper(),
     supports: { streaming: true, capabilities: true, fileEdits: false, workflowBoard: true, transcriptsOnDisk: true },
   },
@@ -134,6 +175,24 @@ const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
     id: "codex",
     label: "Codex",
     command: "codex exec --json",
+    transports: [
+      {
+        id: "exec",
+        label: "exec --json",
+        command: "codex exec --json",
+        interactive: false,
+        supports: { capabilities: false, approvals: false, steering: false },
+        note: "One-way. The opening line carries a thread id and nothing else, so nothing here can populate a picker.",
+      },
+      {
+        id: "app-server",
+        label: "app-server",
+        command: "codex app-server",
+        interactive: true,
+        supports: { capabilities: true, approvals: true, steering: true },
+        note: "Interactive JSON-RPC. Answers model, skill, plugin and hook lists on request, asks for approval before running untrusted commands, and takes steer and interrupt mid-turn.",
+      },
+    ],
     createMapper: () => new CodexStreamMapper(),
     supports: { streaming: false, capabilities: false, fileEdits: true, workflowBoard: false, transcriptsOnDisk: true },
   },
@@ -211,18 +270,22 @@ interface LiveState {
  * and a reader comparing the two should be able to see that without opening
  * the raw pane.
  */
-function ProviderSupport({ provider }: { provider: Provider }) {
+function ProviderSupport({ provider, transport }: { provider: Provider; transport: Transport }) {
   const features = [
+    // What the wire carries, whichever transport is used…
     ["streams tokens", provider.supports.streaming],
-    ["session capabilities", provider.supports.capabilities],
     ["structured file edits", provider.supports.fileEdits],
     ["workflow board", provider.supports.workflowBoard],
     ["transcripts on disk", provider.supports.transcriptsOnDisk],
+    // …and what this transport in particular can do.
+    ["session capabilities", transport.supports.capabilities],
+    ["approvals", transport.supports.approvals],
+    ["steering", transport.supports.steering],
   ] as const
 
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="provider-support">
-      <code className="text-muted-foreground">{provider.command}</code>
+      <code className="text-muted-foreground">{transport.command}</code>
       {features.map(([label, supported]) => (
         <Badge key={label} variant={supported ? "secondary" : "outline"} className={supported ? "" : "opacity-60"}>
           {supported ? label : `no ${label}`}
@@ -639,36 +702,11 @@ function WorkRow({ item, transcript, previews }: { item: WorkItem; transcript: T
       </Message>
     )
   }
-  if (payload.type === "file_edits") {
-    // A provider that reports edits as structure gets the design system's own
-    // changed-file surface; one that does not simply never emits this, and the
-    // row is absent rather than empty.
-    if (payload.edits.length === 0) return null
-    return (
-      <FileDiffCard defaultExpanded itemCount={payload.edits.length} data-testid="file-edits">
-        <FileDiffCardHeader>
-          <FileDiffCardIcon>
-            <EditIcon />
-          </FileDiffCardIcon>
-          <FileDiffCardHeading>
-            <FileDiffCardTitle>
-              {`Changed ${payload.edits.length} file${payload.edits.length === 1 ? "" : "s"}`}
-            </FileDiffCardTitle>
-          </FileDiffCardHeading>
-        </FileDiffCardHeader>
-        <FileDiffList aria-label="Changed files">
-          {payload.edits.map((edit) => (
-            <FileDiffListItem key={edit.path}>
-              <FileDiffPath path={edit.path} />
-              <Badge variant="outline" className="ml-auto">
-                {edit.change}
-              </Badge>
-            </FileDiffListItem>
-          ))}
-        </FileDiffList>
-      </FileDiffCard>
-    )
-  }
+  // Edits are not drawn where they happen. A turn touches the same files
+  // repeatedly and interleaves them with the calls that made them, so inline
+  // rows read as noise between the steps; the turn's changed files are one
+  // summary at the end, which is the question a reader actually has.
+  if (payload.type === "file_edits") return null
   if (payload.type === "error") {
     return <p className="text-destructive text-xs">{payload.message}</p>
   }
@@ -678,6 +716,48 @@ function WorkRow({ item, transcript, previews }: { item: WorkItem; transcript: T
 /** A field a provider left unset, so the surface can omit it rather than print a placeholder. */
 function known(value: string | null | undefined): string | null {
   return value === undefined || value === null || value === "" || value === "unknown" ? null : value
+}
+
+/**
+ * Every file a turn touched, once.
+ *
+ * A turn can edit the same path several times; the reader wants the set of
+ * files that changed, not a replay of each write, so the last change to a path
+ * wins and the order follows first touch.
+ */
+function turnFileEdits(work: readonly WorkItem[]): readonly FileEdit[] {
+  const byPath = new Map<string, FileEdit>()
+  for (const item of work) {
+    if (isToolGroup(item) || item.payload.type !== "file_edits") continue
+    for (const edit of item.payload.edits) byPath.set(edit.path, edit)
+  }
+  return [...byPath.values()]
+}
+
+function TurnFileEdits({ edits }: { edits: readonly FileEdit[] }) {
+  if (edits.length === 0) return null
+  return (
+    <FileDiffCard defaultExpanded itemCount={edits.length} data-testid="file-edits">
+      <FileDiffCardHeader>
+        <FileDiffCardIcon>
+          <EditIcon />
+        </FileDiffCardIcon>
+        <FileDiffCardHeading>
+          <FileDiffCardTitle>{`Changed ${edits.length} file${edits.length === 1 ? "" : "s"}`}</FileDiffCardTitle>
+        </FileDiffCardHeading>
+      </FileDiffCardHeader>
+      <FileDiffList aria-label="Changed files">
+        {edits.map((edit) => (
+          <FileDiffListItem key={edit.path}>
+            <FileDiffPath path={edit.path} />
+            <Badge variant="outline" className="ml-auto">
+              {edit.change}
+            </Badge>
+          </FileDiffListItem>
+        ))}
+      </FileDiffList>
+    </FileDiffCard>
+  )
 }
 
 function TranscriptView({
@@ -760,6 +840,9 @@ function TranscriptView({
                     </MessageContent>
                   </Message>
                 )}
+                {/* Last in the turn: what changed on disk is the turn's
+                    outcome, not a step within it. */}
+                <TurnFileEdits edits={turnFileEdits(turn.work)} />
               </div>
             ))}
           </MessageScrollerContent>
@@ -1003,6 +1086,63 @@ function agentState(agent: WorkflowAgentProgress): string {
   return agent.agentId === null ? "queued" : "running"
 }
 
+/**
+ * The same pane for Codex, fed by the app-server rather than the stream.
+ *
+ * A marketplace's count is the catalogue's real size and the chips are the
+ * sample the reply carried — a curated source holds thousands, which a picker
+ * searches rather than lists.
+ */
+function CodexCapabilitiesView({ capabilities }: { capabilities: codex.CodexCapabilities }) {
+  return (
+    <div className="flex flex-col gap-3 text-xs">
+      <Section title={`Models (${capabilities.models.length})`}>
+        <ul className="space-y-1">
+          {capabilities.models.map((model) => (
+            <li key={model.id} className="flex items-center gap-2">
+              <Badge variant={model.isDefault ? "default" : "outline"}>{model.displayName}</Badge>
+              <span className="text-muted-foreground min-w-0 truncate">{model.description}</span>
+            </li>
+          ))}
+        </ul>
+      </Section>
+      <Section title={`Skills (${capabilities.skills.length})`}>
+        <div className="flex flex-wrap gap-1">
+          {capabilities.skills.map((skill) => (
+            <Badge key={skill.name} variant="secondary">
+              {`/${skill.name}`}
+            </Badge>
+          ))}
+        </div>
+      </Section>
+      <Section title={`Plugin sources (${capabilities.marketplaces.length})`}>
+        <ul className="space-y-1">
+          {capabilities.marketplaces.map((marketplace) => (
+            <li key={marketplace.name} className="flex items-center gap-2">
+              <span>{marketplace.name}</span>
+              <span className="text-muted-foreground ml-auto">
+                {`${marketplace.count.toLocaleString()} plugins`}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Section>
+      <Section title={`Hooks (${capabilities.hooks.length})`}>
+        <div className="flex flex-wrap gap-1">
+          {capabilities.hooks.map((hook, index) => (
+            <Badge key={`${hook.event}-${index}`} variant="outline">
+              {hook.event ?? "hook"}
+            </Badge>
+          ))}
+        </div>
+      </Section>
+      <p className="text-muted-foreground">
+        Read from the app-server, not the stream: `codex exec --json` opens with a thread id and nothing else.
+      </p>
+    </div>
+  )
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="border-border rounded-xl border p-3">
@@ -1014,6 +1154,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function InspectorView({
   captureId,
+  transport,
   count,
   events,
   produced,
@@ -1024,6 +1165,7 @@ function InspectorView({
   count: number
   events: readonly AgentEvent[]
   produced: readonly number[]
+  transport: Transport
   opened: claude.TranscriptRef | null
   onCloseTranscript: () => void
 }) {
@@ -1032,16 +1174,23 @@ function InspectorView({
   // Only Claude advertises its commands, skills and servers; asking Codex's
   // events for them would answer null, and a pane that is always empty is
   // worse than a pane that is absent.
+  // Claude advertises itself on the stream; Codex answers a different channel,
+  // so its capabilities come from a captured app-server reply rather than from
+  // the events. Same pane, two sources, and neither invents the other's.
   const capabilities = React.useMemo(
-    () => (provider.supports.capabilities ? claude.sessionCapabilities(events) : null),
-    [events, provider],
+    () => (transport.supports.capabilities && provider.id === "claude" ? claude.sessionCapabilities(events) : null),
+    [events, provider, transport],
+  )
+  const codexCaps = React.useMemo(
+    () => (transport.supports.capabilities && provider.id === "codex" ? codex.codexCapabilities(codexAppServerCapabilities as never) : null),
+    [provider, transport],
   )
   const [selected, setSelected] = React.useState(0)
   const lines = (LINES.get(captureId) ?? []).slice(0, count)
   const line = lines[Math.min(selected, Math.max(lines.length - 1, 0))]
   const decoded = line === undefined ? null : (JSON.parse(line) as unknown)
   const selectedEvent = events[Math.min(selected, Math.max(events.length - 1, 0))]
-  const shownPane = pane === "capabilities" && !provider.supports.capabilities ? "raw" : pane
+  const shownPane = pane === "capabilities" && !transport.supports.capabilities ? "raw" : pane
 
   // An opened transcript takes the panel over: it is a different conversation,
   // not another view of this one.
@@ -1052,14 +1201,27 @@ function InspectorView({
       <SegmentedControl aria-label="Inspector pane" value={pane} onValueChange={(value) => setPane(value as "raw" | "events" | "capabilities")}>
         <SegmentedControlOption value="raw">Raw wire ({lines.length})</SegmentedControlOption>
         <SegmentedControlOption value="events">Events ({events.length})</SegmentedControlOption>
-        {provider.supports.capabilities ? (
+        {transport.supports.capabilities ? (
           <SegmentedControlOption value="capabilities">Capabilities</SegmentedControlOption>
         ) : null}
       </SegmentedControl>
 
       {shownPane === "capabilities" ? (
-        <div className="min-h-0 flex-1 overflow-auto">
-          <CapabilitiesView capabilities={capabilities} />
+        // A scrolling region holding only chips has nothing focusable inside
+        // it, so a keyboard user cannot reach the scroll. Naming it and making
+        // it a tab stop is the treatment MessageScrollerViewport gives its own
+        // viewport.
+        <div
+          className="focus-visible:outline-ring min-h-0 flex-1 overflow-auto outline-none focus-visible:outline-2 focus-visible:outline-offset-2"
+          tabIndex={0}
+          role="region"
+          aria-label="Session capabilities"
+        >
+          {codexCaps === null ? (
+            <CapabilitiesView capabilities={capabilities} />
+          ) : (
+            <CodexCapabilitiesView capabilities={codexCaps} />
+          )}
         </div>
       ) : shownPane === "raw" ? (
         <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -1199,6 +1361,8 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
   const [captureId, setCaptureId] = React.useState(initialCapture)
   const provider = PROVIDERS[providerOf(captureId)]
   const captures = CAPTURES.filter((entry) => entry.provider === provider.id)
+  const [transportId, setTransportId] = React.useState(provider.transports[0]!.id)
+  const transport = provider.transports.find((entry) => entry.id === transportId) ?? provider.transports[0]!
 
   // Switching provider lands on that provider's first capture, so the two
   // sides are compared on the same scenario rather than on whatever the old
@@ -1206,6 +1370,9 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
   const switchProvider = (next: string) => {
     const first = CAPTURES.find((entry) => entry.provider === next)
     if (first !== undefined) setCaptureId(first.id)
+    // A transport belongs to its provider, so the selection cannot survive the
+    // switch — land on the new provider's first one.
+    setTransportId(PROVIDERS[next as ProviderId].transports[0]!.id)
   }
   const lines = LINES.get(captureId) ?? []
   const [count, setCount] = React.useState(autoplay ? 0 : lines.length)
@@ -1285,7 +1452,17 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
         </div>
       </div>
       <p className="text-muted-foreground text-xs">{capture?.blurb}</p>
-      <ProviderSupport provider={provider} />
+      <div className="flex flex-wrap items-center gap-2">
+        <SegmentedControl aria-label="Transport" value={transport.id} onValueChange={setTransportId}>
+          {provider.transports.map((entry) => (
+            <SegmentedControlOption key={entry.id} value={entry.id}>
+              {entry.label}
+            </SegmentedControlOption>
+          ))}
+        </SegmentedControl>
+        <ProviderSupport provider={provider} transport={transport} />
+      </div>
+      <p className="text-muted-foreground text-xs">{transport.note}</p>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="border-border min-h-0 overflow-hidden rounded-2xl border p-3">
@@ -1299,6 +1476,7 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
         <div className="border-border min-h-0 rounded-2xl border p-3">
           <InspectorView
             captureId={captureId}
+            transport={transport}
             count={count}
             events={events}
             produced={produced}
@@ -1550,6 +1728,18 @@ export const Providers: Story = {
     })
     await expect(canvas.queryByTestId("file-edits")).toBeNull()
     await expect(canvas.getByTestId("provider-support")).toHaveTextContent("streams tokens")
+
+    // Codex's second transport answers what its stream cannot: switching to the
+    // app-server restores the capabilities pane the one-way stream has no data
+    // for, and the support strip flips with it.
+    await userEvent.click(canvas.getByRole("button", { name: "Codex" }))
+    await waitFor(async () => {
+      await expect(canvas.getByRole("button", { name: "app-server" })).toBeInTheDocument()
+    })
+    await expect(canvas.queryByRole("button", { name: "Capabilities" })).toBeNull()
+    await userEvent.click(canvas.getByRole("button", { name: "app-server" }))
+    await userEvent.click(await canvas.findByRole("button", { name: "Capabilities" }))
+    await expect(canvas.getByText(/Models \(\d+\)/)).toBeInTheDocument()
   },
 }
 

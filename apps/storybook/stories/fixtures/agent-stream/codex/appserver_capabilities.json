@@ -1,0 +1,332 @@
+{
+  "model/list": {
+    "data": [
+      {
+        "id": "gpt-5.6-terra",
+        "displayName": "GPT-5.6-Terra",
+        "description": "Balanced agentic coding model for everyday work.",
+        "isDefault": true
+      },
+      {
+        "id": "gpt-5.6-luna",
+        "displayName": "GPT-5.6-Luna",
+        "description": "Fast and affordable agentic coding model.",
+        "isDefault": false
+      },
+      {
+        "id": "gpt-5.5",
+        "displayName": "GPT-5.5",
+        "description": "Frontier model for complex coding, research, and real-world work.",
+        "isDefault": false
+      },
+      {
+        "id": "gpt-5.4-mini",
+        "displayName": "GPT-5.4-Mini",
+        "description": "Small, fast, and cost-efficient model for simpler coding tasks.",
+        "isDefault": false
+      }
+    ]
+  },
+  "skills/list": {
+    "data": [
+      {
+        "cwd": "/home/dev/workspace",
+        "skills": [
+          {
+            "name": "brainstorming",
+            "description": "Use before creating Toolcraft app features, changing behavior, or assembling app specs."
+          },
+          {
+            "name": "browser:control-in-app-browser",
+            "description": "Control the in-app Browser for opening, navigating, inspecting visible or interactive page state, clicking, typing, screenshots, and local web testing. It can have existing signed-in sessions. For semantic operations on linked resources, prefer a purpose-built connector, API, or CLI when available."
+          },
+          {
+            "name": "chrome:control-chrome",
+            "description": "Control the user's Chrome browser for tasks that depend on existing Chrome state: tabs, logged-in sessions, or extensions. Prefer purpose-built connectors, APIs, or CLIs when available."
+          },
+          {
+            "name": "codex:codex-cli-runtime",
+            "description": "Internal helper contract for calling the codex-companion runtime from Claude Code"
+          },
+          {
+            "name": "codex:codex-result-handling",
+            "description": "Internal guidance for presenting Codex helper output back to the user"
+          },
+          {
+            "name": "codex:gpt-5-4-prompting",
+            "description": "Internal guidance for composing Codex and GPT-5.4 prompts for coding, review, diagnosis, and research tasks inside the Codex Claude Code plugin"
+          },
+          {
+            "name": "computer-use:computer-use",
+            "description": "Control local Mac apps through Computer Use for tasks that require reading or operating app UI. Prefer purpose-built connectors, APIs, or CLIs when available."
+          },
+          {
+            "name": "documents:documents",
+            "description": "Create, edit, redline, and comment on `.docx`, Word, and Google Docs-targeted document artifacts inside the container, with a strict render-and-verify workflow. Use `render_docx.py` to generate page PNGs (and optional PDF) for visual QA, then iterate until layout is flawless before delivering the final document."
+          },
+          {
+            "name": "domain-modeling",
+            "description": "Build and sharpen a project's domain model. Use when discussing codebase terminology, writing or editing a CONTEXT.md, or recording or editing an ADR."
+          },
+          {
+            "name": "figma",
+            "description": "Use when a Toolcraft task includes a Figma URL, node ID, or design-to-code requirement."
+          },
+          {
+            "name": "figma-implement-design",
+            "description": "Use to translate inspected Figma structure into a production-ready Toolcraft generated app."
+          },
+          {
+            "name": "find-skills",
+            "description": "Use when the user asks how to do something, wants a skill for a task, or wants to discover and install agent skills."
+          },
+          {
+            "name": "grill-me",
+            "description": "A relentless interview to sharpen a plan or design."
+          },
+          {
+            "name": "grilling",
+            "description": "Grill the user relentlessly about a plan, decision, or idea. Use when the user wants to stress-test their thinking, or uses any 'grill' trigger phrases."
+          },
+          {
+            "name": "pdf:pdf",
+            "description": "Read, create, inspect, render, and verify PDF files where visual layout matters, including fillable AcroForms. Use Poppler rendering plus Python tools such as reportlab, pdfplumber, and pypdf for generation and extraction."
+          },
+          {
+            "name": "presentations:Presentations",
+            "description": "Read, create or edit PowerPoint or Google Slides decks. Use for presentation, slide deck, PowerPoint, PPT, PPTX, or Google Slides requests."
+          },
+          {
+            "name": "prototype",
+            "description": "Build a throwaway prototype to answer a design question. Use when the user wants to sanity-check whether a state model or logic feels right, or explore what a UI should look like."
+          },
+          {
+            "name": "research",
+            "description": "Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent."
+          },
+          {
+            "name": "setup-example-skills",
+            "description": "Configure this repo for the engineering skills \u2014 set up its issue tracker, triage label vocabulary, and domain doc layout. Run once before first use of the other engineering skills."
+          },
+          {
+            "name": "spreadsheets:Spreadsheets",
+            "description": "Create, edit, analyze, and verify standalone spreadsheet files or Google Sheets-ready workbooks, including .xlsx, .xls, .csv, and .tsv. Do not use for live controlling Microsoft Excel app or a live Excel session."
+          },
+          {
+            "name": "spreadsheets:excel-live-control",
+            "description": "Control an open or active Microsoft Excel workbook through the ChatGPT add-in or connected session. Use when the user tags the Microsoft Excel app in Codex or follows up on an established live Excel task. Do not use for standalone spreadsheet files or Google Sheets."
+          },
+          {
+            "name": "systematic-debugging",
+            "description": "Use before fixing broken Toolcraft controls, tests, builds, visual mismatches, exports, or runtime regressions."
+          },
+          {
+            "name": "template-creator:template-creator",
+            "description": "Create or update a reusable personal Codex artifact-template skill. Use when the user invokes $template-creator or asks in natural language to create a reusable template from a reference document, presentation, spreadsheet, Google Docs, Slides, or Sheets link, ImageGen or Product Design image, email, Slack message, or Site project, or explicitly asks to edit or update a passed artifact-template skill. Do not use for one-off creation from an existing template."
+          },
+          {
+            "name": "text-to-lottie",
+            "description": "Create, edit, or fix Lottie/Bodymovin JSON for the Skia Skottie player: logos, loaders, icons, and UI microinteractions."
+          },
+          {
+            "name": "to-spec",
+            "description": "Turn the current conversation into a spec and publish it to the project issue tracker \u2014 no interview, just synthesis of what you've already discussed."
+          },
+          {
+            "name": "visualize:visualize",
+            "description": "Create visualizations and interactive tools directly in conversation. Use when asked to show how something works, make simulators or labs, maps, plots, charts or graphs, comparisons, UI mockups, scenarios, adjustable inputs, and exploration beyond regular text."
+          },
+          {
+            "name": "wayfinder",
+            "description": "Plan a huge chunk of work \u2014 more than one agent session can hold \u2014 as a shared map of decision tickets on your issue tracker, and resolve them one at a time until the way to the destination is clear."
+          },
+          {
+            "name": "writing-plans",
+            "description": "Use before Toolcraft code changes once the product behavior or approved spec is clear."
+          },
+          {
+            "name": "imagegen",
+            "description": "Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts. Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector. Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas."
+          },
+          {
+            "name": "openai-docs",
+            "description": "Use when the user asks how to build with OpenAI products or APIs, asks about Codex itself or choosing Codex surfaces, needs up-to-date official documentation with citations, help choosing the latest model for a use case, or model upgrade and prompt-upgrade guidance; use OpenAI docs MCP tools for non-Codex docs questions, use the Codex manual helper first for broad Codex self-knowledge, and restrict fallback browsing to official OpenAI domains."
+          },
+          {
+            "name": "plugin-creator",
+            "description": "Create and scaffold plugin directories for Codex with a required `.codex-plugin/plugin.json`, optional plugin folders/files, valid manifest defaults, and personal-marketplace entries by default. Use when Codex needs to create a new personal plugin, add optional plugin structure, generate or update marketplace entries for plugin ordering and availability metadata, or update an existing local plugin during development with the CLI-driven cachebuster and reinstall flow."
+          },
+          {
+            "name": "skill-creator",
+            "description": "Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Codex's capabilities with specialized knowledge, workflows, or tool integrations."
+          },
+          {
+            "name": "skill-installer",
+            "description": "Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path. Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos)."
+          }
+        ]
+      }
+    ]
+  },
+  "hooks/list": {
+    "data": [
+      {
+        "cwd": "/home/dev/workspace",
+        "hooks": [
+          {
+            "key": "codex@openai-codex:hooks/hooks.json:session_start:0:0",
+            "eventName": "sessionStart",
+            "handlerType": "command",
+            "matcher": null,
+            "command": "node \"/home/dev/.codex/plugins/cache/openai-codex/codex/1.0.6/scripts/session-lifecycle-hook.mjs\" SessionStart",
+            "timeoutSec": 5,
+            "statusMessage": null,
+            "sourcePath": "/home/dev/.codex/plugins/cache/openai-codex/codex/1.0.6/hooks/hooks.json",
+            "source": "plugin",
+            "pluginId": "codex@openai-codex",
+            "displayOrder": 0,
+            "enabled": true,
+            "isManaged": false,
+            "currentHash": "sha256:e6b9df143de11443eb576c38874cf6e0c48358f948170948fdf630f1c047c098",
+            "trustStatus": "trusted"
+          },
+          {
+            "key": "codex@openai-codex:hooks/hooks.json:stop:0:0",
+            "eventName": "stop",
+            "handlerType": "command",
+            "matcher": null,
+            "command": "node \"/home/dev/.codex/plugins/cache/openai-codex/codex/1.0.6/scripts/stop-review-gate-hook.mjs\"",
+            "timeoutSec": 900,
+            "statusMessage": null,
+            "sourcePath": "/home/dev/.codex/plugins/cache/openai-codex/codex/1.0.6/hooks/hooks.json",
+            "source": "plugin",
+            "pluginId": "codex@openai-codex",
+            "displayOrder": 1,
+            "enabled": true,
+            "isManaged": false,
+            "currentHash": "sha256:3dfaa7e4f022570b260b8a8cf4ac7585c986175256b887a4723fac4f358a482f",
+            "trustStatus": "trusted"
+          }
+        ]
+      }
+    ]
+  },
+  "plugin/list": {
+    "marketplaces": [
+      {
+        "name": "openai-primary-runtime",
+        "pluginCount": 5,
+        "plugins": [
+          {
+            "id": "documents@openai-primary-runtime",
+            "name": "documents",
+            "description": null
+          },
+          {
+            "id": "pdf@openai-primary-runtime",
+            "name": "pdf",
+            "description": null
+          },
+          {
+            "id": "spreadsheets@openai-primary-runtime",
+            "name": "spreadsheets",
+            "description": null
+          },
+          {
+            "id": "presentations@openai-primary-runtime",
+            "name": "presentations",
+            "description": null
+          },
+          {
+            "id": "template-creator@openai-primary-runtime",
+            "name": "template-creator",
+            "description": null
+          }
+        ]
+      },
+      {
+        "name": "openai-bundled",
+        "pluginCount": 7,
+        "plugins": [
+          {
+            "id": "codex-app-tools@openai-bundled",
+            "name": "codex-app-tools",
+            "description": null
+          },
+          {
+            "id": "browser@openai-bundled",
+            "name": "browser",
+            "description": null
+          },
+          {
+            "id": "chrome@openai-bundled",
+            "name": "chrome",
+            "description": null
+          },
+          {
+            "id": "computer-use@openai-bundled",
+            "name": "computer-use",
+            "description": null
+          },
+          {
+            "id": "record-and-replay@openai-bundled",
+            "name": "record-and-replay",
+            "description": null
+          },
+          {
+            "id": "latex@openai-bundled",
+            "name": "latex",
+            "description": null
+          }
+        ]
+      },
+      {
+        "name": "openai-codex",
+        "pluginCount": 1,
+        "plugins": [
+          {
+            "id": "codex@openai-codex",
+            "name": "codex",
+            "description": null
+          }
+        ]
+      },
+      {
+        "name": "openai-curated-remote",
+        "pluginCount": 3161,
+        "plugins": [
+          {
+            "id": "gmail@openai-curated-remote",
+            "name": "gmail",
+            "description": null
+          },
+          {
+            "id": "github@openai-curated-remote",
+            "name": "github",
+            "description": null
+          },
+          {
+            "id": "google-drive@openai-curated-remote",
+            "name": "google-drive",
+            "description": null
+          },
+          {
+            "id": "google-calendar@openai-curated-remote",
+            "name": "google-calendar",
+            "description": null
+          },
+          {
+            "id": "notion@openai-curated-remote",
+            "name": "notion",
+            "description": null
+          },
+          {
+            "id": "slack@openai-curated-remote",
+            "name": "slack",
+            "description": null
+          }
+        ]
+      }
+    ]
+  }
+}

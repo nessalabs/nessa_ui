@@ -8,6 +8,7 @@ import test from "node:test"
 import { TranscriptBuilder } from "./builder"
 import { AgentEventType, isEvent } from "./events"
 import { CODEX_EVENT_MAPPING, codexWireKind } from "./codex/mapping"
+import { CODEX_CAPABILITY_METHODS, codexCapabilities } from "./codex/capabilities"
 import { CodexStreamMapper, mapCodexStream } from "./codex/mapper"
 import { CodexItemType, CodexWireType, parseCodexLines } from "./codex/wire"
 import { applyDeltas, buildTranscript, isToolGroup } from "./transcript"
@@ -171,4 +172,31 @@ test("a malformed line degrades that line, never the stream", () => {
   // A thread line with no id cannot open a session, so it opens nothing.
   assert.deepEqual(mapper.push(`{"type":"${CodexWireType.ThreadStarted}"}`), [])
   assert.equal(CodexItemType.AgentMessage, "agent_message")
+})
+
+test("the app-server answers what the exec stream cannot", () => {
+  // Codex's capabilities live on a different channel: the stream opens with a
+  // thread id and nothing else, so a composer's pickers have to ask the
+  // app-server. This reads a captured reply rather than holding a connection.
+  const replies = JSON.parse(readFileSync(`${FIXTURES}appserver_capabilities.json`, "utf8")) as Record<string, never>
+  const capabilities = codexCapabilities(replies)
+
+  assert.ok(capabilities.models.length > 0)
+  assert.ok(capabilities.models.every((model) => model.id.length > 0 && model.displayName.length > 0))
+  assert.ok(capabilities.skills.length > 0)
+  assert.ok(capabilities.hooks.length > 0)
+
+  // A curated marketplace holds thousands, so the count is the catalogue's real
+  // size and the sample is what a picker was handed — reporting the sample's
+  // length as the size would understate it by three orders of magnitude.
+  const largest = [...capabilities.marketplaces].sort((a, b) => b.count - a.count)[0]!
+  assert.ok(largest.count > largest.sample.length)
+  assert.equal(CODEX_CAPABILITY_METHODS.includes("model/list"), true)
+})
+
+test("a host that asks for only some capabilities gets the rest empty, not an error", () => {
+  const partial = codexCapabilities({ "model/list": { data: [{ id: "gpt-5", displayName: "GPT-5" }] } } as never)
+  assert.equal(partial.models.length, 1)
+  assert.deepEqual(partial.skills, [])
+  assert.deepEqual(partial.marketplaces, [])
 })

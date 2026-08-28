@@ -13,6 +13,16 @@ export {
   type CodexMappingEntry,
   type CodexWireKind,
 } from "./mapping"
+export {
+  CODEX_CAPABILITY_METHODS,
+  codexCapabilities,
+  type CodexCapabilities,
+  type CodexCapabilityMethod,
+  type CodexHook,
+  type CodexMarketplace,
+  type CodexModel,
+  type CodexSkill,
+} from "./capabilities"
 export { CodexStreamMapper, mapCodexStream } from "./mapper"
 export {
   CodexFileChangeKind,
@@ -21,8 +31,17 @@ export {
   CodexWireType,
   parseCodexLine,
   parseCodexLines,
+  type CodexAgentMessageItem,
+  type CodexCollabToolCallItem,
+  type CodexCommandExecutionItem,
+  type CodexFileChangeEntry,
+  type CodexFileChangeItem,
+  type CodexItem,
+  type CodexItemLine,
   type CodexParseFailure,
   type CodexParseResult,
   type CodexUsage,
+  type CodexTodoItem,
+  type CodexTodoListItem,
   type CodexWireEvent,
 } from "./wire"

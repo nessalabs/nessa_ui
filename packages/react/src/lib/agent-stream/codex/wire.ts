@@ -86,11 +86,181 @@ export interface CodexUsage {
   readonly reasoning_output_tokens?: number
 }
 
-/** One decoded line. Fields this library reads are named; the rest is tolerated. */
-export type CodexWireEvent = {
+/**
+ * The shapes below describe the wire; they do not police it.
+ *
+ * A declared type is a claim about bytes, not a check on them, so the mapper
+ * still reads every field through the shared readers rather than trusting these
+ * — see `json.ts`. What they buy is a reader's map of what a line can contain,
+ * autocomplete while writing a consumer, and one place to update when the CLI
+ * moves. Every union keeps an open arm for the same reason the vocabularies are
+ * checklists: a kind from a later release must still parse.
+ */
+
+/** One file an agent touched, as `file_change.changes[]` reports it. */
+export interface CodexFileChangeEntry {
+  readonly path: string
+  readonly kind: CodexFileChangeKind | string
+  /** Present only when the agent supplies one; Codex reports paths, not text. */
+  readonly diff?: string
+}
+
+/** One step of `todo_list.items[]`. A boolean, not a three-state status. */
+export interface CodexTodoItem {
+  readonly text: string
+  readonly completed: boolean
+}
+
+/** Fields every item carries. */
+interface CodexItemBase {
+  readonly id: string
+  readonly status?: CodexItemStatus | string
+}
+
+/** Committed prose from the agent. Codex sends no partial text in this mode. */
+export interface CodexAgentMessageItem extends CodexItemBase {
+  readonly type: "agent_message"
+  readonly text: string
+}
+
+/** Committed reasoning. */
+export interface CodexReasoningItem extends CodexItemBase {
+  readonly type: "reasoning"
+  readonly text?: string
+  readonly summary?: readonly JsonValue[]
+  readonly content?: readonly JsonValue[]
+}
+
+/**
+ * A shell command.
+ *
+ * Richer than Claude's tool result: the exit code is reported, so failure is a
+ * fact the wire states rather than something inferred from output prose.
+ */
+export interface CodexCommandExecutionItem extends CodexItemBase {
+  readonly type: "command_execution"
+  readonly command: string
+  readonly aggregated_output?: string
+  readonly exit_code?: number | null
+  readonly cwd?: string
+}
+
+/** Structured edits — which files changed and how. Claude Code reports no equivalent. */
+export interface CodexFileChangeItem extends CodexItemBase {
+  readonly type: "file_change"
+  readonly changes: readonly CodexFileChangeEntry[]
+}
+
+/** The plan, republished whole on every update. Steps have no ids; position is identity. */
+export interface CodexTodoListItem extends CodexItemBase {
+  readonly type: "todo_list"
+  readonly items: readonly CodexTodoItem[]
+}
+
+export interface CodexWebSearchItem extends CodexItemBase {
+  readonly type: "web_search"
+  readonly query?: string
+  readonly action?: JsonValue
+}
+
+export interface CodexMcpToolCallItem extends CodexItemBase {
+  readonly type: "mcp_tool_call"
+  readonly tool?: string
+  readonly server?: string
+  readonly result?: JsonValue
+}
+
+/**
+ * Delegation.
+ *
+ * The spawned agent writes nothing to this stream: `receiver_thread_ids` is the
+ * address of its own transcript, and `agents_states` is the only live signal
+ * the parent gets about it.
+ */
+export interface CodexCollabToolCallItem extends CodexItemBase {
+  readonly type: "collab_tool_call"
+  readonly tool?: string
+  readonly prompt?: string
+  readonly sender_thread_id?: string
+  readonly receiver_thread_ids?: readonly string[]
+  readonly agents_states?: Readonly<Record<string, JsonValue>>
+}
+
+export interface CodexErrorItem extends CodexItemBase {
+  readonly type: "error"
+  readonly message?: string
+}
+
+/** An item kind this build does not model. Kept open so a later release still parses. */
+export interface CodexUnknownItem extends CodexItemBase {
   readonly type: string
   readonly [key: string]: JsonValue | undefined
 }
+
+/** Everything an `item.*` line can carry. */
+export type CodexItem =
+  | CodexAgentMessageItem
+  | CodexReasoningItem
+  | CodexCommandExecutionItem
+  | CodexFileChangeItem
+  | CodexTodoListItem
+  | CodexWebSearchItem
+  | CodexMcpToolCallItem
+  | CodexCollabToolCallItem
+  | CodexErrorItem
+  | CodexUnknownItem
+
+/** Opens the thread and names it. A resume reuses the same id and says nothing else. */
+export interface CodexThreadStartedLine {
+  readonly type: "thread.started"
+  readonly thread_id: string
+}
+
+/** A bare marker; the turn's own items say everything it does. */
+export interface CodexTurnStartedLine {
+  readonly type: "turn.started"
+}
+
+/** The turn terminator, carrying usage. */
+export interface CodexTurnCompletedLine {
+  readonly type: "turn.completed"
+  readonly usage?: CodexUsage
+  readonly duration_ms?: number
+}
+
+export interface CodexTurnFailedLine {
+  readonly type: "turn.failed"
+  readonly error?: { readonly message?: string }
+  readonly usage?: CodexUsage
+}
+
+/** An item opening, changing, or settling. The item's own `id` is the call id. */
+export interface CodexItemLine {
+  readonly type: "item.started" | "item.updated" | "item.completed"
+  readonly item: CodexItem
+}
+
+/** A thread-level failure outside any item. */
+export interface CodexErrorLine {
+  readonly type: "error"
+  readonly message?: string
+}
+
+/** A line kind this build does not model. */
+export interface CodexUnknownLine {
+  readonly type: string
+  readonly [key: string]: JsonValue | undefined
+}
+
+/** One decoded line. */
+export type CodexWireEvent =
+  | CodexThreadStartedLine
+  | CodexTurnStartedLine
+  | CodexTurnCompletedLine
+  | CodexTurnFailedLine
+  | CodexItemLine
+  | CodexErrorLine
+  | CodexUnknownLine
 
 export interface CodexParseFailure {
   readonly ok: false
