@@ -213,25 +213,32 @@ function ChatBubble({
     ...rest
   } = props
   const longPressHandlers = {
-    onPointerDown: composeHandler(
-      hostPointerDown,
-      (event: React.PointerEvent<HTMLElement>) => {
-        pointerPressedRef.current = true
-        if (event.pointerType !== "mouse" || event.button !== 0) return
-        const { currentTarget, clientX, clientY } = event
-        clearLongPress()
-        longPressTimer.current = setTimeout(() => {
-          currentTarget.dispatchEvent(
-            new MouseEvent("contextmenu", {
-              bubbles: true,
-              cancelable: true,
-              clientX,
-              clientY,
-            }),
-          )
-        }, 500)
-      },
-    ),
+    onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
+      // The pressed flag is bookkeeping, not behavior — it records that a
+      // real pointer press happened regardless of whether the host
+      // preventDefaults the event.
+      pointerPressedRef.current = true
+      composeHandler(
+        hostPointerDown as
+          | ((event: React.PointerEvent<HTMLElement>) => void)
+          | undefined,
+        (composed: React.PointerEvent<HTMLElement>) => {
+          if (composed.pointerType !== "mouse" || composed.button !== 0) return
+          const { currentTarget, clientX, clientY } = composed
+          clearLongPress()
+          longPressTimer.current = setTimeout(() => {
+            currentTarget.dispatchEvent(
+              new MouseEvent("contextmenu", {
+                bubbles: true,
+                cancelable: true,
+                clientX,
+                clientY,
+              }),
+            )
+          }, 500)
+        },
+      )(event)
+    },
     onPointerUp: composeHandler(hostPointerUp, clearLongPress),
     onPointerLeave: composeHandler(
       hostPointerLeave,
@@ -298,13 +305,17 @@ function ChatBubble({
       type="button"
       data-slot="chat-bubble"
       data-tone={tone}
-      onClick={composeHandler(hostClick, () => {
-        // A click that never saw a pointer press came from the keyboard or
-        // assistive tech — activate; plain pointer clicks stay inert.
+      onClick={(event) => {
+        // Flag bookkeeping runs unconditionally; only the selection itself
+        // honors a host preventDefault.
         const fromPointer = pointerPressedRef.current
         pointerPressedRef.current = false
-        if (!fromPointer) onSelect()
-      })}
+        composeHandler(hostClick, () => {
+          // A click that never saw a pointer press came from the keyboard
+          // or assistive tech — activate; plain pointer clicks stay inert.
+          if (!fromPointer) onSelect()
+        })(event)
+      }}
       onKeyDown={composeHandler(hostKeyDown, (event) => {
         if (event.key !== "Enter" && event.key !== " ") return
         event.preventDefault()
