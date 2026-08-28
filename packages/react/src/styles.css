@@ -63,9 +63,22 @@
     letter-spacing: var(--_nessa-letter-spacing-4);
   }
 
+  /* Level-2 variant for dense surfaces (table toolbars): same anti-zoom
+     floor on mobile, level 2 once the viewport can afford it. Declared
+     after .nessa-text-input so it wins when a field carries both. */
+  .nessa-text-input-2 {
+    font-size: max(1rem, var(--_nessa-font-size-2));
+    line-height: var(--_nessa-line-height-2);
+    letter-spacing: var(--_nessa-letter-spacing-2);
+  }
+
   @media (width >= 48rem) {
     .nessa-text-input {
       font-size: var(--_nessa-font-size-4);
+    }
+
+    .nessa-text-input-2 {
+      font-size: var(--_nessa-font-size-2);
     }
   }
 }

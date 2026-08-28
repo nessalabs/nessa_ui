@@ -1043,14 +1043,16 @@ function WorkflowCanvasGrid({
       aria-hidden="true"
       {...props}
       data-slot="workflow-canvas-grid"
-      className={cn("pointer-events-none absolute inset-0", className)}
+      className={cn(
+        "pointer-events-none absolute inset-0 [background-image:radial-gradient(circle,var(--border)_1px,transparent_1.5px)] [background-size:var(--workflow-canvas-grid-spacing)_var(--workflow-canvas-grid-spacing)] [background-position:var(--workflow-canvas-grid-x)_var(--workflow-canvas-grid-y)]",
+        className,
+      )}
       style={{
-        backgroundImage:
-          "radial-gradient(circle, var(--border) 1px, transparent 1.5px)",
-        backgroundSize: `${spacing}px ${spacing}px`,
-        backgroundPosition: `${viewport.x}px ${viewport.y}px`,
+        "--workflow-canvas-grid-spacing": `${spacing}px`,
+        "--workflow-canvas-grid-x": `${viewport.x}px`,
+        "--workflow-canvas-grid-y": `${viewport.y}px`,
         ...style,
-      }}
+      } as React.CSSProperties}
     />
   )
 }

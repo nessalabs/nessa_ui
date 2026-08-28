@@ -60,7 +60,7 @@ function ContextMenuRadioGroup(
 }
 
 const contextMenuItemClassName =
-  "relative flex cursor-default select-none items-center gap-2 rounded-lg px-2 py-1.5 font-sans text-sm text-popover-foreground outline-none transition-colors data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground"
+  "relative flex cursor-default select-none items-center gap-2 rounded-lg px-2 py-1.5 font-sans nessa-text-4 text-popover-foreground outline-none transition-colors data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground"
 
 function ContextMenuContent({
   className,
@@ -236,7 +236,7 @@ function ContextMenuLabel({ className, inset, ...props }: ContextMenuLabelProps)
       data-slot="context-menu-label"
       data-inset={inset || undefined}
       className={cn(
-        "px-2 py-1.5 font-sans text-xs font-medium text-muted-foreground data-[inset]:pl-8",
+        "px-2 py-1.5 font-sans nessa-text-2 font-medium text-muted-foreground data-[inset]:pl-8",
         className,
       )}
       {...props}
@@ -265,7 +265,7 @@ function ContextMenuShortcut({
     <span
       data-slot="context-menu-shortcut"
       className={cn(
-        "ml-auto font-sans text-xs tracking-widest text-muted-foreground",
+        "ml-auto font-sans nessa-text-2 tracking-widest text-muted-foreground",
         className,
       )}
       {...props}

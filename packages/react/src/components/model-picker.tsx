@@ -146,7 +146,7 @@ function resolveActiveProviderId(
 /** Renders model-specific content inside a searchable-listbox option. */
 function ModelPickerRow({ group, model, selected }: ModelPickerRowProps) {
   return (
-    <span className="grid min-h-11 w-full grid-cols-[2rem_minmax(0,1fr)_1.25rem] items-center gap-2 px-2">
+    <span className="grid w-full grid-cols-[2rem_minmax(0,1fr)_1.25rem] items-center gap-2">
       <span
         aria-hidden="true"
         className="flex size-8 items-center justify-center rounded-full bg-background text-foreground shadow-xs [&_svg]:size-4"

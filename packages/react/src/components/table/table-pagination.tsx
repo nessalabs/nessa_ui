@@ -105,7 +105,7 @@ function TablePagination({
     >
       <div
         role="status"
-        className="min-w-0 truncate text-[11px] text-muted-foreground"
+        className="min-w-0 truncate nessa-text-1 text-muted-foreground"
       >
         {summary}
       </div>

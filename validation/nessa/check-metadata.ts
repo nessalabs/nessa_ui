@@ -14,6 +14,7 @@ export const checkMetadata = Object.freeze({
   "typography-scale": { phase: "source", inputs: ["packages/react/src/*.css", "packages/react/src/components/**/*.tsx", "packages/react/src/composites/**/*.tsx"], dependsOn: ["theme-parity"], global: false },
   "registry-parity": { phase: "source", inputs: ["registry.json", "public/r/*.json", "packages/react/src/**/*.{ts,tsx}"], dependsOn: ["theme-parity"], global: false },
   "source-boundaries": { phase: "source", inputs: ["packages/react/src/**/*.{ts,tsx,css}"], dependsOn: [], global: false },
+  "style-discipline": { phase: "source", inputs: ["packages/react/src/**/*.{ts,tsx}", "validation/exceptions.ts"], dependsOn: [], global: false },
   "storybook-coverage": { phase: "source", inputs: ["packages/react/src/index.ts", "apps/storybook/stories/**/*.stories.tsx"], dependsOn: [], global: false },
   "interaction-stability": { phase: "source", inputs: ["packages/react/src/components/model-picker.tsx", "packages/react/src/components/searchable-listbox.tsx", "apps/storybook/stories/model-picker.stories.tsx"], dependsOn: [], global: false },
   "parser-hygiene": { phase: "source", inputs: ["packages/react/src/lib/agent-stream/**/*.ts"], dependsOn: [], global: false },

@@ -181,10 +181,14 @@ function ComposerQueueItem({
       style={{
         ...style,
         transform: CSS.Transform.toString(transform),
-        transition,
-      }}
+        "--composer-queue-sort-transition": transition,
+      } as React.CSSProperties}
+      // The sort-transition class applies only while dnd-kit supplies one, so
+      // an idle item leaves consumer transition utilities untouched instead of
+      // pinning `transition` to an unset custom property.
       className={cn(
         "group relative z-0 grid min-h-11 grid-cols-[1.75rem_minmax(0,1fr)_auto] items-center gap-2 border-b border-border bg-card px-2 py-1.5 font-sans last:border-b-0 data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg",
+        Boolean(transition) && "[transition:var(--composer-queue-sort-transition)]",
         className,
       )}
       {...props}

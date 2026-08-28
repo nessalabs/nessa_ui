@@ -101,8 +101,8 @@ function cssDurationInMilliseconds(value: string, fallback: number) {
  * The moving highlight is painted with theme tokens — muted-foreground body,
  * foreground crest — so it reads in both schemes without `dark:` variants.
  */
-const toolCallShimmerGradient =
-  "linear-gradient(90deg, var(--muted-foreground) 0%, var(--muted-foreground) 38%, var(--foreground) 50%, var(--muted-foreground) 62%, var(--muted-foreground) 100%)"
+const toolCallShimmerClasses =
+  "data-[shimmer=true]:[background-image:linear-gradient(90deg,var(--muted-foreground)_0%,var(--muted-foreground)_38%,var(--foreground)_50%,var(--muted-foreground)_62%,var(--muted-foreground)_100%)] data-[shimmer=true]:bg-[length:200%_100%] data-[shimmer=true]:bg-[position:150%_0] data-[shimmer=true]:bg-clip-text data-[shimmer=true]:[-webkit-background-clip:text] data-[shimmer=true]:text-transparent"
 
 /**
  * Renders the trigger label, sweeping a highlight across the text while
@@ -142,19 +142,7 @@ function ToolCallShimmer({
       ref={ref}
       data-slot="tool-call-shimmer"
       data-shimmer={shimmering ? "true" : undefined}
-      className="min-w-0 truncate text-left"
-      style={
-        shimmering
-          ? {
-              backgroundImage: toolCallShimmerGradient,
-              backgroundSize: "200% 100%",
-              backgroundPosition: "150% 0",
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              color: "transparent",
-            }
-          : undefined
-      }
+      className={cn("min-w-0 truncate text-left", toolCallShimmerClasses)}
     >
       {children}
     </span>
@@ -439,13 +427,14 @@ function ToolCallDiff({
         className,
       )}
       // Custom properties inherit through Pierre's shadow root. The dark
-      // addition green is deepened from Pierre's #5ecc71, and the dark row
-      // washes carry a stronger share of the change color than Pierre's 80/20
-      // mix so added and deleted lines read clearly green and red on the
-      // near-black ground; hosts can override any of these via style.
+      // addition green is deepened from Pierre's #5ecc71 (the
+      // --nessa-diff-dark-addition token), and the dark row washes carry a
+      // stronger share of the change color than Pierre's 80/20 mix so added
+      // and deleted lines read clearly green and red on the near-black
+      // ground; hosts can override any of these via style or the theme.
       style={
         {
-          "--diffs-dark-addition-color": "#2ea043",
+          "--diffs-dark-addition-color": "var(--nessa-diff-dark-addition)",
           "--diffs-bg-addition-override":
             "light-dark(color-mix(in lab, var(--diffs-bg) 88%, var(--diffs-addition-base)), color-mix(in lab, var(--diffs-bg) 68%, var(--diffs-addition-base)))",
           "--diffs-bg-deletion-override":

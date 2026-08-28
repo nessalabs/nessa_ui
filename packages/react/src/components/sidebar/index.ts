@@ -15,6 +15,12 @@ export {
   type SidebarProviderProps,
   type SidebarShortcutModifier,
 } from "./sidebar-provider"
+export {
+  SidebarAction,
+  sidebarActionVariants,
+  type SidebarActionProps,
+  type SidebarActionSize,
+} from "./sidebar-action"
 export { SidebarContent } from "./sidebar-content"
 export { SidebarFooter } from "./sidebar-footer"
 export { SidebarHeader } from "./sidebar-header"

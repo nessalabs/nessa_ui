@@ -1657,7 +1657,7 @@ function TimedEventChip({
       aria-pressed={selected}
       aria-label={`${eventLabel(locale, labels, event)}.${chipShortcutHints(shortcuts, labels)}`}
       className={cn(
-        "absolute flex cursor-grab flex-col items-start gap-0 overflow-hidden rounded-md px-2 py-0.5 text-start nessa-text-2 font-medium leading-4 shadow-xs ring-1 ring-background",
+        "absolute flex cursor-grab flex-col items-start gap-0 overflow-hidden rounded-md px-2 py-0.5 text-start nessa-text-2 font-medium shadow-xs ring-1 ring-background",
         eventCalendarToneVariants({ tone }),
         surfaceTransitionClassName,
         insetFocusClassName,
@@ -2232,7 +2232,7 @@ function TimeDayColumn({
           aria-hidden="true"
           data-slot="event-calendar-move-preview"
           className={cn(
-            "pointer-events-none absolute inset-x-0.5 z-40 truncate rounded-md px-2 py-0.5 text-start nessa-text-2 font-medium leading-4 opacity-90 shadow-md ring-1 ring-background",
+            "pointer-events-none absolute inset-x-0.5 z-40 truncate rounded-md px-2 py-0.5 text-start nessa-text-2 font-medium opacity-90 shadow-md ring-1 ring-background",
             eventCalendarToneVariants({ tone: shownPreview.event.tone }),
             eventClassName?.({
               event: shownPreview.event,

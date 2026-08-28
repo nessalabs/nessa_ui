@@ -8,6 +8,7 @@ import { parserHygieneCheck } from "./parser-hygiene.ts"
 import { registryParityCheck } from "./registry-parity.ts"
 import { sourceBoundariesCheck } from "./source-boundaries.ts"
 import { storybookCoverageCheck } from "./storybook-coverage.ts"
+import { styleDisciplineCheck } from "./style-discipline.ts"
 import { themeParityCheck } from "./theme-parity.ts"
 import { typographyScaleCheck } from "./typography-scale.ts"
 
@@ -18,6 +19,7 @@ export const nessaChecks = Object.freeze([
   typographyScaleCheck,
   registryParityCheck,
   sourceBoundariesCheck,
+  styleDisciplineCheck,
   storybookCoverageCheck,
   interactionStabilityCheck,
   parserHygieneCheck,
