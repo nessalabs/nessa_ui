@@ -188,6 +188,7 @@ export {
   CodeBlock,
   CodeBlockProvider,
   CopyButton,
+  preloadCodeHighlighter,
   useCodeBlockConfig,
   type CodeBlockConfig,
   type CodeBlockMode,

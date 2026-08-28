@@ -44,14 +44,14 @@ const pdfSrc = `data:application/pdf;base64,${btoa(minimalPdf)}`
 
 
 /**
- * Every text-based renderer fetches its source before it renders anything,
- * so a play test waits on fetch, React commit, and the renderer's own async
- * work — Shiki highlighting, table layout — in one window. testing-library's
- * default is 1s, which is comfortable alone and marginal when the whole
- * suite runs in parallel, so these waits get a budget proportional to the
- * 30s test timeout instead of the default.
+ * Syntax highlighting loads Shiki's themes and grammars on first use, and
+ * the whole suite races that one cold start. Storybook warms it at boot
+ * (see .storybook/preview.ts), so this deadline is the backstop for a run
+ * that starts before the warm-up lands — the same budget CodeBlock's own
+ * stories give the same work. It is a deadline, not a delay: the wait ends
+ * as soon as the text appears.
  */
-const settles = { timeout: 15000 } as const
+const highlights = { timeout: 15000 } as const
 
 export const ImagePreview: Story = {
   parameters: storyDocumentation(
@@ -198,7 +198,7 @@ export const ImageError: Story = {
     const canvas = within(canvasElement)
     await waitFor(async () => {
       await expect(canvas.getByText(/Image failed to load/)).toBeVisible()
-    }, settles)
+    })
   },
 }
 
@@ -268,7 +268,7 @@ export const MarkdownPreview: Story = {
       await expect(
         canvas.getByRole("heading", { name: "Release notes" }),
       ).toBeVisible()
-    }, settles)
+    })
     const root = canvasElement.querySelector('[data-slot="file-preview"]')
     await expect(root).toHaveAttribute("data-kind", "markdown")
   },
@@ -288,7 +288,7 @@ export const JsonPreview: Story = {
     const canvas = within(canvasElement)
     await waitFor(async () => {
       await expect(canvas.getByText(/nessa/)).toBeVisible()
-    }, settles)
+    })
     await expect(
       canvasElement.querySelector('[data-slot="file-preview-json"]'),
     ).not.toBeNull()
@@ -311,7 +311,7 @@ export const CsvPreview: Story = {
       await expect(
         canvas.getByRole("columnheader", { name: "population" }),
       ).toBeVisible()
-    }, settles)
+    })
     await expect(canvas.getByRole("cell", { name: "Kathmandu" })).toBeVisible()
   },
 }
@@ -338,7 +338,7 @@ export const CsvPreviewTall: Story = {
       await expect(
         canvas.getByRole("cell", { name: "600" }),
       ).toBeInTheDocument()
-    }, settles)
+    })
     // The regression this guards: percentage caps resolving against an
     // auto-height frame left the container unscrollable and rows clipped.
     const container = canvasElement.querySelector<HTMLElement>(
@@ -367,21 +367,20 @@ export const CodePreview: Story = {
     />
   ),
   play: async ({ canvasElement }) => {
-    // Two waits, not one: the renderer only mounts once its fetch resolves,
-    // and Pierre then highlights into the <diffs-container> shadow root
-    // asynchronously. Sharing one budget between them is what made this
-    // flake under a full parallel run.
+    // Two waits, not one: the renderer mounts when its fetch resolves, and
+    // Pierre highlights into the <diffs-container> shadow root afterwards.
+    // Splitting them says which stage hung when one does.
     await waitFor(async () => {
       await expect(
         canvasElement.querySelector('[data-slot="file-preview-text"]'),
       ).not.toBeNull()
-    }, settles)
+    }, highlights)
     await waitFor(async () => {
       const shadowText = canvasElement
         .querySelector('[data-slot="file-preview-text"]')
         ?.querySelector("diffs-container")?.shadowRoot?.textContent
       await expect(shadowText).toContain("greet")
-    }, settles)
+    }, highlights)
     const root = canvasElement.querySelector('[data-slot="file-preview"]')
     await expect(root).toHaveAttribute("data-kind", "text")
   },
