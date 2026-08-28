@@ -19,6 +19,7 @@ const twMerge = extendTailwindMerge({
         "nessa-text-6",
         "nessa-text-7",
         "nessa-text-input",
+        "nessa-text-input-2",
       ],
     },
   },

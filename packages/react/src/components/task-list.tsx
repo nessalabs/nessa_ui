@@ -226,7 +226,7 @@ function TaskListItem({
       data-slot="task-list-item-label"
       id={interactive ? labelId : undefined}
       className={cn(
-        "min-w-0 nessa-text-4 leading-5 text-foreground transition-[color,text-decoration-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
+        "min-w-0 nessa-text-4 text-foreground transition-[color,text-decoration-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
         done && "text-muted-foreground line-through",
       )}
     >
@@ -237,7 +237,7 @@ function TaskListItem({
     <span
       data-slot="task-list-item-meta"
       id={interactive ? metaId : undefined}
-      className="shrink-0 nessa-text-4 leading-5 text-muted-foreground"
+      className="shrink-0 nessa-text-4 text-muted-foreground"
     >
       {meta}
     </span>

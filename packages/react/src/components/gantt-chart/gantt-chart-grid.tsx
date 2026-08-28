@@ -516,7 +516,7 @@ function TaskBar({
       {...sharedButtonProps}
       data-slot="gantt-chart-bar"
       className={cn(
-        "absolute flex cursor-grab items-center overflow-hidden rounded-md px-2 text-start nessa-text-2 font-medium leading-4 shadow-xs",
+        "absolute flex cursor-grab items-center overflow-hidden rounded-md px-2 text-start nessa-text-2 font-medium shadow-xs",
         ganttChartToneVariants({ tone }),
         surfaceTransitionClassName,
         insetFocusClassName,
