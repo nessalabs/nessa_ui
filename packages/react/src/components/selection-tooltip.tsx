@@ -272,7 +272,7 @@ function SelectionTooltipAction({
       type={type}
       data-slot="selection-tooltip-action"
       className={cn(
-        "inline-flex h-8 shrink-0 select-none items-center gap-1.5 whitespace-nowrap rounded-lg border-0 bg-transparent px-2.5 text-sm font-medium text-popover-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 active:translate-y-px [&_svg]:size-4 [&_svg]:shrink-0",
+        "inline-flex h-8 shrink-0 select-none items-center gap-1.5 whitespace-nowrap rounded-lg border-0 bg-transparent px-2.5 nessa-text-4 font-medium text-popover-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 active:translate-y-px [&_svg]:size-4 [&_svg]:shrink-0",
         className,
       )}
       {...props}
@@ -288,7 +288,7 @@ function SelectionTooltipAction({
             side="top"
             sideOffset={6}
             data-slot="selection-tooltip-action-tip"
-            className="z-50 max-w-56 rounded-lg bg-primary px-2.5 py-1 text-center font-sans text-xs font-medium text-primary-foreground shadow-md"
+            className="z-50 max-w-56 rounded-lg bg-primary px-2.5 py-1 text-center font-sans nessa-text-2 font-medium text-primary-foreground shadow-md"
           >
             {tooltip}
             <TooltipPrimitive.Arrow

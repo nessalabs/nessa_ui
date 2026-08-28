@@ -270,7 +270,7 @@ function ReferenceTrigger({
         {...(href !== undefined ? { href } : {})}
         {...(!asChild && href === undefined ? { type: "button" } : {})}
         className={cn(
-          "mx-0.5 box-border inline-flex max-w-48 shrink-0 cursor-pointer items-center gap-1 overflow-hidden whitespace-nowrap rounded-full border border-border bg-background px-1.5 py-px align-baseline font-sans text-xs font-medium text-muted-foreground no-underline transition-colors hover:border-ring/60 hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring data-[state=open]:border-ring/60 data-[state=open]:text-foreground [&>svg]:size-3 [&>svg]:shrink-0",
+          "mx-0.5 box-border inline-flex max-w-48 shrink-0 cursor-pointer items-center gap-1 overflow-hidden whitespace-nowrap rounded-full border border-border bg-background px-1.5 py-px align-baseline font-sans nessa-text-2 font-medium text-muted-foreground no-underline transition-colors hover:border-ring/60 hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring data-[state=open]:border-ring/60 data-[state=open]:text-foreground [&>svg]:size-3 [&>svg]:shrink-0",
           className,
         )}
         onClick={(event: React.MouseEvent<HTMLAnchorElement>) => {
@@ -408,7 +408,7 @@ function ReferenceContent({
           if (target && isWithinTrigger(target)) event.preventDefault()
         }}
         className={cn(
-          "z-50 w-[min(22rem,calc(100vw-1.5rem))] rounded-xl border border-border bg-popover font-sans text-sm text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+          "z-50 w-[min(22rem,calc(100vw-1.5rem))] rounded-xl border border-border bg-popover font-sans nessa-text-4 text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           className,
         )}
         {...props}
@@ -581,7 +581,7 @@ function ReferenceCard({
             </button>
             <span
               aria-live="polite"
-              className="text-xs tabular-nums text-muted-foreground"
+              className="nessa-text-2 tabular-nums text-muted-foreground"
             >
               {index + 1} / {sources.length}
             </span>
@@ -610,7 +610,7 @@ function ReferenceCard({
           }
           tabIndex={excerptScrollable ? 0 : undefined}
           className={cn(
-            "overflow-y-auto text-sm leading-relaxed text-popover-foreground outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring [&_p]:m-0",
+            "overflow-y-auto nessa-text-4 leading-relaxed text-popover-foreground outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring [&_p]:m-0",
             // A fixed height while paging keeps the card silhouette still as
             // sources swap; a lone source hugs its excerpt up to the cap.
             sources.length > 1 ? "h-32" : "max-h-48",
@@ -628,7 +628,7 @@ function ReferenceCard({
           {source.meta !== undefined ? (
             <span
               data-slot="reference-card-meta"
-              className="inline-flex items-center rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
+              className="inline-flex items-center rounded-full border border-border px-2 py-0.5 nessa-text-2 text-muted-foreground"
             >
               {source.meta}
             </span>
@@ -637,7 +637,7 @@ function ReferenceCard({
             <a
               data-slot="reference-card-source-link"
               href={source.href}
-              className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-popover-foreground no-underline hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&>svg]:size-3"
+              className="ml-auto inline-flex items-center gap-1 nessa-text-2 font-medium text-popover-foreground no-underline hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&>svg]:size-3"
             >
               {source.sourceLabel ?? "View source"}
               <ArrowUpRight aria-hidden="true" />

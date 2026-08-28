@@ -58,7 +58,7 @@ function ComposerDeliveryMode({
           disabled={disabled}
           onClick={() => onValueChange(mode)}
           className={cn(
-            "h-7 rounded-full px-2.5 font-sans text-xs font-medium capitalize text-muted-foreground outline-none transition-[color,background-color,box-shadow] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50",
+            "h-7 rounded-full px-2.5 font-sans nessa-text-2 font-medium capitalize text-muted-foreground outline-none transition-[color,background-color,box-shadow] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50",
             value === mode && "bg-background text-foreground shadow-xs",
           )}
         >
@@ -200,14 +200,14 @@ function ComposerQueueItem({
       >
         <GripVertical aria-hidden="true" className="size-3.5" />
       </button>
-      <div className="min-w-0 truncate text-sm text-foreground">{children}</div>
+      <div className="min-w-0 truncate nessa-text-4 text-foreground">{children}</div>
       <div className="flex items-center gap-0.5">
         {onSteer ? (
           <button
             type="button"
             aria-label={`${steerLabel} ${itemLabel}`}
             onClick={onSteer}
-            className="inline-flex h-7 items-center gap-1 rounded-full border-0 bg-transparent px-2 font-sans text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="inline-flex h-7 items-center gap-1 rounded-full border-0 bg-transparent px-2 font-sans nessa-text-2 font-medium text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
             <CornerDownRight aria-hidden="true" className="size-3" />
             {steerLabel}

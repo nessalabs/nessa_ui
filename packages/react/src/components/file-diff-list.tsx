@@ -146,7 +146,7 @@ function FileDiffCardTitle({
   return (
     <div
       data-slot="file-diff-card-title"
-      className={cn("truncate text-sm font-semibold text-foreground", className)}
+      className={cn("truncate nessa-text-4 font-semibold text-foreground", className)}
       {...props}
     />
   )
@@ -176,7 +176,7 @@ function DiffStat({ additions, deletions, className, ...props }: DiffStatProps) 
     <span
       data-slot="diff-stat"
       className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 text-xs font-medium tabular-nums",
+        "inline-flex shrink-0 items-center gap-1.5 nessa-text-2 font-medium tabular-nums",
         className,
       )}
       {...props}
@@ -209,7 +209,7 @@ function FileDiffPath({ path, className, ...props }: FileDiffPathProps) {
       data-slot="file-diff-path"
       title={path}
       className={cn(
-        "min-w-0 truncate text-sm text-muted-foreground",
+        "min-w-0 truncate nessa-text-4 text-muted-foreground",
         className,
       )}
       {...props}
@@ -388,7 +388,7 @@ function FileDiffListToggle({
       aria-controls={listId}
       onClick={toggleExpanded}
       className={cn(
-        "m-1 flex min-h-9 items-center gap-1.5 rounded-lg border-0 bg-transparent px-3 text-left text-sm text-muted-foreground outline-none transition-colors hover:bg-accent/50 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        "m-1 flex min-h-9 items-center gap-1.5 rounded-lg border-0 bg-transparent px-3 text-left nessa-text-4 text-muted-foreground outline-none transition-colors hover:bg-accent/50 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         className,
       )}
       {...props}

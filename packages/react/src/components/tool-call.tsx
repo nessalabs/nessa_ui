@@ -196,7 +196,7 @@ function ToolCallTrigger({
     <Collapsible.Trigger
       data-slot="tool-call-trigger"
       className={cn(
-        "flex w-fit min-w-0 max-w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-sm text-muted-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none",
+        "flex w-fit min-w-0 max-w-full items-center gap-1.5 rounded-md px-1 py-0.5 nessa-text-4 text-muted-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none",
         "group-data-[status=error]/tool-call:text-destructive",
         className,
       )}
@@ -212,7 +212,7 @@ function ToolCallTrigger({
       )}
       <ToolCallShimmer active={status === "running"}>{children}</ToolCallShimmer>
       {meta != null && (
-        <span className="min-w-0 truncate text-xs font-normal text-muted-foreground">
+        <span className="min-w-0 truncate nessa-text-2 font-normal text-muted-foreground">
           {meta}
         </span>
       )}
@@ -252,7 +252,7 @@ function ToolCallContent({ className, ...props }: ToolCallContentProps) {
 function toolCallPanelContent(content: React.ReactNode) {
   if (typeof content !== "string") return content
   return (
-    <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-5 text-foreground">
+    <pre className="whitespace-pre-wrap break-words font-mono nessa-text-2 leading-5 text-foreground">
       {content}
     </pre>
   )
@@ -320,7 +320,7 @@ function ToolCallTabs({
           <Tabs.Trigger
             key={pane.value}
             value={pane.value}
-            className="rounded-md px-2 py-0.5 text-xs font-medium text-muted-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring data-[state=active]:bg-muted data-[state=active]:text-foreground motion-reduce:transition-none"
+            className="rounded-md px-2 py-0.5 nessa-text-2 font-medium text-muted-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring data-[state=active]:bg-muted data-[state=active]:text-foreground motion-reduce:transition-none"
           >
             {pane.label}
           </Tabs.Trigger>
@@ -435,7 +435,7 @@ function ToolCallDiff({
     <div
       data-slot="tool-call-diff"
       className={cn(
-        "w-full min-w-0 max-w-full overflow-hidden rounded-xl text-[0.8125rem] leading-6",
+        "w-full min-w-0 max-w-full overflow-hidden rounded-xl nessa-text-3 leading-6",
         className,
       )}
       // Custom properties inherit through Pierre's shadow root. The dark
@@ -485,7 +485,7 @@ function ToolCallFile({
 }: ToolCallFileProps) {
   const interactive = onClick != null
   const chipClassName = cn(
-    "inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground",
+    "inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 nessa-text-2 text-foreground [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground",
     interactive &&
       "cursor-pointer transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:border-ring/40 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none",
     className,

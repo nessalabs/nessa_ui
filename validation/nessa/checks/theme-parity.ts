@@ -20,7 +20,44 @@ export function extractThemeTokens(root: Root): ThemeTokens {
   return result
 }
 
-const reducedMotionCss = {
+export const typographyLevels = Object.freeze([1, 2, 3, 4, 5, 6, 7] as const)
+export const scalePresets = Object.freeze({ "90": "0.9", "95": "0.95", "100": "1", "105": "1.05", "110": "1.1" })
+
+const entries = <Value,>(build: (level: number) => readonly [string, Value]) => Object.fromEntries(typographyLevels.map(build))
+
+/**
+ * The registry base must install the same scale chain and typography helpers the
+ * package emits, in the same order, so a copied component renders identically to
+ * its packaged twin under every scale preset.
+ */
+const scaleCss = {
+  ":where(:root, [data-nessa-root])": { "--_nessa-scale-factor": "1" },
+  ...Object.fromEntries(Object.entries(scalePresets).map(([preset, factor]) => [
+    `:where([data-nessa-scale="${preset}"])`,
+    { "--_nessa-scale-factor": factor },
+  ])),
+  ":where(:root, [data-nessa-root], [data-nessa-theme], [data-nessa-scale])": {
+    ...entries((level) => [`--_nessa-font-size-${level}`, `calc(var(--nessa-font-size-${level}) * var(--_nessa-scale-factor))`]),
+    ...entries((level) => [`--_nessa-line-height-${level}`, `var(--nessa-line-height-${level})`]),
+    ...entries((level) => [`--_nessa-letter-spacing-${level}`, `var(--nessa-letter-spacing-${level})`]),
+  },
+  "@layer components": {
+    ...entries((level) => [`.nessa-text-${level}`, {
+      "font-size": `var(--_nessa-font-size-${level})`,
+      "line-height": `var(--_nessa-line-height-${level})`,
+      "letter-spacing": `var(--_nessa-letter-spacing-${level})`,
+    }]),
+    ".nessa-text-input": {
+      "font-size": "max(1rem, var(--_nessa-font-size-4))",
+      "line-height": "var(--_nessa-line-height-4)",
+      "letter-spacing": "var(--_nessa-letter-spacing-4)",
+    },
+    "@media (width >= 48rem)": { ".nessa-text-input": { "font-size": "var(--_nessa-font-size-4)" } },
+  },
+}
+
+const baseCss = {
+  ...scaleCss,
   "@media (prefers-reduced-motion: reduce)": {
     ":root, :where([data-nessa-root], [data-nessa-theme], [data-nessa-scale])": {
       "--nessa-motion-duration-fast": "0ms",
@@ -75,12 +112,12 @@ export const themeParityCheck = defineCheck({
       findings.push(context.fail("Radius drifted across package and registry base.", { contractId: "TOKEN-003" }))
     }
     if (
-      JSON.stringify(sourceBase.css) !== JSON.stringify(reducedMotionCss) ||
-      JSON.stringify(publicBase.css) !== JSON.stringify(reducedMotionCss)
+      JSON.stringify(sourceBase.css) !== JSON.stringify(baseCss) ||
+      JSON.stringify(publicBase.css) !== JSON.stringify(baseCss)
     ) {
-      findings.push(context.fail("Reduced-motion token overrides differ across package and registry artifacts.", { contractId: "TOKEN-003" }))
+      findings.push(context.fail("Scale, typography-helper, or reduced-motion base CSS differs across package and registry artifacts.", { contractId: "TOKEN-003" }))
     }
-    if (!findings.length) findings.push(context.pass("Light/Dark tokens, fonts, radius, and reduced-motion overrides match package and registry artifacts.", { contractId: "TOKEN-003" }))
+    if (!findings.length) findings.push(context.pass("Light/Dark tokens, fonts, radius, scale chain, and helper CSS match package and registry artifacts.", { contractId: "TOKEN-003" }))
     return findings
   },
 })

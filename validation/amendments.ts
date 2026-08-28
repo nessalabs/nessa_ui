@@ -88,4 +88,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-006",
+    kind: "transition",
+    contractId: "TOKEN-004",
+    baseRevision: "2c40e690284acbfe6841edbd1b920983e4259712",
+    targets: ["validation/contracts.ts", "validation/nessa/check-metadata.ts"],
+    beforeFingerprint: "22709c0ab698f9ec6303b75205b58bedad282f42f2557a1afa522ad90ea50549",
+    afterFingerprint: "0c8c594c2db19d3e276520762192c724d44bd5b14046e5f2b62cfa260f1c2b09",
+    rationale: "Activates the coordinated typography levels and the constrained UI scale the core contract already specified but nothing implemented: text size was raw Tailwind, including five ad-hoc arbitrary values, so no consumer could change UI size and no gate could see the drift.",
+    compatibility: "Strictly adds an enforced contract and its checker; every level reproduces the size and line-height the migrated Tailwind utility already rendered at scale 100, and no existing requirement is weakened or excepted.",
+    migration: "Nessa-owned components name a nessa-text level instead of a Tailwind size utility, using an em value only where a descendant selector cannot carry a helper class; applications opt into a different UI size by setting data-nessa-scale to one of the five presets on any wrapper element.",
+    supersedes: null,
+    pullRequest: null,
+  },
 ])

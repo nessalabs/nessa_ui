@@ -8,11 +8,13 @@ import { registryParityCheck } from "./registry-parity.ts"
 import { sourceBoundariesCheck } from "./source-boundaries.ts"
 import { storybookCoverageCheck } from "./storybook-coverage.ts"
 import { themeParityCheck } from "./theme-parity.ts"
+import { typographyScaleCheck } from "./typography-scale.ts"
 
 export const nessaChecks = Object.freeze([
   governanceCheck,
   cssOwnershipCheck,
   themeParityCheck,
+  typographyScaleCheck,
   registryParityCheck,
   sourceBoundariesCheck,
   storybookCoverageCheck,

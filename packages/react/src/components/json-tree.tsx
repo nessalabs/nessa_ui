@@ -303,7 +303,7 @@ function JsonTree({
       data-slot="json-tree"
       data-collapsible={collapsible ? "true" : undefined}
       className={cn(
-        "min-w-0 font-mono text-xs leading-5 text-foreground",
+        "min-w-0 font-mono nessa-text-2 leading-5 text-foreground",
         className,
       )}
       {...props}

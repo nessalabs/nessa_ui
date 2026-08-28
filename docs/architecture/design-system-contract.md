@@ -424,6 +424,8 @@ Public typography sizes, spacing, control heights/padding, and icon sizes descri
 
 Scale is not density. A future density axis may alter whitespace/control compactness without changing text. Do not add density until real compact-layout requirements establish its semantics.
 
+TOKEN-004 enforces the typography axis of this contract, which is the axis whose tokens exist: the seven coordinated levels, the private computed aliases, the five preset factors, and the `nessa-text-*` helpers that Nessa-owned components name instead of a Tailwind size utility. Spacing, control geometry, and icon dimensions still come from Tailwind utilities and join the same scale chain when their ramps are tokenised; adding them extends this contract rather than replacing it. A descendant selector that cannot carry a helper class sizes in `em` so it continues to follow the active scale.
+
 ### Motion and reduced motion
 
 Motion is token-driven CSS, not provider state. Components use duration/easing semantic tokens, and CSS owns the accessibility fallback:
@@ -1107,6 +1109,7 @@ This table is the exhaustive machine-mirrored index of normative rule groups. De
 | TOKEN-001 | Package and registry use one canonical Light/Dark semantic token chain. | `#one-live-token-chain-for-package-and-registry` |
 | TOKEN-002 | Nessa supplies font stacks while applications own font delivery. | `#typography-font-delivery-and-responsive-behavior` |
 | TOKEN-003 | Every current package and registry Light/Dark token projection remains exactly equal. | `#one-live-token-chain-for-package-and-registry` |
+| TOKEN-004 | Coordinated typography levels and the constrained scale chain own every Nessa text size. | `#constrained-ui-scale` |
 | REG-001 | Committed registry artifacts are deterministic reproductions of the registry source. | `#deterministic-generated-artifacts` |
 | REG-002 | Registry item source content matches canonical component source. | `#one-live-token-chain-for-package-and-registry` |
 | REG-003 | Registry dependencies include the matching Nessa base and required utilities. | `#registry-topology` |

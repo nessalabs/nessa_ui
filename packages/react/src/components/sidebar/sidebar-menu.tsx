@@ -47,7 +47,7 @@ function SidebarMenu({ nested = false, className, ...props }: SidebarMenuProps) 
  * @returns The composed class-name string for a Sidebar menu-item control.
  */
 const sidebarMenuItemVariants = cva(
-  "group/menu-button relative flex w-full min-w-0 appearance-none items-center gap-2.5 overflow-hidden rounded-lg border-0 bg-transparent text-left font-sans text-sm font-normal text-sidebar-foreground no-underline outline-none transition-[color,background-color,box-shadow,padding] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground group-data-[has-trailing=true]/menu-item:pe-16 group-data-[nested=true]/menu:min-h-8 group-data-[nested=true]/menu:ps-10 group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0",
+  "group/menu-button relative flex w-full min-w-0 appearance-none items-center gap-2.5 overflow-hidden rounded-lg border-0 bg-transparent text-left font-sans nessa-text-4 font-normal text-sidebar-foreground no-underline outline-none transition-[color,background-color,box-shadow,padding] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground group-data-[has-trailing=true]/menu-item:pe-16 group-data-[nested=true]/menu:min-h-8 group-data-[nested=true]/menu:ps-10 group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0",
   {
     variants: {
       variant: {
@@ -55,7 +55,7 @@ const sidebarMenuItemVariants = cva(
         outline: "border border-sidebar-border bg-sidebar shadow-xs",
       },
       size: {
-        sm: "min-h-8 px-2 text-xs",
+        sm: "min-h-8 px-2 nessa-text-2",
         default: "min-h-9 px-2.5",
         lg: "min-h-12 px-2.5",
       },
@@ -196,7 +196,7 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
         {description ? (
           <span
             data-slot="sidebar-menu-item-description"
-            className="w-full truncate text-xs font-normal leading-4 text-sidebar-foreground/60"
+            className="w-full truncate nessa-text-2 font-normal leading-4 text-sidebar-foreground/60"
           >
             {description}
           </span>
@@ -242,7 +242,7 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
           {badge ? (
             <span
               data-slot="sidebar-menu-item-badge"
-              className="pointer-events-none inline-flex min-w-6 items-center justify-center text-xs font-medium tabular-nums text-sidebar-foreground/60 group-has-data-[active=true]/menu-item:text-sidebar-accent-foreground"
+              className="pointer-events-none inline-flex min-w-6 items-center justify-center nessa-text-2 font-medium tabular-nums text-sidebar-foreground/60 group-has-data-[active=true]/menu-item:text-sidebar-accent-foreground"
             >
               {badge}
             </span>

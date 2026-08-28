@@ -811,7 +811,7 @@ function ModelThinkingControl({
             }}
           />
           <div className="relative z-[1] flex min-h-8 items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-1 text-sm font-medium">
+            <div className="flex min-w-0 items-center gap-1 nessa-text-4 font-medium">
               <span data-slot="model-thinking-level-label" className="truncate">
                 {selected?.label}
               </span>
