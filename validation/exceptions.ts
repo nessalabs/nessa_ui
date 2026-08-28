@@ -37,10 +37,29 @@ export interface FocusContrastException {
   removalCondition: string
 }
 
-export type ValidationException = OccurrenceException | ContrastException | FocusContrastException
+export interface StyleException {
+  kind: "style"
+  contractId: "STYLE-002" | "STYLE-003"
+  path: string
+  needle: string
+  maximumOccurrences: number
+  rationale: string
+  removalCondition: string
+}
+
+export type ValidationException = OccurrenceException | ContrastException | FocusContrastException | StyleException
 
 const focusRationale = "Current shadcn-derived translucent focus treatment predates Nessa semantic focus-state tokens."
 const focusRemoval = "Remove with the semantic focus/invalid token migration before provider stabilization."
+
+const style = (
+  contractId: "STYLE-002" | "STYLE-003",
+  path: string,
+  needle: string,
+  maximumOccurrences: number,
+  rationale: string,
+  removalCondition: string,
+): StyleException => ({ kind: "style", contractId, path, needle, maximumOccurrences, rationale, removalCondition })
 
 export const exceptions = Object.freeze([
   {
@@ -51,15 +70,6 @@ export const exceptions = Object.freeze([
     maximumOccurrences: 1,
     rationale: "Transitional shadcn compatibility declaration predates scoped resolved-mode tokens.",
     removalCondition: "Remove when provider-scoped mode selectors and semantic state tokens land.",
-  },
-  {
-    kind: "occurrence",
-    contractId: "SRC-002",
-    path: "packages/react/src/components/input.tsx",
-    needle: "dark:aria-invalid:ring-destructive/40",
-    maximumOccurrences: 1,
-    rationale: "Existing invalid state still carries its shadcn dark override.",
-    removalCondition: "Replace with a semantic invalid-focus token during canonical theme generation.",
   },
   {
     kind: "contrast",
@@ -103,4 +113,5 @@ export const exceptions = Object.freeze([
   { kind: "focus-contrast", contractId: "A11Y-002", component: "input", state: "focus-visible:invalid", mode: "light", token: "--destructive", opacity: 0.2, surface: "--background", requiredRatio: 3, expectedTokenValue: "oklch(0.577 0.235 27.325)", expectedSurfaceValue: "oklch(1 0 0)", rationale: focusRationale, removalCondition: focusRemoval },
   { kind: "focus-contrast", contractId: "A11Y-002", component: "input", state: "focus-visible:invalid", mode: "light", token: "--destructive", opacity: 0.2, surface: "--card", requiredRatio: 3, expectedTokenValue: "oklch(0.577 0.235 27.325)", expectedSurfaceValue: "oklch(1 0 0)", rationale: focusRationale, removalCondition: focusRemoval },
   { kind: "focus-contrast", contractId: "A11Y-002", component: "input", state: "focus-visible:invalid", mode: "light", token: "--destructive", opacity: 0.2, surface: "--popover", requiredRatio: 3, expectedTokenValue: "oklch(0.577 0.235 27.325)", expectedSurfaceValue: "oklch(1 0 0)", rationale: focusRationale, removalCondition: focusRemoval },
+  style("STYLE-003", "packages/react/src/components/event-calendar.tsx", "zIndex", 1, "Overlapping event segments compute a continuous per-column layer (30 + column) inside the day cell's own stacking context.", "Restructure segment layering onto the frozen scale (e.g. render-order layering) when the calendar's overlap model is next revised."),
 ] satisfies readonly ValidationException[])

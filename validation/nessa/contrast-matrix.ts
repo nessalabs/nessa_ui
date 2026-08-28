@@ -33,4 +33,6 @@ export const contrastMatrix = Object.freeze([
   { foreground: "--nessa-diff-deletion", background: "--card", overlay: { token: "--accent", opacity: 0.5 }, minimum: 4.5, role: "normal-text" },
   { foreground: "--nessa-fast-mode-active", background: "--card", minimum: 4.5, role: "normal-text" },
   { foreground: "--nessa-fast-mode-active", background: "--background", minimum: 4.5, role: "normal-text" },
+  // The chat bubble's white text on the fixed chat accent (#0071e3 holds 4.7:1).
+  { foreground: "--nessa-chat-rim-head", background: "--nessa-chat-accent", minimum: 4.5, role: "normal-text" },
 ] satisfies readonly ContrastPair[])

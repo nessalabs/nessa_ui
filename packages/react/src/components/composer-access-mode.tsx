@@ -30,7 +30,7 @@ function ComposerAccessModeIcon({
         width="18"
         height="18"
         viewBox="0 0 18 18"
-        className={cn("size-[18px] shrink-0", className)}
+        className={cn("size-4.5 shrink-0", className)}
         data-access-mode-icon={value}
         data-nucleo-icon="access-full"
       >
@@ -64,7 +64,7 @@ function ComposerAccessModeIcon({
       width="18"
       height="18"
       viewBox="0 0 18 18"
-      className={cn("size-[18px] shrink-0", className)}
+      className={cn("size-4.5 shrink-0", className)}
       data-access-mode-icon={value}
       data-nucleo-icon={
         value === "auto-approval"

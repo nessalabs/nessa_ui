@@ -5,6 +5,7 @@ const sidebarFocusComponents = Object.freeze([
 ] as const)
 
 const composerFocusComponents = Object.freeze([
+  { component: "chat-bubbles", count: 5 },
   { component: "chat-composer", count: 3 },
   { component: "code-block", count: 1 },
   { component: "composer-access-mode", count: 2 },
@@ -30,6 +31,9 @@ type FocusComponent =
   | "event-calendar"
   | "gantt-chart/gantt-chart-grid"
   | "file-diff-list"
+  | "chat-tabs"
+  | "file-preview/file-preview"
+  | "file-preview/file-preview-fallback"
   | "kanban/kanban-card"
   | "kanban/kanban-column"
   | "questionnaire"
@@ -98,8 +102,7 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     component: "input",
     layer: "ring",
     state: "focus-visible:invalid",
-    className: "aria-invalid:ring-destructive/20",
-    darkClassName: "dark:aria-invalid:ring-destructive/40",
+    className: "aria-invalid:ring-(--nessa-invalid-ring)",
     light: { token: "--destructive", opacity: 0.2 },
     dark: { token: "--destructive", opacity: 0.4 },
   },
@@ -145,6 +148,19 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
+  // The tab trigger sits inside the horizontally scrolling tablist, so its
+  // outline draws inset to survive the overflow clipping; the new-tab
+  // control shares the treatment for consistency. (The close affordance is
+  // pointer-only and carries no focus treatment.)
+  {
+    component: "chat-tabs",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 2,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
   {
     component: "event-calendar",
     layer: "outline",
@@ -180,6 +196,27 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     state: "focus-visible",
     className: "focus-visible:outline-ring",
     count: 3,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The header download link sits in a padded header row and the fallback's
+  // download link sits on a padded empty-state surface, so both keep the
+  // standard outset outline.
+  {
+    component: "file-preview/file-preview",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  {
+    component: "file-preview/file-preview-fallback",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -356,9 +393,15 @@ export const focusGeometryClasses = Object.freeze([
   // The scrollable list region draws its outline inset so the card's
   // overflow clipping cannot swallow it; the row action and toggle buttons
   // sit inside padded rows and keep the standard outset offset.
+  { component: "chat-tabs", className: "focus-visible:outline-2", count: 2 },
+  { component: "chat-tabs", className: "focus-visible:-outline-offset-2", count: 2 },
   { component: "file-diff-list", className: "focus-visible:outline-2", count: 3 },
   { component: "file-diff-list", className: "focus-visible:outline-offset-2", count: 2 },
   { component: "file-diff-list", className: "focus-visible:-outline-offset-2", count: 1 },
+  { component: "file-preview/file-preview", className: "focus-visible:outline-2", count: 1 },
+  { component: "file-preview/file-preview", className: "focus-visible:outline-offset-2", count: 1 },
+  { component: "file-preview/file-preview-fallback", className: "focus-visible:outline-2", count: 1 },
+  { component: "file-preview/file-preview-fallback", className: "focus-visible:outline-offset-2", count: 1 },
   // The pager buttons and the scrollable excerpt region sit at the card
   // edge, so their outlines draw inset like file-diff-list's list region;
   // chip and links keep the outset offset.

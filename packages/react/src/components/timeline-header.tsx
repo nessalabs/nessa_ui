@@ -64,7 +64,7 @@ function TimelineHeaderCell({
     <div
       data-slot="timeline-header-cell"
       className={cn(
-        "absolute flex items-center border-l border-border/60 text-xs text-muted-foreground",
+        "absolute flex items-center border-l border-border/60 nessa-text-2 text-muted-foreground",
         pinLabelInset === undefined && "overflow-hidden",
         className,
       )}

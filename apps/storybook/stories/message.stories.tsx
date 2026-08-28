@@ -316,10 +316,11 @@ export const ActionsAndEditing: Story = {
     await waitFor(() =>
       expect(Number(getComputedStyle(actionsRow).opacity)).toBe(1),
     )
-    // Copy confirms by swapping to a check.
+    // Copy confirms by swapping to a check. The copied state lands only
+    // after the async clipboard write settles, so the query must retry.
     await userEvent.click(copyAction)
     await expect(
-      canvas.getByRole("button", { name: "Copied" }),
+      await canvas.findByRole("button", { name: "Copied" }),
     ).toBeVisible()
     // Edit swaps the bubble for a prefilled composer.
     await userEvent.click(canvas.getByRole("button", { name: "Edit message" }))
