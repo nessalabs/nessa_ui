@@ -216,7 +216,10 @@ export const ComposedParts: Story = {
   },
 }
 
-const sampleMarkdown = `# Release notes
+// The sample deliberately has no h1: the storybook docs check requires the
+// docs page's last visible h1 (the component title) to sit in the initial
+// viewport, and a story-rendered h1 further down the page breaks that.
+const sampleMarkdown = `## Release notes
 
 Version **2.4** ships the renderer registry.
 
