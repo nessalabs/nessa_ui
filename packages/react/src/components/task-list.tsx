@@ -4,7 +4,7 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-import { Checkbox } from "./checkbox"
+import { Checkbox, checkboxCheckPath } from "./checkbox"
 
 /**
  * The lifecycle of one task row. `todo` and `done` are the pair a person
@@ -67,6 +67,9 @@ function TaskList({ labels: labelsProp, className, ...props }: TaskListProps) {
     <TaskListLabelsContext.Provider value={labels}>
       <ul
         data-slot="task-list"
+        // list-none makes Safari/VoiceOver strip list semantics; the
+        // explicit role restores them.
+        role="list"
         className={cn(
           "m-0 flex w-full min-w-0 list-none flex-col gap-2.5 p-0 font-sans text-foreground",
           className,
@@ -104,13 +107,15 @@ function TaskListItemIndicator({ status }: { status: TaskListItemStatus }) {
         fillOpacity={status === "done" ? 0.2 : undefined}
         stroke="currentColor"
         strokeWidth={1.5}
-        strokeDasharray={status === "active" ? "3 3.4" : undefined}
+        // Eight exact 6.4795-unit periods around the 51.836-unit
+        // circumference, so the spinning ring closes without a seam.
+        strokeDasharray={status === "active" ? "3 3.4795" : undefined}
         strokeLinecap="round"
         className={cn(status === "todo" && "text-muted-foreground")}
       />
       {status === "done" && (
         <path
-          d="M5.75 9.25L8 11.75L12.25 6.25"
+          d={checkboxCheckPath}
           stroke="currentColor"
           strokeWidth={1.5}
           strokeLinecap="round"
@@ -136,7 +141,8 @@ export interface TaskListItemProps
   /**
    * The row's lifecycle state, exposed as `data-status` for host styling.
    * `active` rows are `aria-busy` and spin their indicator; `done` rows
-   * strike and mute their content.
+   * strike and mute their content. Does not apply to a presentational
+   * `icon` row, which is an entry rather than a task.
    *
    * @default "todo"
    */
@@ -149,18 +155,35 @@ export interface TaskListItemProps
    * they are agent-owned states a click cannot resolve.
    */
   onStatusChange?: (status: "todo" | "done") => void
-  /** Disables an interactive row's checkbox without removing the row. */
+  /** Disables an interactive row: the whole row fades and stops responding. */
   disabled?: boolean
   /**
+   * Extra props forwarded to an interactive row's underlying checkbox —
+   * most usefully `name` and `value`, which put the row's checked state
+   * into a wrapping form's `FormData`; its `className` and
+   * `inputClassName` merge into the row's checkbox classes rather than
+   * replacing them. Ignored on read-only rows, which render no input.
+   */
+  inputProps?: Omit<
+    React.ComponentProps<typeof Checkbox>,
+    "checked" | "defaultChecked" | "indeterminate" | "onChange" | "disabled"
+  >
+  /**
    * Replaces the status indicator with the host's own glyph — a calendar
-   * or video icon on an agenda row, say. The row still announces its
-   * status; the glyph itself is decorative. Ignored on interactive rows,
-   * which need their checkbox.
+   * or video icon on an agenda row, say — and makes the row a purely
+   * presentational entry: `status` stops applying, so the row carries no
+   * `data-status`, no `aria-busy`, no announcement, and no done styling.
+   * The glyph itself is decorative. Any falsy value counts as absent (so
+   * conditional `icon={isCall && <VideoIcon />}` falls back to the status
+   * indicator), and a row with `onStatusChange` ignores the prop entirely
+   * — it stays a task through every status.
    */
   icon?: React.ReactNode
   /**
    * Muted detail after the label — a time such as "at 9:30 AM", an owner,
-   * a duration.
+   * a duration. Like `icon`, any falsy value counts as absent, so
+   * conditional `meta={task.due && formatDue(task.due)}` renders nothing
+   * for rows without one.
    */
   meta?: React.ReactNode
 }
@@ -176,6 +199,7 @@ function TaskListItem({
   status = "todo",
   onStatusChange,
   disabled,
+  inputProps,
   icon,
   meta,
   className,
@@ -185,11 +209,22 @@ function TaskListItem({
   const labels = React.useContext(TaskListLabelsContext)
   const interactive =
     onStatusChange != null && (status === "todo" || status === "done")
-  const done = status === "done"
+  // A falsy icon is what conditionals like `icon={isCall && <VideoIcon />}`
+  // produce for the plain rows, so every falsy value counts as no icon —
+  // never as a glyph, and never as presentational. A row with
+  // `onStatusChange` is a task through every status (`active` and
+  // `failed` included), so the icon never applies to it.
+  const iconNode = icon || null
+  const presentational = onStatusChange == null && iconNode != null
+  const done = status === "done" && !presentational
+
+  const labelId = React.useId()
+  const metaId = React.useId()
 
   const label = (
     <span
       data-slot="task-list-item-label"
+      id={interactive ? labelId : undefined}
       className={cn(
         "min-w-0 text-sm leading-5 text-foreground transition-[color,text-decoration-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
         done && "text-muted-foreground line-through",
@@ -198,10 +233,11 @@ function TaskListItem({
       {children}
     </span>
   )
-  const metaNode = meta != null && (
+  const metaNode = Boolean(meta) && (
     <span
       data-slot="task-list-item-meta"
-      className="min-w-0 shrink-0 text-sm leading-5 text-muted-foreground"
+      id={interactive ? metaId : undefined}
+      className="shrink-0 text-sm leading-5 text-muted-foreground"
     >
       {meta}
     </span>
@@ -210,9 +246,18 @@ function TaskListItem({
   return (
     <li
       data-slot="task-list-item"
-      data-status={status}
-      aria-busy={status === "active" || undefined}
-      className={cn("flex min-w-0", className)}
+      data-status={presentational ? undefined : status}
+      aria-busy={(!presentational && status === "active") || undefined}
+      className={cn(
+        "flex min-w-0",
+        // The Checkbox already fades itself when disabled, so the fade
+        // lands on the text spans only — the whole row dims evenly
+        // instead of the control dimming twice.
+        interactive &&
+          disabled &&
+          "[&_[data-slot=task-list-item-label]]:opacity-50 [&_[data-slot=task-list-item-meta]]:opacity-50",
+        className,
+      )}
       {...props}
     >
       {interactive ? (
@@ -223,8 +268,27 @@ function TaskListItem({
           )}
         >
           <Checkbox
-            className="mt-px"
-            inputClassName="rounded-full"
+            // The spread comes first so the controlled contract — checked,
+            // disabled, onChange — always wins, even for untyped callers
+            // the Omit cannot police.
+            {...inputProps}
+            className={cn("mt-px", inputProps?.className)}
+            inputClassName={cn("rounded-full", inputProps?.inputClassName)}
+            // The whole label — meta included — stays the click target,
+            // while the accessible name stays the task label alone. A host
+            // naming the input itself through inputProps wins instead.
+            aria-labelledby={
+              inputProps?.["aria-labelledby"] ??
+              (inputProps?.["aria-label"] != null ? undefined : labelId)
+            }
+            // Meta is demoted from the name to a description, so it still
+            // reaches focus-mode screen-reader users; a host's own
+            // description ids merge with it rather than replacing it.
+            aria-describedby={
+              [inputProps?.["aria-describedby"], metaNode ? metaId : undefined]
+                .filter(Boolean)
+                .join(" ") || undefined
+            }
             checked={done}
             disabled={disabled}
             onChange={(event) =>
@@ -240,9 +304,15 @@ function TaskListItem({
             aria-hidden="true"
             className="mt-px inline-flex size-[18px] shrink-0 items-center justify-center [&_svg]:size-full"
           >
-            {icon ?? <TaskListItemIndicator status={status} />}
+            {presentational ? (
+              iconNode
+            ) : (
+              <TaskListItemIndicator status={status} />
+            )}
           </span>
-          <span className="sr-only">{labels[status]}: </span>
+          {!presentational && (
+            <span className="sr-only">{labels[status]}: </span>
+          )}
           {label}
           {metaNode}
         </span>

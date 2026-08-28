@@ -11,7 +11,11 @@ export {
   CardHeader,
   CardTitle,
 } from "./components/card"
-export { Checkbox, type CheckboxProps } from "./components/checkbox"
+export {
+  Checkbox,
+  checkboxCheckPath,
+  type CheckboxProps,
+} from "./components/checkbox"
 export {
   ConversationRail,
   ConversationRailItem,

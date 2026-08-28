@@ -22,7 +22,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A list of tasks for agent plan steps and personal checklists. The root is a plain ul stacking TaskListItem rows; each row carries a status — todo, active, done, or failed — drawn as a circular indicator matched to the Checkbox's stroke style, with the label as children and muted trailing detail through meta. Rows are read-only by default, announcing their status through visually hidden text, which is the shape agent transcripts stream; passing onStatusChange turns a todo/done row into a real circular checkbox with native keyboard and form semantics, and an icon prop swaps the indicator for a host glyph on agenda-style rows. The list owns no task state: hosts render rows from their own data and apply toggles themselves.",
+          "A list of tasks for agent plan steps and personal checklists. The root is a plain ul stacking TaskListItem rows; each row carries a status — todo, active, done, or failed — drawn as a circular indicator matched to the Checkbox's stroke style, with the label as children and muted trailing detail through meta. Rows are read-only by default, announcing their status through visually hidden text, which is the shape agent transcripts stream; passing onStatusChange turns a todo/done row into a real circular checkbox with native keyboard and form semantics, and an icon prop turns an agenda-style row into a presentational entry drawn with the host's own glyph, outside the status contract. The list owns no task state: hosts render rows from their own data and apply toggles themselves.",
       },
     },
   },
@@ -76,35 +76,42 @@ function ChecklistHost() {
     groceries: "done",
     dentist: "todo",
   })
-  const tasks = [
+  const tasks: { id: string; label: string; meta?: string }[] = [
     { id: "update", label: "Send the weekly update" },
     { id: "notes", label: "Review project notes" },
     { id: "groceries", label: "Pick up groceries" },
-    { id: "dentist", label: "Book a dentist appointment" },
+    { id: "dentist", label: "Book a dentist appointment", meta: "due Friday" },
   ]
   return (
-    <TaskList aria-label="Today's tasks">
-      {tasks.map((task) => (
-        <TaskListItem
-          key={task.id}
-          status={statuses[task.id]}
-          onStatusChange={(next) =>
-            setStatuses((current) => ({ ...current, [task.id]: next }))
-          }
-        >
-          {task.label}
+    <form
+      data-testid="checklist-form"
+      onSubmit={(event) => event.preventDefault()}
+    >
+      <TaskList aria-label="Today's tasks">
+        {tasks.map((task) => (
+          <TaskListItem
+            key={task.id}
+            status={statuses[task.id]}
+            meta={task.meta}
+            inputProps={{ name: "done-tasks", value: task.id }}
+            onStatusChange={(next) =>
+              setStatuses((current) => ({ ...current, [task.id]: next }))
+            }
+          >
+            {task.label}
+          </TaskListItem>
+        ))}
+        <TaskListItem status="todo" disabled onStatusChange={() => {}}>
+          Water the plants
         </TaskListItem>
-      ))}
-      <TaskListItem status="todo" disabled onStatusChange={() => {}}>
-        Water the plants
-      </TaskListItem>
-    </TaskList>
+      </TaskList>
+    </form>
   )
 }
 
 export const InteractiveChecklist: Story = {
   parameters: storyDocumentation(
-    "A person's checklist: onStatusChange turns each todo/done row into a real circular checkbox whose label is the whole row, so clicking the text toggles it too. The rows render only what status says — the host applies each reported change to its own state — and a disabled row fades and stops responding. The play test toggles a row through the checkbox role and asserts the checked state and strike-through follow.",
+    "A person's checklist: onStatusChange turns each todo/done row into a real circular checkbox whose label is the whole row, so clicking the text toggles it too. The rows render only what status says — the host applies each reported change to its own state — and a disabled row fades and stops responding. inputProps carries name and value onto the native input, so a wrapping form sees the done rows in its FormData; the play test toggles rows through the checkbox role and asserts checked state, data-status, and the submitted values follow.",
   ),
   render: () => (
     <div className="w-[min(24rem,calc(100vw-2rem))]">
@@ -130,6 +137,14 @@ export const InteractiveChecklist: Story = {
     await expect(update).toBeChecked()
     await expect(update.closest("li")).toHaveAttribute("data-status", "done")
 
+    // The native inputs carry name/value, so the wrapping form's FormData
+    // lists exactly the done rows.
+    const form = canvas.getByTestId("checklist-form") as HTMLFormElement
+    await expect(new FormData(form).getAll("done-tasks")).toEqual([
+      "update",
+      "groceries",
+    ])
+
     // Unchecking reports "todo" back and the strike-through clears.
     await userEvent.click(groceries)
     await expect(groceries).not.toBeChecked()
@@ -141,6 +156,15 @@ export const InteractiveChecklist: Story = {
     await expect(
       canvas.getByRole("checkbox", { name: "Water the plants" }),
     ).toBeDisabled()
+
+    // Meta stays out of the checkbox's accessible name and lands in its
+    // description instead, so trailing detail is announced without
+    // polluting the name.
+    const dentist = canvas.getByRole("checkbox", {
+      name: "Book a dentist appointment",
+    })
+    await expect(dentist).not.toBeChecked()
+    await expect(dentist).toHaveAccessibleDescription("due Friday")
   },
 }
 
@@ -214,6 +238,15 @@ export const DailyBriefCard: Story = {
     await expect(
       within(events).getByText("at 9:30 AM"),
     ).toBeInTheDocument()
+    // Icon rows are presentational, not tasks: no status is announced or
+    // stamped for them, while the indicator-drawn focus block keeps its
+    // full active contract.
+    await expect(within(events).queryByText("Not started:")).toBeNull()
+    await expect(within(events).getByText("In progress:")).toBeInTheDocument()
+    const eventRows = within(events).getAllByRole("listitem")
+    await expect(eventRows[0]).not.toHaveAttribute("data-status")
+    await expect(eventRows[2]).toHaveAttribute("data-status", "active")
+    await expect(eventRows[2]).toHaveAttribute("aria-busy", "true")
   },
 }
 
