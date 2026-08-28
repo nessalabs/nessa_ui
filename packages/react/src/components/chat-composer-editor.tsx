@@ -290,9 +290,11 @@ export interface ChatComposerEditorProps
   /** The minimum pasted-text length that `onPasteAttachment` captures. Defaults to 500. */
   pasteAttachmentMinLength?: number
   /**
-   * Receives files from a paste or drop that carried no plain text (for
-   * example a copied screenshot), so the host can attach them. Without it,
-   * file payloads are ignored; text content is never affected.
+   * Receives files from a paste that carried no plain text (for example a
+   * copied screenshot), so the host can attach them. Without it, pasted
+   * file payloads are ignored; text content is never affected. Dropped
+   * files belong to FileDropZone — wrap the composer in one, or pass the
+   * composer's `fileDrop` prop — so one surface owns every drop.
    */
   onPasteFiles?: (files: readonly File[]) => void
 }
@@ -689,11 +691,10 @@ function ChatComposerEditor({
           // Drops bypass the paste handler; intercept them the same way so
           // rich HTML (or markup posing as a chip host) never enters the DOM.
           event.preventDefault()
-          const files = Array.from(event.dataTransfer.files)
-          if (files.length > 0) {
-            onPasteFiles?.(files)
-            return
-          }
+          // A file drop is an attachment gesture, not an editing one: leave
+          // it to the surrounding FileDropZone, which sees this same event
+          // as it bubbles and owns the accept, size, and count rules.
+          if (event.dataTransfer.files.length > 0) return
           const text = event.dataTransfer.getData("text/plain")
           if (!text) return
           const root = event.currentTarget

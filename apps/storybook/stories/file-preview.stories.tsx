@@ -42,6 +42,17 @@ trailer<</Size 4/Root 1 0 R>>
 %%EOF`
 const pdfSrc = `data:application/pdf;base64,${btoa(minimalPdf)}`
 
+
+/**
+ * Syntax highlighting loads Shiki's themes and grammars on first use, and
+ * the whole suite races that one cold start. Storybook warms it at boot
+ * (see .storybook/preview.ts), so this deadline is the backstop for a run
+ * that starts before the warm-up lands — the same budget CodeBlock's own
+ * stories give the same work. It is a deadline, not a delay: the wait ends
+ * as soon as the text appears.
+ */
+const highlights = { timeout: 15000 } as const
+
 export const ImagePreview: Story = {
   parameters: storyDocumentation(
     "A raster image with header chrome: file name, formatted size, and a download link. The image renderer keeps the picture contained inside the content box.",
@@ -356,17 +367,20 @@ export const CodePreview: Story = {
     />
   ),
   play: async ({ canvasElement }) => {
-    // The code draws inside Pierre's <diffs-container> shadow root and
-    // highlighting is async, so wait and read the shadow text directly.
-    await waitFor(
-      async () => {
-        const shadowText = canvasElement
-          .querySelector('[data-slot="file-preview-text"]')
-          ?.querySelector("diffs-container")?.shadowRoot?.textContent
-        await expect(shadowText).toContain("greet")
-      },
-      { timeout: 5000 },
-    )
+    // Two waits, not one: the renderer mounts when its fetch resolves, and
+    // Pierre highlights into the <diffs-container> shadow root afterwards.
+    // Splitting them says which stage hung when one does.
+    await waitFor(async () => {
+      await expect(
+        canvasElement.querySelector('[data-slot="file-preview-text"]'),
+      ).not.toBeNull()
+    }, highlights)
+    await waitFor(async () => {
+      const shadowText = canvasElement
+        .querySelector('[data-slot="file-preview-text"]')
+        ?.querySelector("diffs-container")?.shadowRoot?.textContent
+      await expect(shadowText).toContain("greet")
+    }, highlights)
     const root = canvasElement.querySelector('[data-slot="file-preview"]')
     await expect(root).toHaveAttribute("data-kind", "text")
   },

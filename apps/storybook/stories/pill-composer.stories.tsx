@@ -1452,6 +1452,10 @@ export const Playground: Story = {
     const body = within(canvasElement.ownerDocument.body)
     const input = canvas.getByRole("textbox", { name: "Message" })
     const rim = rimElement(canvasElement)
+    // The rim fades on a token-duration transition, so its resting opacity
+    // is only exact once the surface has come to rest — reading it on the
+    // frame the story mounts catches the fade mid-flight.
+    await waitForSettledAnimations(canvasElement)
     await expect(getComputedStyle(rim).opacity).toBe("0")
     await userEvent.type(input, "Ship the release notes{enter}")
     await expect(
@@ -1656,6 +1660,7 @@ export const Generating: Story = {
     if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
     const canvas = within(canvasElement)
     const rim = rimElement(canvasElement)
+    await waitForSettledAnimations(canvasElement)
     await expect(getComputedStyle(rim).opacity).toBe("0")
     await expect(rim.getAnimations({ subtree: true })).toHaveLength(0)
     await userEvent.click(

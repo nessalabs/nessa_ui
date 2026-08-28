@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { registerCustomTheme } from "@pierre/diffs"
+import { preloadHighlighter, registerCustomTheme } from "@pierre/diffs"
 import { File } from "@pierre/diffs/react"
 import type {
   DiffsThemeNames,
@@ -137,6 +137,28 @@ registerCustomTheme("nessa-dark", async () => nessaDarkTheme)
 const defaultCodeTheme: ThemesType = {
   dark: "nessa-dark",
   light: "light-plus",
+}
+
+/**
+ * Loads the syntax highlighter's themes and grammars ahead of the first
+ * code block that needs them. Shiki resolves both lazily, on first render,
+ * so a code surface that appears during a busy moment — a streamed message,
+ * a route transition — pays that cost while the user is watching. An app
+ * that knows it will render code can call this once at boot and move the
+ * work to an idle moment; skipping it changes nothing but the timing.
+ *
+ * `langs` are the file types the app expects to render, and `theme`
+ * defaults to the same pair CodeBlock itself uses. Resolves when the
+ * highlighter is warm, and rejects only if the load itself fails — nothing
+ * downstream depends on it, so a rejection is safe to ignore.
+ */
+export async function preloadCodeHighlighter(
+  langs: readonly SupportedLanguages[],
+  theme: DiffsThemeNames | ThemesType = defaultCodeTheme,
+): Promise<void> {
+  const themes =
+    typeof theme === "string" ? [theme] : [theme.dark, theme.light]
+  await preloadHighlighter({ themes, langs: [...langs] })
 }
 
 const CodeBlockContext = React.createContext<CodeBlockConfig>({})
