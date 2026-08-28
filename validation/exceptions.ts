@@ -72,15 +72,6 @@ export const exceptions = Object.freeze([
     removalCondition: "Remove when provider-scoped mode selectors and semantic state tokens land.",
   },
   {
-    kind: "occurrence",
-    contractId: "SRC-002",
-    path: "packages/react/src/components/input.tsx",
-    needle: "dark:aria-invalid:ring-destructive/40",
-    maximumOccurrences: 1,
-    rationale: "Existing invalid state still carries its shadcn dark override.",
-    removalCondition: "Replace with a semantic invalid-focus token during canonical theme generation.",
-  },
-  {
     kind: "contrast",
     contractId: "A11Y-001",
     mode: "light",
