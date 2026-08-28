@@ -530,6 +530,15 @@ export {
   type TableViewOptionsProps,
 } from "./components/table"
 export {
+  TaskList,
+  TaskListItem,
+  taskListDefaultLabels,
+  type TaskListItemProps,
+  type TaskListItemStatus,
+  type TaskListLabels,
+  type TaskListProps,
+} from "./components/task-list"
+export {
   AppShell,
   AppShellBody,
   AppShellDock,
