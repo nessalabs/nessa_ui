@@ -689,4 +689,28 @@ export {
   type FlowChartLayoutNode,
   type FlowChartLayoutOptions,
 } from "./components/flow-chart"
+export {
+  FilePreview,
+  FilePreviewContent,
+  FilePreviewFallback,
+  FilePreviewHeader,
+  FilePreviewImage,
+  FilePreviewPdf,
+  defaultFilePreviewRenderers,
+  detectFileKind,
+  filePreviewImageExtensions,
+  filePreviewPdfExtensions,
+  formatFileSize,
+  useFilePreviewContext,
+  type FilePreviewContentProps,
+  type FilePreviewContextValue,
+  type FilePreviewFallbackProps,
+  type FilePreviewFile,
+  type FilePreviewHeaderProps,
+  type FilePreviewKind,
+  type FilePreviewProps,
+  type FilePreviewRenderer,
+  type FilePreviewRendererMap,
+  type FilePreviewRendererProps,
+} from "./components/file-preview"
 export { cn } from "./lib/utils"
