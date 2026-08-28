@@ -221,6 +221,24 @@
       ]
     },
     {
+      "name": "task-list",
+      "type": "registry:ui",
+      "title": "Task list",
+      "description": "A task list for agent plan steps and personal checklists: status-carrying rows (todo, active, done, failed) with circular indicators, trailing meta detail, host icons on agenda rows, and an interactive mode that turns todo/done rows into real circular checkboxes.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/checkbox",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/task-list.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/task-list.tsx"
+        }
+      ]
+    },
+    {
       "name": "input",
       "type": "registry:ui",
       "title": "Input",
