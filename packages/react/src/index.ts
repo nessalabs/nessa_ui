@@ -670,4 +670,20 @@ export {
   type RandomAvatarTone,
   type RandomAvatarToneRange,
 } from "./components/random-avatar"
+export {
+  SankeyChart,
+  computeSankeyLayout,
+  sankeyCenterlinePath,
+  sankeyChartLinkId,
+  sankeyRibbonPath,
+  type SankeyAlign,
+  type SankeyChartLink,
+  type SankeyChartNode,
+  type SankeyChartNodeContext,
+  type SankeyChartProps,
+  type SankeyLayout,
+  type SankeyLayoutLink,
+  type SankeyLayoutNode,
+  type SankeyLayoutOptions,
+} from "./components/sankey-chart"
 export { cn } from "./lib/utils"

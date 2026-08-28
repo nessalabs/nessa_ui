@@ -1370,6 +1370,33 @@
       ]
     },
     {
+      "name": "sankey-chart",
+      "type": "registry:ui",
+      "title": "Sankey chart",
+      "description": "A flow diagram: node bars in columns joined by ribbons whose thickness is proportional to the flow they carry. Neutral by default with optional per-node color, it fills the host's box on both axes, lays out any number of stages via longest-path columns, and makes every ribbon a keyboard-focusable button with hover emphasis and host-controllable link selection drawn as a centerline stroke.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/sankey-chart/index.ts",
+          "type": "registry:ui",
+          "target": "components/ui/sankey-chart/index.ts"
+        },
+        {
+          "path": "packages/react/src/components/sankey-chart/sankey-chart.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/sankey-chart/sankey-chart.tsx"
+        },
+        {
+          "path": "packages/react/src/components/sankey-chart/sankey-chart-layout.ts",
+          "type": "registry:ui",
+          "target": "components/ui/sankey-chart/sankey-chart-layout.ts"
+        }
+      ]
+    },
+    {
       "name": "random-avatar",
       "type": "registry:ui",
       "title": "Random avatar",
