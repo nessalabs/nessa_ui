@@ -31,6 +31,7 @@ type FocusComponent =
   | "event-calendar"
   | "gantt-chart/gantt-chart-grid"
   | "file-diff-list"
+  | "chat-tabs"
   | "file-preview/file-preview"
   | "file-preview/file-preview-fallback"
   | "kanban/kanban-card"
