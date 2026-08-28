@@ -173,7 +173,7 @@ function MermaidViewer({ svg, onClose }: { svg: string; onClose: () => void }) {
     >
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
-          <span className="text-sm font-medium">Diagram</span>
+          <span className="nessa-text-4 font-medium">Diagram</span>
           <div className="flex items-center gap-1.5">
             <button
               type="button"
@@ -197,7 +197,7 @@ function MermaidViewer({ svg, onClose }: { svg: string; onClose: () => void }) {
             >
               <ZoomOut aria-hidden="true" />
             </button>
-            <span className="w-12 text-center text-xs tabular-nums text-muted-foreground">
+            <span className="w-12 text-center nessa-text-2 tabular-nums text-muted-foreground">
               {Math.round(view.scale * 100)}%
             </span>
             <button

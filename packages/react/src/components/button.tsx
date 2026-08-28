@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
 // child and would silently override the author. Note the opt-out matches
 // `size-*` only: an icon sized with `h-*`/`w-*` still takes the default.
 const buttonVariants = cva(
-  "inline-flex box-border shrink-0 appearance-none items-center justify-center gap-2 whitespace-nowrap rounded-md border-0 bg-transparent p-0 font-sans text-sm font-medium text-foreground no-underline transition-[color,background-color,border-color,box-shadow,transform] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50 active:translate-y-px [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0",
+  "inline-flex box-border shrink-0 appearance-none items-center justify-center gap-2 whitespace-nowrap rounded-md border-0 bg-transparent p-0 font-sans nessa-text-4 font-medium text-foreground no-underline transition-[color,background-color,border-color,box-shadow,transform] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50 active:translate-y-px [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -25,7 +25,7 @@ const buttonVariants = cva(
       },
       size: {
         default: "h-9 px-4 py-2",
-        sm: "h-8 gap-1.5 px-3 text-xs",
+        sm: "h-8 gap-1.5 px-3 nessa-text-2",
         lg: "h-10 px-6",
         icon: "size-9",
       },

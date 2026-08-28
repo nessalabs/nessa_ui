@@ -11,6 +11,7 @@ export const checkMetadata = Object.freeze({
   governance: { phase: "source", inputs: ["README.md", ".node-version", ".github/CODEOWNERS", "docs/architecture/design-system-contract.md", "docs/plans/**/*.md", "validation/contracts.ts", "validation/amendments.ts", "validation/exceptions.ts", "validation/nessa/check-metadata.ts", "validation/nessa/checks/**/*.ts"], dependsOn: [], global: true },
   "css-ownership": { phase: "source", inputs: ["packages/react/src/*.css", "packages/react/package.json"], dependsOn: [], global: false },
   "theme-parity": { phase: "source", inputs: ["packages/react/src/theme.css", "registry.json", "public/r/nessa-base.json"], dependsOn: [], global: false },
+  "typography-scale": { phase: "source", inputs: ["packages/react/src/*.css", "packages/react/src/components/**/*.tsx", "packages/react/src/composites/**/*.tsx"], dependsOn: ["theme-parity"], global: false },
   "registry-parity": { phase: "source", inputs: ["registry.json", "public/r/*.json", "packages/react/src/**/*.{ts,tsx}"], dependsOn: ["theme-parity"], global: false },
   "source-boundaries": { phase: "source", inputs: ["packages/react/src/**/*.{ts,tsx,css}"], dependsOn: [], global: false },
   "style-discipline": { phase: "source", inputs: ["packages/react/src/**/*.{ts,tsx}", "validation/exceptions.ts"], dependsOn: [], global: false },

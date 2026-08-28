@@ -461,7 +461,7 @@ function ConversationRailPreview({
       role="tooltip"
       data-slot="conversation-rail-preview"
       className={cn(
-        "pointer-events-none absolute left-full top-1/2 z-50 ml-2 w-64 -translate-x-1 -translate-y-1/2 rounded-xl border border-border bg-popover p-3 text-left text-sm text-popover-foreground opacity-0 shadow-lg transition-[opacity,translate] duration-150 ease-out motion-reduce:transition-none",
+        "pointer-events-none absolute left-full top-1/2 z-50 ml-2 w-64 -translate-x-1 -translate-y-1/2 rounded-xl border border-border bg-popover p-3 text-left nessa-text-4 text-popover-foreground opacity-0 shadow-lg transition-[opacity,translate] duration-150 ease-out motion-reduce:transition-none",
         "before:absolute before:inset-y-0 before:-left-2 before:w-2 before:content-['']",
         "group-[[data-preview-suppressed=false]:hover]/rail-item:pointer-events-auto group-[[data-preview-suppressed=false]:hover]/rail-item:translate-x-0 group-[[data-preview-suppressed=false]:hover]/rail-item:opacity-100 group-[[data-preview-suppressed=false]:has(:focus-visible)]/rail-item:pointer-events-auto group-[[data-preview-suppressed=false]:has(:focus-visible)]/rail-item:translate-x-0 group-[[data-preview-suppressed=false]:has(:focus-visible)]/rail-item:opacity-100",
         className,

@@ -30,7 +30,7 @@ function ComposerAccessModeIcon({
         width="18"
         height="18"
         viewBox="0 0 18 18"
-        className={cn("size-[18px] shrink-0", className)}
+        className={cn("size-4.5 shrink-0", className)}
         data-access-mode-icon={value}
         data-nucleo-icon="access-full"
       >
@@ -64,7 +64,7 @@ function ComposerAccessModeIcon({
       width="18"
       height="18"
       viewBox="0 0 18 18"
-      className={cn("size-[18px] shrink-0", className)}
+      className={cn("size-4.5 shrink-0", className)}
       data-access-mode-icon={value}
       data-nucleo-icon={
         value === "auto-approval"
@@ -160,7 +160,7 @@ const ComposerAccessMode = React.forwardRef<
             aria-label={`Access mode: ${label}`}
             title={title ?? label}
             className={cn(
-              "inline-flex h-9 min-w-0 items-center gap-1.5 rounded-full px-2.5 font-sans text-sm font-medium text-muted-foreground outline-none transition-[color,background-color,box-shadow] hover:bg-accent hover:text-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50",
+              "inline-flex h-9 min-w-0 items-center gap-1.5 rounded-full px-2.5 font-sans nessa-text-4 font-medium text-muted-foreground outline-none transition-[color,background-color,box-shadow] hover:bg-accent hover:text-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50",
               value === "full-access" && "text-destructive",
               className,
             )}
@@ -182,7 +182,7 @@ const ComposerAccessMode = React.forwardRef<
               contentClassName,
             )}
           >
-            <DropdownMenu.Label className="px-2 py-1.5 font-sans text-xs font-medium text-muted-foreground">
+            <DropdownMenu.Label className="px-2 py-1.5 font-sans nessa-text-2 font-medium text-muted-foreground">
               Access mode
             </DropdownMenu.Label>
             <DropdownMenu.RadioGroup value={value} onValueChange={setValue}>
@@ -191,7 +191,7 @@ const ComposerAccessMode = React.forwardRef<
                     key={option}
                     value={option}
                     className={cn(
-                      "flex min-h-10 cursor-default select-none items-center gap-2 rounded-lg px-2 font-sans text-sm text-foreground outline-none transition-colors data-[highlighted]:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring data-[state=checked]:bg-accent/70",
+                      "flex min-h-10 cursor-default select-none items-center gap-2 rounded-lg px-2 font-sans nessa-text-4 text-foreground outline-none transition-colors data-[highlighted]:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring data-[state=checked]:bg-accent/70",
                       option === "full-access" && "text-destructive",
                     )}
                   >

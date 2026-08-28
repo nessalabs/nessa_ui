@@ -28,7 +28,7 @@ import { Input } from "../input"
  * matched here.
  */
 const tableControlVariants = cva(
-  "inline-flex h-8 box-border shrink-0 cursor-pointer appearance-none items-center gap-2 whitespace-nowrap rounded-md border border-input bg-transparent font-sans text-xs font-medium text-foreground outline-none transition-[color,background-color,border-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-accent hover:text-accent-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 aria-expanded:border-ring motion-reduce:transition-none",
+  "inline-flex h-8 box-border shrink-0 cursor-pointer appearance-none items-center gap-2 whitespace-nowrap rounded-md border border-input bg-transparent font-sans nessa-text-2 font-medium text-foreground outline-none transition-[color,background-color,border-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-accent hover:text-accent-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 aria-expanded:border-ring motion-reduce:transition-none",
   {
     variants: {
       padding: {
@@ -111,7 +111,7 @@ function TableSearchField({
       />
       <Input
         type={type}
-        className={cn("h-8 pl-8 md:text-xs", inputClassName)}
+        className={cn("h-8 pl-8 nessa-text-input-2", inputClassName)}
         {...props}
       />
     </div>
@@ -158,7 +158,7 @@ function TableFilterToggle({
       <ListFilter aria-hidden="true" className="size-3.5 shrink-0" />
       {children ?? "Filters"}
       {activeCount > 0 ? (
-        <Badge variant="secondary" className="px-1.5 font-mono text-[11px] tabular-nums">
+        <Badge variant="secondary" className="px-1.5 font-mono nessa-text-1 tabular-nums">
           {activeCount}
         </Badge>
       ) : null}
@@ -267,11 +267,11 @@ function TableFilterSelect({
             <DropdownMenuRadioItem
               key={option.value}
               value={option.value}
-              className="text-xs"
+              className="nessa-text-2"
             >
               <span className="flex-1 truncate">{option.label}</span>
               {option.count !== undefined ? (
-                <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                <span className="font-mono nessa-text-1 tabular-nums text-muted-foreground">
                   {option.count}
                 </span>
               ) : null}
@@ -383,7 +383,7 @@ function TableViewOptions({
             disabled={column.locked}
             onCheckedChange={(next) => toggle(column.id, next === true)}
             onSelect={(event) => event.preventDefault()}
-            className="text-xs"
+            className="nessa-text-2"
           >
             {column.label}
           </DropdownMenuCheckboxItem>

@@ -32,7 +32,7 @@ function SidebarGroupLabel({ className, ...props }: React.ComponentProps<"h2">) 
     <h2
       data-slot="sidebar-group-label"
       className={cn(
-        "flex min-h-8 shrink-0 items-center px-2.5 text-xs font-medium text-sidebar-foreground/60 transition-[height,margin,opacity] duration-200 group-data-[state=collapsed]/sidebar:-mt-8 group-data-[state=collapsed]/sidebar:opacity-0",
+        "flex min-h-8 shrink-0 items-center px-2.5 nessa-text-2 font-medium text-sidebar-foreground/60 transition-[height,margin,opacity] duration-200 group-data-[state=collapsed]/sidebar:-mt-8 group-data-[state=collapsed]/sidebar:opacity-0",
         className,
       )}
       {...props}
@@ -89,7 +89,7 @@ function SidebarGroupContent({
   return (
     <div
       data-slot="sidebar-group-content"
-      className={cn("w-full text-sm", className)}
+      className={cn("w-full nessa-text-4", className)}
       {...props}
     />
   )

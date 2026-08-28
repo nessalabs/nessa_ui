@@ -1,4 +1,4 @@
-@layer theme, base, nessa-components, components, utilities;
+@layer theme, base, nessa-helpers, nessa-components, components, utilities;
 
 @import "tailwindcss/theme.css" layer(theme);
 @import "./theme.css" layer(theme);
@@ -8,3 +8,77 @@
 @source "./composites";
 
 @custom-variant dark (&:is(.dark *));
+
+@layer nessa-helpers {
+  /* Coordinated typography helpers. A level applies size, unitless
+     line-height, and tracking together; the layer sits before the utility
+     layers so an explicit Tailwind utility on the same element still wins. */
+  .nessa-text-1 {
+    font-size: var(--_nessa-font-size-1);
+    line-height: var(--_nessa-line-height-1);
+    letter-spacing: var(--_nessa-letter-spacing-1);
+  }
+
+  .nessa-text-2 {
+    font-size: var(--_nessa-font-size-2);
+    line-height: var(--_nessa-line-height-2);
+    letter-spacing: var(--_nessa-letter-spacing-2);
+  }
+
+  .nessa-text-3 {
+    font-size: var(--_nessa-font-size-3);
+    line-height: var(--_nessa-line-height-3);
+    letter-spacing: var(--_nessa-letter-spacing-3);
+  }
+
+  .nessa-text-4 {
+    font-size: var(--_nessa-font-size-4);
+    line-height: var(--_nessa-line-height-4);
+    letter-spacing: var(--_nessa-letter-spacing-4);
+  }
+
+  .nessa-text-5 {
+    font-size: var(--_nessa-font-size-5);
+    line-height: var(--_nessa-line-height-5);
+    letter-spacing: var(--_nessa-letter-spacing-5);
+  }
+
+  .nessa-text-6 {
+    font-size: var(--_nessa-font-size-6);
+    line-height: var(--_nessa-line-height-6);
+    letter-spacing: var(--_nessa-letter-spacing-6);
+  }
+
+  .nessa-text-7 {
+    font-size: var(--_nessa-font-size-7);
+    line-height: var(--_nessa-line-height-7);
+    letter-spacing: var(--_nessa-letter-spacing-7);
+  }
+
+  /* Below the mobile viewport threshold the field floors at 1rem so focus
+     never triggers browser zoom; at and above it the active level applies. */
+  .nessa-text-input {
+    font-size: max(1rem, var(--_nessa-font-size-4));
+    line-height: var(--_nessa-line-height-4);
+    letter-spacing: var(--_nessa-letter-spacing-4);
+  }
+
+  /* Level-2 variant for dense surfaces (table toolbars): same anti-zoom
+     floor on mobile, level 2 once the viewport can afford it. Declared
+     after .nessa-text-input so it wins when a field carries both. */
+  .nessa-text-input-2 {
+    font-size: max(1rem, var(--_nessa-font-size-2));
+    line-height: var(--_nessa-line-height-2);
+    letter-spacing: var(--_nessa-letter-spacing-2);
+  }
+
+  @media (width >= 48rem) {
+    .nessa-text-input {
+      font-size: var(--_nessa-font-size-4);
+    }
+
+    .nessa-text-input-2 {
+      font-size: var(--_nessa-font-size-2);
+    }
+  }
+}

@@ -84,7 +84,7 @@ function MessageAvatar({
       role={label === undefined ? undefined : "img"}
       aria-label={label}
       className={cn(
-        "flex size-8 shrink-0 select-none items-center justify-center overflow-hidden rounded-full bg-muted text-xs font-medium text-muted-foreground",
+        "flex size-8 shrink-0 select-none items-center justify-center overflow-hidden rounded-full bg-muted nessa-text-2 font-medium text-muted-foreground",
         className,
       )}
       {...props}
@@ -150,7 +150,7 @@ function MessageBubble({
       data-streaming={streaming ? "true" : undefined}
       aria-busy={streaming || undefined}
       className={cn(
-        "w-fit min-w-0 max-w-full whitespace-pre-wrap break-words text-left text-sm leading-6",
+        "w-fit min-w-0 max-w-full whitespace-pre-wrap break-words text-left nessa-text-4 leading-6",
         variant === "muted" && "rounded-2xl bg-muted px-4 py-2.5 text-foreground",
         variant === "primary" &&
           "rounded-2xl bg-primary px-4 py-2.5 text-primary-foreground",
@@ -416,7 +416,7 @@ function MessageHeader({ className, ...props }: MessageHeaderProps) {
     <div
       data-slot="message-header"
       className={cn(
-        "flex items-center gap-2 px-1 text-xs font-medium text-muted-foreground",
+        "flex items-center gap-2 px-1 nessa-text-2 font-medium text-muted-foreground",
         className,
       )}
       {...props}
@@ -432,7 +432,7 @@ function MessageFooter({ className, ...props }: MessageFooterProps) {
     <div
       data-slot="message-footer"
       className={cn(
-        "flex items-center gap-2 px-1 text-xs text-muted-foreground",
+        "flex items-center gap-2 px-1 nessa-text-2 text-muted-foreground",
         className,
       )}
       {...props}
@@ -458,7 +458,7 @@ function MessageActions({ className, ...props }: MessageActionsProps) {
         // Reveal binds to :focus-visible, not :focus-within: a pointer click
         // parks focus on the clicked action, and plain focus-within would
         // keep the row lit after the pointer moves on.
-        "flex items-center gap-1 px-1 text-xs text-muted-foreground opacity-0 transition-opacity group-hover/message:opacity-100 group-has-[:focus-visible]/message:opacity-100",
+        "flex items-center gap-1 px-1 nessa-text-2 text-muted-foreground opacity-0 transition-opacity group-hover/message:opacity-100 group-has-[:focus-visible]/message:opacity-100",
         className,
       )}
       {...props}
@@ -538,7 +538,7 @@ function MessageAttachments({
           </button>
           <span
             aria-live="polite"
-            className="text-xs tabular-nums text-muted-foreground"
+            className="nessa-text-2 tabular-nums text-muted-foreground"
           >
             {active + 1} / {items.length}
           </span>
@@ -618,12 +618,12 @@ function MessageAttachment({
           {icon ?? <FileText />}
         </span>
         {name != null && (
-          <span className="max-w-full truncate px-3 text-sm font-medium text-foreground">
+          <span className="max-w-full truncate px-3 nessa-text-4 font-medium text-foreground">
             {name}
           </span>
         )}
         {meta != null && (
-          <span className="max-w-full truncate px-3 text-xs text-muted-foreground">
+          <span className="max-w-full truncate px-3 nessa-text-2 text-muted-foreground">
             {meta}
           </span>
         )}
@@ -719,8 +719,8 @@ function MessageThreadSummary({
       type="button"
       data-slot="message-thread-summary"
       className={cn(
-        "group/thread-summary ml-10 flex w-fit min-w-0 items-center gap-1.5 rounded-lg border border-transparent bg-transparent px-1.5 py-1 text-xs font-medium text-foreground outline-none transition-[border-color,background-color] hover:border-border hover:bg-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-        "[&_[data-slot=message-avatar]]:size-5 [&_[data-slot=message-avatar]]:text-[0.625rem]",
+        "group/thread-summary ml-10 flex w-fit min-w-0 items-center gap-1.5 rounded-lg border border-transparent bg-transparent px-1.5 py-1 nessa-text-2 font-medium text-foreground outline-none transition-[border-color,background-color] hover:border-border hover:bg-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        "[&_[data-slot=message-avatar]]:size-5 [&_[data-slot=message-avatar]]:text-[0.8333em]",
         className,
       )}
       {...props}

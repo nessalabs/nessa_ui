@@ -1325,7 +1325,7 @@ function EventCalendarToolbar({
       <p
         data-slot="event-calendar-range-label"
         aria-live="polite"
-        className="ms-1 truncate text-sm font-semibold"
+        className="ms-1 truncate nessa-text-4 font-semibold"
       >
         {formatRangeLabel(locale, view, date, weekStartsOn)}
       </p>
@@ -1657,7 +1657,7 @@ function TimedEventChip({
       aria-pressed={selected}
       aria-label={`${eventLabel(locale, labels, event)}.${chipShortcutHints(shortcuts, labels)}`}
       className={cn(
-        "absolute flex cursor-grab flex-col items-start gap-0 overflow-hidden rounded-md px-2 py-0.5 text-start text-xs font-medium leading-4 shadow-xs ring-1 ring-background",
+        "absolute flex cursor-grab flex-col items-start gap-0 overflow-hidden rounded-md px-2 py-0.5 text-start nessa-text-2 font-medium shadow-xs ring-1 ring-background",
         eventCalendarToneVariants({ tone }),
         surfaceTransitionClassName,
         insetFocusClassName,
@@ -1768,12 +1768,12 @@ function DefaultMoveConfirm({
       radius="lg"
       className="flex w-64 flex-col gap-2 p-3"
     >
-      <p className="text-xs font-medium">
+      <p className="nessa-text-2 font-medium">
         {durationChanged
           ? labels.confirmResizeTitle(context.event.title)
           : labels.confirmMoveTitle(context.event.title)}
       </p>
-      <p className="text-xs text-muted-foreground">
+      <p className="nessa-text-2 text-muted-foreground">
         {formatDayLong(locale, context.range.start)},{" "}
         {timeFormat.format(context.range.start)} –{" "}
         {timeFormat.format(context.range.end)}
@@ -2232,7 +2232,7 @@ function TimeDayColumn({
           aria-hidden="true"
           data-slot="event-calendar-move-preview"
           className={cn(
-            "pointer-events-none absolute inset-x-0.5 z-40 truncate rounded-md px-2 py-0.5 text-start text-xs font-medium leading-4 opacity-90 shadow-md ring-1 ring-background",
+            "pointer-events-none absolute inset-x-0.5 z-40 truncate rounded-md px-2 py-0.5 text-start nessa-text-2 font-medium opacity-90 shadow-md ring-1 ring-background",
             eventCalendarToneVariants({ tone: shownPreview.event.tone }),
             eventClassName?.({
               event: shownPreview.event,
@@ -2345,7 +2345,7 @@ function AllDayChip({ event }: { event: EventCalendarEvent }) {
       aria-pressed={selected}
       aria-label={eventLabel(locale, labels, event)}
       className={cn(
-        "w-full truncate rounded-md px-2 py-0.5 text-start text-xs font-medium",
+        "w-full truncate rounded-md px-2 py-0.5 text-start nessa-text-2 font-medium",
         eventCalendarToneVariants({ tone }),
         surfaceTransitionClassName,
         insetFocusClassName,
@@ -2652,14 +2652,14 @@ function TimeGrid({ days }: { days: Date[] }) {
                 key={day.getTime()}
                 className="flex min-w-0 flex-1 flex-col items-center gap-0.5 border-s border-border py-1.5"
               >
-                <span className="text-xs text-muted-foreground">
+                <span className="nessa-text-2 text-muted-foreground">
                   {weekdayFormat.format(day)}
                 </span>
                 <Button
                   variant="ghost"
                   size="icon"
                   className={cn(
-                    "size-7 rounded-full text-sm",
+                    "size-7 rounded-full nessa-text-4",
                     isToday &&
                       "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground",
                   )}
@@ -2679,7 +2679,7 @@ function TimeGrid({ days }: { days: Date[] }) {
         {hasAllDay ? (
           <div data-slot="event-calendar-all-day-row" className="flex border-t border-border">
             <div className="flex w-14 shrink-0 items-start justify-end pe-2 pt-1">
-              <span className="text-[11px] text-muted-foreground">
+              <span className="nessa-text-1 text-muted-foreground">
                 {labels.allDay}
               </span>
             </div>
@@ -2709,7 +2709,7 @@ function TimeGrid({ days }: { days: Date[] }) {
           ).map((hour) => (
             <span
               key={hour}
-              className="absolute end-0 block -translate-y-1/2 pe-2 text-[11px] text-muted-foreground"
+              className="absolute end-0 block -translate-y-1/2 pe-2 nessa-text-1 text-muted-foreground"
               style={{ top: (hour - minMinute / 60) * hourHeight }}
             >
               {formatHour(locale, hour)}
@@ -2835,7 +2835,7 @@ function MonthDayCell({
       <span
         data-slot="event-calendar-month-day-number"
         className={cn(
-          "pointer-events-none relative z-10 grid size-5 shrink-0 place-items-center self-start rounded-full text-xs",
+          "pointer-events-none relative z-10 grid size-5 shrink-0 place-items-center self-start rounded-full nessa-text-2",
           outsideMonth && "text-muted-foreground",
           isToday && "bg-primary font-semibold text-primary-foreground",
         )}
@@ -2871,7 +2871,7 @@ function MonthDayCell({
                 aria-pressed={selected}
                 aria-label={eventLabel(locale, labels, event)}
                 className={cn(
-                  "w-full shrink-0 truncate rounded px-1.5 py-px text-start text-xs font-medium",
+                  "w-full shrink-0 truncate rounded px-1.5 py-px text-start nessa-text-2 font-medium",
                   eventCalendarToneVariants({ tone }),
                   surfaceTransitionClassName,
                   insetFocusClassName,
@@ -2960,7 +2960,7 @@ function MonthGrid() {
         {days.slice(0, WEEK_LENGTH).map((day) => (
           <span
             key={day.getTime()}
-            className="border-s border-border py-1 text-center text-xs text-muted-foreground first:border-s-0"
+            className="border-s border-border py-1 text-center nessa-text-2 text-muted-foreground first:border-s-0"
           >
             {weekdayFormat.format(day)}
           </span>

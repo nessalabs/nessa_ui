@@ -974,7 +974,7 @@ function GanttChartToolbar({
       </div>
       <p
         data-slot="gantt-chart-range-label"
-        className="ms-1 truncate text-sm font-semibold"
+        className="ms-1 truncate nessa-text-4 font-semibold"
       >
         {formatRangeLabel(locale, range)}
       </p>

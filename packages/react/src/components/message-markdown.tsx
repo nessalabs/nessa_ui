@@ -267,9 +267,9 @@ function MessageMarkdown({
         // whitespace-normal guards against inheriting pre-wrap from a
         // MessageBubble, which would render the newlines between markdown
         // blocks as extra blank lines on top of the block margins.
-        "min-w-0 max-w-full whitespace-normal text-sm leading-6 text-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+        "min-w-0 max-w-full whitespace-normal nessa-text-4 leading-6 text-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
         "[&_p]:my-3",
-        "[&_h1]:mb-3 [&_h1]:mt-5 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mb-3 [&_h2]:mt-5 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-base [&_h3]:font-semibold [&_h4]:mb-2 [&_h4]:mt-4 [&_h4]:font-semibold",
+        "[&_h1]:mb-3 [&_h1]:mt-5 [&_h1]:text-[1.428571em] [&_h1]:leading-[1.4] [&_h1]:font-semibold [&_h2]:mb-3 [&_h2]:mt-5 [&_h2]:text-[1.285714em] [&_h2]:leading-[1.555556] [&_h2]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-[1.142857em] [&_h3]:leading-[1.5] [&_h3]:font-semibold [&_h4]:mb-2 [&_h4]:mt-4 [&_h4]:font-semibold",
         "[&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_li]:pl-1",
         // The :not guards keep inline-code and fallback <pre> styling away
         // from the DOM rendered by the code, math, and diagram surfaces.

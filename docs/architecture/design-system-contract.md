@@ -364,6 +364,7 @@ export const NessaScale = {
   Default: "100",
   Large: "105",
   Larger: "110",
+  Largest: "125",
 } as const
 
 export type NessaScale =
@@ -390,13 +391,20 @@ Scale does not affect:
 Do not implement scale with CSS `zoom`, transforms, or mutation of `html`/wrapper `font-size`. Use the same modern CSS arithmetic baseline as Tailwind CSS v4: Chrome 111+, Safari 16.4+, and Firefox 128+. The Vite, Next, registry, and browser fixtures gate this contract. A private factor keeps nested scale and later consumer baseline overrides composable without a selector cross-product:
 
 ```css
+/* The zero-specificity baseline must precede the presets: on the root
+   provider, which carries data-nessa-root and data-nessa-scale together,
+   the preset wins purely by source order. */
+:where(:root, [data-nessa-root]) { --_nessa-scale-factor: 1; }
+
 :where([data-nessa-scale="90"]) { --_nessa-scale-factor: 0.9; }
 :where([data-nessa-scale="95"]) { --_nessa-scale-factor: 0.95; }
 :where([data-nessa-scale="100"]) { --_nessa-scale-factor: 1; }
 :where([data-nessa-scale="105"]) { --_nessa-scale-factor: 1.05; }
 :where([data-nessa-scale="110"]) { --_nessa-scale-factor: 1.1; }
+:where([data-nessa-scale="125"]) { --_nessa-scale-factor: 1.25; }
 
 :where(
+  :root,
   [data-nessa-root],
   [data-nessa-theme],
   [data-nessa-scale]
@@ -405,24 +413,40 @@ Do not implement scale with CSS `zoom`, transforms, or mutation of `html`/wrappe
     calc(var(--nessa-font-size-2) * var(--_nessa-scale-factor));
   --_nessa-line-height-2: var(--nessa-line-height-2);
   --_nessa-letter-spacing-2: var(--nessa-letter-spacing-2);
-  --_nessa-space-3:
-    calc(var(--nessa-space-3) * var(--_nessa-scale-factor));
-  --_nessa-control-height-md:
-    max(
-      1.5rem,
-      calc(
-        var(--nessa-control-height-md)
-        * var(--_nessa-scale-factor)
-      )
-    );
 }
 ```
+
+Geometry does not need a bespoke token ramp. Tailwind CSS v4 derives every
+spacing and sizing utility from a single `--spacing` base and resolves the
+variable at the element that uses the utility, so redeclaring that base per
+scope carries padding, gaps, control heights, and spacing-derived icon sizes
+through the same factor as type:
+
+```css
+:root,
+:where(
+  [data-nessa-root],
+  [data-nessa-theme],
+  [data-nessa-scale]
+) {
+  --spacing: calc(0.25rem * var(--_nessa-scale-factor));
+}
+```
+
+The bare `:root` (not `:where`) outranks Tailwind's own `:root, :host`
+declaration earlier in the shared theme layer. Radii, border widths, focus
+rings, and motion keep their own tokens and never resolve through
+`--spacing`. A dimension that must stay absolute under scale — a hairline, a
+focus ring, a border — is expressed as an arbitrary px value precisely
+because those opt out of the spacing base.
 
 These computed aliases are redeclared at every root, theme, and scale scope. This is necessary because an inherited custom property may otherwise retain the value computed against its parent's tokens. Theme overrides and nested scale changes always recompute locally while retaining consumer-overridden baselines.
 
 Public typography sizes, spacing, control heights/padding, and icon sizes describe the `100`-scale baseline. Active scale is applied after consumer overrides through the private computed aliases. Public unitless line-height ratios are direct private aliases and are never multiplied by scale. Consumers needing an exact final rendered dimension override component CSS; a public baseline token intentionally continues through the active scale contract.
 
 Scale is not density. A future density axis may alter whitespace/control compactness without changing text. Do not add density until real compact-layout requirements establish its semantics.
+
+TOKEN-004 enforces both axes of this contract: the seven coordinated levels, the private computed aliases, the six preset factors, the `nessa-text-*` helpers that Nessa-owned components name instead of a Tailwind size utility, and the `--spacing` redeclaration that carries geometry through the same factor. A descendant selector that cannot carry a helper class sizes in `em` so it continues to follow the active scale.
 
 ### Styling discipline and inline-style escape hatch
 
@@ -681,7 +705,7 @@ Do not remap generic `--spacing`, `--text-*`, radius, shadow, or motion variable
 
 The generator audits compiled registry component classes. It allows exactly the semantic-color table above, including deliberate `card` → `surface` and `ring` → `focus` mappings; fails on any unlisted generic theme dependency; verifies every registry-used `nessa-*` helper exists in the registry `components` payload and package `nessa.components` output; and rejects generic Tailwind type/spacing/radius/shadow/motion dependencies. This is a focused shadcn color bridge, not permission to mirror the consumer's entire Tailwind theme.
 
-Browser tests verify computed styles for package and copied registry components under Default Light/Dark, all five scale presets, nested custom themes/scales, nested Default resets, custom font overrides, and host content outside Nessa.
+Browser tests verify computed styles for package and copied registry components under Default Light/Dark, all six scale presets, nested custom themes/scales, nested Default resets, custom font overrides, and host content outside Nessa.
 
 ## Simplified color-mode API
 
@@ -1119,6 +1143,7 @@ This table is the exhaustive machine-mirrored index of normative rule groups. De
 | TOKEN-001 | Package and registry use one canonical Light/Dark semantic token chain. | `#one-live-token-chain-for-package-and-registry` |
 | TOKEN-002 | Nessa supplies font stacks while applications own font delivery. | `#typography-font-delivery-and-responsive-behavior` |
 | TOKEN-003 | Every current package and registry Light/Dark token projection remains exactly equal. | `#one-live-token-chain-for-package-and-registry` |
+| TOKEN-004 | Coordinated typography levels and the constrained scale chain own every Nessa text size. | `#constrained-ui-scale` |
 | REG-001 | Committed registry artifacts are deterministic reproductions of the registry source. | `#deterministic-generated-artifacts` |
 | REG-002 | Registry item source content matches canonical component source. | `#one-live-token-chain-for-package-and-registry` |
 | REG-003 | Registry dependencies include the matching Nessa base and required utilities. | `#registry-topology` |
@@ -1152,7 +1177,7 @@ The contract above is normative. The sequence below is planning guidance only an
 - document application-owned font delivery, preload/font-display decisions, fallback stacks, and metric adjustment;
 - create `tokens.ts`, `registry.source.ts`, and the deterministic generator;
 - generate namespaced theme CSS and live scoped registry aliases;
-- generate scale factors and locally recomputed private aliases for all five scale presets;
+- generate scale factors and locally recomputed private aliases for all six scale presets;
 - generate the semver-protected static `nessa-*` registry helpers and exact semantic-color bridge allowlist;
 - introduce `nessa.tokens` and `nessa.components` layers;
 - freeze the exact three-file package CSS graph and eliminate Nessa-owned `dark:*` dependencies in favor of semantic tokens;
@@ -1192,7 +1217,7 @@ Acceptance:
 
 - `<NessaProvider>` works with no props;
 - `data-nessa-mode` is always Light or Dark;
-- `data-nessa-scale` is always one of the five frozen presets and defaults to `100`;
+- `data-nessa-scale` is always one of the six frozen presets and defaults to `100`;
 - a theme-only scope inherits scale, while scale-only and theme-plus-scale scopes set an absolute value that recomputes locally;
 - every theme-bearing scope emits resolved mode locally, so nested Dark/Light providers are independent and no selector crosses a root boundary;
 - controlled System without a supplied resolution renders Light for SSR/first hydration, while a supplied resolution registers no media listener;
@@ -1287,7 +1312,7 @@ Fixtures verify:
 - Default Light/Dark;
 - unknown-theme fallback;
 - nested custom theme and a Default reset that restores all theme-owned categories while preserving inherited scale;
-- all five scales and a nested theme-plus-scale scope;
+- all six scales and a nested theme-plus-scale scope;
 - custom font-family/type-ramp and spacing/control-size overrides demonstrated at both 100 and 110;
 - 200% zoom/reflow, Input at least 1rem below 48rem and compact-token behavior at/above 48rem, focus visibility, exact AA contrast, and forced-colors behavior;
 - fallback-first then preferred-font rendering without clipped or unusable controls;
@@ -1333,7 +1358,7 @@ Public API includes:
 - package `nessa.tokens`/`nessa.components` layer names and registry `base`/`components` precedence mapping;
 - built-in theme names and fallback behavior;
 - color-mode constants, props, and resolution rules;
-- `NessaScale`, its five values, affected axes, and excluded axes;
+- `NessaScale`, its six values, affected axes, and excluded axes;
 - controlled-System dynamic `resolvedMode` handoff and Light SSR fallback behavior;
 - the Tailwind v4 browser floor used by scale arithmetic;
 - the 48rem Input text-size threshold and interactive target-size floors;
@@ -1372,7 +1397,7 @@ An implementation of this foundation conforms only when:
 2. Controlled applications own persistence and may supply System resolution without a separate strategy API.
 3. Unknown themes safely fall back and named nested themes/reset behavior work in Light and Dark.
 4. Typography, spacing, geometry, color, radius, shadow, and motion resolve through one live namespaced package/registry chain with a complete color allowlist and stable registry utilities.
-5. All five scale presets and nested absolute scaling work without context-driven component styling or host document mutation.
+5. All six scale presets and nested absolute scaling work without context-driven component styling or host document mutation.
 6. Font delivery remains application-owned, and fallback-to-preferred-font rendering remains usable without clipped controls.
 7. Zoom/reflow, the 48rem Input rule, target floors, focus, frozen WCAG 2.2 AA contrast thresholds, forced colors, and reduced motion pass accessibility checks.
 8. Controlled System supports Light SSR fallback, application-supplied resolution, and a listener-safe seed-to-Nessa handoff.

@@ -156,7 +156,7 @@ function GeneratingSurfaceLabel({ children }: { children: React.ReactNode }) {
       ref={ref}
       data-slot="generating-surface-label"
       data-shimmer={reducedMotion ? undefined : "true"}
-      className={cn("relative text-sm text-muted-foreground", generatingLabelShimmerClasses)}
+      className={cn("relative nessa-text-4 text-muted-foreground", generatingLabelShimmerClasses)}
     >
       {children}
     </span>

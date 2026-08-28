@@ -167,7 +167,7 @@ function SectionedListbox<Item>({
       {loading ? (
         <div
           data-slot="sectioned-listbox-loading"
-          className="flex min-h-28 items-center justify-center gap-2 px-3 text-sm text-muted-foreground"
+          className="flex min-h-28 items-center justify-center gap-2 px-3 nessa-text-4 text-muted-foreground"
           role="status"
         >
           <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
@@ -187,7 +187,7 @@ function SectionedListbox<Item>({
                 id={sectionHeaderId}
                 data-slot="sectioned-listbox-section-label"
                 className={cn(
-                  "sticky top-0 z-10 bg-popover px-3 py-2 font-sans text-sm font-medium text-foreground",
+                  "sticky top-0 z-10 bg-popover px-3 py-2 font-sans nessa-text-4 font-medium text-foreground",
                   sectionLabelClassName,
                 )}
               >
@@ -243,7 +243,7 @@ function SectionedListbox<Item>({
       ) : (
         <div
           data-slot="sectioned-listbox-empty"
-          className="flex min-h-28 items-center justify-center px-3 text-sm text-muted-foreground"
+          className="flex min-h-28 items-center justify-center px-3 nessa-text-4 text-muted-foreground"
           role="status"
         >
           {emptyMessage}

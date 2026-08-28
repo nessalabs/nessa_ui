@@ -291,7 +291,7 @@ function CodeBlock({
     <div
       data-slot="code-block"
       className={cn(
-        "group/copy relative min-w-0 max-w-full overflow-hidden rounded-xl text-[0.8125rem] leading-6",
+        "group/copy relative min-w-0 max-w-full overflow-hidden rounded-xl nessa-text-3 leading-6",
         className,
       )}
       {...props}

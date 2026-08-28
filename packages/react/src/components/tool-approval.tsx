@@ -455,7 +455,7 @@ function ToolApprovalTitle({ className, ...props }: ToolApprovalTitleProps) {
     <div
       data-slot="tool-approval-title"
       className={cn(
-        "text-sm font-medium leading-5 text-foreground",
+        "nessa-text-4 font-medium text-foreground",
         className,
       )}
       {...props}
@@ -474,7 +474,7 @@ function ToolApprovalDescription({
   return (
     <div
       data-slot="tool-approval-description"
-      className={cn("text-sm leading-5 text-muted-foreground", className)}
+      className={cn("nessa-text-4 text-muted-foreground", className)}
       {...props}
     />
   )
@@ -600,8 +600,9 @@ function ToolApprovalCommand({
       return identityKey()
     }
   }, [json, structured])
+  // leading-5 deliberately loosens level 2's ratio for scannable mono JSON.
   const regionClassName = cn(
-    "max-h-48 w-full min-w-0 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/40 px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
+    "max-h-48 w-full min-w-0 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/40 px-3 py-2 font-mono nessa-text-2 leading-5 text-foreground outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
     className,
   )
   const regionProps = {
@@ -764,7 +765,7 @@ function ToolApprovalActionMenu({
           )}
         >
           {menuLabel != null && (
-            <DropdownMenu.Label className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+            <DropdownMenu.Label className="px-2 py-1.5 nessa-text-2 font-medium text-muted-foreground">
               {menuLabel}
             </DropdownMenu.Label>
           )}
@@ -798,7 +799,7 @@ function ToolApprovalActionMenuItem({
       data-slot="tool-approval-action-menu-item"
       aria-describedby={description != null ? descriptionId : undefined}
       className={cn(
-        "flex min-h-9 cursor-default select-none flex-col items-start justify-center gap-0.5 rounded-lg px-2 py-1.5 text-sm text-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] data-[highlighted]:bg-accent focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none",
+        "flex min-h-9 cursor-default select-none flex-col items-start justify-center gap-0.5 rounded-lg px-2 py-1.5 nessa-text-4 text-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] data-[highlighted]:bg-accent focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none",
         className,
       )}
       {...props}
@@ -812,7 +813,7 @@ function ToolApprovalActionMenuItem({
           id={descriptionId}
           aria-hidden="true"
           data-slot="tool-approval-action-menu-item-description"
-          className="text-xs text-muted-foreground"
+          className="nessa-text-2 text-muted-foreground"
         >
           {description}
         </span>

@@ -9,11 +9,13 @@ import { sourceBoundariesCheck } from "./source-boundaries.ts"
 import { storybookCoverageCheck } from "./storybook-coverage.ts"
 import { styleDisciplineCheck } from "./style-discipline.ts"
 import { themeParityCheck } from "./theme-parity.ts"
+import { typographyScaleCheck } from "./typography-scale.ts"
 
 export const nessaChecks = Object.freeze([
   governanceCheck,
   cssOwnershipCheck,
   themeParityCheck,
+  typographyScaleCheck,
   registryParityCheck,
   sourceBoundariesCheck,
   styleDisciplineCheck,

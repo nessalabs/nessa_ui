@@ -1,4 +1,4 @@
-@layer theme, base, nessa-components, components, utilities;
+@layer theme, base, nessa-helpers, nessa-components, components, utilities;
 
 @import "tailwindcss/preflight.css" layer(base);
 @import "./styles.css";

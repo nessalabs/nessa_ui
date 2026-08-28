@@ -222,7 +222,7 @@ function SearchableListbox<Item>({
           // outline here reads as a permanent box around the search row for as
           // long as the surface is open. The caret indicates focus, and the
           // wrapping row owns the surface treatment.
-          className="h-full min-w-0 flex-1 appearance-none bg-transparent font-sans text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:pointer-events-none disabled:opacity-50"
+          className="h-full min-w-0 flex-1 appearance-none bg-transparent font-sans nessa-text-4 text-foreground outline-none placeholder:text-muted-foreground disabled:pointer-events-none disabled:opacity-50"
         />
       </label>
       <div
@@ -236,7 +236,7 @@ function SearchableListbox<Item>({
         {loading ? (
           <div
             data-slot="searchable-listbox-loading"
-            className="flex min-h-28 items-center justify-center gap-2 px-3 text-sm text-muted-foreground"
+            className="flex min-h-28 items-center justify-center gap-2 px-3 nessa-text-4 text-muted-foreground"
             role="status"
           >
             <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
@@ -290,7 +290,7 @@ function SearchableListbox<Item>({
         ) : (
           <div
             data-slot="searchable-listbox-empty"
-            className="flex min-h-28 items-center justify-center px-3 text-sm text-muted-foreground"
+            className="flex min-h-28 items-center justify-center px-3 nessa-text-4 text-muted-foreground"
             role="status"
           >
             {emptyMessage}

@@ -155,7 +155,7 @@ function QuestionnaireProgress({
       className={cn(
         bar
           ? "h-1 w-full min-w-24 overflow-hidden rounded-full bg-border"
-          : "text-xs font-medium tabular-nums text-muted-foreground",
+          : "nessa-text-2 font-medium tabular-nums text-muted-foreground",
         className,
       )}
       {...props}
@@ -220,7 +220,7 @@ function QuestionnaireTitle({ className, ...props }: QuestionnaireTitleProps) {
     <legend
       data-slot="questionnaire-title"
       className={cn(
-        "m-0 mb-1 p-0 text-base font-medium leading-6 text-foreground",
+        "m-0 mb-1 p-0 nessa-text-5 font-medium text-foreground",
         className,
       )}
       {...props}
@@ -242,7 +242,7 @@ function QuestionnaireDescription({
   return (
     <p
       data-slot="questionnaire-description"
-      className={cn("m-0 text-sm leading-5 text-muted-foreground", className)}
+      className={cn("m-0 nessa-text-4 text-muted-foreground", className)}
       {...props}
     />
   )
@@ -384,7 +384,7 @@ function QuestionnaireChoice({
     >
       <span
         data-slot="questionnaire-choice-indicator"
-        className="relative mt-px inline-flex size-[18px] shrink-0 text-primary"
+        className="relative mt-px inline-flex size-4.5 shrink-0 text-primary"
       >
         <input
           type={multiple ? "checkbox" : "radio"}
@@ -422,7 +422,7 @@ function QuestionnaireChoice({
       </span>
       <span
         data-slot="questionnaire-choice-label"
-        className="min-w-0 flex-1 text-sm leading-5 text-foreground"
+        className="min-w-0 flex-1 nessa-text-4 text-foreground"
       >
         {children}
       </span>

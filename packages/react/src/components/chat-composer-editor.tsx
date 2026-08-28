@@ -612,11 +612,11 @@ function ChatComposerEditor({
           // Like ChatComposerInput, the editor carries no border or focus
           // outline: the caret indicates focus and the composer's borderMode
           // owns any surface treatment.
-          "min-w-0 w-full overflow-y-auto whitespace-pre-wrap break-words border-0 bg-transparent px-1 py-1 font-sans text-base leading-6 text-foreground outline-none",
+          "min-w-0 w-full overflow-y-auto whitespace-pre-wrap break-words border-0 bg-transparent px-1 py-1 font-sans nessa-text-5 text-foreground outline-none",
           "empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)]",
           constrained ? "min-h-0 max-h-full" : "min-h-14",
-          size === "compact" && !constrained && "min-h-10 text-sm leading-5",
-          size === "compact" && constrained && "text-sm leading-5",
+          size === "compact" && !constrained && "min-h-10 nessa-text-4",
+          size === "compact" && constrained && "nessa-text-4",
           disabled && "cursor-not-allowed opacity-50",
           className,
         )}
