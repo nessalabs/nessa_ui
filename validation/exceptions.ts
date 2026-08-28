@@ -52,8 +52,6 @@ export type ValidationException = OccurrenceException | ContrastException | Focu
 const focusRationale = "Current shadcn-derived translucent focus treatment predates Nessa semantic focus-state tokens."
 const focusRemoval = "Remove with the semantic focus/invalid token migration before provider stabilization."
 
-const stackingRationale = "Existing ModelPicker popover layering (its content above z-50 siblings, decorations above their card) predates the frozen z-0..z-50 stacking scale."
-const stackingRemoval = "Re-layer onto the frozen scale (or a future semantic stacking token) without changing render order."
 const inlinePaintRationale = "Runtime-computed paint (generated gradients, shimmer text, avatar blending) predates semantic paint tokens for this surface."
 const inlineGeometryRationale = "Runtime-measured spacing or layering has no utility form because its value is computed from live geometry."
 const inlineMotionRationale = "Runtime-supplied motion timing (a consumer-controlled duration prop, dnd-kit's sortable transition) predates semantic motion-state tokens for these surfaces."
@@ -128,8 +126,6 @@ export const exceptions = Object.freeze([
   { kind: "focus-contrast", contractId: "A11Y-002", component: "input", state: "focus-visible:invalid", mode: "light", token: "--destructive", opacity: 0.2, surface: "--background", requiredRatio: 3, expectedTokenValue: "oklch(0.577 0.235 27.325)", expectedSurfaceValue: "oklch(1 0 0)", rationale: focusRationale, removalCondition: focusRemoval },
   { kind: "focus-contrast", contractId: "A11Y-002", component: "input", state: "focus-visible:invalid", mode: "light", token: "--destructive", opacity: 0.2, surface: "--card", requiredRatio: 3, expectedTokenValue: "oklch(0.577 0.235 27.325)", expectedSurfaceValue: "oklch(1 0 0)", rationale: focusRationale, removalCondition: focusRemoval },
   { kind: "focus-contrast", contractId: "A11Y-002", component: "input", state: "focus-visible:invalid", mode: "light", token: "--destructive", opacity: 0.2, surface: "--popover", requiredRatio: 3, expectedTokenValue: "oklch(0.577 0.235 27.325)", expectedSurfaceValue: "oklch(1 0 0)", rationale: focusRationale, removalCondition: focusRemoval },
-  style("STYLE-002", "packages/react/src/components/model-capability-controls.tsx", "z-[1]", 2, stackingRationale, stackingRemoval),
-  style("STYLE-002", "packages/react/src/components/model-capability-controls.tsx", "z-[60]", 1, stackingRationale, stackingRemoval),
   style("STYLE-003", "packages/react/src/composites/app-shell/app-shell-drag.tsx", "visibility", 1, inlineGeometryRationale, inlineRemoval),
   style("STYLE-003", "packages/react/src/components/workflow-canvas/workflow-canvas.tsx", "backgroundImage", 1, inlinePaintRationale, inlineRemoval),
   style("STYLE-003", "packages/react/src/components/workflow-canvas/workflow-canvas.tsx", "backgroundSize", 1, inlinePaintRationale, inlineRemoval),

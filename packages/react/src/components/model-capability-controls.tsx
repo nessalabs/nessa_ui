@@ -794,7 +794,7 @@ function ModelThinkingControl({
           sideOffset={8}
           collisionPadding={12}
           className={cn(
-            "relative z-[60] w-[min(17rem,calc(100vw-1.5rem))] rounded-xl border border-border bg-popover p-3 font-sans text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            "relative z-50 w-[min(17rem,calc(100vw-1.5rem))] rounded-xl border border-border bg-popover p-3 font-sans text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             contentClassName,
           )}
         >
@@ -810,7 +810,7 @@ function ModelThinkingControl({
                 "0 0 1rem color-mix(in oklab, var(--nessa-thinking-fill-current) 10%, transparent)",
             }}
           />
-          <div className="relative z-[1] flex min-h-8 items-center justify-between gap-3">
+          <div className="relative z-10 flex min-h-8 items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-1 text-sm font-medium">
               <span data-slot="model-thinking-level-label" className="truncate">
                 {selected?.label}
@@ -850,7 +850,7 @@ function ModelThinkingControl({
               const index = levels.findIndex((level) => level.value === nextValue)
               if (index >= 0) selectIndex(index)
             }}
-            className="relative z-[1] mt-3"
+            className="relative z-10 mt-3"
           />
         </Popover.Content>
       </Popover.Portal> : null}
