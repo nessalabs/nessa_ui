@@ -57,7 +57,7 @@ const BUDGET_LINKS: FlowChartLink[] = [
   { source: "dividends", target: "savings", value: 110 },
 ]
 
-const euros = (value: number) => `€${value.toLocaleString("en-US")}`
+const dollars = (value: number) => `$${value.toLocaleString("en-US")}`
 
 export const MonthlyBudget: Story = {
   parameters: storyDocumentation(
@@ -68,11 +68,11 @@ export const MonthlyBudget: Story = {
     <div className="h-[440px] w-full max-w-3xl">
       <FlowChart
         {...args}
-        formatValue={euros}
+        formatValue={dollars}
         renderNodeDetail={({ column, columnCount, value, columnTotal }) =>
           column === columnCount - 1
             ? `${Math.round((value / columnTotal) * 100)}%`
-            : euros(value)
+            : dollars(value)
         }
         aria-label="Monthly income and spending flow"
       />
@@ -81,10 +81,10 @@ export const MonthlyBudget: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     const ribbon = await canvas.findByRole("button", {
-      name: "Dividends to Savings, €110",
+      name: "Dividends to Savings, $110",
     })
     const other = canvas.getByRole("button", {
-      name: "Salary to Housing, €1,450",
+      name: "Salary to Housing, $1,450",
     })
     await waitFor(() =>
       expect(parseFloat(getComputedStyle(ribbon).opacity)).toBeCloseTo(0.5, 1),
@@ -125,7 +125,7 @@ export const HoverDetail: Story = {
     <div className="h-[440px] w-full max-w-3xl">
       <FlowChart
         {...args}
-        formatValue={euros}
+        formatValue={dollars}
         aria-label="Monthly income and spending flow with hover details"
         renderHoverDetail={(hover) =>
           hover.kind === "link" ? (
@@ -134,7 +134,7 @@ export const HoverDetail: Story = {
                 {hover.source.label} → {hover.target.label}
               </p>
               <p className="nessa-text-2 text-muted-foreground">
-                {euros(hover.link.value)}
+                {dollars(hover.link.value)}
               </p>
             </div>
           ) : (
@@ -143,7 +143,7 @@ export const HoverDetail: Story = {
                 {hover.node.label}
               </p>
               <p className="nessa-text-2 text-muted-foreground">
-                {euros(hover.context.value)} ·{" "}
+                {dollars(hover.context.value)} ·{" "}
                 {Math.round(
                   (hover.context.value / hover.context.columnTotal) * 100,
                 )}
@@ -158,7 +158,7 @@ export const HoverDetail: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     const ribbon = await canvas.findByRole("button", {
-      name: "Freelance to Investing, €380",
+      name: "Freelance to Investing, $380",
     })
     await userEvent.hover(ribbon)
     await waitFor(() => {
@@ -167,7 +167,7 @@ export const HoverDetail: Story = {
       )
       expect(detail).not.toBeNull()
       expect(detail!.textContent).toContain("Freelance → Investing")
-      expect(detail!.textContent).toContain("€380")
+      expect(detail!.textContent).toContain("$380")
     })
     await userEvent.unhover(ribbon)
     await waitFor(() =>
@@ -290,7 +290,7 @@ function StreamingFlowChart() {
         <FlowChart
           nodes={BUDGET_NODES.slice(0, frame.nodes)}
           links={BUDGET_LINKS.slice(0, frame.links)}
-          formatValue={euros}
+          formatValue={dollars}
           onLayoutIssues={setIssues}
           aria-label="Budget flow streaming in"
         />
