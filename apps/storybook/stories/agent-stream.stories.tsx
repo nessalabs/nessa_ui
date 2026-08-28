@@ -1420,23 +1420,32 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
   return (
     <TranscriptLocation.Provider value={{ location, runIds }}>
     <OpenTranscript.Provider value={setOpened}>
-    <div className="border-border bg-background flex h-[42rem] w-full flex-col gap-3 rounded-3xl border p-4">
+    {/*
+      Height is fixed only where the two panes sit side by side. Below that
+      breakpoint they stack, and pinning the shell to one screen would give each
+      pane half of it — so the shell grows and the page scrolls instead.
+    */}
+    <div className="border-border bg-background flex w-full flex-col gap-3 rounded-3xl border p-3 sm:p-4 lg:h-[42rem]">
       <div className="flex flex-wrap items-center gap-2">
-        <SegmentedControl aria-label="Provider" value={provider.id} onValueChange={switchProvider}>
+        <SegmentedControl aria-label="Provider" value={provider.id} onValueChange={switchProvider} className="shrink-0">
           {Object.values(PROVIDERS).map((entry) => (
             <SegmentedControlOption key={entry.id} value={entry.id}>
               {entry.label}
             </SegmentedControlOption>
           ))}
         </SegmentedControl>
-        <SegmentedControl aria-label="Capture" value={captureId} onValueChange={setCaptureId}>
+        {/* Nine captures do not fit a phone. The row scrolls itself; the
+            negative margin keeps the scroll edge off the control's focus ring. */}
+        <div className="-mx-1 min-w-0 max-w-full overflow-x-auto px-1">
+          <SegmentedControl aria-label="Capture" value={captureId} onValueChange={setCaptureId} className="w-max">
           {captures.map((entry) => (
             <SegmentedControlOption key={entry.id} value={entry.id}>
               {entry.label}
             </SegmentedControlOption>
           ))}
-        </SegmentedControl>
-        <div className="ml-auto flex items-center gap-2">
+          </SegmentedControl>
+        </div>
+        <div className="flex items-center gap-2 sm:ml-auto">
           <Button size="sm" variant="outline" onClick={() => { setCount(0); setPlaying(true) }}>
             Replay
           </Button>
@@ -1453,7 +1462,7 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
       </div>
       <p className="text-muted-foreground text-xs">{capture?.blurb}</p>
       <div className="flex flex-wrap items-center gap-2">
-        <SegmentedControl aria-label="Transport" value={transport.id} onValueChange={setTransportId}>
+        <SegmentedControl aria-label="Transport" value={transport.id} onValueChange={setTransportId} className="shrink-0">
           {provider.transports.map((entry) => (
             <SegmentedControlOption key={entry.id} value={entry.id}>
               {entry.label}
@@ -1465,7 +1474,7 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
       <p className="text-muted-foreground text-xs">{transport.note}</p>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="border-border min-h-0 overflow-hidden rounded-2xl border p-3">
+        <div className="border-border flex min-h-[26rem] flex-col overflow-hidden rounded-2xl border p-3 lg:min-h-0">
           <TranscriptView
             transcript={transcript}
             previews={previews}
@@ -1473,7 +1482,7 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
             provider={provider}
           />
         </div>
-        <div className="border-border min-h-0 rounded-2xl border p-3">
+        <div className="border-border flex min-h-[26rem] flex-col rounded-2xl border p-3 lg:min-h-0">
           <InspectorView
             captureId={captureId}
             transport={transport}
