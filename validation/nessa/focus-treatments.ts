@@ -1,6 +1,9 @@
 const sidebarFocusComponents = Object.freeze([
-  { component: "sidebar/sidebar-group", count: 1 },
-  { component: "sidebar/sidebar-menu", count: 1 },
+  // The group's action and a row's action share one recipe, so their outline
+  // is declared once in the module that owns it rather than in each.
+  { component: "sidebar/sidebar-action", count: 1 },
+  // The row control and a collapsible row's separate disclosure.
+  { component: "sidebar/sidebar-menu", count: 2 },
   { component: "sidebar/sidebar-trigger", count: 1 },
 ] as const)
 
@@ -32,6 +35,7 @@ type FocusComponent =
   | "gantt-chart/gantt-chart-grid"
   | "file-diff-list"
   | "chat-tabs"
+  | "tabs"
   | "file-preview/file-preview"
   | "file-preview/file-preview-fallback"
   | "kanban/kanban-card"
@@ -114,6 +118,17 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     state: "focus-visible",
     className: "focus-visible:outline-ring",
     count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The tab control and the panel, which Radix makes a focus stop so a
+  // reader arriving from the tab lands on the content.
+  {
+    component: "tabs",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 2,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -382,6 +397,12 @@ export const focusGeometryClasses = Object.freeze([
   { component: "input", className: "focus-visible:ring-[3px]" },
   { component: "questionnaire", className: "focus-visible:outline-2", count: 1 },
   { component: "questionnaire", className: "focus-visible:outline-offset-2", count: 1 },
+  // The tab's outline draws inset: a horizontal strip scrolls, which clips
+  // both axes, so an outset ring would be cut off at top and bottom. The
+  // panel is not in that strip and keeps the standard outset offset.
+  { component: "tabs", className: "focus-visible:outline-2", count: 2 },
+  { component: "tabs", className: "focus-visible:-outline-offset-2", count: 1 },
+  { component: "tabs", className: "focus-visible:outline-offset-2", count: 1 },
   ...composerFocusComponents.flatMap(({ component, count }) => [
     { component, className: "focus-visible:outline-2", count },
     { component, className: "focus-visible:outline-offset-2", count },

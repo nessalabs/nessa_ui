@@ -1104,10 +1104,35 @@
       ]
     },
     {
+      "name": "tabs",
+      "type": "registry:ui",
+      "title": "Tabs",
+      "description": "An accessible tab list and its panels: roving focus with arrow, Home and End keys, horizontal or vertical orientation, automatic or manual activation, and underline or pill presentation.",
+      "dependencies": [
+        "class-variance-authority",
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/segmented-control",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/tabs.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/tabs.tsx"
+        }
+      ]
+    },
+    {
       "name": "segmented-control",
       "type": "registry:ui",
       "title": "Segmented control",
       "description": "A compact single-choice switcher: a bordered pill of pressed/unpressed buttons for view and scale toggles, with controlled or uncontrolled value state.",
+      "dependencies": [
+        "class-variance-authority"
+      ],
       "registryDependencies": [
         "nessalabs/nessa_ui/button",
         "nessalabs/nessa_ui/nessa-base",
@@ -1218,6 +1243,7 @@
       "description": "A composable application sidebar with controlled collapse state and keyboard support.",
       "dependencies": [
         "class-variance-authority",
+        "lucide-react",
         "radix-ui"
       ],
       "registryDependencies": [
@@ -1274,6 +1300,11 @@
           "path": "packages/react/src/components/sidebar/sidebar-inset.tsx",
           "type": "registry:ui",
           "target": "components/ui/sidebar/sidebar-inset.tsx"
+        },
+        {
+          "path": "packages/react/src/components/sidebar/sidebar-action.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/sidebar/sidebar-action.tsx"
         },
         {
           "path": "packages/react/src/components/sidebar/sidebar-group.tsx",

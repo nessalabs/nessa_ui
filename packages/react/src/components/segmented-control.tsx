@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { cva } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
@@ -13,6 +14,22 @@ interface SegmentedControlContextValue {
 
 const SegmentedControlContext =
   React.createContext<SegmentedControlContextValue | null>(null)
+
+/**
+ * Creates the class names for the bordered strip a set of compact choices
+ * sits in.
+ *
+ * Shared with `TabsList`'s pill presentation, which renders the same shell:
+ * two strips a reader sees as one control should not be painted from two
+ * literals that drift apart. Exported as a variants function rather than a
+ * class constant so it stays statically validatable in the consuming module,
+ * the way `popoverSurfaceVariants` is.
+ *
+ * @returns The composed class-name string for a segmented strip.
+ */
+const segmentedShellVariants = cva(
+  "flex items-center gap-0.5 rounded-lg border border-border p-0.5",
+)
 
 export interface SegmentedControlProps
   extends Omit<React.ComponentProps<"div">, "onChange"> {
@@ -61,10 +78,7 @@ function SegmentedControl({
       <div
         role="group"
         data-slot="segmented-control"
-        className={cn(
-          "flex items-center gap-0.5 rounded-lg border border-border p-0.5",
-          className,
-        )}
+        className={cn(segmentedShellVariants(), className)}
         {...props}
       />
     </SegmentedControlContext.Provider>
@@ -111,4 +125,4 @@ function SegmentedControlOption({
   )
 }
 
-export { SegmentedControl, SegmentedControlOption }
+export { SegmentedControl, SegmentedControlOption, segmentedShellVariants }

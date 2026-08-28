@@ -19,8 +19,8 @@ function TabsExample() {
     <div className="flex h-64 min-w-0 w-[min(30rem,calc(100vw-2rem))] flex-col gap-3 rounded-[2rem] bg-background p-3">
       <ChatTabs
         tabs={tabs}
-        activeId={activeId}
-        onSelect={setActiveId}
+        value={activeId}
+        onValueChange={setActiveId}
         onClose={(id) => {
           setTabs((current) => {
             const next = current.filter((tab) => tab.id !== id)
@@ -53,7 +53,7 @@ function TabsExample() {
 const meta = {
   title: "Components/ChatTabs",
   component: ChatTabs,
-  args: { tabs: [], activeId: null, onSelect: () => undefined },
+  args: { tabs: [], value: null, onValueChange: () => undefined },
   tags: ["autodocs", "test"],
   parameters: {
     layout: "centered",

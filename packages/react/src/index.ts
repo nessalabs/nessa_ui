@@ -128,8 +128,20 @@ export {
   type TimelineHeaderProps,
 } from "./components/timeline-header"
 export {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  tabsListVariants,
+  type TabsContentProps,
+  type TabsListProps,
+  type TabsProps,
+  type TabsTriggerProps,
+} from "./components/tabs"
+export {
   SegmentedControl,
   SegmentedControlOption,
+  segmentedShellVariants,
   type SegmentedControlOptionProps,
   type SegmentedControlProps,
 } from "./components/segmented-control"
@@ -468,6 +480,7 @@ export {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
+  SidebarAction,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuSkeleton,
@@ -476,8 +489,11 @@ export {
   SidebarSide,
   SidebarTrigger,
   SidebarVariant,
+  sidebarActionVariants,
   sidebarMenuItemVariants,
   useSidebar,
+  type SidebarActionProps,
+  type SidebarActionSize,
   type SidebarMenuItemProps,
   type SidebarMenuProps,
   type SidebarMenuSkeletonProps,
