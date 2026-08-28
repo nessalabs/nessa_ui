@@ -186,7 +186,9 @@ export const EditDiff: Story = {
         expect(diff!.firstElementChild?.shadowRoot?.textContent).toContain(
           "remainder",
         ),
-      { timeout: 5000 },
+      // Pierre highlights asynchronously, and 5s is marginal once the whole
+      // suite runs in parallel; the file's own timeout is 30s.
+      { timeout: 15000 },
     )
   },
 }
