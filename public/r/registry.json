@@ -607,7 +607,7 @@
       "name": "agent-stream",
       "type": "registry:lib",
       "title": "Agent stream parser",
-      "description": "A framework-free parser for coding-agent output streams: decodes Claude Code's stream-json lines, normalizes them into a harness-agnostic event log, and folds that log into the turns, tool groups, delegated runs and plan a transcript UI draws.",
+      "description": "A framework-free parser for coding-agent output streams: decodes Claude Code's stream-json and Codex's exec --json into one harness-agnostic event log, and folds that log into the turns, tool groups, delegated runs and plan a transcript UI draws.",
       "files": [
         {
           "path": "packages/react/src/lib/agent-stream/index.ts",
@@ -668,6 +668,26 @@
           "path": "packages/react/src/lib/agent-stream/claude/store.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/claude/store.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/codex/index.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/codex/index.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/codex/wire.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/codex/wire.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/codex/mapping.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/codex/mapping.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/codex/mapper.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/codex/mapper.ts"
         }
       ]
     },

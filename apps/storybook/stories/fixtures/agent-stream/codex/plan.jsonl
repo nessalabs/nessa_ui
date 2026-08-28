@@ -1,0 +1,19 @@
+{"type":"thread.started","thread_id":"01a04963-cd5c-7382-931e-c978ff8b2049"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"I’ll track the work in three sequential steps: create `a.txt`, create `b.txt`, then run `ls *.txt`. I’ll preserve any unrelated files and report each result as it completes."}}
+{"type":"item.started","item":{"id":"item_1","type":"todo_list","items":[{"text":"Create a.txt containing 'a'","completed":false},{"text":"Create b.txt containing 'b'","completed":false},{"text":"Run ls *.txt and record the result","completed":false}]}}
+{"type":"item.started","item":{"id":"item_2","type":"file_change","changes":[{"path":"/home/dev/workspace/sandbox/a.txt","kind":"add"}],"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_2","type":"file_change","changes":[{"path":"/home/dev/workspace/sandbox/a.txt","kind":"add"}],"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"Step 1 complete: created `a.txt` with the exact contents `a`. Moving to `b.txt`."}}
+{"type":"item.updated","item":{"id":"item_1","type":"todo_list","items":[{"text":"Create a.txt containing 'a'","completed":true},{"text":"Create b.txt containing 'b'","completed":false},{"text":"Run ls *.txt and record the result","completed":false}]}}
+{"type":"item.started","item":{"id":"item_4","type":"file_change","changes":[{"path":"/home/dev/workspace/sandbox/b.txt","kind":"add"}],"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_4","type":"file_change","changes":[{"path":"/home/dev/workspace/sandbox/b.txt","kind":"add"}],"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_5","type":"agent_message","text":"Step 2 complete: created `b.txt` with the exact contents `b`. I’m running the requested wildcard listing now."}}
+{"type":"item.updated","item":{"id":"item_1","type":"todo_list","items":[{"text":"Create a.txt containing 'a'","completed":true},{"text":"Create b.txt containing 'b'","completed":true},{"text":"Run ls *.txt and record the result","completed":false}]}}
+{"type":"item.started","item":{"id":"item_6","type":"command_execution","command":"/bin/zsh -lc 'ls *.txt'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_6","type":"command_execution","command":"/bin/zsh -lc 'ls *.txt'","aggregated_output":"a.txt\nb.txt\nnotes.txt\n","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_7","type":"agent_message","text":"Step 3 complete: `ls *.txt` returned `a.txt`, `b.txt`, and the pre-existing `notes.txt`. Finalizing the progress tracker."}}
+{"type":"item.updated","item":{"id":"item_1","type":"todo_list","items":[{"text":"Create a.txt containing 'a'","completed":true},{"text":"Create b.txt containing 'b'","completed":true},{"text":"Run ls *.txt and record the result","completed":true}]}}
+{"type":"item.completed","item":{"id":"item_8","type":"agent_message","text":"Completed all three steps:\n\n1. Created `a.txt` containing `a`\n2. Created `b.txt` containing `b`\n3. Ran `ls *.txt`, which returned:\n\n```text\na.txt\nb.txt\nnotes.txt\n```"}}
+{"type":"item.completed","item":{"id":"item_1","type":"todo_list","items":[{"text":"Create a.txt containing 'a'","completed":true},{"text":"Create b.txt containing 'b'","completed":true},{"text":"Run ls *.txt and record the result","completed":true}]}}
+{"type":"turn.completed","usage":{"input_tokens":140766,"cached_input_tokens":128000,"output_tokens":903,"reasoning_output_tokens":76}}

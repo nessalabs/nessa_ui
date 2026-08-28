@@ -3,6 +3,7 @@
 // ---------- the contract every provider maps onto ----------
 export {
   AgentEventType,
+  FileChange,
   PlanStepStatus,
   TaskKind,
   isEvent,
@@ -14,6 +15,7 @@ export {
   type AgentPath,
   type BlockRef,
   type DeltaPayload,
+  type FileEdit,
   type MapperOptions,
   type PlanStep,
   type SessionInfo,
@@ -67,7 +69,9 @@ export {
  * the "nothing else moves" claim the layering exists to keep.
  */
 export * as claude from "./claude"
+export * as codex from "./codex"
 
 // The two entry points are also exported flat, because reaching for a parser by
 // name is the common case and `claude.ClaudeStreamMapper` stutters.
 export { ClaudeStreamMapper, mapClaudeStream } from "./claude/mapper"
+export { CodexStreamMapper, mapCodexStream } from "./codex/mapper"

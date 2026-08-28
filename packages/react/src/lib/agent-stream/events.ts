@@ -133,6 +133,24 @@ export const TaskKind = Object.freeze({
 
 export type TaskKind = (typeof TaskKind)[keyof typeof TaskKind]
 
+/** How a file changed. Shared: every provider that reports edits reports one of these. */
+export const FileChange = Object.freeze({
+  Add: "add",
+  Update: "update",
+  Delete: "delete",
+  Rename: "rename",
+} as const)
+
+export type FileChange = (typeof FileChange)[keyof typeof FileChange]
+
+/** One file an agent touched. */
+export interface FileEdit {
+  readonly path: string
+  readonly change: FileChange
+  /** A unified diff when the provider supplies one; Codex reports paths only. */
+  readonly unifiedDiff: string | null
+}
+
 /** How a turn ended. */
 export type TurnStatus = "completed" | "interrupted" | "error"
 
@@ -248,8 +266,18 @@ export type AgentEventPayload =
     }
   | { readonly type: "tool_call_completed"; readonly callId: string; readonly result: ToolResult }
   /**
-   * The agent's plan, republished whole on every `TodoWrite`. Latest wins —
-   * consumers replace rather than accumulate.
+   * Files an agent changed, reported as structure rather than as prose.
+   *
+   * Only some providers report this: Codex publishes the touched paths and how
+   * each changed, while Claude Code surfaces the same work as ordinary file
+   * tool calls a consumer would have to parse. A view that wants a changed-file
+   * list reads this where it exists and falls back to tool calls where it does
+   * not — the absence is a property of the provider, not an error.
+   */
+  | { readonly type: "file_edits"; readonly callId: string | null; readonly edits: readonly FileEdit[] }
+  /**
+   * The agent's plan, republished whole. Latest wins — consumers replace rather
+   * than accumulate.
    */
   | { readonly type: "plan_updated"; readonly steps: readonly PlanStep[] }
   // ---------- delegated work ----------
@@ -363,6 +391,7 @@ export const AgentEventType = Object.freeze({
   ToolCallStarted: "tool_call_started",
   ToolCallCompleted: "tool_call_completed",
   PlanUpdated: "plan_updated",
+  FileEdits: "file_edits",
   TaskStarted: "task_started",
   TaskProgress: "task_progress",
   TaskCompleted: "task_completed",

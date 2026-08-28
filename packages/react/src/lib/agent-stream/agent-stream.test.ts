@@ -583,6 +583,10 @@ const UNCAPTURED: ReadonlyMap<string, string> = new Map([
   ["permission_denied", "needs a sandbox path refusal or a mode that cannot ask"],
   ["rate_limited", "only emitted when a limit is actually reached"],
   ["model_changed", "derived across two captures; covered by the resume test"],
+  // A capability Claude Code does not have: it surfaces edits as ordinary file
+  // tool calls. Codex reports them as structure, and covers this in its own
+  // suite.
+  ["file_edits", "Claude Code reports no structured edits; the Codex captures cover it"],
 ])
 
 const DECLARED: ReadonlySet<string> = new Set([
@@ -592,6 +596,7 @@ const DECLARED: ReadonlySet<string> = new Set([
   "context_compacted",
   "delta",
   "error",
+  "file_edits",
   "hook",
   "model_changed",
   "permission_decided",
