@@ -612,6 +612,7 @@ export {
   type SplitPaneOptions,
   type WorkspaceLayout,
 } from "./lib/app-shell-layout"
+export * from "./lib/agent-stream"
 export {
   WorkflowCanvas,
   WorkflowCanvasConnectionLine,

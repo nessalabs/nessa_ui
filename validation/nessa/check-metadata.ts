@@ -16,6 +16,7 @@ export const checkMetadata = Object.freeze({
   "source-boundaries": { phase: "source", inputs: ["packages/react/src/**/*.{ts,tsx,css}"], dependsOn: [], global: false },
   "storybook-coverage": { phase: "source", inputs: ["packages/react/src/index.ts", "apps/storybook/stories/**/*.stories.tsx"], dependsOn: [], global: false },
   "interaction-stability": { phase: "source", inputs: ["packages/react/src/components/model-picker.tsx", "packages/react/src/components/searchable-listbox.tsx", "apps/storybook/stories/model-picker.stories.tsx"], dependsOn: [], global: false },
+  "parser-hygiene": { phase: "source", inputs: ["packages/react/src/lib/agent-stream/**/*.ts"], dependsOn: [], global: false },
   "package-artifacts": { phase: "source", inputs: ["packages/react/package.json", "packages/react/{README.md,LICENSE}"], dependsOn: [], global: false },
   accessibility: { phase: "source", inputs: ["packages/react/src/theme.css", "packages/react/src/components/**/*.tsx", "packages/react/src/composites/**/*.tsx", "validation/exceptions.ts", "validation/nessa/{contrast-matrix,focus-treatments}.ts"], dependsOn: ["theme-parity"], global: false },
   "package-artifacts-built": { phase: "artifacts", inputs: ["packages/react/dist/**/*"], dependsOn: [], global: false },
