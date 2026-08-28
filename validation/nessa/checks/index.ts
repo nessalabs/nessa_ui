@@ -7,6 +7,7 @@ import { packageArtifactsBuiltCheck, packageArtifactsCheck } from "./package-art
 import { registryParityCheck } from "./registry-parity.ts"
 import { sourceBoundariesCheck } from "./source-boundaries.ts"
 import { storybookCoverageCheck } from "./storybook-coverage.ts"
+import { styleDisciplineCheck } from "./style-discipline.ts"
 import { themeParityCheck } from "./theme-parity.ts"
 
 export const nessaChecks = Object.freeze([
@@ -15,6 +16,7 @@ export const nessaChecks = Object.freeze([
   themeParityCheck,
   registryParityCheck,
   sourceBoundariesCheck,
+  styleDisciplineCheck,
   storybookCoverageCheck,
   interactionStabilityCheck,
   packageArtifactsCheck,

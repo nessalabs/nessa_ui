@@ -424,6 +424,16 @@ Public typography sizes, spacing, control heights/padding, and icon sizes descri
 
 Scale is not density. A future density axis may alter whitespace/control compactness without changing text. Do not add density until real compact-layout requirements establish its semantics.
 
+### Styling discipline and inline-style escape hatch
+
+Component styling stays inside the semantic token system, with one narrow, exactly-ledgered escape hatch for values that only exist at runtime. Three invariants make styling-at-a-distance and token bypasses structurally difficult rather than merely discouraged:
+
+1. **Semantic color only (STYLE-001).** Class surfaces (`className`, `cn`, `cva`) never use raw Tailwind palette scales (`bg-red-500`, `text-zinc-400`) or arbitrary literal color values (`bg-[#fff]`, `text-[oklch(...)]`). Every color routes through a semantic token utility or a `--nessa-*` custom property, so a palette or theme change is a token edit, never a component sweep. `color-mix()` and `light-dark()` over token references are token-preserving and stay allowed; a literal color constructor inside them is still a violation. This invariant has no exception ledger: a new raw color is always a contract violation.
+2. **Frozen stacking scale (STYLE-002).** Class-surface z-index utilities are limited to `z-0`, `z-10`, `z-20`, `z-30`, `z-40`, `z-50`, and `z-auto`. Arbitrary or off-scale values (`z-[60]`, `z-[1]`) are exact transitional exceptions in the validation ledger; new layering fits the existing scale or amends this contract explicitly.
+3. **Inline styles are computed geometry only (STYLE-003).** Properties declared through the JSX `style` attribute are limited to CSS custom properties (`--*`) and a frozen allowlist of runtime-geometry properties: inset/position (`left`, `top`, `insetInlineStart`, …), sizing (`width`, `maxHeight`, `flexBasis`, …), transforms (`transform`, `translate`, `rotate`, `scale`, `transformOrigin`, `transformBox`), and `opacity`. Anything else — paint, spacing, layering, motion — either becomes a utility fed by a custom property or is an exact ledgered exception. Static values that a utility can express never belong in `style`.
+
+The exception ledger is exact: each entry pins one file, one needle, and a maximum occurrence count, and the checker fails when an occurrence drifts in either direction. Genuinely runtime-computed surfaces (generated gradients, measured gaps, cascade-derived layering) remain expressible, but every such site is visible, counted, and carries its own removal condition.
+
 ### Motion and reduced motion
 
 Motion is token-driven CSS, not provider state. Components use duration/easing semantic tokens, and CSS owns the accessibility fallback:
@@ -1123,6 +1133,9 @@ This table is the exhaustive machine-mirrored index of normative rule groups. De
 | A11Y-002 | Effective focus and invalid treatments meet non-text contrast or use exact transitional exceptions. | `#accessibility-and-rendering-invariants` |
 | A11Y-003 | Target size, zoom, reflow, focus geometry, and forced-colors evidence require review until browser gates land. | `#accessibility-and-rendering-invariants` |
 | A11Y-004 | Valid wider-gamut contrast requires color-managed browser evidence until automated support lands. | `#accessibility-and-rendering-invariants` |
+| STYLE-001 | Component class surfaces use semantic tokens only, never raw palette scales or literal color values. | `#styling-discipline-and-inline-style-escape-hatch` |
+| STYLE-002 | Class-surface stacking utilities stay on the frozen z-0 through z-50 scale. | `#styling-discipline-and-inline-style-escape-hatch` |
+| STYLE-003 | Inline style declarations are limited to custom properties and the computed-geometry allowlist. | `#styling-discipline-and-inline-style-escape-hatch` |
 | PROVIDER-001 | Provider, scope, mode, SSR, wrapper, and context boundaries activate together under their frozen contract. | `#simplified-color-mode-api` |
 | ICON-001 | Semantic icons activate only with a real consuming component and frozen resolution/accessibility ownership. | `#real-icon-consumer-before-api-stability` |
 
