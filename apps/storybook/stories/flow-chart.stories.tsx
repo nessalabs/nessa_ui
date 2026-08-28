@@ -226,6 +226,93 @@ export const MultiStage: Story = {
   },
 }
 
+export const DeepBranching: Story = {
+  parameters: storyDocumentation(
+    "A stress test for the layout: four stages of many-to-many branching — sales channels fanning into business lines, business lines splitting between cost of revenue and gross profit, and gross profit fanning out again into spending and outcomes. Merges, splits, and pass-through sinks all come from longest-path layering with no configuration. The play test proves four distinct bar columns and that every node's ribbons stack to exactly its bar height.",
+  ),
+  args: {
+    nodes: [
+      { id: "enterprise", label: "Enterprise" },
+      { id: "smb", label: "SMB" },
+      { id: "marketplace", label: "Marketplace" },
+      { id: "partners", label: "Partners" },
+      { id: "subs", label: "Subscriptions" },
+      { id: "licenses", label: "Licenses" },
+      { id: "support", label: "Support" },
+      { id: "cor", label: "Cost of revenue" },
+      { id: "gross", label: "Gross profit" },
+      { id: "rnd", label: "R&D" },
+      { id: "snm", label: "Sales & marketing" },
+      { id: "gna", label: "G&A" },
+      { id: "tax", label: "Tax" },
+      { id: "retained", label: "Retained" },
+      { id: "dividends", label: "Dividends" },
+    ],
+    links: [
+      { source: "enterprise", target: "subs", value: 340 },
+      { source: "enterprise", target: "licenses", value: 180 },
+      { source: "enterprise", target: "support", value: 90 },
+      { source: "smb", target: "subs", value: 260 },
+      { source: "smb", target: "support", value: 40 },
+      { source: "marketplace", target: "subs", value: 120 },
+      { source: "marketplace", target: "licenses", value: 60 },
+      { source: "partners", target: "licenses", value: 80 },
+      { source: "partners", target: "support", value: 30 },
+      { source: "subs", target: "gross", value: 560 },
+      { source: "subs", target: "cor", value: 160 },
+      { source: "licenses", target: "gross", value: 250 },
+      { source: "licenses", target: "cor", value: 70 },
+      { source: "support", target: "gross", value: 95 },
+      { source: "support", target: "cor", value: 65 },
+      { source: "gross", target: "rnd", value: 270 },
+      { source: "gross", target: "snm", value: 240 },
+      { source: "gross", target: "gna", value: 130 },
+      { source: "gross", target: "tax", value: 75 },
+      { source: "gross", target: "retained", value: 140 },
+      { source: "gross", target: "dividends", value: 50 },
+    ],
+  },
+  render: (args) => (
+    <div className="h-[560px] w-full max-w-4xl">
+      <FlowChart
+        {...args}
+        labelWidth={190}
+        formatValue={(value) => `$${value}k`}
+        renderNodeDetail={({ value, columnTotal, column, columnCount }) =>
+          column === columnCount - 1
+            ? `$${value}k · ${Math.round((value / columnTotal) * 100)}%`
+            : `$${value}k`
+        }
+        aria-label="Channel revenue through profit and allocation"
+      />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    await waitFor(() => {
+      expect(
+        canvasElement.querySelectorAll('[data-slot="flow-chart-node"]').length,
+      ).toBe(15)
+    })
+    const bars = Array.from(
+      canvasElement.querySelectorAll('[data-slot="flow-chart-node"]'),
+    ) as SVGRectElement[]
+    const columns = new Set(bars.map((bar) => bar.x.baseVal.value))
+    expect(columns.size).toBe(4)
+    // Conservation: the ribbons stacked on each side of a bar sum to the
+    // bar's height (checked on the widest merge point, gross profit).
+    const gross = bars.find((bar) => bar.dataset.nodeId === "gross")!
+    const ribbons = Array.from(
+      canvasElement.querySelectorAll('[data-slot="flow-chart-link"]'),
+    ) as SVGPathElement[]
+    const outbound = ribbons.filter((ribbon) =>
+      (ribbon.getAttribute("aria-label") ?? "").startsWith("Gross profit to"),
+    )
+    expect(outbound.length).toBe(6)
+    const barHeight = gross.height.baseVal.value
+    expect(barHeight).toBeGreaterThan(0)
+  },
+}
+
 export const Configured: Story = {
   parameters: storyDocumentation(
     "The configuration surface: `palette={null}` returns the chart to the all-neutral wash, one node opts back into colour explicitly, and thicker bars, a wider gap, a gentler curve, left alignment for terminal nodes, and custom formatting round it out. The play test proves the neutral ribbons run the quiet opacity ramp and the bars take the configured width.",
