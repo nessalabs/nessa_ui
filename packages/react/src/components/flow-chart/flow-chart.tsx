@@ -30,19 +30,18 @@ export interface FlowChartNode {
 }
 
 /**
- * Muted tints node bars cycle through by default — dilute enough that
+ * Pastel tints node bars cycle through by default — dilute enough that
  * overlapping ribbons stay readable, distinct enough that each origin's
- * flows read as one family. Earthy and low-chroma on purpose: slate,
- * sage, clay, mauve, terracotta, mist, periwinkle.
+ * flows read as one family: peach, aqua, lilac, butter, rose, sky, sage.
  */
 export const flowChartPalette: readonly string[] = Object.freeze([
-  "oklch(0.72 0.07 245)",
-  "oklch(0.74 0.08 145)",
-  "oklch(0.75 0.09 70)",
-  "oklch(0.70 0.07 325)",
-  "oklch(0.72 0.08 30)",
-  "oklch(0.74 0.06 195)",
-  "oklch(0.70 0.06 285)",
+  "oklch(0.87 0.07 45)",
+  "oklch(0.86 0.07 185)",
+  "oklch(0.84 0.08 310)",
+  "oklch(0.89 0.08 100)",
+  "oklch(0.85 0.07 5)",
+  "oklch(0.85 0.06 235)",
+  "oklch(0.87 0.07 150)",
 ])
 
 /** A weighted flow between two nodes. */
