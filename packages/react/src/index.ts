@@ -11,7 +11,11 @@ export {
   CardHeader,
   CardTitle,
 } from "./components/card"
-export { Checkbox, type CheckboxProps } from "./components/checkbox"
+export {
+  Checkbox,
+  checkboxCheckPath,
+  type CheckboxProps,
+} from "./components/checkbox"
 export {
   ConversationRail,
   ConversationRailItem,
@@ -529,6 +533,15 @@ export {
   type TableViewColumn,
   type TableViewOptionsProps,
 } from "./components/table"
+export {
+  TaskList,
+  TaskListItem,
+  taskListDefaultLabels,
+  type TaskListItemProps,
+  type TaskListItemStatus,
+  type TaskListLabels,
+  type TaskListProps,
+} from "./components/task-list"
 export {
   AppShell,
   AppShellBody,
