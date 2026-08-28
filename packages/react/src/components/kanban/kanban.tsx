@@ -1547,10 +1547,10 @@ function KanbanBoard({
         {...props}
         ref={composedRef}
         data-slot="kanban-board"
-        className={cn("relative flex items-start gap-4", className)}
+        className={cn("relative flex items-start gap-4 pe-(--kanban-reserved-column)", className)}
         style={
           reservedColumnWidth > 0
-            ? { ...props.style, paddingInlineEnd: reservedColumnWidth }
+            ? ({ ...props.style, "--kanban-reserved-column": `${reservedColumnWidth}px` } as React.CSSProperties)
             : props.style
         }
       >

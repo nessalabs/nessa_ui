@@ -52,10 +52,6 @@ export type ValidationException = OccurrenceException | ContrastException | Focu
 const focusRationale = "Current shadcn-derived translucent focus treatment predates Nessa semantic focus-state tokens."
 const focusRemoval = "Remove with the semantic focus/invalid token migration before provider stabilization."
 
-const inlinePaintRationale = "Runtime-computed paint (generated gradients, shimmer text, avatar blending) predates semantic paint tokens for this surface."
-const inlineGeometryRationale = "Runtime-measured spacing or layering has no utility form because its value is computed from live geometry."
-const inlineMotionRationale = "Runtime-supplied motion timing (a consumer-controlled duration prop, dnd-kit's sortable transition) predates semantic motion-state tokens for these surfaces."
-const inlineRemoval = "Route through a --nessa-* custom property plus a utility when the owning surface's semantic tokens land."
 const style = (
   contractId: "STYLE-002" | "STYLE-003",
   path: string,
@@ -126,36 +122,6 @@ export const exceptions = Object.freeze([
   { kind: "focus-contrast", contractId: "A11Y-002", component: "input", state: "focus-visible:invalid", mode: "light", token: "--destructive", opacity: 0.2, surface: "--background", requiredRatio: 3, expectedTokenValue: "oklch(0.577 0.235 27.325)", expectedSurfaceValue: "oklch(1 0 0)", rationale: focusRationale, removalCondition: focusRemoval },
   { kind: "focus-contrast", contractId: "A11Y-002", component: "input", state: "focus-visible:invalid", mode: "light", token: "--destructive", opacity: 0.2, surface: "--card", requiredRatio: 3, expectedTokenValue: "oklch(0.577 0.235 27.325)", expectedSurfaceValue: "oklch(1 0 0)", rationale: focusRationale, removalCondition: focusRemoval },
   { kind: "focus-contrast", contractId: "A11Y-002", component: "input", state: "focus-visible:invalid", mode: "light", token: "--destructive", opacity: 0.2, surface: "--popover", requiredRatio: 3, expectedTokenValue: "oklch(0.577 0.235 27.325)", expectedSurfaceValue: "oklch(1 0 0)", rationale: focusRationale, removalCondition: focusRemoval },
-  style("STYLE-003", "packages/react/src/composites/app-shell/app-shell-drag.tsx", "visibility", 1, inlineGeometryRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/workflow-canvas/workflow-canvas.tsx", "backgroundImage", 1, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/workflow-canvas/workflow-canvas.tsx", "backgroundSize", 1, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/workflow-canvas/workflow-canvas.tsx", "backgroundPosition", 1, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/workflow-canvas/workflow-canvas-edge.tsx", "strokeWidth", 1, inlineGeometryRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/tool-call.tsx", "color", 1, inlinePaintRationale, inlineRemoval),
   style("STYLE-003", "packages/react/src/components/tool-call.tsx", "--diffs-dark-addition-color", 1, "Third-party diff-renderer theming bridge deliberately deepens Pierre's dark-row addition green with a fixed value.", "Replace with a --nessa-diff-* dark-surface token when the diff token set covers renderer theming."),
-  style("STYLE-003", "packages/react/src/components/tool-call.tsx", "backgroundImage", 1, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/tool-call.tsx", "backgroundSize", 1, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/tool-call.tsx", "backgroundPosition", 1, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/tool-call.tsx", "backgroundClip", 1, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/tool-call.tsx", "WebkitBackgroundClip", 1, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/random-avatar.tsx", "mixBlendMode", 3, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/random-avatar.tsx", "isolation", 1, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/model-capability-controls.tsx", "filter", 3, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/model-capability-controls.tsx", "boxShadow", 2, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/model-capability-controls.tsx", "backgroundImage", 2, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/model-capability-controls.tsx", "backgroundColor", 1, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/model-capability-controls.tsx", "background", 2, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/message.tsx", "transitionDuration", 1, inlineMotionRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/kanban/kanban.tsx", "paddingInlineEnd", 1, inlineGeometryRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/kanban/kanban-column.tsx", "paddingBottom", 1, inlineGeometryRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/generating-surface.tsx", "color", 1, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/generating-surface.tsx", "background", 1, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/generating-surface.tsx", "backgroundImage", 1, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/generating-surface.tsx", "backgroundSize", 1, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/generating-surface.tsx", "backgroundPosition", 1, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/generating-surface.tsx", "backgroundClip", 1, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/generating-surface.tsx", "WebkitBackgroundClip", 1, inlinePaintRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/gantt-chart/gantt-chart-grid.tsx", "paddingInlineStart", 1, inlineGeometryRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/event-calendar.tsx", "zIndex", 1, inlineGeometryRationale, inlineRemoval),
-  style("STYLE-003", "packages/react/src/components/composer-queue.tsx", "transition", 1, inlineMotionRationale, inlineRemoval),
+  style("STYLE-003", "packages/react/src/components/event-calendar.tsx", "zIndex", 1, "Overlapping event segments compute a continuous per-column layer (30 + column) inside the day cell's own stacking context.", "Restructure segment layering onto the frozen scale (e.g. render-order layering) when the calendar's overlap model is next revised."),
 ] satisfies readonly ValidationException[])

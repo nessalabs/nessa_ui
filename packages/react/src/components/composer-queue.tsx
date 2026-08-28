@@ -181,10 +181,10 @@ function ComposerQueueItem({
       style={{
         ...style,
         transform: CSS.Transform.toString(transform),
-        transition,
-      }}
+        "--composer-queue-sort-transition": transition,
+      } as React.CSSProperties}
       className={cn(
-        "group relative z-0 grid min-h-11 grid-cols-[1.75rem_minmax(0,1fr)_auto] items-center gap-2 border-b border-border bg-card px-2 py-1.5 font-sans last:border-b-0 data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg",
+        "group relative z-0 grid min-h-11 grid-cols-[1.75rem_minmax(0,1fr)_auto] items-center gap-2 border-b border-border bg-card px-2 py-1.5 font-sans last:border-b-0 [transition:var(--composer-queue-sort-transition)] data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg",
         className,
       )}
       {...props}

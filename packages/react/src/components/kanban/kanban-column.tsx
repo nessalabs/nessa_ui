@@ -539,7 +539,7 @@ function KanbanColumnList({
       data-accepts={accepts ? undefined : "false"}
       data-drop-target={gapTop !== null ? "true" : undefined}
       className={cn(
-        "relative box-border flex min-h-10 flex-col gap-2",
+        "relative box-border flex min-h-10 flex-col gap-2 pb-(--kanban-drop-gap)",
         className,
       )}
       // The cards part with transforms, which open the slot without
@@ -549,7 +549,7 @@ function KanbanColumnList({
       // insertion index can never chase its own preview.
       style={
         gapHeight !== null
-          ? { ...props.style, paddingBottom: gapHeight }
+          ? ({ ...props.style, "--kanban-drop-gap": `${gapHeight}px` } as React.CSSProperties)
           : props.style
       }
     >

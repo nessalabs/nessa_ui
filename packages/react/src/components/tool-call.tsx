@@ -101,8 +101,8 @@ function cssDurationInMilliseconds(value: string, fallback: number) {
  * The moving highlight is painted with theme tokens — muted-foreground body,
  * foreground crest — so it reads in both schemes without `dark:` variants.
  */
-const toolCallShimmerGradient =
-  "linear-gradient(90deg, var(--muted-foreground) 0%, var(--muted-foreground) 38%, var(--foreground) 50%, var(--muted-foreground) 62%, var(--muted-foreground) 100%)"
+const toolCallShimmerClasses =
+  "data-[shimmer=true]:[background-image:linear-gradient(90deg,var(--muted-foreground)_0%,var(--muted-foreground)_38%,var(--foreground)_50%,var(--muted-foreground)_62%,var(--muted-foreground)_100%)] data-[shimmer=true]:bg-[length:200%_100%] data-[shimmer=true]:bg-[position:150%_0] data-[shimmer=true]:bg-clip-text data-[shimmer=true]:[-webkit-background-clip:text] data-[shimmer=true]:text-transparent"
 
 /**
  * Renders the trigger label, sweeping a highlight across the text while
@@ -142,19 +142,7 @@ function ToolCallShimmer({
       ref={ref}
       data-slot="tool-call-shimmer"
       data-shimmer={shimmering ? "true" : undefined}
-      className="min-w-0 truncate text-left"
-      style={
-        shimmering
-          ? {
-              backgroundImage: toolCallShimmerGradient,
-              backgroundSize: "200% 100%",
-              backgroundPosition: "150% 0",
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              color: "transparent",
-            }
-          : undefined
-      }
+      className={cn("min-w-0 truncate text-left", toolCallShimmerClasses)}
     >
       {children}
     </span>

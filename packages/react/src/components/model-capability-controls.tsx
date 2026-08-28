@@ -224,17 +224,16 @@ interface ModelThinkingSliderFillProps {
   streamSpeedMultiplier: number
 }
 
-/** Mirrors the level-progress gradient while leaving the ambient stream physical. */
-function thinkingFillGradient(dir: "ltr" | "rtl"): React.CSSProperties {
-  return {
-    backgroundImage: `linear-gradient(${dir === "rtl" ? "270deg" : "90deg"}, color-mix(in oklab, var(--nessa-thinking-fill-current) 58%, var(--nessa-thinking-fill-base)) 0%, color-mix(in oklab, var(--nessa-thinking-fill-base) 64%, var(--nessa-thinking-fill-current)) 46%, color-mix(in oklab, var(--nessa-thinking-fill-highlight) 62%, var(--nessa-thinking-fill-current)) 100%)`,
-  }
-}
+/**
+ * Mirrors the level-progress gradient while leaving the ambient stream
+ * physical; the sweep direction rides the --model-thinking-fill-angle custom
+ * property so RTL flips without a second gradient.
+ */
+const thinkingFillGradientClass =
+  "[background-image:linear-gradient(var(--model-thinking-fill-angle,90deg),color-mix(in_oklab,var(--nessa-thinking-fill-current)_58%,var(--nessa-thinking-fill-base))_0%,color-mix(in_oklab,var(--nessa-thinking-fill-base)_64%,var(--nessa-thinking-fill-current))_46%,color-mix(in_oklab,var(--nessa-thinking-fill-highlight)_62%,var(--nessa-thinking-fill-current))_100%)]"
 
-const streamSheenTexture: React.CSSProperties = {
-  backgroundImage:
-    "linear-gradient(90deg, transparent 0%, color-mix(in oklab, var(--nessa-thinking-fill-highlight) 4%, transparent) 24%, color-mix(in oklab, var(--foreground) 14%, transparent) 50%, color-mix(in oklab, var(--nessa-thinking-fill-highlight) 4%, transparent) 76%, transparent 100%)",
-}
+const streamSheenTextureClass =
+  "[background-image:linear-gradient(90deg,transparent_0%,color-mix(in_oklab,var(--nessa-thinking-fill-highlight)_4%,transparent)_24%,color-mix(in_oklab,var(--foreground)_14%,transparent)_50%,color-mix(in_oklab,var(--nessa-thinking-fill-highlight)_4%,transparent)_76%,transparent_100%)]"
 
 /** Renders the reduced-motion-safe fill and ambient stream layers. */
 function ModelThinkingSliderFill({
@@ -385,32 +384,29 @@ function ModelThinkingSliderFill({
       ref={surfaceRef}
       data-slot="model-thinking-slider-liquid"
       aria-hidden="true"
-      className="absolute inset-0 isolate overflow-hidden"
-      style={{
-        backgroundColor: "var(--nessa-thinking-fill-base)",
-        ...thinkingFillGradient(dir),
-      }}
+      className={cn(
+        "absolute inset-0 isolate overflow-hidden bg-(--nessa-thinking-fill-base)",
+        thinkingFillGradientClass,
+      )}
+      style={{ "--model-thinking-fill-angle": dir === "rtl" ? "270deg" : "90deg" } as React.CSSProperties}
     >
       <span
         ref={currentRef}
         data-slot="model-thinking-slider-current"
-        className="absolute aspect-square rounded-full bg-[var(--nessa-thinking-fill-current)] opacity-25"
+        className="absolute aspect-square rounded-full bg-[var(--nessa-thinking-fill-current)] opacity-25 [filter:blur(var(--model-thinking-slider-current-blur))]"
         style={{
           insetBlock:
             "calc(var(--model-thinking-slider-current-inset) * -1)",
           insetInlineStart:
             "calc(var(--model-thinking-slider-current-offset) * -1)",
-          filter: "blur(var(--model-thinking-slider-current-blur))",
         }}
       />
       <span
         ref={flareRef}
         data-slot="model-thinking-slider-flare"
-        className="absolute top-1/2 size-[var(--model-thinking-slider-flare-size)] rounded-full opacity-0"
+        className="absolute top-1/2 size-[var(--model-thinking-slider-flare-size)] rounded-full opacity-0 bg-(--nessa-thinking-fill-highlight) [filter:blur(var(--model-thinking-slider-flare-blur))]"
         style={{
           insetInlineEnd: 0,
-          background: "var(--nessa-thinking-fill-highlight)",
-          filter: "blur(var(--model-thinking-slider-flare-blur))",
         }}
       />
       <span
@@ -418,30 +414,23 @@ function ModelThinkingSliderFill({
         dir="ltr"
         data-slot="model-thinking-slider-ultra-stream"
         data-energy={streamEnergy.toFixed(2)}
-        className="absolute inset-y-0 left-0 flex w-[200%] will-change-transform"
+        className="absolute inset-y-0 left-0 flex w-[200%] will-change-transform [filter:saturate(var(--model-thinking-stream-saturate))_brightness(var(--model-thinking-stream-brightness))]"
         style={{
-          filter: `saturate(${1 + streamEnergy * 0.7}) brightness(${1 + streamEnergy * 0.22})`,
+          "--model-thinking-stream-saturate": `${1 + streamEnergy * 0.7}`,
+          "--model-thinking-stream-brightness": `${1 + streamEnergy * 0.22}`,
           opacity: streamOpacity,
-        }}
+        } as React.CSSProperties}
       >
         <span
           data-slot="model-thinking-slider-ultra-stream-period"
-          className="h-full w-1/2 shrink-0"
-          style={streamSheenTexture}
+          className={cn("h-full w-1/2 shrink-0", streamSheenTextureClass)}
         />
         <span
           data-slot="model-thinking-slider-ultra-stream-period"
-          className="h-full w-1/2 shrink-0"
-          style={streamSheenTexture}
+          className={cn("h-full w-1/2 shrink-0", streamSheenTextureClass)}
         />
       </span>
-      <span
-        className="absolute inset-0"
-        style={{
-          boxShadow:
-            "inset 0 1px color-mix(in oklab, var(--foreground) 13%, transparent), inset 0 -1px color-mix(in oklab, var(--background) 16%, transparent)",
-        }}
-      />
+      <span className="absolute inset-0 [box-shadow:inset_0_1px_color-mix(in_oklab,var(--foreground)_13%,transparent),inset_0_-1px_color-mix(in_oklab,var(--background)_16%,transparent)]" />
     </span>
   )
 }
@@ -802,13 +791,7 @@ function ModelThinkingControl({
             data-slot="model-thinking-ultra-shader"
             data-active={selected?.accent === "ultra"}
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-0 transition-[opacity,filter] [transition-duration:var(--nessa-motion-duration-normal)] [transition-timing-function:var(--nessa-motion-easing-emphasized)] data-[active=true]:opacity-100 motion-reduce:transition-none"
-            style={{
-              background:
-                "radial-gradient(circle at 78% 12%, color-mix(in oklab, var(--nessa-thinking-fill-current) 13%, transparent), transparent 62%)",
-              boxShadow:
-                "0 0 1rem color-mix(in oklab, var(--nessa-thinking-fill-current) 10%, transparent)",
-            }}
+            className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-0 transition-[opacity,filter] [transition-duration:var(--nessa-motion-duration-normal)] [transition-timing-function:var(--nessa-motion-easing-emphasized)] data-[active=true]:opacity-100 motion-reduce:transition-none [background:radial-gradient(circle_at_78%_12%,color-mix(in_oklab,var(--nessa-thinking-fill-current)_13%,transparent),transparent_62%)] [box-shadow:0_0_1rem_color-mix(in_oklab,var(--nessa-thinking-fill-current)_10%,transparent)]"
           />
           <div className="relative z-10 flex min-h-8 items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-1 text-sm font-medium">

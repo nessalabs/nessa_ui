@@ -396,8 +396,8 @@ function MessageStreamText({
           {tail.map(({ key, grapheme }) => (
             <span
               key={key}
-              style={{ transitionDuration: `${fade}ms` }}
-              className="opacity-100 transition-opacity ease-out starting:opacity-0 motion-reduce:transition-none"
+              style={{ "--message-grapheme-fade": `${fade}ms` } as React.CSSProperties}
+              className="opacity-100 transition-opacity duration-(--message-grapheme-fade) ease-out starting:opacity-0 motion-reduce:transition-none"
             >
               {grapheme}
             </span>
