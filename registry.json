@@ -688,6 +688,16 @@
           "path": "packages/react/src/lib/agent-stream/codex/mapper.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/codex/mapper.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/capabilities.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/capabilities.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/codex/capabilities.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/codex/capabilities.ts"
         }
       ]
     },

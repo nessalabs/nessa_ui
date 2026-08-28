@@ -20,6 +20,7 @@ import { asNumber, asObject, asRecord, asString, asStrings } from "../json"
 import { toolKind, toolTitle } from "./tools"
 import type {
   JsonValue,
+  WireLine,
   WireContentBlock,
   WireEvent,
   WireStreamFrame,
@@ -81,6 +82,9 @@ function normalizeUsage(usage: JsonValue | undefined, costUsd: number | null): U
     outputTokens: output,
     cacheReadTokens: cacheRead,
     cacheCreationTokens: cacheCreation,
+    // Claude folds reasoning into its output count and reports no separate
+    // figure, so this is unreported rather than zero.
+    reasoningTokens: null,
     ...(costUsd === null ? {} : { totalCostUsd: costUsd }),
   }
 }
@@ -212,12 +216,13 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
         ),
       ]
     }
-    return this.map(parsed.event)
+    return this.map(parsed.line)
   }
 
   /** Maps an already-decoded line. */
-  map(event: WireEvent): readonly AgentEvent[] {
-    const raw = event as unknown as JsonValue
+  map(event: WireLine): readonly AgentEvent[] {
+    const raw = event as JsonValue
+    const line = asRecord(raw)
     // A line delivered twice — a replayed tail, two captures concatenated —
     // must be absorbed once: counting a committed block a second time shifts
     // every later index in that message and breaks the delta join silently.
@@ -230,15 +235,16 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
         if (!oldest.done) this.seenUuids.delete(oldest.value)
       }
     }
-    const sessionId = asString(asRecord(raw).session_id) ?? this.lastSession?.sessionId ?? "unknown"
-    const path = this.pathOf(asRecord(raw).parent_tool_use_id)
-    const ts = asString(asRecord(raw).timestamp)
+    const sessionId = asString(line.session_id) ?? this.lastSession?.sessionId ?? "unknown"
+    const path = this.pathOf(line.parent_tool_use_id)
+    const ts = asString(line.timestamp)
 
     switch (event.type) {
       case ClaudeWireType.System:
         return this.mapSystem(asString(asRecord(raw).subtype) ?? "unknown", sessionId, path, ts, raw)
       case ClaudeWireType.StreamEvent:
-        return this.wrap(this.mapStreamFrame((event as { event: WireStreamFrame }).event, path), sessionId, path, ts, raw)
+        // Read, not asserted: `mapStreamFrame` narrows every field it uses.
+        return this.wrap(this.mapStreamFrame(asRecord(line.event) as WireStreamFrame, path), sessionId, path, ts, raw)
       case ClaudeWireType.Assistant:
         return this.mapAssistant(asRecord(raw), sessionId, path, ts, raw)
       case ClaudeWireType.User:
@@ -305,8 +311,8 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
       case ClaudeSystemSubtype.Init: {
         const session: SessionInfo = {
           sessionId,
-          model: asString(line.model) ?? "unknown",
-          cwd: asString(line.cwd) ?? "",
+          model: asString(line.model),
+          cwd: asString(line.cwd),
           tools: asStrings(line.tools),
           slashCommands: asStrings(line.slash_commands),
           agents: asStrings(line.agents),
@@ -325,9 +331,9 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
                 source: asString(asRecord(entry).source) ?? "",
               }))
             : [],
-          permissionMode: asString(line.permissionMode) ?? "default",
-          version: asString(line.claude_code_version) ?? "",
-          outputStyle: asString(line.output_style) ?? "",
+          permissionMode: asString(line.permissionMode),
+          version: asString(line.claude_code_version),
+          outputStyle: asString(line.output_style),
           initIndex: this.initCount,
         }
         const previous = this.lastSession
@@ -337,7 +343,14 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
         const events = [this.build({ type: "session_started", session }, sessionId, path, ts, raw)]
         // A resumed run with `--model` looks exactly like this and nothing else
         // announces it, so the change is derived from two inits or not seen.
-        if (previous !== null && previous.sessionId === sessionId && previous.model !== session.model) {
+        // A change is only a change when both sides said something.
+        if (
+          previous !== null &&
+          previous.sessionId === sessionId &&
+          previous.model !== null &&
+          session.model !== null &&
+          previous.model !== session.model
+        ) {
           events.push(this.build({ type: "model_changed", from: previous.model, to: session.model }, sessionId, path, ts, raw))
         }
         return events
@@ -956,6 +969,7 @@ function taskUsage(usage: Record<string, JsonValue>): Usage | null {
     outputTokens: null,
     cacheReadTokens: null,
     cacheCreationTokens: null,
+    reasoningTokens: null,
   }
 }
 

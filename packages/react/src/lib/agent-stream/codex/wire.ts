@@ -1,5 +1,6 @@
 /** @responsibility Describes Codex's `exec --json` wire shapes and decodes one line into them without interpreting it. */
 
+import { parseJsonLine } from "../json"
 import type { JsonValue } from "../json"
 
 /** Re-exported so one import gives a consumer this wire's whole vocabulary. */
@@ -67,9 +68,18 @@ export const CodexFileChangeKind = Object.freeze({
   Add: "add",
   Update: "update",
   Delete: "delete",
+  Rename: "rename",
 } as const)
 
 export type CodexFileChangeKind = (typeof CodexFileChangeKind)[keyof typeof CodexFileChangeKind]
+
+/**
+ * The collab tool that opens a delegated run.
+ *
+ * Other collab tools — `wait` — act on a run that already exists, so only this
+ * one starts a task; treating them all as spawns makes one agent look like two.
+ */
+export const CODEX_SPAWN_TOOL = "spawn_agent"
 
 /**
  * Codex's token accounting, as carried on `turn.completed`.
@@ -180,7 +190,7 @@ export interface CodexMcpToolCallItem extends CodexItemBase {
 export interface CodexCollabToolCallItem extends CodexItemBase {
   readonly type: "collab_tool_call"
   readonly tool?: string
-  readonly prompt?: string
+  readonly prompt?: string | null
   readonly sender_thread_id?: string
   readonly receiver_thread_ids?: readonly string[]
   readonly agents_states?: Readonly<Record<string, JsonValue>>
@@ -246,6 +256,12 @@ export interface CodexErrorLine {
   readonly message?: string
 }
 
+/** Any decoded line, before anything past `type` has been checked. */
+export interface CodexRawLine {
+  readonly type: string
+  readonly [key: string]: JsonValue | undefined
+}
+
 /** A line kind this build does not model. */
 export interface CodexUnknownLine {
   readonly type: string
@@ -270,7 +286,17 @@ export interface CodexParseFailure {
 
 export interface CodexParseSuccess {
   readonly ok: true
-  readonly event: CodexWireEvent
+  /**
+   * What the parser actually verified: an object with a string `type`.
+   *
+   * Not one of the arms above. Returning the union would claim
+   * `thread_id`, `item.id` and the rest are present when nothing checked
+   * them — and a consumer trusting that claim reads `undefined` from a field
+   * typed `string`. The arms stay exported as a description of the wire; a
+   * consumer that wants one narrows to it after checking, the way this
+   * package's own mapper does.
+   */
+  readonly line: CodexRawLine
 }
 
 export type CodexParseResult = CodexParseSuccess | CodexParseFailure
@@ -282,27 +308,19 @@ export type CodexParseResult = CodexParseSuccess | CodexParseFailure
  * a stream is read for as long as the process runs, and one malformed line must
  * not end the transcript.
  */
+/**
+ * Decodes one line of Codex's stream.
+ *
+ * The decoding itself is shared — every provider's wire is newline-delimited
+ * JSON, and one copy per provider is one place per provider for a bug in it to
+ * live. What stays here is the naming and the return type.
+ */
 export function parseCodexLine(line: string): CodexParseResult {
-  const trimmed = line.trim()
-  if (trimmed.length === 0) return { ok: false, line, reason: "empty line" }
-
-  let decoded: unknown
-  try {
-    decoded = JSON.parse(trimmed)
-  } catch (error) {
-    return { ok: false, line, reason: error instanceof Error ? error.message : "invalid JSON" }
-  }
-
-  if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)) {
-    return { ok: false, line, reason: "line is not a JSON object" }
-  }
-  const event = decoded as { type?: unknown }
-  if (typeof event.type !== "string") return { ok: false, line, reason: "line has no `type`" }
-
-  return { ok: true, event: decoded as CodexWireEvent }
+  const result = parseJsonLine(line)
+  return result.ok ? { ok: true, line: result.line as CodexRawLine } : result
 }
 
-/** Splits a whole capture into lines and decodes each one, keeping failures in place. */
+/** Decodes a whole capture, keeping failures in place. */
 export function parseCodexLines(text: string): readonly CodexParseResult[] {
   return text
     .split("\n")

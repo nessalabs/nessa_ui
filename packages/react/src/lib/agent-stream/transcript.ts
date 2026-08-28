@@ -12,6 +12,7 @@ import type {
 } from "./events"
 import { TranscriptBuilder } from "./builder"
 import { pathKey } from "./events"
+import type { AgentEventType } from "./events"
 
 /** A run of consecutive same-tool calls, collapsed behind one row. */
 export interface ToolGroup {
@@ -145,7 +146,7 @@ export const GROUP_MIN = 2
  * changed files as one summary at the end of the turn — so counting either
  * would both overstate a collapse and split a run of calls down the middle.
  */
-export const RENDERS: ReadonlySet<string> = new Set([
+export const RENDERS: ReadonlySet<AgentEventType> = new Set<AgentEventType>([
   "user_message",
   "assistant_text",
   "reasoning",

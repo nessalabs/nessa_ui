@@ -246,27 +246,33 @@ test("a session's own advertisement is readable for a composer's pickers", () =>
   const capabilities = sessionCapabilities(mapClaudeStream(capture("tools")))
   assert.notEqual(capabilities, null)
   const { commands, skills, agents, tools, mcpServers, plugins } = capabilities!
+  // Claude reports every one of these on its stream, so a null here would mean
+  // the reader stopped filling a section it can fill.
+  assert.ok(
+    [commands, skills, agents, tools, mcpServers, plugins].every((section) => section !== null),
+    "Claude advertises all of these; none should read as unreported",
+  )
 
-  assert.ok(commands.length > 0)
-  assert.ok(skills.length > 0)
-  assert.ok(agents.includes("Explore"))
+  assert.ok(commands!.length > 0)
+  assert.ok(skills!.length > 0)
+  assert.ok(agents!.includes("Explore"))
   // A skill and a slash command are the same entry seen twice; the command
   // carries the source so a picker can group them rather than list them twice.
-  assert.ok(commands.some((command) => command.source === "skill"))
+  assert.ok(commands!.some((command) => command.source === "skill"))
   // A plugin command is `plugin:command`, which is where the plugin name is.
-  assert.ok(commands.some((command) => command.source === "plugin" && command.plugin !== null))
+  assert.ok(commands!.some((command) => command.source === "plugin" && command.plugin !== null))
   // Terminal commands are the session's to advertise but not to run.
-  assert.ok(commands.some((command) => command.source === "terminal"))
-  assert.ok(plugins.length > 0)
+  assert.ok(commands!.some((command) => command.source === "terminal"))
+  assert.ok(plugins!.length > 0)
 
   // MCP tools are matched back to their server across the naming mismatch:
   // "example Mail" supplies `mcp__example_Mail__*`.
-  const connected = mcpServers.filter((server) => server.connected)
+  const connected = mcpServers!.filter((server) => server.connected)
   assert.ok(connected.length > 0)
   assert.ok(connected.some((server) => server.tools.length > 0), "a connected server should own tools")
-  assert.ok(mcpServers.some((server) => !server.connected), "an unauthenticated server still appears, with its status")
-  assert.ok(tools.some((tool) => tool.kind === "shell"))
-  assert.ok(tools.some((tool) => tool.kind === "mcp" && tool.server !== null))
+  assert.ok(mcpServers!.some((server) => !server.connected), "an unauthenticated server still appears, with its status")
+  assert.ok(tools!.some((tool) => tool.kind === "shell"))
+  assert.ok(tools!.some((tool) => tool.kind === "mcp" && tool.server !== null))
 })
 
 test("tools that arrive in a later init are marked deferred", () => {
@@ -276,7 +282,7 @@ test("tools that arrive in a later init are marked deferred", () => {
   assert.notEqual(capabilities, null)
   const first = mapClaudeStream(capture("todos")).find((event) => event.payload.type === "session_started")
   assert.notEqual(first, undefined)
-  assert.ok(capabilities!.tools.length >= (first!.payload as { session: { tools: readonly string[] } }).session.tools.length)
+  assert.ok((capabilities!.tools ?? []).length >= (first!.payload as { session: { tools: readonly string[] } }).session.tools.length)
 })
 
 test("a workflow's agents are visible through its progress board", () => {
@@ -407,7 +413,7 @@ test("every conversation in a session comes back as a pointer a host can act on"
   const session = transcript.session
   assert.notEqual(session, null)
 
-  const location = sessionLocationOf("/home/me/.claude/projects", session!)
+  const location = sessionLocationOf("/home/me/.claude/projects", session!)!
   const refs = collectTranscriptRefs(location, transcript.runs)
 
   // The main conversation is in the list, so a switcher over "what is open" is
@@ -426,7 +432,7 @@ test("every conversation in a session comes back as a pointer a host can act on"
 
 test("a pointer that cannot be built says what is missing instead of guessing", () => {
   const transcript = buildTranscript(mapClaudeStream(capture("workflow_phases")))
-  const location = sessionLocationOf("/home/me/.claude/projects", transcript.session!)
+  const location = sessionLocationOf("/home/me/.claude/projects", transcript.session!)!
 
   // A workflow agent needs a run id, and the stream never carries one.
   const blocked = collectTranscriptRefs(location, transcript.runs).filter((ref) => ref.kind === "workflow_agent")
@@ -589,36 +595,14 @@ const UNCAPTURED: ReadonlyMap<string, string> = new Map([
   ["file_edits", "Claude Code reports no structured edits; the Codex captures cover it"],
 ])
 
-const DECLARED: ReadonlySet<string> = new Set([
-  "activity",
-  "assistant_text",
-  "background_tasks_changed",
-  "context_compacted",
-  "delta",
-  "error",
-  "file_edits",
-  "hook",
-  "model_changed",
-  "permission_decided",
-  "permission_denied",
-  "permission_requested",
-  "plan_updated",
-  "post_turn_summary",
-  "rate_limited",
-  "reasoning",
-  "session_started",
-  "status_changed",
-  "task_completed",
-  "task_progress",
-  "task_started",
-  "thinking_progress",
-  "tool_call_completed",
-  "tool_call_started",
-  "turn_completed",
-  "unknown",
-  "user_message",
-  "workflow_progress",
-])
+/**
+ * Derived, not repeated.
+ *
+ * A second hand-kept list of the payload kinds is a list that drifts from the
+ * union it mirrors; `AgentEventType` is already the inventory, so the coverage
+ * check reads it.
+ */
+const DECLARED: ReadonlySet<string> = new Set(Object.values(AgentEventType))
 
 test("every declared payload variant is either exercised or knowingly uncaptured", () => {
   const emitted = new Set<string>()
@@ -674,7 +658,7 @@ test("structured payloads carry the fields their consumers switch on", () => {
           assert.ok(payload.block.index >= 0)
           break
         case "session_started":
-          assert.ok(payload.session.model.length > 0)
+          assert.ok(payload.session.model === null || payload.session.model.length > 0)
           assert.ok(payload.session.sessionId.length > 0)
           assert.ok(payload.session.initIndex >= 0)
           break

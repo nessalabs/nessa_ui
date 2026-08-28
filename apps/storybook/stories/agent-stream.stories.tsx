@@ -39,6 +39,7 @@ import {
   ToolCallTabs,
   ToolCallTrigger,
   applyDeltas,
+  unreportedCapabilities,
   TranscriptBuilder,
   isToolGroup,
   previewOf,
@@ -49,6 +50,8 @@ import {
   type FileEdit,
   type ToolKind,
   type WorkflowAgentProgress,
+  type AgentCapabilities,
+  type JsonValue,
   type Transcript,
   type WorkItem,
 } from "@nessa-ui/react"
@@ -350,22 +353,6 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
   }
 }
 
-/**
- * On-disk transcripts, by the id the stream reports.
- *
- * A host reaches these through the path contract in `store.ts`; the story ships
- * two of them as fixtures so the expanded views are real rather than mocked.
- */
-const DISK_TRANSCRIPTS: Readonly<Record<string, string>> = {
-  a37fefefbc61e13e3: diskSubagent,
-  a35ea63276cd501aa: diskWorkflowAgent,
-}
-
-function diskTranscript(id: string | null): readonly AgentEvent[] | null {
-  if (id === null) return null
-  const source = DISK_TRANSCRIPTS[id]
-  return source === undefined ? null : mapClaudeStream(source)
-}
 
 /**
  * How a row asks the panel to open a transcript.
@@ -376,6 +363,17 @@ function diskTranscript(id: string | null): readonly AgentEvent[] | null {
  * knows a path, the shell owns the surface.
  */
 const OpenTranscript = React.createContext<(ref: claude.TranscriptRef) => void>(() => {})
+
+/**
+ * On-disk transcripts, by the id the stream reports.
+ *
+ * A host reaches these through the path contract in `store.ts`; the story ships
+ * two of them as fixtures so the opened views are real rather than mocked.
+ */
+const DISK_TRANSCRIPTS: Readonly<Record<string, string>> = {
+  a37fefefbc61e13e3: diskSubagent,
+  a35ea63276cd501aa: diskWorkflowAgent,
+}
 
 const TOOL_ICONS: Partial<Record<ToolKind, React.ReactNode>> = {
   shell: <BashIcon />,
@@ -796,8 +794,8 @@ function TranscriptView({
 
       {transcript.plan.length === 0 ? null : (
         <TaskList aria-label="Agent plan" className="border-border rounded-xl border p-3">
-          {transcript.plan.map((step) => (
-            <TaskListItem key={step.id ?? step.content} status={planStatus(step)}>
+          {transcript.plan.map((step, index) => (
+            <TaskListItem key={step.id ?? `step:${index}`} status={planStatus(step)}>
               {step.content}
             </TaskListItem>
           ))}
@@ -854,55 +852,132 @@ function TranscriptView({
 }
 
 /** The raw side: the bytes as they arrived, and the events they became, selectable against each other. */
-function CapabilitiesView({ capabilities }: { capabilities: claude.SessionCapabilities | null }) {
-  if (capabilities === null) return <p className="text-muted-foreground text-xs">No init line yet.</p>
-  const bySource = (source: string) => capabilities.commands.filter((command) => command.source === source)
+/**
+ * One capabilities pane for every provider.
+ *
+ * The shape is shared and every section is nullable, so a provider that cannot
+ * report something leaves it null and the section is absent — no per-provider
+ * branch here, and no empty list pretending to be an answer. Where the answers
+ * come from stays each provider's business: Claude advertises itself on its
+ * event stream, Codex answers a separate interactive channel.
+ */
+function CapabilitiesView({ capabilities }: { capabilities: AgentCapabilities | null }) {
+  if (capabilities === null) return <p className="text-muted-foreground text-xs">Nothing advertised yet.</p>
+  const unreported = unreportedCapabilities(capabilities)
+  const commands = capabilities.commands
+
   return (
     <div className="flex flex-col gap-3 text-xs">
-      <Section title={`Slash commands (${capabilities.commands.length})`}>
-        {(["skill", "plugin", "session", "terminal"] as const).map((source) =>
-          bySource(source).length === 0 ? null : (
-            <div key={source} className="mb-2">
-              <p className="text-muted-foreground mb-1 uppercase">{source}</p>
-              <div className="flex flex-wrap gap-1">
-                {bySource(source).map((command) => (
-                  <Badge key={command.name} variant="secondary">{`/${command.name}`}</Badge>
-                ))}
+      {capabilities.models === null ? null : (
+        <Section title={`Models (${capabilities.models.length})`}>
+          <ul className="space-y-1">
+            {capabilities.models.map((model) => (
+              <li key={model.id} className="flex items-center gap-2">
+                <Badge variant={model.isDefault ? "default" : "outline"}>{model.label}</Badge>
+                <span className="text-muted-foreground min-w-0 truncate">{model.description}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {commands === null ? null : (
+        <Section title={`Slash commands (${commands.length})`}>
+          {(["skill", "plugin", "session", "terminal"] as const).map((source) => {
+            const group = commands.filter((command) => command.source === source)
+            if (group.length === 0) return null
+            return (
+              <div key={source} className="mb-2">
+                <p className="text-muted-foreground mb-1 uppercase">{source}</p>
+                <div className="flex flex-wrap gap-1">
+                  {group.map((command) => (
+                    <Badge key={command.name} variant="secondary">{`/${command.name}`}</Badge>
+                  ))}
+                </div>
               </div>
-            </div>
-          ),
-        )}
-      </Section>
-      <Section title={`MCP servers (${capabilities.mcpServers.length})`}>
-        <ul className="space-y-1">
-          {capabilities.mcpServers.map((server) => (
-            <li key={server.name} className="flex items-center gap-2">
-              <Badge variant={server.connected ? "default" : "outline"}>{server.status}</Badge>
-              <span>{server.name}</span>
-              <span className="text-muted-foreground ml-auto">{server.tools.length} tools</span>
-            </li>
-          ))}
-        </ul>
-      </Section>
-      <Section title={`Subagents (${capabilities.agents.length})`}>
-        <div className="flex flex-wrap gap-1">
-          {capabilities.agents.map((agent) => (
-            <Badge key={agent} variant="outline">{agent}</Badge>
-          ))}
-        </div>
-      </Section>
-      <Section title={`Tools (${capabilities.tools.length})`}>
-        <p className="text-muted-foreground mb-1">
-          {capabilities.tools.filter((tool) => tool.deferred).length} arrived in a later init — deferred tools loading on demand.
+            )
+          })}
+        </Section>
+      )}
+
+      {capabilities.skills === null ? null : (
+        <Section title={`Skills (${capabilities.skills.length})`}>
+          <div className="flex flex-wrap gap-1">
+            {capabilities.skills.map((skill) => (
+              <Badge key={skill.name} variant="secondary">{`/${skill.name}`}</Badge>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {capabilities.mcpServers === null ? null : (
+        <Section title={`MCP servers (${capabilities.mcpServers.length})`}>
+          <ul className="space-y-1">
+            {capabilities.mcpServers.map((server) => (
+              <li key={server.name} className="flex items-center gap-2">
+                <Badge variant={server.connected ? "default" : "outline"}>{server.status}</Badge>
+                <span>{server.name}</span>
+                <span className="text-muted-foreground ml-auto">{`${server.tools.length} tools`}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {capabilities.agents === null ? null : (
+        <Section title={`Subagents (${capabilities.agents.length})`}>
+          <div className="flex flex-wrap gap-1">
+            {capabilities.agents.map((agent) => (
+              <Badge key={agent} variant="outline">{agent}</Badge>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {capabilities.tools === null ? null : (
+        <Section title={`Tools (${capabilities.tools.length})`}>
+          <p className="text-muted-foreground mb-1">
+            {`${capabilities.tools.filter((tool) => tool.deferred).length} arrived in a later advertisement — deferred tools loading on demand.`}
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {capabilities.tools.slice(0, 40).map((tool) => (
+              <Badge key={tool.name} variant={tool.deferred ? "secondary" : "outline"}>
+                {tool.name}
+              </Badge>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {capabilities.pluginSources === null ? null : (
+        <Section title={`Plugin sources (${capabilities.pluginSources.length})`}>
+          <ul className="space-y-1">
+            {capabilities.pluginSources.map((source) => (
+              <li key={source.name} className="flex items-center gap-2">
+                <span>{source.name}</span>
+                {/* The catalogue's real size, not the sample the reply carried. */}
+                <span className="text-muted-foreground ml-auto">{`${source.count.toLocaleString()} plugins`}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {capabilities.hooks === null ? null : (
+        <Section title={`Hooks (${capabilities.hooks.length})`}>
+          <div className="flex flex-wrap gap-1">
+            {capabilities.hooks.map((hook, index) => (
+              <Badge key={`${hook.event}-${index}`} variant="outline">{hook.event ?? "hook"}</Badge>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {unreported.length === 0 ? null : (
+        <p className="text-muted-foreground">
+          {`Not reported here: ${unreported.join(", ")} — absent because this transport does not carry it, not because there is none.`}
         </p>
-        <div className="flex flex-wrap gap-1">
-          {capabilities.tools.slice(0, 40).map((tool) => (
-            <Badge key={tool.name} variant={tool.deferred ? "secondary" : "outline"}>
-              {tool.name}
-            </Badge>
-          ))}
-        </div>
-      </Section>
+      )}
     </div>
   )
 }
@@ -1032,11 +1107,13 @@ function AgentRow({
 
   if (!openable) {
     return (
-      <div
-        className="flex items-baseline gap-2 rounded-lg px-1 py-1 text-sm"
-        title={transcript?.blockedBy ?? undefined}
-      >
+      <div className="flex items-baseline gap-2 rounded-lg px-1 py-1 text-sm">
         {body}
+        {/* Visible, not a tooltip: a reason only a mouse can reach is a reason
+            a keyboard or screen-reader user never learns. */}
+        {transcript?.blockedBy === undefined || transcript.blockedBy === null ? null : (
+          <span className="text-muted-foreground min-w-0 shrink truncate text-xs">{transcript.blockedBy}</span>
+        )}
       </div>
     )
   }
@@ -1086,62 +1163,6 @@ function agentState(agent: WorkflowAgentProgress): string {
   return agent.agentId === null ? "queued" : "running"
 }
 
-/**
- * The same pane for Codex, fed by the app-server rather than the stream.
- *
- * A marketplace's count is the catalogue's real size and the chips are the
- * sample the reply carried — a curated source holds thousands, which a picker
- * searches rather than lists.
- */
-function CodexCapabilitiesView({ capabilities }: { capabilities: codex.CodexCapabilities }) {
-  return (
-    <div className="flex flex-col gap-3 text-xs">
-      <Section title={`Models (${capabilities.models.length})`}>
-        <ul className="space-y-1">
-          {capabilities.models.map((model) => (
-            <li key={model.id} className="flex items-center gap-2">
-              <Badge variant={model.isDefault ? "default" : "outline"}>{model.displayName}</Badge>
-              <span className="text-muted-foreground min-w-0 truncate">{model.description}</span>
-            </li>
-          ))}
-        </ul>
-      </Section>
-      <Section title={`Skills (${capabilities.skills.length})`}>
-        <div className="flex flex-wrap gap-1">
-          {capabilities.skills.map((skill) => (
-            <Badge key={skill.name} variant="secondary">
-              {`/${skill.name}`}
-            </Badge>
-          ))}
-        </div>
-      </Section>
-      <Section title={`Plugin sources (${capabilities.marketplaces.length})`}>
-        <ul className="space-y-1">
-          {capabilities.marketplaces.map((marketplace) => (
-            <li key={marketplace.name} className="flex items-center gap-2">
-              <span>{marketplace.name}</span>
-              <span className="text-muted-foreground ml-auto">
-                {`${marketplace.count.toLocaleString()} plugins`}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </Section>
-      <Section title={`Hooks (${capabilities.hooks.length})`}>
-        <div className="flex flex-wrap gap-1">
-          {capabilities.hooks.map((hook, index) => (
-            <Badge key={`${hook.event}-${index}`} variant="outline">
-              {hook.event ?? "hook"}
-            </Badge>
-          ))}
-        </div>
-      </Section>
-      <p className="text-muted-foreground">
-        Read from the app-server, not the stream: `codex exec --json` opens with a thread id and nothing else.
-      </p>
-    </div>
-  )
-}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -1169,7 +1190,12 @@ function InspectorView({
   opened: claude.TranscriptRef | null
   onCloseTranscript: () => void
 }) {
+  // Per pane, and reset with the capture: raw lines and events are
+  // deliberately not one-to-one, so one shared index highlights row 12 of a
+  // list the detail below is not showing.
   const [pane, setPane] = React.useState<"raw" | "events" | "capabilities">("raw")
+  const [selectedByPane, setSelectedByPane] = React.useState<{ raw: number; events: number }>({ raw: 0, events: 0 })
+  React.useEffect(() => setSelectedByPane({ raw: 0, events: 0 }), [captureId])
   const provider = PROVIDERS[providerOf(captureId)]
   // Only Claude advertises its commands, skills and servers; asking Codex's
   // events for them would answer null, and a pane that is always empty is
@@ -1177,15 +1203,24 @@ function InspectorView({
   // Claude advertises itself on the stream; Codex answers a different channel,
   // so its capabilities come from a captured app-server reply rather than from
   // the events. Same pane, two sources, and neither invents the other's.
+  // Keyed on the event count, not on `events`: the live reader appends to one
+  // array and hands the same object back, so a memo on its identity is computed
+  // once — against whatever the log held on the first render. After a Replay
+  // that was zero events, and the pane then read "nothing advertised" for good.
   const capabilities = React.useMemo(
     () => (transport.supports.capabilities && provider.id === "claude" ? claude.sessionCapabilities(events) : null),
-    [events, provider, transport],
+    [events, events.length, provider.id, transport.supports.capabilities],
   )
   const codexCaps = React.useMemo(
-    () => (transport.supports.capabilities && provider.id === "codex" ? codex.codexCapabilities(codexAppServerCapabilities as never) : null),
-    [provider, transport],
+    () =>
+      transport.supports.capabilities && provider.id === "codex"
+        ? codex.codexCapabilities(codexAppServerCapabilities as unknown as Record<string, JsonValue>)
+        : null,
+    [provider.id, transport.supports.capabilities],
   )
-  const [selected, setSelected] = React.useState(0)
+  const selected = pane === "events" ? selectedByPane.events : selectedByPane.raw
+  const setSelected = (index: number) =>
+    setSelectedByPane((current) => ({ ...current, [pane === "events" ? "events" : "raw"]: index }))
   const lines = (LINES.get(captureId) ?? []).slice(0, count)
   const line = lines[Math.min(selected, Math.max(lines.length - 1, 0))]
   const decoded = line === undefined ? null : (JSON.parse(line) as unknown)
@@ -1198,7 +1233,7 @@ function InspectorView({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      <SegmentedControl aria-label="Inspector pane" value={pane} onValueChange={(value) => setPane(value as "raw" | "events" | "capabilities")}>
+      <SegmentedControl aria-label="Inspector pane" value={shownPane} onValueChange={(value) => setPane(value as "raw" | "events" | "capabilities")}>
         <SegmentedControlOption value="raw">Raw wire ({lines.length})</SegmentedControlOption>
         <SegmentedControlOption value="events">Events ({events.length})</SegmentedControlOption>
         {transport.supports.capabilities ? (
@@ -1217,11 +1252,8 @@ function InspectorView({
           role="region"
           aria-label="Session capabilities"
         >
-          {codexCaps === null ? (
-            <CapabilitiesView capabilities={capabilities} />
-          ) : (
-            <CodexCapabilitiesView capabilities={codexCaps} />
-          )}
+          {/* One pane, two sources: whichever the provider filled. */}
+          <CapabilitiesView capabilities={capabilities ?? codexCaps} />
         </div>
       ) : shownPane === "raw" ? (
         <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -1234,6 +1266,7 @@ function InspectorView({
                   <button
                     type="button"
                     onClick={() => setSelected(index)}
+                    aria-current={index === selected}
                     className={`w-full truncate rounded px-2 py-0.5 text-left ${index === selected ? "bg-accent text-accent-foreground" : "hover:bg-muted"}`}
                   >
                     <span className="text-muted-foreground">{String(index).padStart(3, "0")}</span> {parsed.type}
@@ -1264,6 +1297,7 @@ function InspectorView({
                 <button
                   type="button"
                   onClick={() => setSelected(index)}
+                  aria-current={index === selected}
                   className={`w-full truncate rounded px-2 py-0.5 text-left ${index === selected ? "bg-accent text-accent-foreground" : "hover:bg-muted"}`}
                 >
                   <span className="text-muted-foreground">{String(event.seq).padStart(3, "0")}</span> {event.payload.type}
@@ -1368,6 +1402,9 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
   // sides are compared on the same scenario rather than on whatever the old
   // selection happened to be.
   const switchProvider = (next: string) => {
+    // The control fires on the selected option too, so without this a click on
+    // the provider already showing throws away the capture and transport.
+    if (next === provider.id) return
     const first = CAPTURES.find((entry) => entry.provider === next)
     if (first !== undefined) setCaptureId(first.id)
     // A transport belongs to its provider, so the selection cannot survive the
@@ -1406,9 +1443,13 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
   React.useEffect(() => setOpened(null), [captureId])
 
   const session = transcript.session
+  // Claude's store only: the path is built from a Claude session's cwd and its
+  // own on-disk layout. Handing it a Codex thread produced a confident
+  // `~/.claude/projects/...` path for a transcript that is not there, in a
+  // format this parser could not read anyway.
   const location = React.useMemo(
-    () => (session === null ? null : claude.sessionLocationOf("~/.claude/projects", session)),
-    [session],
+    () => (session === null || provider.id !== "claude" ? null : claude.sessionLocationOf("~/.claude/projects", session)),
+    [session, provider.id],
   )
   // A host reads these off the workflow records on disk; the story supplies the
   // one it has so the workflow pointers resolve instead of staying blocked.
@@ -1471,7 +1512,10 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
         </SegmentedControl>
         <ProviderSupport provider={provider} transport={transport} />
       </div>
-      <p className="text-muted-foreground text-xs">{transport.note}</p>
+      <p className="text-muted-foreground text-xs">
+        {transport.note}
+        {transport.interactive ? " These captures were recorded from the one-way mode; this row describes what the interactive one adds." : ""}
+      </p>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="border-border flex min-h-[26rem] flex-col overflow-hidden rounded-2xl border p-3 lg:min-h-0">
@@ -1509,7 +1553,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "The agent stream parser, driven by real `claude -p --output-format stream-json` captures. Left is the transcript drawn from parsed events with Message, ToolCall, TaskList and MessageMarkdown; right is the same bytes unparsed — every wire line and every event it became, selectable against each other through JsonTree. The player feeds lines one at a time so the delta path, the shimmer on an unfinished call and the plan filling in all happen the way they do against a live process.",
+          "The agent stream parser, driven by real captures from two agents — `claude -p --output-format stream-json` and `codex exec --json`. Left is the transcript drawn from parsed events with Message, ToolCall, TaskList and MessageMarkdown; right is the same bytes unparsed — every wire line and every event it became, selectable against each other through JsonTree. The player feeds lines one at a time so the delta path, the shimmer on an unfinished call and the plan filling in all happen the way they do against a live process.",
       },
     },
   },
@@ -1644,7 +1688,7 @@ const STRUCTURE = `classDiagram
     }
 
     class CodexMapper {
-        <<codex/ — not built>>
+        <<codex/mapper.ts>>
         +push(line) AgentEvent[]
     }
 
@@ -1660,7 +1704,7 @@ const STRUCTURE = `classDiagram
     TranscriptBuilder --> Transcript : snapshot per frame
     SessionStore ..> AgentEvent : keys read off task_started
     SessionStore ..> ClaudeStreamMapper : disk transcripts reuse it
-    CodexMapper ..> AgentEvent : same contract
+    CodexMapper --> AgentEvent : same contract
     AcpMapper ..> AgentEvent : same contract
 `
 

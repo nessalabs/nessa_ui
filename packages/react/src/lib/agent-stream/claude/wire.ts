@@ -1,5 +1,6 @@
 /** @responsibility Describes Claude Code's `stream-json` wire shapes and decodes one line into them without interpreting it. */
 
+import { parseJsonLine } from "../json"
 import type { JsonValue } from "../json"
 
 /** Re-exported so one import gives a consumer this wire's whole vocabulary. */
@@ -329,6 +330,12 @@ export type WireSystemEvent =
   | WireHookEvent
   | WireUnknownSystemEvent
 
+/** Any decoded line, before anything past `type` has been checked. */
+export interface WireLine {
+  readonly type: string
+  readonly [key: string]: JsonValue | undefined
+}
+
 /**
  * One decoded line. Every arm keeps the fields this library reads and tolerates
  * the rest: the CLI adds keys and whole subtypes between releases, and a parser
@@ -406,7 +413,14 @@ export interface WireParseFailure {
 
 export interface WireParseSuccess {
   readonly ok: true
-  readonly event: WireEvent
+  /**
+   * What the parser actually verified: an object with a string `type`.
+   *
+   * Not one of the arms above. Returning the union would claim fields nothing
+   * checked; the arms describe the wire, and a consumer narrows to one after
+   * checking, the way this package's own mapper does.
+   */
+  readonly line: WireLine
 }
 
 export type WireParseResult = WireParseSuccess | WireParseFailure
@@ -419,34 +433,19 @@ export type WireParseResult = WireParseSuccess | WireParseFailure
  * not end the transcript. Blank lines are a failure with an explicit reason so
  * a caller can filter them knowingly instead of by accident.
  */
+/**
+ * Decodes one line of Claude Code's stream.
+ *
+ * The decoding itself is shared — every provider's wire is newline-delimited
+ * JSON, and one copy per provider is one place per provider for a bug in it to
+ * live. What stays here is the naming and the return type.
+ */
 export function parseWireLine(line: string): WireParseResult {
-  const trimmed = line.trim()
-  if (trimmed.length === 0) return { ok: false, line, reason: "empty line" }
-
-  let decoded: unknown
-  try {
-    decoded = JSON.parse(trimmed)
-  } catch (error) {
-    return {
-      ok: false,
-      line,
-      reason: error instanceof Error ? error.message : "invalid JSON",
-    }
-  }
-
-  if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)) {
-    return { ok: false, line, reason: "line is not a JSON object" }
-  }
-
-  const event = decoded as { type?: unknown }
-  if (typeof event.type !== "string") {
-    return { ok: false, line, reason: "line has no `type`" }
-  }
-
-  return { ok: true, event: decoded as WireEvent }
+  const result = parseJsonLine(line)
+  return result.ok ? { ok: true, line: result.line as WireLine } : result
 }
 
-/** Splits a whole capture into lines and decodes each one, keeping failures in place. */
+/** Decodes a whole capture, keeping failures in place. */
 export function parseWireLines(text: string): readonly WireParseResult[] {
   return text
     .split("\n")

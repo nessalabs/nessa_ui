@@ -4,7 +4,7 @@ import { AgentEventType, FileChange, PlanStepStatus, TaskKind, ToolKind } from "
 import { asRecord, asString } from "../json"
 import type { JsonValue } from "../json"
 import { CodexFileChangeKind, CodexItemType, CodexWireType } from "./wire"
-import type { CodexWireEvent } from "./wire"
+import type { CodexRawLine } from "./wire"
 
 /** A line's kind at the granularity the mapping turns on: the line type, plus the item kind where there is one. */
 export type CodexWireKind = string
@@ -65,6 +65,30 @@ export const CODEX_EVENT_MAPPING: Readonly<Record<CodexWireKind, CodexMappingEnt
   },
 
   // ---------- tools ----------
+  [`${CodexWireType.ItemUpdated}/${CodexItemType.CommandExecution}`]: {
+    emits: [],
+    note: "incremental output on a long command; the completion carries the whole of it, so a partial adds nothing a consumer can use yet",
+  },
+  [`${CodexWireType.ItemUpdated}/${CodexItemType.AgentMessage}`]: {
+    emits: [],
+    note: "the message is reported whole on completion",
+  },
+  [`${CodexWireType.ItemUpdated}/${CodexItemType.Reasoning}`]: {
+    emits: [],
+    note: "reported whole on completion",
+  },
+  [`${CodexWireType.ItemUpdated}/${CodexItemType.FileChange}`]: {
+    emits: [],
+    note: "the completion publishes the paths",
+  },
+  [`${CodexWireType.ItemUpdated}/${CodexItemType.WebSearch}`]: {
+    emits: [],
+    note: "the completion settles the search",
+  },
+  [`${CodexWireType.ItemUpdated}/${CodexItemType.CollabToolCall}`]: {
+    emits: [AgentEventType.TaskCompleted],
+    note: "a live agents_states update; a terminal state closes the run the spawn opened",
+  },
   [`${CodexWireType.ItemStarted}/${CodexItemType.CommandExecution}`]: {
     emits: [AgentEventType.ToolCallStarted],
     note: "a shell command begins; the item id is the call id",
@@ -132,8 +156,8 @@ export const CODEX_EVENT_MAPPING: Readonly<Record<CodexWireKind, CodexMappingEnt
 })
 
 /** The mapping key for one decoded line. */
-export function codexWireKind(event: CodexWireEvent): CodexWireKind {
-  const line = asRecord(event as unknown as JsonValue)
+export function codexWireKind(event: CodexRawLine): CodexWireKind {
+  const line = asRecord(event as JsonValue)
   const type = asString(line.type) ?? "unknown"
   const item = asRecord(line.item)
   const itemType = asString(item.type)
@@ -152,19 +176,20 @@ export function codexMappingFor(kind: CodexWireKind): CodexMappingEntry | null {
  * gives: the mapping is data, and written as data the compiler checks it
  * against the provider's own union.
  */
-export const CODEX_TOOL_KIND: Readonly<Record<string, ToolKind>> = Object.freeze({
+export const CODEX_TOOL_KIND: Readonly<Partial<Record<CodexItemType, ToolKind>>> = Object.freeze({
   [CodexItemType.CommandExecution]: "shell",
   [CodexItemType.FileChange]: "file_edit",
   [CodexItemType.WebSearch]: "web",
   [CodexItemType.McpToolCall]: "mcp",
   [CodexItemType.CollabToolCall]: "subagent",
-  [CodexItemType.TodoList]: "plan",
 })
 
 /** Reads an item kind as one of our tool kinds. */
 export function codexToolKind(itemType: string | null): ToolKind {
   if (itemType === null) return "other"
-  return CODEX_TOOL_KIND[itemType] ?? "other"
+  // Keyed by the provider's own union, so a renamed kind fails to compile
+  // rather than silently rendering every call as "other".
+  return CODEX_TOOL_KIND[itemType as CodexItemType] ?? "other"
 }
 
 /** Codex's file-change words, mapped to ours. */
@@ -172,6 +197,7 @@ export const CODEX_FILE_CHANGE: Readonly<Record<CodexFileChangeKind, FileChange>
   [CodexFileChangeKind.Add]: "add",
   [CodexFileChangeKind.Update]: "update",
   [CodexFileChangeKind.Delete]: "delete",
+  [CodexFileChangeKind.Rename]: "rename",
 })
 
 /** Reads a change kind as one of ours, defaulting to an update. */

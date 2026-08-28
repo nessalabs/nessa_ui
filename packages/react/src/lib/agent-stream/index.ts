@@ -27,6 +27,19 @@ export {
   type WorkflowPhaseProgress,
 } from "./events"
 export {
+  unreportedCapabilities,
+  type AgentCapabilities,
+  type CapabilityCommand,
+  type CapabilityHook,
+  type CapabilityModel,
+  type CapabilityPlugin,
+  type CapabilityPluginSource,
+  type CapabilityServer,
+  type CapabilitySkill,
+  type CapabilityTool,
+  type CommandSource,
+} from "./capabilities"
+export {
   asArray,
   asBoolean,
   asNumber,
@@ -35,6 +48,10 @@ export {
   asRecord,
   asString,
   asStrings,
+  parseJsonLine,
+  parseJsonLines,
+  shortenPath,
+  type JsonLineResult,
   type JsonValue,
 } from "./json"
 

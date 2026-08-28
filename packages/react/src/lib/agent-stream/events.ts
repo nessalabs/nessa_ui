@@ -169,14 +169,30 @@ export interface Usage {
   readonly outputTokens: number | null
   readonly cacheReadTokens: number | null
   readonly cacheCreationTokens: number | null
+  /**
+   * Tokens spent reasoning, where a provider counts them separately.
+   *
+   * Codex reports this; Claude Code folds reasoning into its output count and
+   * reports none. Null therefore means "not reported", never "none spent", and
+   * a total that includes it must not also add it twice.
+   */
+  readonly reasoningTokens: number | null
   readonly totalCostUsd?: number
 }
 
 /** What one `system/init` said the session was configured with. */
 export interface SessionInfo {
+  /** The only field every provider asserts. */
   readonly sessionId: string
-  readonly model: string
-  readonly cwd: string
+  /**
+   * Null where the provider does not say.
+   *
+   * Codex's thread line carries an id and nothing else, so filling these with
+   * `"unknown"` would put a placeholder on screen and state something the wire
+   * never did — the same reason the token counters are nullable.
+   */
+  readonly model: string | null
+  readonly cwd: string | null
   readonly tools: readonly string[]
   readonly slashCommands: readonly string[]
   readonly agents: readonly string[]
@@ -185,9 +201,9 @@ export interface SessionInfo {
   /** Commands the terminal owns rather than the session (`/doctor`, `/color`). */
   readonly terminalSlashCommands: readonly string[]
   readonly plugins: readonly { readonly name: string; readonly version: string | null; readonly source: string }[]
-  readonly permissionMode: string
-  readonly version: string
-  readonly outputStyle: string
+  readonly permissionMode: string | null
+  readonly version: string | null
+  readonly outputStyle: string | null
   /**
    * Which `init` this is within the mapped stream, counting from zero.
    *

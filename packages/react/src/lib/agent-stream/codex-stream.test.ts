@@ -42,7 +42,7 @@ test("every line kind the captures contain is declared in the mapping table", ()
   for (const name of NAMES) {
     for (const result of parseCodexLines(capture(name))) {
       if (!result.ok) continue
-      const kind = codexWireKind(result.event)
+      const kind = codexWireKind(result.line)
       assert.ok(CODEX_EVENT_MAPPING[kind] !== undefined, `${name}: ${kind} is not in CODEX_EVENT_MAPPING`)
     }
   }
@@ -53,9 +53,9 @@ test("what the mapper emits is what the table promises", () => {
     const mapper = new CodexStreamMapper()
     for (const result of parseCodexLines(capture(name))) {
       if (!result.ok) continue
-      const kind = codexWireKind(result.event)
+      const kind = codexWireKind(result.line)
       const declared = new Set(CODEX_EVENT_MAPPING[kind]!.emits)
-      for (const event of mapper.map(result.event)) {
+      for (const event of mapper.map(result.line)) {
         assert.ok(declared.has(event.payload.type as never), `${name}: ${kind} emitted an undeclared ${event.payload.type}`)
       }
     }
@@ -181,22 +181,81 @@ test("the app-server answers what the exec stream cannot", () => {
   const replies = JSON.parse(readFileSync(`${FIXTURES}appserver_capabilities.json`, "utf8")) as Record<string, never>
   const capabilities = codexCapabilities(replies)
 
-  assert.ok(capabilities.models.length > 0)
-  assert.ok(capabilities.models.every((model) => model.id.length > 0 && model.displayName.length > 0))
-  assert.ok(capabilities.skills.length > 0)
-  assert.ok(capabilities.hooks.length > 0)
+  assert.ok((capabilities.models ?? []).length > 0)
+  assert.ok(capabilities.models!.every((model) => model.id.length > 0 && model.label.length > 0))
+  assert.ok((capabilities.skills ?? []).length > 0)
+
+  // Hooks are named `eventName`/`sourcePath` in the reply. Reading `event`
+  // and `source` instead returned a list of blank rows that still passed a
+  // length check, so the assertion now looks at the values.
+  assert.ok((capabilities.hooks ?? []).length > 0)
+  assert.ok(capabilities.hooks!.every((hook) => hook.event !== null), "every hook names its event")
+  assert.ok(capabilities.hooks!.some((hook) => hook.source !== null), "a hook says where it came from")
+
+  // Sections this reply cannot answer read as unreported, not as empty.
+  assert.equal(capabilities.commands, null)
+  assert.equal(capabilities.mcpServers, null)
 
   // A curated marketplace holds thousands, so the count is the catalogue's real
   // size and the sample is what a picker was handed — reporting the sample's
   // length as the size would understate it by three orders of magnitude.
-  const largest = [...capabilities.marketplaces].sort((a, b) => b.count - a.count)[0]!
+  const largest = [...capabilities.pluginSources!].sort((a, b) => b.count - a.count)[0]!
   assert.ok(largest.count > largest.sample.length)
   assert.equal(CODEX_CAPABILITY_METHODS.includes("model/list"), true)
 })
 
 test("a host that asks for only some capabilities gets the rest empty, not an error", () => {
   const partial = codexCapabilities({ "model/list": { data: [{ id: "gpt-5", displayName: "GPT-5" }] } } as never)
-  assert.equal(partial.models.length, 1)
+  assert.equal(partial.models!.length, 1)
   assert.deepEqual(partial.skills, [])
-  assert.deepEqual(partial.marketplaces, [])
+  assert.deepEqual(partial.pluginSources, [])
+})
+
+test("one spawned agent is one run, and its result is the run's result", () => {
+  // `spawn_agent` opens the run and a later `wait` reports its outcome — two
+  // items, one agent. Treating every collab call as a spawn made two runs, the
+  // second labelled "wait" with no prompt and no output.
+  const { runs } = buildTranscript(mapCodexStream(capture("delegate")))
+  const agents = runs.filter((run) => run.kind === "agent")
+  assert.equal(agents.length, 1, "two runs here would be the same agent counted twice")
+
+  // The agent's own text arrives in `agents_states`, which is the only place
+  // this stream carries it. Reporting the receiver thread ids as the summary
+  // put machine addresses where the reader expects an answer.
+  const run = agents[0]!
+  assert.equal(run.done, true)
+  assert.ok(run.usage === null || run.usage.totalTokens === null)
+  assert.match(run.status ?? run.description ?? "", /.+/)
+  const summary = run.events.length === 0 ? runSummary(mapCodexStream(capture("delegate"))) : null
+  assert.ok(summary !== null && summary.includes("bonjour"), `expected the agent's own answer, got ${summary}`)
+})
+
+/** The last summary a task_completed carried, which is where a run's outcome lands. */
+function runSummary(events: readonly ReturnType<typeof mapCodexStream>[number][]): string | null {
+  let summary: string | null = null
+  for (const event of events) {
+    if (event.payload.type === "task_completed" && event.payload.summary !== null) summary = event.payload.summary
+  }
+  return summary
+}
+
+test("reasoning tokens are counted, not dropped", () => {
+  // Codex reports them separately and excludes them from `output_tokens`, so a
+  // total without them understates the turn.
+  const events = mapCodexStream(capture("plan"))
+  const usage = events.flatMap((event) => (event.payload.type === "turn_completed" ? [event.payload.usage] : []))[0]
+  assert.notEqual(usage, null)
+  assert.notEqual(usage!.reasoningTokens, null)
+  assert.equal(usage!.totalTokens, (usage!.inputTokens ?? 0) + (usage!.outputTokens ?? 0) + (usage!.reasoningTokens ?? 0))
+})
+
+test("a call's input is its arguments, not the whole line", () => {
+  const events = mapCodexStream(capture("tools"))
+  const call = events.find((event) => event.payload.type === "tool_call_started")
+  const input = call?.payload.type === "tool_call_started" ? (call.payload.input as Record<string, unknown>) : {}
+  // The item also carries id, status and output; those describe the call's
+  // lifecycle, and a drawer printing them as "input" shows plumbing.
+  assert.equal("id" in input, false)
+  assert.equal("status" in input, false)
+  assert.ok("command" in input || "changes" in input)
 })

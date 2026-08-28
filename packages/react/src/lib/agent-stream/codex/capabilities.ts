@@ -1,5 +1,12 @@
 /** @responsibility Reads what a Codex session can do from the app-server, which is the only place that answers. */
 
+import type {
+  AgentCapabilities,
+  CapabilityHook,
+  CapabilityModel,
+  CapabilityPluginSource,
+  CapabilitySkill,
+} from "../capabilities"
 import { asArray, asNumber, asRecord, asString } from "../json"
 import type { JsonValue } from "../json"
 
@@ -17,43 +24,7 @@ import type { JsonValue } from "../json"
  * captured reply.
  */
 
-export interface CodexModel {
-  readonly id: string
-  readonly displayName: string
-  readonly description: string | null
-  readonly isDefault: boolean
-}
 
-export interface CodexSkill {
-  readonly name: string
-  readonly description: string | null
-}
-
-export interface CodexHook {
-  readonly event: string | null
-  readonly source: string | null
-}
-
-/**
- * A plugin source.
- *
- * `count` is the marketplace's real size and `sample` is what was returned:
- * a curated marketplace holds thousands, so a picker searches it rather than
- * listing it, and a surface that showed only the sample would misreport the
- * catalogue's size.
- */
-export interface CodexMarketplace {
-  readonly name: string
-  readonly count: number
-  readonly sample: readonly { readonly id: string | null; readonly name: string | null }[]
-}
-
-export interface CodexCapabilities {
-  readonly models: readonly CodexModel[]
-  readonly skills: readonly CodexSkill[]
-  readonly hooks: readonly CodexHook[]
-  readonly marketplaces: readonly CodexMarketplace[]
-}
 
 /** The app-server methods this reads, so a host knows what to ask for. */
 export const CODEX_CAPABILITY_METHODS = Object.freeze([
@@ -72,15 +43,15 @@ export type CodexCapabilityMethod = (typeof CODEX_CAPABILITY_METHODS)[number]
  * for only what a surface needs, and a picker with no plugins is a picker, not
  * a failure.
  */
-export function codexCapabilities(replies: Readonly<Record<string, JsonValue>>): CodexCapabilities {
-  const models: CodexModel[] = []
+export function codexCapabilities(replies: Readonly<Record<string, JsonValue>>): AgentCapabilities {
+  const models: CapabilityModel[] = []
   for (const entry of asArray(asRecord(replies["model/list"]).data)) {
     const model = asRecord(entry)
     const id = asString(model.id)
     if (id === null) continue
     models.push({
       id,
-      displayName: asString(model.displayName) ?? id,
+      label: asString(model.displayName) ?? id,
       description: asString(model.description),
       isDefault: model.isDefault === true,
     })
@@ -88,7 +59,7 @@ export function codexCapabilities(replies: Readonly<Record<string, JsonValue>>):
 
   // Skills and hooks are reported per working directory, since both can be
   // defined by the project as well as the user.
-  const skills: CodexSkill[] = []
+  const skills: CapabilitySkill[] = []
   for (const scope of asArray(asRecord(replies["skills/list"]).data)) {
     for (const entry of asArray(asRecord(scope).skills)) {
       const skill = asRecord(entry)
@@ -98,24 +69,26 @@ export function codexCapabilities(replies: Readonly<Record<string, JsonValue>>):
     }
   }
 
-  const hooks: CodexHook[] = []
+  const hooks: CapabilityHook[] = []
   for (const scope of asArray(asRecord(replies["hooks/list"]).data)) {
     for (const entry of asArray(asRecord(scope).hooks)) {
       const hook = asRecord(entry)
-      hooks.push({ event: asString(hook.event) ?? asString(hook.type), source: asString(hook.source) ?? asString(hook.path) })
+      // The reply names these `eventName` and `sourcePath`; `source` beside
+      // them is the *kind* of source ("plugin"), not where it came from, so
+      // reading it as the location returns the same word for every hook.
+      hooks.push({ event: asString(hook.eventName), source: asString(hook.sourcePath) })
     }
   }
 
-  const marketplaces: CodexMarketplace[] = []
+  const pluginSources: CapabilityPluginSource[] = []
   for (const entry of asArray(asRecord(replies["plugin/list"]).marketplaces)) {
     const marketplace = asRecord(entry)
     const name = asString(marketplace.name)
     if (name === null) continue
-    const sample = asArray(marketplace.plugins).map((plugin) => ({
-      id: asString(asRecord(plugin).id),
-      name: asString(asRecord(plugin).name),
-    }))
-    marketplaces.push({
+    const sample = asArray(marketplace.plugins)
+      .map((plugin) => asString(asRecord(plugin).name) ?? asString(asRecord(plugin).id))
+      .filter((name): name is string => name !== null)
+    pluginSources.push({
       name,
       // The reply carries the true size when the sample is trimmed; without it
       // the sample's length is the best available answer.
@@ -124,5 +97,23 @@ export function codexCapabilities(replies: Readonly<Record<string, JsonValue>>):
     })
   }
 
-  return { models, skills, hooks, marketplaces }
+  return {
+    // The app-server answers about the installation, not about one thread, so
+    // the session's own identity is not part of this reply.
+    sessionId: null,
+    model: null,
+    cwd: null,
+    permissionMode: null,
+    models,
+    skills,
+    hooks,
+    pluginSources,
+    // Null rather than empty: Codex has these concepts, this reply does not
+    // carry them, and a picker should omit the section rather than show it bare.
+    commands: null,
+    agents: null,
+    tools: null,
+    mcpServers: null,
+    plugins: null,
+  }
 }

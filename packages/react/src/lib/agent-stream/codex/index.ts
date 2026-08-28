@@ -16,32 +16,9 @@ export {
 export {
   CODEX_CAPABILITY_METHODS,
   codexCapabilities,
-  type CodexCapabilities,
   type CodexCapabilityMethod,
-  type CodexHook,
-  type CodexMarketplace,
-  type CodexModel,
-  type CodexSkill,
 } from "./capabilities"
 export { CodexStreamMapper, mapCodexStream } from "./mapper"
-export {
-  CodexFileChangeKind,
-  CodexItemStatus,
-  CodexItemType,
-  CodexWireType,
-  parseCodexLine,
-  parseCodexLines,
-  type CodexAgentMessageItem,
-  type CodexCollabToolCallItem,
-  type CodexCommandExecutionItem,
-  type CodexFileChangeEntry,
-  type CodexFileChangeItem,
-  type CodexItem,
-  type CodexItemLine,
-  type CodexParseFailure,
-  type CodexParseResult,
-  type CodexUsage,
-  type CodexTodoItem,
-  type CodexTodoListItem,
-  type CodexWireEvent,
-} from "./wire"
+// The whole wire surface, so a consumer holding a `CodexWireEvent` can name
+// every arm it narrows to. A hand-kept list drifts — this one already had.
+export * from "./wire"
