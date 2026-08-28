@@ -88,4 +88,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-006",
+    kind: "transition",
+    contractId: "STYLE-001",
+    baseRevision: "797c59bf8c85ec3dc6c3d50096b9ddf363afd698",
+    targets: ["validation/contracts.ts", "validation/exceptions.ts", "validation/nessa/check-metadata.ts"],
+    beforeFingerprint: "22709c0ab698f9ec6303b75205b58bedad282f42f2557a1afa522ad90ea50549",
+    afterFingerprint: "949e200a1041173b0ceafd3a9256b30cd6259a9ac95c8731f2f9b1fa98856f1e",
+    rationale: "Adds three enforced styling-discipline contracts (STYLE-001 semantic-color-only class surfaces, STYLE-002 frozen stacking scale, STYLE-003 inline-style computed-geometry allowlist) with a new style-discipline checker, making token bypasses and unaudited inline styling structurally visible instead of convention-guarded; the checker covers .ts and .tsx class surfaces, named colors, paint arbitrary properties, dynamic style keys, and literal-color custom properties.",
+    compatibility: "Strictly adds validation with no consumer runtime API changes; every existing off-scale stacking utility and out-of-allowlist inline style property is preserved verbatim as an exact ledgered occurrence, so no rendered output changes.",
+    migration: "New code uses semantic token utilities for color, the z-0..z-50 scale for layering, and custom properties plus the geometry allowlist for runtime-computed inline styles; ledgered occurrences shrink toward zero under their recorded removal conditions and may never grow without an explicit amendment.",
+    supersedes: null,
+    pullRequest: null,
+  },
 ])

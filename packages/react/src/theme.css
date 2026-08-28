@@ -41,6 +41,8 @@
   --nessa-fast-mode-active: oklch(0.57 0.22 300);
   --nessa-diff-addition: oklch(0.5 0.137 150);
   --nessa-diff-deletion: oklch(0.55 0.19 27);
+  --nessa-invalid-ring: color-mix(in oklab, var(--destructive) 20%, transparent);
+  --nessa-diff-dark-addition: oklch(0.6222 0.1661 146.22);
 }
 
 .dark {
@@ -76,6 +78,8 @@
   --nessa-fast-mode-active: oklch(0.72 0.185 306);
   --nessa-diff-addition: oklch(0.77 0.17 152);
   --nessa-diff-deletion: oklch(0.7 0.19 25);
+  --nessa-invalid-ring: color-mix(in oklab, var(--destructive) 40%, transparent);
+  --nessa-diff-dark-addition: oklch(0.6222 0.1661 146.22);
 }
 
 @media (prefers-reduced-motion: reduce) {

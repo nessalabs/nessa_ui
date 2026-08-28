@@ -1726,11 +1726,11 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
                     through it across the pinned column. */}
                 <div
                   data-slot="gantt-chart-task-cell"
-                  className="sticky left-0 z-20 flex shrink-0 items-center gap-1 border-b border-r border-border/40 border-r-border bg-background pe-3 text-sm"
+                  className="sticky left-0 z-20 flex shrink-0 items-center gap-1 border-b border-r border-border/40 border-r-border bg-background pe-3 ps-(--gantt-row-indent) text-sm"
                   style={{
                     width: taskListWidth,
-                    paddingInlineStart: 8 + row.depth * 16,
-                  }}
+                    "--gantt-row-indent": `${8 + row.depth * 16}px`,
+                  } as React.CSSProperties}
                 >
                   {row.summary ? (
                     <button

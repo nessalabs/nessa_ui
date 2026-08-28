@@ -54,7 +54,9 @@ function parseArgs(args: readonly string[]): CliOptions {
 }
 
 async function gitPaths(args: readonly string[]): Promise<string[]> {
-  const { stdout } = await execFileAsync("git", [...args, "-z"], { cwd: repoRoot, maxBuffer: 20 * 1024 * 1024 })
+  // -z must precede any "--" pathspec separator; appended at the end it would be
+  // consumed as a pathspec and silently empty the diff.
+  const { stdout } = await execFileAsync("git", [args[0]!, "-z", ...args.slice(1)], { cwd: repoRoot, maxBuffer: 20 * 1024 * 1024 })
   return stdout.split("\0").filter(Boolean)
 }
 

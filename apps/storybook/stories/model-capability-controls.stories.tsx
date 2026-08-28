@@ -104,8 +104,8 @@ async function verifyUltraStream(canvasElement: HTMLElement) {
   await expect(getComputedStyle(periods[0]!).backgroundImage).toBe(
     getComputedStyle(periods[1]!).backgroundImage,
   )
-  await expect(periods[0]!.style.backgroundImage).toMatch(
-    /^linear-gradient\(90deg, transparent 0%,[\s\S]*transparent 100%\)$/,
+  await expect(getComputedStyle(periods[0]!).backgroundImage).toMatch(
+    /^linear-gradient\(90deg, (?:transparent|rgba\(0, 0, 0, 0\)) 0%,[\s\S]*(?:transparent|rgba\(0, 0, 0, 0\)) 100%\)$/,
   )
   await expect(streamRect.top).toBeGreaterThanOrEqual(trackRect.top)
   await expect(streamRect.bottom).toBeLessThanOrEqual(trackRect.bottom)
