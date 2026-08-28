@@ -703,6 +703,27 @@ export {
   type RandomAvatarToneRange,
 } from "./components/random-avatar"
 export {
+  FlowChart,
+  computeFlowChartLayout,
+  flowChartCenterlinePath,
+  flowChartLinkId,
+  flowChartPalette,
+  flowChartRibbonPath,
+  type FlowChartAlign,
+  type FlowChartLink,
+  type FlowChartNode,
+  type FlowChartHoverContext,
+  type FlowChartNodeContext,
+  type FlowChartProps,
+  type FlowChartLayout,
+  type FlowChartLayoutIssue,
+  type FlowChartLayoutLink,
+  type FlowChartLayoutNode,
+  type FlowChartLayoutOptions,
+  type FlowChartLinkInput,
+  type FlowChartNodeInput,
+} from "./components/flow-chart"
+export {
   FilePreview,
   FilePreviewContent,
   FilePreviewFallback,
