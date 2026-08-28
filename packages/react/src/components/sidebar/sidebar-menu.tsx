@@ -2,11 +2,54 @@
 
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
+import { ChevronDown } from "lucide-react"
 import { Slot } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
 /** @responsibility Provides semantic navigation lists, complete rows, and loading states. */
+
+/**
+ * Decorative branch guides drawn by a nested list for its own rows.
+ *
+ * A row's guide is two pieces. The elbow is one bordered box whose
+ * logical-start and block-end edges meet at a rounded corner, so a single
+ * element draws both legs and mirrors under RTL. The spine is a full-height
+ * rule that every row except the last draws, overshooting the row by the
+ * list's own `gap-0.5` so it meets the next row's spine.
+ *
+ * The spine runs the row's whole height rather than starting at the branch
+ * point: the elbow's rounded corner leaves its vertical leg short by the
+ * corner radius, so a spine starting at the branch would open a gap the
+ * width of that radius. Running the full height makes one unbroken line
+ * that the elbow branches off, and leaves the last row — which draws no
+ * spine — terminating at its own elbow.
+ *
+ * Every dimension and the colour are custom properties so hosts can retune
+ * the guides without restating the geometry.
+ */
+const sidebarMenuGuideClasses = [
+  "[--nessa-sidebar-guide-inset:1.25rem]",
+  "[--nessa-sidebar-guide-reach:0.75rem]",
+  "[--nessa-sidebar-guide-branch:1rem]",
+  "[--nessa-sidebar-guide-width:1px]",
+  "[--nessa-sidebar-guide-radius:0.375rem]",
+  "[--nessa-sidebar-guide-color:var(--color-sidebar-border)]",
+  // Elbow: the branch from the spine across to the row.
+  "[&>li]:before:pointer-events-none [&>li]:before:absolute [&>li]:before:z-10 [&>li]:before:content-['']",
+  "[&>li]:before:top-0 [&>li]:before:start-(--nessa-sidebar-guide-inset)",
+  "[&>li]:before:h-(--nessa-sidebar-guide-branch) [&>li]:before:w-(--nessa-sidebar-guide-reach)",
+  "[&>li]:before:rounded-es-[var(--nessa-sidebar-guide-radius)]",
+  "[&>li]:before:border-s-[length:var(--nessa-sidebar-guide-width)]",
+  "[&>li]:before:border-b-[length:var(--nessa-sidebar-guide-width)]",
+  "[&>li]:before:border-[color:var(--nessa-sidebar-guide-color)]",
+  // Spine: the unbroken rule carrying on to the next row's elbow.
+  "[&>li:not(:last-child)]:after:pointer-events-none [&>li:not(:last-child)]:after:absolute [&>li:not(:last-child)]:after:z-10 [&>li:not(:last-child)]:after:content-['']",
+  "[&>li:not(:last-child)]:after:top-0 [&>li:not(:last-child)]:after:-bottom-0.5",
+  "[&>li:not(:last-child)]:after:start-(--nessa-sidebar-guide-inset)",
+  "[&>li:not(:last-child)]:after:w-(--nessa-sidebar-guide-width)",
+  "[&>li:not(:last-child)]:after:bg-[var(--nessa-sidebar-guide-color)]",
+].join(" ")
 
 /** Properties accepted by a semantic Sidebar navigation list. */
 interface SidebarMenuProps extends React.ComponentProps<"ul"> {
@@ -15,22 +58,48 @@ interface SidebarMenuProps extends React.ComponentProps<"ul"> {
    * @defaultValue false
    */
   nested?: boolean
+  /**
+   * Draws decorative branch guides connecting the list's rows to their
+   * parent row. Applies only to a `nested` list, which is the only list
+   * that has a parent to connect to. The guides are pure presentation:
+   * hierarchy remains carried by the nested list structure itself.
+   *
+   * Retune the guides with custom properties, all settable on the list or
+   * any ancestor: `--nessa-sidebar-guide-inset` (offset from the logical
+   * start), `--nessa-sidebar-guide-reach` (how far the elbow crosses toward
+   * the row), `--nessa-sidebar-guide-branch` (where on the row the elbow
+   * meets it), `--nessa-sidebar-guide-width` (line thickness),
+   * `--nessa-sidebar-guide-radius` (elbow corner), and
+   * `--nessa-sidebar-guide-color` (defaults to the sidebar border token).
+   *
+   * @defaultValue false
+   */
+  guides?: boolean
 }
 
 /**
  * Renders a semantic list of Sidebar navigation rows.
  *
- * @param props - Native list properties and whether the list represents nested navigation.
+ * @param props - Native list properties, whether the list represents nested navigation, and whether it draws branch guides.
  * @returns A vertical, unstyled Sidebar navigation list.
  */
-function SidebarMenu({ nested = false, className, ...props }: SidebarMenuProps) {
+function SidebarMenu({
+  nested = false,
+  guides = false,
+  className,
+  ...props
+}: SidebarMenuProps) {
+  const guided = nested && guides
+
   return (
     <ul
       data-slot="sidebar-menu"
       data-nested={nested || undefined}
+      data-guides={guided || undefined}
       className={cn(
         "group/menu flex w-full min-w-0 list-none flex-col gap-0.5 p-0",
         nested && "group-data-[state=collapsed]/sidebar:hidden",
+        guided && sidebarMenuGuideClasses,
         className,
       )}
       {...props}
@@ -107,6 +176,26 @@ interface SidebarMenuItemProps
   /** Optional nested list rendered after the row control. */
   submenu?: React.ReactNode
   /**
+   * Turns `submenu` into a disclosure and chooses what operates it.
+   * `"row"` makes the row control itself the disclosure button, for a
+   * parent that is only a container; `"chevron"` adds a separate control at
+   * the logical start so the row stays free to navigate. Has no effect
+   * without a `submenu`.
+   */
+  collapsible?: "row" | "chevron"
+  /** Accessible name for a `"chevron"` disclosure control. */
+  collapsibleLabel?: string
+  /** Open state of a collapsible `submenu`, for host-controlled disclosure. */
+  open?: boolean
+  /**
+   * Initial open state of a collapsible `submenu` when the host does not
+   * control `open`.
+   * @defaultValue false
+   */
+  defaultOpen?: boolean
+  /** Called with the next open state whenever the disclosure is operated. */
+  onOpenChange?: (open: boolean) => void
+  /**
    * Default accessible label and native title for the control. Explicit
    * `aria-label` or `title` properties take precedence.
    */
@@ -131,6 +220,31 @@ interface SidebarMenuItemProps
 }
 
 /**
+ * Renders the disclosure chevron for a collapsible row.
+ *
+ * The glyph points down when open and toward the inline end when closed.
+ * Closed rotates a down-chevron rather than mirroring it, so the direction
+ * stays correct under RTL without a scale transform fighting the rotation.
+ *
+ * @param props - Whether the disclosure it belongs to is open.
+ * @returns A decorative chevron that rotates with the disclosure state.
+ */
+function SidebarMenuItemChevron({ open }: { open: boolean }) {
+  return (
+    <ChevronDown
+      aria-hidden="true"
+      className={cn(
+        "size-4 shrink-0 transition-transform duration-150 group-data-[state=collapsed]/sidebar:hidden",
+        // Both directions are scoped so neither has to out-order the other:
+        // an unscoped `-rotate-90` wins over `rtl:rotate-90` on source order
+        // and leaves a closed chevron pointing the wrong way under RTL.
+        !open && "ltr:-rotate-90 rtl:rotate-90",
+      )}
+    />
+  )
+}
+
+/**
  * Renders a complete Sidebar navigation row and any associated trailing or nested content.
  *
  * Rows are memoized: in long lists, pass referentially stable slot elements
@@ -145,6 +259,11 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
   badge,
   children,
   collapsedIcon,
+  collapsible,
+  collapsibleLabel = "Toggle submenu",
+  defaultOpen = false,
+  onOpenChange,
+  open: controlledOpen,
   containerClassName,
   description,
   icon,
@@ -159,14 +278,39 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
   className,
   ...props
 }: SidebarMenuItemProps) {
+  // A submenu is only a disclosure when the host asks for one; without
+  // `collapsible` the submenu renders exactly as before, always open and
+  // carrying no disclosure semantics.
+  const isCollapsible = collapsible != null && submenu != null
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(defaultOpen)
+  const open = controlledOpen ?? uncontrolledOpen
+  const generatedSubmenuId = React.useId()
+  const submenuId = `${generatedSubmenuId}-submenu`
+  const toggleOpen = React.useCallback(() => {
+    const next = !open
+    if (controlledOpen === undefined) setUncontrolledOpen(next)
+    onOpenChange?.(next)
+  }, [controlledOpen, onOpenChange, open])
+
   const Comp = asChild ? Slot.Root : "button"
   const label =
     asChild && React.isValidElement<{ children?: React.ReactNode }>(children)
       ? children.props.children
       : children
   const hasTrailing = Boolean(badge || trailing)
+  // The trailing region is a band as tall as the row's own first line, so
+  // its content centres against the row whatever height that content is —
+  // a 14px spinner and a 28px icon button both land on the row's midline.
+  // The band's height mirrors the control's `min-h-*`, and is read from the
+  // same `size` prop rather than from `:has()`, which would match a nested
+  // submenu's rows and let a child row's size move its parent's trailing.
+  const trailingBandClassName =
+    size === "sm" ? "h-8" : size === "lg" ? "h-12" : "h-9"
   const content = (
     <>
+      {isCollapsible && collapsible === "row" ? (
+        <SidebarMenuItemChevron open={open} />
+      ) : null}
       {icon ? (
         <span
           aria-hidden="true"
@@ -205,6 +349,21 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
     </>
   )
 
+  // In `"row"` mode the row control is the disclosure, so it carries the
+  // disclosure semantics and toggles after any handler the host passed —
+  // and only if that handler did not preventDefault.
+  const rowDisclosureProps =
+    isCollapsible && collapsible === "row"
+      ? {
+          "aria-expanded": open,
+          "aria-controls": submenuId,
+          onClick: (event: React.MouseEvent<HTMLButtonElement>) => {
+            props.onClick?.(event)
+            if (!event.defaultPrevented) toggleOpen()
+          },
+        }
+      : null
+
   const control = (
     <Comp
       type={asChild ? undefined : "button"}
@@ -213,8 +372,18 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
       data-size={size ?? "default"}
       aria-label={tooltip}
       title={tooltip}
-      className={cn(sidebarMenuItemVariants({ variant, size, inset }), className)}
+      className={cn(
+        sidebarMenuItemVariants({
+          variant,
+          size,
+          // A `"chevron"` disclosure sits in the row's logical-start space,
+          // so the row reserves that space the same way `inset` does.
+          inset: isCollapsible && collapsible === "chevron" ? true : inset,
+        }),
+        className,
+      )}
       {...props}
+      {...rowDisclosureProps}
     >
       {asChild && React.isValidElement(children)
         ? React.cloneElement(children, undefined, content)
@@ -226,15 +395,35 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
     <li
       data-slot="sidebar-menu-item"
       data-has-trailing={hasTrailing || undefined}
+      data-state={isCollapsible ? (open ? "open" : "closed") : undefined}
       className={cn("group/menu-item relative min-w-0", containerClassName)}
     >
+      {isCollapsible && collapsible === "chevron" ? (
+        <button
+          type="button"
+          data-slot="sidebar-menu-item-disclosure"
+          aria-expanded={open}
+          aria-controls={submenuId}
+          aria-label={collapsibleLabel}
+          onClick={toggleOpen}
+          // The 24px control centres on the same axis as a `"row"` chevron,
+          // which sits inside the control's own 10px leading padding.
+          className={cn(
+            "absolute start-1.5 top-0 z-10 flex w-6 appearance-none items-center justify-center rounded-md border-0 bg-transparent p-0 text-sidebar-foreground/70 outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring group-data-[state=collapsed]/sidebar:hidden",
+            trailingBandClassName,
+          )}
+        >
+          <SidebarMenuItemChevron open={open} />
+        </button>
+      ) : null}
       {control}
       {hasTrailing ? (
         <div
           data-slot="sidebar-menu-item-trailing"
           data-show-on-hover={showTrailingOnHover || undefined}
           className={cn(
-            "absolute end-1 top-1.5 z-10 flex items-center gap-0.5 group-has-data-[size=sm]/menu-item:top-1 group-has-data-[size=lg]/menu-item:top-3 group-data-[state=collapsed]/sidebar:hidden",
+            "absolute end-1 top-0 z-10 flex items-center gap-0.5 group-data-[nested=true]/menu:h-8 group-data-[state=collapsed]/sidebar:hidden",
+            trailingBandClassName,
             showTrailingOnHover &&
               "[@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:opacity-0 [@media(hover:hover)_and_(pointer:fine)]:group-focus-within/menu-item:pointer-events-auto [@media(hover:hover)_and_(pointer:fine)]:group-focus-within/menu-item:opacity-100 [@media(hover:hover)_and_(pointer:fine)]:group-hover/menu-item:pointer-events-auto [@media(hover:hover)_and_(pointer:fine)]:group-hover/menu-item:opacity-100",
           )}
@@ -250,7 +439,20 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
           {trailing}
         </div>
       ) : null}
-      {submenu}
+      {isCollapsible ? (
+        // The wrapper always renders so `aria-controls` always names a real
+        // element; `hidden` closes it without discarding the subtree's own
+        // state. A closed disclosure keeps its rows out of the a11y tree.
+        <div
+          id={submenuId}
+          data-slot="sidebar-menu-item-submenu"
+          hidden={!open}
+        >
+          {submenu}
+        </div>
+      ) : (
+        submenu
+      )}
     </li>
   )
 })
