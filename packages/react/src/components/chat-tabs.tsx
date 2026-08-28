@@ -65,6 +65,10 @@ function ChatTabs({
   ...props
 }: ChatTabsProps) {
   const tabRefs = React.useRef(new Map<string, HTMLButtonElement>())
+  // Roving tabindex needs one focusable stop even when activeId matches no
+  // tab (the type allows null, and hosts may close the active tab without
+  // reselecting) — the first tab takes it as a fallback.
+  const hasActiveTab = tabs.some((tab) => tab.id === activeId)
 
   const selectRelativeTab = (index: number, key: string) => {
     if (tabs.length === 0) return
@@ -126,7 +130,7 @@ function ChatTabs({
                 aria-selected={active}
                 aria-busy={tab.loading || undefined}
                 aria-controls={`chat-tab-panel-${tab.id}`}
-                tabIndex={active ? 0 : -1}
+                tabIndex={active || (!hasActiveTab && index === 0) ? 0 : -1}
                 aria-label={tab.title}
                 title={tab.title}
                 onClick={() => onSelect(tab.id)}
@@ -142,13 +146,21 @@ function ChatTabs({
                   }
                   // The close affordance is pointer-only (a tablist may own
                   // nothing but tabs), so Delete is the accessible close.
+                  // Focus hands to a successor once the tab is gone, instead
+                  // of falling to the document body.
                   if (
                     (event.key === "Delete" || event.key === "Backspace") &&
                     tab.closeable &&
                     onClose
                   ) {
                     event.preventDefault()
+                    const successorId = (tabs[index + 1] ?? tabs[index - 1])?.id
                     onClose(tab.id)
+                    if (successorId !== undefined) {
+                      setTimeout(() => {
+                        tabRefs.current.get(successorId)?.focus()
+                      }, 0)
+                    }
                   }
                 }}
                 className={cn(

@@ -345,6 +345,7 @@ export {
   ChatMessageQuote,
   ChatMessageReceipt,
   ChatReactionPicker,
+  chatReactionOptions,
   ChatTypingIndicator,
   type ChatAttachmentStackProps,
   type ChatAttachmentTileProps,

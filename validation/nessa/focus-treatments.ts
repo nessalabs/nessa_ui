@@ -147,8 +147,10 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
-  // Every chat-tab control sits inside the horizontally scrolling tablist,
-  // so all three outlines draw inset to survive the overflow clipping.
+  // The tab trigger sits inside the horizontally scrolling tablist, so its
+  // outline draws inset to survive the overflow clipping; the new-tab
+  // control shares the treatment for consistency. (The close affordance is
+  // pointer-only and carries no focus treatment.)
   {
     component: "chat-tabs",
     layer: "outline",

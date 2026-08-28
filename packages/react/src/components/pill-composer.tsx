@@ -51,19 +51,13 @@ const pillComposerRimTrailClassName =
 const pillComposerRimCometClassName =
   "bg-[conic-gradient(from_0deg,transparent_0deg,transparent_280deg,var(--nessa-chat-rim-3)_280deg,var(--nessa-chat-rim-4)_330deg,var(--nessa-chat-rim-head)_356deg,transparent_360deg)]"
 
-/** Masks a full-bleed layer down to an edge band `inset` pixels deep. */
-function rimBandMask(inset: number): React.CSSProperties {
-  return {
-    padding: inset,
-    WebkitMaskImage:
-      "linear-gradient(#000 0 0), linear-gradient(#000 0 0)",
-    WebkitMaskClip: "content-box, border-box",
-    WebkitMaskComposite: "xor",
-    maskImage: "linear-gradient(#000 0 0), linear-gradient(#000 0 0)",
-    maskClip: "content-box, border-box",
-    maskComposite: "exclude",
-  }
-}
+/**
+ * Masks a full-bleed layer down to an edge band: two stacked masks, the
+ * inner clipped to the content box, composited away from the outer. The
+ * mask only needs any opaque paint, so it borrows the foreground token.
+ */
+const pillComposerRimBandClassName =
+  "[mask-image:linear-gradient(var(--foreground)_0_0),linear-gradient(var(--foreground)_0_0)] [mask-clip:content-box,border-box] [mask-composite:exclude] [-webkit-mask-image:linear-gradient(var(--foreground)_0_0),linear-gradient(var(--foreground)_0_0)] [-webkit-mask-clip:content-box,border-box] [-webkit-mask-composite:xor]"
 
 // The spinner square is twice the pill's width, so rotating it never
 // exposes a corner on any wider-than-tall pill.
@@ -190,8 +184,10 @@ function PillComposerRim({
     >
       <span
         data-slot="pill-composer-rim-glow"
-        className="absolute inset-0 overflow-hidden rounded-[inherit]"
-        style={rimBandMask(5)}
+        className={cn(
+          "absolute inset-0 overflow-hidden rounded-[inherit] p-[5px]",
+          pillComposerRimBandClassName,
+        )}
       >
         <span
           ref={glowSpinRef}
@@ -206,8 +202,10 @@ function PillComposerRim({
       </span>
       <span
         data-slot="pill-composer-rim-ring"
-        className="absolute inset-0 overflow-hidden rounded-[inherit]"
-        style={rimBandMask(2)}
+        className={cn(
+          "absolute inset-0 overflow-hidden rounded-[inherit] p-[2px]",
+          pillComposerRimBandClassName,
+        )}
       >
         <span
           ref={ringSpinRef}

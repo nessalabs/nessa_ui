@@ -30,6 +30,17 @@ function cssDurationInMilliseconds(value: string, fallback: number) {
   return value.trim().endsWith("ms") ? parsed : parsed * 1000
 }
 
+/** Runs the host's handler first; ours follows unless the host prevented default. */
+function composeHandler<E extends { defaultPrevented: boolean }>(
+  theirs: ((event: E) => void) | undefined,
+  ours: (event: E) => void,
+) {
+  return (event: E) => {
+    theirs?.(event)
+    if (!event.defaultPrevented) ours(event)
+  }
+}
+
 const chatBubblesFocusClassName =
   "outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
 
@@ -184,24 +195,49 @@ function ChatBubble({
     longPressTimer.current = null
   }, [])
   React.useEffect(() => clearLongPress, [clearLongPress])
+  // Tracks whether the upcoming click began as a real pointer press. A
+  // click with no preceding pointerdown came from the keyboard or from
+  // assistive tech synthesizing activation — those must select, while
+  // plain pointer clicks stay inert.
+  const pointerPressedRef = React.useRef(false)
+  const {
+    onPointerDown: hostPointerDown,
+    onPointerUp: hostPointerUp,
+    onPointerLeave: hostPointerLeave,
+    onClick: hostClick,
+    onContextMenu: hostContextMenu,
+    onKeyDown: hostKeyDown,
+    ...rest
+  } = props
   const longPressHandlers = {
-    onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
-      if (event.pointerType !== "mouse" || event.button !== 0) return
-      const { currentTarget, clientX, clientY } = event
-      clearLongPress()
-      longPressTimer.current = setTimeout(() => {
-        currentTarget.dispatchEvent(
-          new MouseEvent("contextmenu", {
-            bubbles: true,
-            cancelable: true,
-            clientX,
-            clientY,
-          }),
-        )
-      }, 500)
-    },
-    onPointerUp: clearLongPress,
-    onPointerLeave: clearLongPress,
+    onPointerDown: composeHandler(
+      hostPointerDown,
+      (event: React.PointerEvent<HTMLElement>) => {
+        pointerPressedRef.current = true
+        if (event.pointerType !== "mouse" || event.button !== 0) return
+        const { currentTarget, clientX, clientY } = event
+        clearLongPress()
+        longPressTimer.current = setTimeout(() => {
+          currentTarget.dispatchEvent(
+            new MouseEvent("contextmenu", {
+              bubbles: true,
+              cancelable: true,
+              clientX,
+              clientY,
+            }),
+          )
+        }, 500)
+      },
+    ),
+    onPointerUp: composeHandler(hostPointerUp, clearLongPress),
+    onPointerLeave: composeHandler(
+      hostPointerLeave,
+      (event: React.PointerEvent<HTMLElement>) => {
+        void event
+        pointerPressedRef.current = false
+        clearLongPress()
+      },
+    ),
   }
   const reactionBadge = reaction ? (
     <span
@@ -232,7 +268,14 @@ function ChatBubble({
         data-slot="chat-bubble"
         data-tone={tone}
         className={bubbleClassName}
-        {...(props as React.HTMLAttributes<HTMLSpanElement>)}
+        {...(rest as React.HTMLAttributes<HTMLSpanElement>)}
+        onClick={hostClick as React.MouseEventHandler<HTMLElement> | undefined}
+        onContextMenu={
+          hostContextMenu as React.MouseEventHandler<HTMLElement> | undefined
+        }
+        onKeyDown={
+          hostKeyDown as React.KeyboardEventHandler<HTMLElement> | undefined
+        }
         {...longPressHandlers}
       >
         {children}
@@ -245,21 +288,29 @@ function ChatBubble({
       type="button"
       data-slot="chat-bubble"
       data-tone={tone}
-      onClick={(event) => {
-        // Keyboard activation reports detail 0; mouse clicks stay inert.
-        if (event.detail === 0) onSelect()
-      }}
-      onContextMenu={(event) => {
+      onClick={composeHandler(hostClick, () => {
+        // A click that never saw a pointer press came from the keyboard or
+        // assistive tech — activate; plain pointer clicks stay inert.
+        const fromPointer = pointerPressedRef.current
+        pointerPressedRef.current = false
+        if (!fromPointer) onSelect()
+      })}
+      onKeyDown={composeHandler(hostKeyDown, (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return
         event.preventDefault()
         onSelect()
-      }}
+      })}
+      onContextMenu={composeHandler(hostContextMenu, (event) => {
+        event.preventDefault()
+        onSelect()
+      })}
       {...longPressHandlers}
       className={cn(
         bubbleClassName,
         "cursor-pointer border-0",
         chatBubblesFocusClassName,
       )}
-      {...props}
+      {...rest}
     >
       {children}
       {reactionBadge}
@@ -287,8 +338,9 @@ export interface ChatReactionOption {
   label: string
 }
 
-/** iMessage's tapback set, the picker's default options. */
-const chatReactionOptions: readonly ChatReactionOption[] = [
+/** iMessage's tapback set — the picker's default options, exported so menu
+ * hosts can rebuild the row as keyboard-reachable menu items. */
+export const chatReactionOptions: readonly ChatReactionOption[] = [
   { emoji: "❤️", label: "love" },
   { emoji: "👍", label: "thumbs up" },
   { emoji: "👎", label: "thumbs down" },
@@ -505,6 +557,7 @@ function ChatAttachmentTile({
         title={label}
         className={tileClassName}
         style={style}
+        {...(props as React.HTMLAttributes<HTMLSpanElement>)}
       >
         {content}
       </span>
@@ -648,23 +701,54 @@ function ChatAttachmentViewer({
   React.useEffect(() => {
     const node = ref.current
     const ownerDocument = node?.ownerDocument
-    if (!ownerDocument) return
+    if (!node || !ownerDocument) return
+    // Modal focus management: remember the opener, move focus inside, keep
+    // Tab cycling within the dialog, and hand focus back on close.
+    const opener =
+      ownerDocument.activeElement instanceof HTMLElement
+        ? ownerDocument.activeElement
+        : null
+    const focusables = () =>
+      Array.from(
+        node.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute("disabled"))
+    focusables()[0]?.focus()
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return
-      event.preventDefault()
-      event.stopPropagation()
-      onClose()
+      if (event.key === "Escape") {
+        event.preventDefault()
+        event.stopPropagation()
+        onClose()
+        return
+      }
+      if (event.key !== "Tab") return
+      const order = focusables()
+      if (order.length === 0) return
+      const first = order[0]!
+      const last = order[order.length - 1]!
+      const current = ownerDocument.activeElement
+      if (event.shiftKey && (current === first || !node.contains(current))) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && current === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
     ownerDocument.addEventListener("keydown", handleKeyDown, { capture: true })
-    return () =>
+    return () => {
       ownerDocument.removeEventListener("keydown", handleKeyDown, {
         capture: true,
       })
+      opener?.focus()
+    }
   }, [onClose])
   return (
     <div
       ref={ref}
       role="dialog"
+      aria-modal="true"
       aria-label="Attachments"
       data-slot="chat-attachment-viewer"
       className={cn(

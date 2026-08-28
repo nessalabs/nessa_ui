@@ -9,7 +9,7 @@ import {
   ChatMessage,
   ChatMessageQuote,
   ChatMessageReceipt,
-  ChatReactionPicker,
+  chatReactionOptions,
   ChatTypingIndicator,
   MessageMarkdown,
   ContextMenu,
@@ -132,7 +132,9 @@ function ConversationExample() {
           >
             <ContextMenuTrigger asChild>
               <ChatBubble
+                role="button"
                 aria-label={`Reply to: ${entry.text}`}
+                aria-haspopup="menu"
                 title="Right-click to reply or react"
                 tabIndex={0}
                 reaction={reactions[entry.id]}
@@ -146,25 +148,39 @@ function ConversationExample() {
               collisionBoundary={frameElement ?? undefined}
               collisionPadding={8}
             >
-              <ContextMenuItem asChild>
-                <div className="p-0.5 focus:bg-transparent data-[highlighted]:bg-transparent">
-                  <ChatReactionPicker
-                    value={reactions[entry.id] ?? null}
-                    onSelect={(emoji) => {
+              {/* Each tapback is its own menu item, so arrow keys reach
+                  every emoji and Enter applies it. */}
+              <div className="flex max-w-60 items-center gap-1 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {chatReactionOptions.map((option) => (
+                  <ContextMenuItem
+                    key={option.emoji}
+                    asChild
+                    onSelect={() => {
                       setReactions((current) =>
-                        current[entry.id] === emoji
+                        current[entry.id] === option.emoji
                           ? Object.fromEntries(
                               Object.entries(current).filter(
                                 ([id]) => Number(id) !== entry.id,
                               ),
                             )
-                          : { ...current, [entry.id]: emoji },
+                          : { ...current, [entry.id]: option.emoji },
                       )
                     }}
-                    className="bg-transparent shadow-none"
-                  />
-                </div>
-              </ContextMenuItem>
+                  >
+                    <button
+                      type="button"
+                      aria-label={`React with ${option.label}`}
+                      className={
+                        reactions[entry.id] === option.emoji
+                          ? "flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-(--nessa-chat-accent) p-0 font-sans nessa-text-6 data-[highlighted]:bg-accent"
+                          : "flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 font-sans nessa-text-6 data-[highlighted]:bg-accent"
+                      }
+                    >
+                      {option.emoji}
+                    </button>
+                  </ContextMenuItem>
+                ))}
+              </div>
               <ContextMenuSeparator />
               <ContextMenuItem onSelect={() => setReplyTargetId(entry.id)}>
                 Reply
@@ -415,20 +431,22 @@ export const Conversation: Story = {
     })
     await expect(getComputedStyle(first).filter).toBe("none")
     await userEvent.click(
-      await body.findByRole("button", { name: "React with love" }),
+      await body.findByRole("menuitem", { name: "React with love" }),
     )
     const badge = canvasElement.querySelector<HTMLElement>(
       '[data-slot="chat-reaction"]',
     )!
     await expect(badge).toHaveTextContent("❤️")
-    // Right-click again and re-pick the same emoji to clear it.
+    // Right-click again and re-pick the same emoji — by keyboard this time
+    // (each tapback is a real menu item, so arrows + Enter reach it) — to
+    // clear it.
     await userEvent.pointer({
       keys: "[MouseRight]",
       target: canvas.getByLabelText("Reply to: thanks"),
     })
-    await userEvent.click(
-      await body.findByRole("button", { name: "React with love" }),
-    )
+    await body.findByRole("menuitem", { name: "React with love" })
+    await userEvent.keyboard("{ArrowDown}")
+    await userEvent.keyboard("{Enter}")
     await expect(
       canvasElement.querySelector('[data-slot="chat-reaction"]'),
     ).not.toBeInTheDocument()

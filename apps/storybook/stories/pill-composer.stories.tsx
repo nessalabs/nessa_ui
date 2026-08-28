@@ -16,8 +16,8 @@ import {
   ChatMessage,
   ChatMessageQuote,
   ChatMessageReceipt,
+  chatReactionOptions,
   ChatTabs,
-  ChatReactionPicker,
   ChatTypingIndicator,
   cn,
   MessageMarkdown,
@@ -418,15 +418,30 @@ function DemoBubble({
               onReplyCommit?.()
             }}
           >
-            <ContextMenuItem asChild>
-              <div className="p-0.5 focus:bg-transparent data-[highlighted]:bg-transparent">
-                <ChatReactionPicker
-                  value={message.reaction ?? null}
-                  onSelect={(emoji) => onReact?.(emoji)}
-                  className="bg-transparent shadow-none"
-                />
-              </div>
-            </ContextMenuItem>
+            {/* Each tapback is its own menu item, so arrow keys reach every
+                emoji and Enter applies it — a single wrapped picker would be
+                mouse-only inside a Radix menu. */}
+            <div className="flex max-w-60 items-center gap-1 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {chatReactionOptions.map((option) => (
+                <ContextMenuItem
+                  key={option.emoji}
+                  asChild
+                  onSelect={() => onReact?.(option.emoji)}
+                >
+                  <button
+                    type="button"
+                    aria-label={`React with ${option.label}`}
+                    className={cn(
+                      "flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 font-sans nessa-text-6 data-[highlighted]:bg-accent",
+                      message.reaction === option.emoji &&
+                        "bg-(--nessa-chat-accent)",
+                    )}
+                  >
+                    {option.emoji}
+                  </button>
+                </ContextMenuItem>
+              ))}
+            </div>
             <ContextMenuSeparator />
             <ContextMenuItem
               onSelect={() => {
@@ -752,6 +767,11 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
           setModelCardOpen(false)
         }}
         onClose={(id) => {
+          if (id === generatingTabId) {
+            if (replyTimer.current) clearTimeout(replyTimer.current)
+            streamCleanup.current?.()
+            setGeneratingTabId(null)
+          }
           setTabs((current) => {
             const next = current.filter((tab) => tab.id !== id)
             if (id === activeTabId && next.length > 0) {
@@ -1604,7 +1624,7 @@ export const Playground: Story = {
       target: canvas.getByLabelText("Reply to: thanks"),
     })
     await userEvent.click(
-      await body.findByRole("button", { name: "React with love" }),
+      await body.findByRole("menuitem", { name: "React with love" }),
     )
     const reactionBadge = canvasElement.querySelector<HTMLElement>(
       '[data-slot="chat-reaction"]',
