@@ -1,8 +1,12 @@
 "use client"
 
+import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
+import { Slot } from "radix-ui"
 
-/** @responsibility Defines the shared presentation of Sidebar icon action controls. */
+import { cn } from "@/lib/utils"
+
+/** @responsibility Provides the Sidebar icon action control and its shared presentation. */
 
 /**
  * Creates the class names for a Sidebar icon action control.
@@ -37,4 +41,50 @@ type SidebarActionSize = NonNullable<
   VariantProps<typeof sidebarActionVariants>["size"]
 >
 
-export { sidebarActionVariants, type SidebarActionSize }
+/** Properties accepted by a trailing action control on a Sidebar row or group. */
+interface SidebarActionProps
+  extends React.ComponentProps<"button">,
+    VariantProps<typeof sidebarActionVariants> {
+  /**
+   * Merges control behavior and styling into the single child element, for a
+   * menu or dialog trigger that must own the rendered control.
+   * @defaultValue false
+   */
+  asChild?: boolean
+}
+
+/**
+ * An icon control for a Sidebar row or group's trailing region — row settings, a
+ * kebab menu, a dismiss. Give it an `aria-label`: it is icon-only, and it
+ * sits beside the row's own control rather than inside it, so it needs its
+ * own name.
+ *
+ * @param props - Native button properties and whether to merge into a child.
+ * @returns A compact control styled for the Sidebar's trailing region.
+ */
+function SidebarAction({
+  asChild = false,
+  className,
+  size,
+  ...props
+}: SidebarActionProps) {
+  const Comp = asChild ? Slot.Root : "button"
+
+  return (
+    <Comp
+      type={asChild ? undefined : "button"}
+      data-slot="sidebar-action"
+      data-sidebar="action"
+      className={cn(sidebarActionVariants({ size }), className)}
+      {...props}
+    />
+  )
+}
+
+export {
+  SidebarAction,
+  sidebarActionVariants,
+  type SidebarActionProps,
+  type SidebarActionSize,
+}
+

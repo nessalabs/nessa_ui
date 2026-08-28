@@ -7,8 +7,6 @@ import { Slot } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
-import { sidebarActionVariants } from "./sidebar-action"
-
 /** @responsibility Provides semantic navigation lists, complete rows, and loading states. */
 
 /**
@@ -326,6 +324,12 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
   const open = controlledOpen ?? uncontrolledOpen
   const generatedSubmenuId = React.useId()
   const submenuId = `${generatedSubmenuId}-submenu`
+  /**
+   * Flips the disclosure, reporting the next state to the host and owning it
+   * locally only while the host does not.
+   *
+   * @returns Nothing; the next open state is reported through `onOpenChange`.
+   */
   const toggleOpen = React.useCallback(() => {
     const next = !open
     if (controlledOpen === undefined) setUncontrolledOpen(next)
@@ -536,43 +540,6 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
   )
 })
 
-/** Properties accepted by a trailing action control on a Sidebar row. */
-interface SidebarMenuActionProps extends React.ComponentProps<"button"> {
-  /**
-   * Merges control behavior and styling into the single child element, for a
-   * menu or dialog trigger that must own the rendered control.
-   * @defaultValue false
-   */
-  asChild?: boolean
-}
-
-/**
- * An icon control for a Sidebar row's trailing region — row settings, a
- * kebab menu, a dismiss. Give it an `aria-label`: it is icon-only, and it
- * sits beside the row's own control rather than inside it, so it needs its
- * own name.
- *
- * @param props - Native button properties and whether to merge into a child.
- * @returns A compact control styled for the Sidebar's trailing region.
- */
-function SidebarMenuAction({
-  asChild = false,
-  className,
-  ...props
-}: SidebarMenuActionProps) {
-  const Comp = asChild ? Slot.Root : "button"
-
-  return (
-    <Comp
-      type={asChild ? undefined : "button"}
-      data-slot="sidebar-menu-action"
-      data-sidebar="menu-action"
-      className={cn(sidebarActionVariants({ size: "sm" }), className)}
-      {...props}
-    />
-  )
-}
-
 // Loading row
 
 /**
@@ -640,11 +607,9 @@ function SidebarMenuSkeleton({
 
 export {
   SidebarMenu,
-  SidebarMenuAction,
   SidebarMenuItem,
   SidebarMenuSkeleton,
   sidebarMenuItemVariants,
-  type SidebarMenuActionProps,
   type SidebarMenuItemProps,
   type SidebarMenuProps,
   type SidebarMenuSkeletonProps,

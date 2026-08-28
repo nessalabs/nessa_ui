@@ -29,7 +29,7 @@ import {
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
-  SidebarMenuAction,
+  SidebarAction,
   SidebarMenuItem,
   SidebarProvider,
   SplitView,
@@ -232,11 +232,11 @@ function ChannelRail({
                     badge={String(total)}
                     showTrailingOnHover
                     trailing={
-                      <SidebarMenuAction
+                      <SidebarAction
                         aria-label={`Channel settings for ${channel.name}`}
                       >
                         <Settings aria-hidden="true" />
-                      </SidebarMenuAction>
+                      </SidebarAction>
                     }
                     submenu={
                       <SidebarMenu nested guides>

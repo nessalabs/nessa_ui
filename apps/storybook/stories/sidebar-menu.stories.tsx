@@ -13,7 +13,7 @@ import {
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
-  SidebarMenuAction,
+  SidebarAction,
   SidebarMenuItem,
   SidebarMenuSkeleton,
   SidebarProvider,
@@ -41,7 +41,7 @@ const menuDescriptions = {
   NestedMenuGuides:
     "The guides variant of a nested SidebarMenu draws decorative branch lines from the parent row to each child, terminating in an elbow on the last row. Guides are presentation only: hierarchy stays in the nested list structure, and the logical-start offset retunes through --nessa-sidebar-guide-inset.",
   TrailingAction:
-    "SidebarMenuAction is the trailing icon control on a row — settings, a kebab menu, a dismiss. Paired with a badge and showTrailingOnHover the two share one cell and swap, so revealing the action costs the reader neither width nor the row's resting count. The reveal answers hover and keyboard focus only: :focus-within would keep the row you last clicked revealed while you hover another, showing two rows' actions at once.",
+    "SidebarAction is the trailing icon control on a row — settings, a kebab menu, a dismiss. Paired with a badge and showTrailingOnHover the two share one cell and swap, so revealing the action costs the reader neither width nor the row's resting count. The reveal answers hover and keyboard focus only: :focus-within would keep the row you last clicked revealed while you hover another, showing two rows' actions at once.",
   CollapsibleSubmenu:
     "A submenu becomes a disclosure through the collapsible prop. In row mode the parent row is the disclosure button; in chevron mode a separate control at the logical start toggles it so the row itself stays free to navigate. Open state is uncontrolled through defaultOpen or host-controlled through open and onOpenChange.",
 } as const
@@ -681,9 +681,9 @@ export const TrailingAction: StoryObj = {
             badge={String(index === 0 ? 5 : 2)}
             showTrailingOnHover
             trailing={
-              <SidebarMenuAction aria-label={`Settings for ${channel}`}>
+              <SidebarAction aria-label={`Settings for ${channel}`}>
                 <Settings aria-hidden="true" />
-              </SidebarMenuAction>
+              </SidebarAction>
             }
           >
             {channel}
