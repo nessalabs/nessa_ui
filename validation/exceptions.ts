@@ -52,11 +52,11 @@ export type ValidationException = OccurrenceException | ContrastException | Focu
 const focusRationale = "Current shadcn-derived translucent focus treatment predates Nessa semantic focus-state tokens."
 const focusRemoval = "Remove with the semantic focus/invalid token migration before provider stabilization."
 
-const stackingRationale = "Existing popover-internal layering predates the frozen z-0..z-50 stacking scale."
+const stackingRationale = "Existing ModelPicker popover layering (its content above z-50 siblings, decorations above their card) predates the frozen z-0..z-50 stacking scale."
 const stackingRemoval = "Re-layer onto the frozen scale (or a future semantic stacking token) without changing render order."
 const inlinePaintRationale = "Runtime-computed paint (generated gradients, shimmer text, avatar blending) predates semantic paint tokens for this surface."
 const inlineGeometryRationale = "Runtime-measured spacing or layering has no utility form because its value is computed from live geometry."
-const inlineMotionRationale = "Runtime-computed motion timing is derived from Nessa motion tokens read in JS."
+const inlineMotionRationale = "Runtime-supplied motion timing (a consumer-controlled duration prop, dnd-kit's sortable transition) predates semantic motion-state tokens for these surfaces."
 const inlineRemoval = "Route through a --nessa-* custom property plus a utility when the owning surface's semantic tokens land."
 const style = (
   contractId: "STYLE-002" | "STYLE-003",
@@ -136,6 +136,7 @@ export const exceptions = Object.freeze([
   style("STYLE-003", "packages/react/src/components/workflow-canvas/workflow-canvas.tsx", "backgroundPosition", 1, inlinePaintRationale, inlineRemoval),
   style("STYLE-003", "packages/react/src/components/workflow-canvas/workflow-canvas-edge.tsx", "strokeWidth", 1, inlineGeometryRationale, inlineRemoval),
   style("STYLE-003", "packages/react/src/components/tool-call.tsx", "color", 1, inlinePaintRationale, inlineRemoval),
+  style("STYLE-003", "packages/react/src/components/tool-call.tsx", "--diffs-dark-addition-color", 1, "Third-party diff-renderer theming bridge deliberately deepens Pierre's dark-row addition green with a fixed value.", "Replace with a --nessa-diff-* dark-surface token when the diff token set covers renderer theming."),
   style("STYLE-003", "packages/react/src/components/tool-call.tsx", "backgroundImage", 1, inlinePaintRationale, inlineRemoval),
   style("STYLE-003", "packages/react/src/components/tool-call.tsx", "backgroundSize", 1, inlinePaintRationale, inlineRemoval),
   style("STYLE-003", "packages/react/src/components/tool-call.tsx", "backgroundPosition", 1, inlinePaintRationale, inlineRemoval),
