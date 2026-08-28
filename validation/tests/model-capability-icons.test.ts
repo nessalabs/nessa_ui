@@ -28,7 +28,7 @@ test("model capability icons use redistributable Lucide geometry and active stat
   )
 
   assert.match(speed, /<Zap/)
-  assert.match(speed, /className=\{cn\("size-\[18px\]", className\)\}/)
+  assert.match(speed, /className=\{cn\("size-4.5", className\)\}/)
   assert.match(speed, /fill=\{active \? "currentColor" : "none"\}/)
   assert.match(source, /const renderedIcon = typeof icon === "function" \? icon\(\{ pressed \}\) : icon/)
   assert.match(source, /\{renderedIcon \?\? <ModelFastModeIcon aria-hidden="true" active=\{pressed\} \/>\}/)

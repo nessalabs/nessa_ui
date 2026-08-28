@@ -156,6 +156,9 @@
         ":where([data-nessa-scale=\"110\"])": {
           "--_nessa-scale-factor": "1.1"
         },
+        ":where([data-nessa-scale=\"125\"])": {
+          "--_nessa-scale-factor": "1.25"
+        },
         ":where(:root, [data-nessa-root], [data-nessa-theme], [data-nessa-scale])": {
           "--_nessa-font-size-1": "calc(var(--nessa-font-size-1) * var(--_nessa-scale-factor))",
           "--_nessa-font-size-2": "calc(var(--nessa-font-size-2) * var(--_nessa-scale-factor))",
@@ -178,6 +181,9 @@
           "--_nessa-letter-spacing-5": "var(--nessa-letter-spacing-5)",
           "--_nessa-letter-spacing-6": "var(--nessa-letter-spacing-6)",
           "--_nessa-letter-spacing-7": "var(--nessa-letter-spacing-7)"
+        },
+        ":root, :where([data-nessa-root], [data-nessa-theme], [data-nessa-scale])": {
+          "--spacing": "calc(0.25rem * var(--_nessa-scale-factor))"
         },
         "@layer components": {
           ".nessa-text-1": {
@@ -220,9 +226,17 @@
             "line-height": "var(--_nessa-line-height-4)",
             "letter-spacing": "var(--_nessa-letter-spacing-4)"
           },
+          ".nessa-text-input-2": {
+            "font-size": "max(1rem, var(--_nessa-font-size-2))",
+            "line-height": "var(--_nessa-line-height-2)",
+            "letter-spacing": "var(--_nessa-letter-spacing-2)"
+          },
           "@media (width >= 48rem)": {
             ".nessa-text-input": {
               "font-size": "var(--_nessa-font-size-4)"
+            },
+            ".nessa-text-input-2": {
+              "font-size": "var(--_nessa-font-size-2)"
             }
           }
         },

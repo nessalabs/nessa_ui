@@ -18,7 +18,7 @@ function ModelFastModeIcon({
   className,
   ...props
 }: ModelFastModeIconProps) {
-  return <Zap className={cn("size-[18px]", className)} fill={active ? "currentColor" : "none"} {...props} />
+  return <Zap className={cn("size-4.5", className)} fill={active ? "currentColor" : "none"} {...props} />
 }
 
 /** Renders the redistributable default thinking-capability icon. */

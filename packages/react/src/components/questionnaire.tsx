@@ -384,7 +384,7 @@ function QuestionnaireChoice({
     >
       <span
         data-slot="questionnaire-choice-indicator"
-        className="relative mt-px inline-flex size-[18px] shrink-0 text-primary"
+        className="relative mt-px inline-flex size-4.5 shrink-0 text-primary"
       >
         <input
           type={multiple ? "checkbox" : "radio"}

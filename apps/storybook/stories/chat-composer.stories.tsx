@@ -179,7 +179,7 @@ function ComposerExample({
               onValueChange={setModel}
             />
             <ModelThinkingControl
-              icon={<ThinkingIcon className="size-[18px]" />}
+              icon={<ThinkingIcon className="size-4.5" />}
               levels={thinkingLevels}
               value={thinking}
               onValueChange={setThinking}
@@ -187,7 +187,7 @@ function ComposerExample({
                 pressed: fastMode,
                 onPressedChange: setFastMode,
                 icon: ({ pressed }) => (
-                  <FastIcon active={pressed} className="size-[18px]" />
+                  <FastIcon active={pressed} className="size-4.5" />
                 ),
               }}
             />

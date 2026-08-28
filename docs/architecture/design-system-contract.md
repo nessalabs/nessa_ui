@@ -364,6 +364,7 @@ export const NessaScale = {
   Default: "100",
   Large: "105",
   Larger: "110",
+  Largest: "125",
 } as const
 
 export type NessaScale =
@@ -395,6 +396,7 @@ Do not implement scale with CSS `zoom`, transforms, or mutation of `html`/wrappe
 :where([data-nessa-scale="100"]) { --_nessa-scale-factor: 1; }
 :where([data-nessa-scale="105"]) { --_nessa-scale-factor: 1.05; }
 :where([data-nessa-scale="110"]) { --_nessa-scale-factor: 1.1; }
+:where([data-nessa-scale="125"]) { --_nessa-scale-factor: 1.25; }
 
 :where(
   [data-nessa-root],
@@ -405,18 +407,32 @@ Do not implement scale with CSS `zoom`, transforms, or mutation of `html`/wrappe
     calc(var(--nessa-font-size-2) * var(--_nessa-scale-factor));
   --_nessa-line-height-2: var(--nessa-line-height-2);
   --_nessa-letter-spacing-2: var(--nessa-letter-spacing-2);
-  --_nessa-space-3:
-    calc(var(--nessa-space-3) * var(--_nessa-scale-factor));
-  --_nessa-control-height-md:
-    max(
-      1.5rem,
-      calc(
-        var(--nessa-control-height-md)
-        * var(--_nessa-scale-factor)
-      )
-    );
 }
 ```
+
+Geometry does not need a bespoke token ramp. Tailwind CSS v4 derives every
+spacing and sizing utility from a single `--spacing` base and resolves the
+variable at the element that uses the utility, so redeclaring that base per
+scope carries padding, gaps, control heights, and spacing-derived icon sizes
+through the same factor as type:
+
+```css
+:root,
+:where(
+  [data-nessa-root],
+  [data-nessa-theme],
+  [data-nessa-scale]
+) {
+  --spacing: calc(0.25rem * var(--_nessa-scale-factor));
+}
+```
+
+The bare `:root` (not `:where`) outranks Tailwind's own `:root, :host`
+declaration earlier in the shared theme layer. Radii, border widths, focus
+rings, and motion keep their own tokens and never resolve through
+`--spacing`. A dimension that must stay absolute under scale — a hairline, a
+focus ring, a border — is expressed as an arbitrary px value precisely
+because those opt out of the spacing base.
 
 These computed aliases are redeclared at every root, theme, and scale scope. This is necessary because an inherited custom property may otherwise retain the value computed against its parent's tokens. Theme overrides and nested scale changes always recompute locally while retaining consumer-overridden baselines.
 
@@ -424,7 +440,7 @@ Public typography sizes, spacing, control heights/padding, and icon sizes descri
 
 Scale is not density. A future density axis may alter whitespace/control compactness without changing text. Do not add density until real compact-layout requirements establish its semantics.
 
-TOKEN-004 enforces the typography axis of this contract, which is the axis whose tokens exist: the seven coordinated levels, the private computed aliases, the five preset factors, and the `nessa-text-*` helpers that Nessa-owned components name instead of a Tailwind size utility. Spacing, control geometry, and icon dimensions still come from Tailwind utilities and join the same scale chain when their ramps are tokenised; adding them extends this contract rather than replacing it. A descendant selector that cannot carry a helper class sizes in `em` so it continues to follow the active scale.
+TOKEN-004 enforces both axes of this contract: the seven coordinated levels, the private computed aliases, the six preset factors, the `nessa-text-*` helpers that Nessa-owned components name instead of a Tailwind size utility, and the `--spacing` redeclaration that carries geometry through the same factor. A descendant selector that cannot carry a helper class sizes in `em` so it continues to follow the active scale.
 
 ### Styling discipline and inline-style escape hatch
 

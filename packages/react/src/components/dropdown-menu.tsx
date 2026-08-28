@@ -87,7 +87,7 @@ function DropdownMenuLabel({
     <DropdownMenuPrimitive.Label
       data-slot="dropdown-menu-label"
       className={cn(
-        "px-2 py-1.5 text-xs font-medium text-muted-foreground",
+        "px-2 py-1.5 nessa-text-2 font-medium text-muted-foreground",
         className,
       )}
       {...props}
@@ -96,7 +96,7 @@ function DropdownMenuLabel({
 }
 
 const dropdownMenuItemClassName =
-  "relative flex min-h-8 cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 font-sans text-sm text-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground"
+  "relative flex min-h-8 cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 font-sans nessa-text-4 text-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground"
 
 export interface DropdownMenuItemProps
   extends React.ComponentProps<typeof DropdownMenuPrimitive.Item> {
@@ -221,7 +221,7 @@ function DropdownMenuShortcut({
     <span
       data-slot="dropdown-menu-shortcut"
       className={cn(
-        "ml-auto font-mono text-xs tracking-widest text-muted-foreground",
+        "ml-auto font-mono nessa-text-2 tracking-widest text-muted-foreground",
         className,
       )}
       {...props}

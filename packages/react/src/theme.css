@@ -133,6 +133,10 @@
   --_nessa-scale-factor: 1.1;
 }
 
+:where([data-nessa-scale="125"]) {
+  --_nessa-scale-factor: 1.25;
+}
+
 :where(
   :root,
   [data-nessa-root],
@@ -167,6 +171,18 @@
   --_nessa-letter-spacing-5: var(--nessa-letter-spacing-5);
   --_nessa-letter-spacing-6: var(--nessa-letter-spacing-6);
   --_nessa-letter-spacing-7: var(--nessa-letter-spacing-7);
+}
+
+/* Geometry follows the same factor. Tailwind v4 sizing utilities resolve
+   `--spacing` at the element that uses them, so redeclaring it per scope
+   scales padding, gaps, and control geometry in lockstep with type —
+   no component opts in individually. Radii, border widths, focus rings,
+   and motion stay pinned to their own tokens on purpose. The bare `:root`
+   (not `:where`) outranks Tailwind's own `:root, :host` declaration
+   earlier in the shared theme layer. */
+:root,
+:where([data-nessa-root], [data-nessa-theme], [data-nessa-scale]) {
+  --spacing: calc(0.25rem * var(--_nessa-scale-factor));
 }
 
 @media (prefers-reduced-motion: reduce) {
