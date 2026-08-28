@@ -213,6 +213,13 @@ export {
   type GeneratingSurfaceProps,
 } from "./components/generating-surface"
 export {
+  GradientSurface,
+  gradientSurfacePatterns,
+  gradientSurfacePresets,
+  type GradientSurfacePattern,
+  type GradientSurfaceProps,
+} from "./components/gradient-surface"
+export {
   MermaidDiagram,
   type MermaidDiagramProps,
 } from "./components/mermaid-diagram"
