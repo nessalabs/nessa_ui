@@ -6,6 +6,8 @@ import { Tabs as TabsPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
+import { segmentedShellVariants } from "./segmented-control"
+
 /** @responsibility Provides an accessible tab list and its associated panels. */
 
 export type TabsProps = React.ComponentProps<typeof TabsPrimitive.Root>
@@ -69,12 +71,15 @@ const tabsListVariants = cva(
           "data-[orientation=horizontal]:[&>[data-slot=tabs-trigger]]:after:inset-x-0 data-[orientation=horizontal]:[&>[data-slot=tabs-trigger]]:after:bottom-0 data-[orientation=horizontal]:[&>[data-slot=tabs-trigger]]:after:h-0.5",
           "data-[orientation=vertical]:[&>[data-slot=tabs-trigger]]:justify-start data-[orientation=vertical]:[&>[data-slot=tabs-trigger]]:px-2.5 data-[orientation=vertical]:[&>[data-slot=tabs-trigger]]:after:inset-y-0 data-[orientation=vertical]:[&>[data-slot=tabs-trigger]]:after:-end-px data-[orientation=vertical]:[&>[data-slot=tabs-trigger]]:after:w-0.5",
         ],
+        // The same strip SegmentedControl renders, painted from the same
+        // recipe and agreeing with it on the selected treatment — the two
+        // read as one control, so they must not diverge.
         pill: [
-          "gap-0.5 rounded-lg border border-border p-0.5",
-          "[&>[data-slot=tabs-trigger]]:min-h-8 [&>[data-slot=tabs-trigger]]:rounded-md [&>[data-slot=tabs-trigger]]:px-2.5",
+          segmentedShellVariants(),
+          "[&>[data-slot=tabs-trigger]]:min-h-7 [&>[data-slot=tabs-trigger]]:rounded-md [&>[data-slot=tabs-trigger]]:px-2.5",
           "data-[orientation=horizontal]:[&>[data-slot=tabs-trigger]]:flex-1",
-          "[&>[data-slot=tabs-trigger]]:hover:bg-accent",
-          "[&>[data-slot=tabs-trigger][data-state=active]]:bg-accent [&>[data-slot=tabs-trigger][data-state=active]]:text-accent-foreground",
+          "[&>[data-slot=tabs-trigger]]:hover:bg-accent [&>[data-slot=tabs-trigger]]:hover:text-accent-foreground",
+          "[&>[data-slot=tabs-trigger][data-state=active]]:bg-secondary [&>[data-slot=tabs-trigger][data-state=active]]:text-secondary-foreground [&>[data-slot=tabs-trigger][data-state=active]]:shadow-xs",
         ],
       },
     },

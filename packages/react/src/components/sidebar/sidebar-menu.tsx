@@ -7,6 +7,8 @@ import { Slot } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
+import { sidebarActionVariants } from "./sidebar-action"
+
 /** @responsibility Provides semantic navigation lists, complete rows, and loading states. */
 
 /**
@@ -565,10 +567,7 @@ function SidebarMenuAction({
       type={asChild ? undefined : "button"}
       data-slot="sidebar-menu-action"
       data-sidebar="menu-action"
-      className={cn(
-        "inline-flex size-6 shrink-0 appearance-none items-center justify-center rounded-md border-0 bg-transparent p-0 text-sidebar-foreground/70 outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring disabled:pointer-events-none disabled:opacity-50 [&>svg]:size-3.5 [&>svg]:shrink-0",
-        className,
-      )}
+      className={cn(sidebarActionVariants({ size: "sm" }), className)}
       {...props}
     />
   )

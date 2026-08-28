@@ -25,11 +25,13 @@ export interface ChatTabItem {
 }
 
 export interface ChatTabsProps
-  extends Omit<React.ComponentProps<"div">, "onSelect"> {
+  extends React.ComponentProps<"div"> {
   tabs: readonly ChatTabItem[]
   /** The selected tab's id. */
-  activeId: string | null
-  onSelect: (id: string) => void
+  /** The selected tab, or `null` when no tab is selected. */
+  value: string | null
+  /** Fires with the newly selected tab id. */
+  onValueChange: (value: string) => void
   /** Enables each closeable tab's close control. */
   onClose?: (id: string) => void
   /** Renders the trailing new-tab control. */
@@ -54,8 +56,8 @@ export interface ChatTabsProps
  */
 function ChatTabs({
   tabs,
-  activeId,
-  onSelect,
+  value,
+  onValueChange,
   onClose,
   onNew,
   newTabLabel = "New tab",
@@ -65,10 +67,10 @@ function ChatTabs({
   ...props
 }: ChatTabsProps) {
   const tabRefs = React.useRef(new Map<string, HTMLButtonElement>())
-  // Roving tabindex needs one focusable stop even when activeId matches no
+  // Roving tabindex needs one focusable stop even when `value` matches no
   // tab (the type allows null, and hosts may close the active tab without
   // reselecting) — the first tab takes it as a fallback.
-  const hasActiveTab = tabs.some((tab) => tab.id === activeId)
+  const hasActiveTab = tabs.some((tab) => tab.id === value)
 
   const selectRelativeTab = (index: number, key: string) => {
     if (tabs.length === 0) return
@@ -80,7 +82,7 @@ function ChatTabs({
           : (index + (key === "ArrowLeft" ? -1 : 1) + tabs.length) % tabs.length
     const next = tabs[nextIndex]
     if (!next) return
-    onSelect(next.id)
+    onValueChange(next.id)
     tabRefs.current.get(next.id)?.focus()
   }
 
@@ -97,7 +99,7 @@ function ChatTabs({
         className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto [overscroll-behavior-x:contain] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {tabs.map((tab, index) => {
-          const active = tab.id === activeId
+          const active = tab.id === value
           const badgeCount = Math.max(0, tab.badgeCount ?? 0)
           return (
             <span
@@ -133,7 +135,7 @@ function ChatTabs({
                 tabIndex={active || (!hasActiveTab && index === 0) ? 0 : -1}
                 aria-label={tab.title}
                 title={tab.title}
-                onClick={() => onSelect(tab.id)}
+                onClick={() => onValueChange(tab.id)}
                 onKeyDown={(event) => {
                   if (
                     ["ArrowLeft", "ArrowRight", "Home", "End"].includes(

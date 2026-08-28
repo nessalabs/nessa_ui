@@ -141,6 +141,7 @@ export {
 export {
   SegmentedControl,
   SegmentedControlOption,
+  segmentedShellVariants,
   type SegmentedControlOptionProps,
   type SegmentedControlProps,
 } from "./components/segmented-control"

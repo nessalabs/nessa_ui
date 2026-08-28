@@ -1,8 +1,9 @@
 const sidebarFocusComponents = Object.freeze([
-  { component: "sidebar/sidebar-group", count: 1 },
-  // The row control, a collapsible row's separate disclosure, and the
-  // trailing action control.
-  { component: "sidebar/sidebar-menu", count: 3 },
+  // The group's action and a row's action share one recipe, so their outline
+  // is declared once in the module that owns it rather than in each.
+  { component: "sidebar/sidebar-action", count: 1 },
+  // The row control and a collapsible row's separate disclosure.
+  { component: "sidebar/sidebar-menu", count: 2 },
   { component: "sidebar/sidebar-trigger", count: 1 },
 ] as const)
 

@@ -3,6 +3,8 @@ import { Slot } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
+import { sidebarActionVariants } from "./sidebar-action"
+
 /** @responsibility Organizes related Sidebar content under an optional label and action. */
 
 /**
@@ -68,7 +70,10 @@ function SidebarGroupAction({
       data-slot="sidebar-group-action"
       data-sidebar="group-action"
       className={cn(
-        "absolute end-2 top-2.5 inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0 text-sidebar-foreground/60 outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring group-data-[state=collapsed]/sidebar:hidden [&>svg]:size-4 [&>svg]:shrink-0",
+        sidebarActionVariants({ size: "md" }),
+        // Placement stays with the caller; only the control's own
+        // presentation is shared.
+        "absolute end-2 top-2.5 group-data-[state=collapsed]/sidebar:hidden",
         className,
       )}
       {...props}

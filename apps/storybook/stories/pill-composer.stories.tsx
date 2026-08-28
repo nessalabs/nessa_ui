@@ -757,8 +757,8 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
           ...tab,
           loading: generatingTabId === tab.id,
         }))}
-        activeId={activeTabId}
-        onSelect={(id) => {
+        value={activeTabId}
+        onValueChange={(id) => {
           setActiveTabId(id)
           setReplyTarget(null)
           setMenuTargetId(null)

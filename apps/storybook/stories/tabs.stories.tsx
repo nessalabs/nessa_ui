@@ -121,7 +121,7 @@ export const Underline: Story = {
 
 export const Pill: Story = {
   parameters: storyDocumentation(
-    "The pill presentation: a bordered strip whose selected tab is a filled chip, for a compact switcher inside a toolbar or panel header. The tabs share the width equally.",
+    "The pill presentation: the same bordered strip SegmentedControl renders, from the same recipe and agreeing with it on the selected treatment — the two read as one control, so they must not diverge. Use Tabs when the strip swaps a panel and SegmentedControl when it toggles a setting. The tabs share the width equally.",
   ),
   render: () => (
     <Tabs defaultValue="threads" className="w-80">
@@ -146,14 +146,14 @@ export const Pill: Story = {
     const files = canvas.getByRole("tab", { name: "Files" })
     await userEvent.click(files)
     await expect(files).toHaveAttribute("aria-selected", "true")
-    // The selected chip paints the accent surface and the rest stay
-    // transparent — asserted against the token, not merely against a
-    // sibling, which `hover:bg-accent` alone could satisfy.
+    // The selected chip paints the same surface SegmentedControl's does, and
+    // the rest stay transparent — asserted against the token rather than
+    // merely against a sibling, which `hover:bg-accent` alone could satisfy.
     const pins = canvas.getByRole("tab", { name: "Pins" })
-    const accent = getComputedStyle(canvasElement.ownerDocument.body)
-      .getPropertyValue("--color-accent")
+    const secondary = getComputedStyle(canvasElement.ownerDocument.body)
+      .getPropertyValue("--color-secondary")
       .trim()
-    await expect(accent).not.toBe("")
+    await expect(secondary).not.toBe("")
     await expect(getComputedStyle(files).backgroundColor).not.toBe(
       "rgba(0, 0, 0, 0)",
     )
