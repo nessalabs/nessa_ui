@@ -365,6 +365,7 @@ export {
   PillComposer,
   PillComposerRow,
   type PillComposerProps,
+  type PillComposerRimVariant,
 } from "./components/pill-composer"
 export {
   DiffStat,

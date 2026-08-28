@@ -38,6 +38,9 @@ import {
   PillComposer,
   PillComposerRow,
   SearchableListbox,
+  SegmentedControl,
+  SegmentedControlOption,
+  type PillComposerRimVariant,
   SectionedListbox,
   type ModelPickerGroup,
   type ModelPickerValue,
@@ -1059,13 +1062,18 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
   )
 }
 
-/** A minimal pill with a scaffolding toggle for exercising the rim by hand. */
+/** A minimal pill with scaffolding controls for exercising the rim by hand. */
 function GeneratingExample() {
   const [generating, setGenerating] = React.useState(false)
+  const [variant, setVariant] = React.useState<PillComposerRimVariant>("orbit")
   const [message, setMessage] = React.useState("")
   return (
     <div className="flex min-w-0 w-[min(28rem,calc(100vw-2rem))] flex-col gap-4 rounded-[2rem] bg-background p-4">
-      <PillComposer generating={generating} onSubmit={(event) => event.preventDefault()}>
+      <PillComposer
+        generating={generating}
+        rimVariant={variant}
+        onSubmit={(event) => event.preventDefault()}
+      >
         <PillComposerRow>
           <ChatComposerAction aria-label="Add attachment" title="Add attachment">
             <Plus aria-hidden="true" />
@@ -1081,13 +1089,25 @@ function GeneratingExample() {
           </ChatComposerAction>
         </PillComposerRow>
       </PillComposer>
-      <button
-        type="button"
-        onClick={() => setGenerating((current) => !current)}
-        className="self-start rounded-full border border-border bg-card px-3 py-1.5 font-sans nessa-text-4 text-card-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-      >
-        {generating ? "Stop generating" : "Start generating"}
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setGenerating((current) => !current)}
+          className="rounded-full border border-border bg-card px-3 py-1.5 font-sans nessa-text-4 text-card-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          {generating ? "Stop generating" : "Start generating"}
+        </button>
+        <SegmentedControl
+          aria-label="Rim animation"
+          value={variant}
+          onValueChange={(next) => setVariant(next as PillComposerRimVariant)}
+        >
+          <SegmentedControlOption value="orbit">Orbit</SegmentedControlOption>
+          <SegmentedControlOption value="comet">Comet</SegmentedControlOption>
+          <SegmentedControlOption value="pulse">Pulse</SegmentedControlOption>
+          <SegmentedControlOption value="aurora">Aurora</SegmentedControlOption>
+        </SegmentedControl>
+      </div>
     </div>
   )
 }
@@ -1600,7 +1620,7 @@ export const Playground: Story = {
 export const Generating: Story = {
   tags: ["reduced-motion"],
   parameters: storyDocumentation(
-    "The rim in isolation with a scaffolding toggle. The crisp band hugs the rim while a blurred copy bleeds inward; toggling fades the whole treatment over the normal motion duration, and the revolution only stops once the fade-out completes.",
+    "The rim in isolation with scaffolding controls. The crisp band hugs the rim while a blurred copy bleeds inward; toggling fades the whole treatment over the normal motion duration, and the motion only stops once the fade-out completes. The switcher walks the built-in rimVariant presets: Orbit revolves the trail at constant speed, Comet laps faster with an eased surge, Pulse holds still and breathes, and Aurora revolves while the spectrum cycles hue.",
   ),
   render: () => <GeneratingExample />,
   play: async ({ canvasElement }) => {
@@ -1628,6 +1648,24 @@ export const Generating: Story = {
     } else {
       await expect(rim.getAnimations({ subtree: true })).toHaveLength(0)
     }
+    // Every preset keeps the rim animating (reduced motion keeps it still).
+    for (const preset of ["Comet", "Pulse", "Aurora"]) {
+      await userEvent.click(canvas.getByRole("button", { name: preset }))
+      await expect(rim).toHaveAttribute(
+        "data-variant",
+        preset.toLowerCase(),
+      )
+      if (!prefersReducedMotion(canvasElement)) {
+        await waitFor(() => {
+          expect(
+            rim.getAnimations({ subtree: true }).length,
+          ).toBeGreaterThanOrEqual(2)
+        })
+      } else {
+        await expect(rim.getAnimations({ subtree: true })).toHaveLength(0)
+      }
+    }
+    await userEvent.click(canvas.getByRole("button", { name: "Orbit" }))
     await userEvent.click(
       canvas.getByRole("button", { name: "Stop generating" }),
     )

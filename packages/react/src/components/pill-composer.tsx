@@ -60,14 +60,25 @@ function rimBandMask(inset: number): React.CSSProperties {
 // The spinner square is twice the pill's width, so rotating it never
 // exposes a corner on any wider-than-tall pill.
 
+export type PillComposerRimVariant = "orbit" | "comet" | "pulse" | "aurora"
+
 /**
  * The traveling-light overlay: a thin crisp gradient band on the pill's
  * rim, plus a blurred copy bleeding a few pixels inward as a soft glow —
  * nothing renders outside the pill. It fades in and out with `active` and
- * keeps revolving until the fade-out finishes, so toggling reads as the
- * light dimming, not stopping.
+ * keeps animating until the fade-out finishes, so toggling reads as the
+ * light dimming, not stopping. The motion itself comes in variants:
+ * `orbit` revolves the trail at constant speed, `comet` laps faster with
+ * an eased surge each revolution, `pulse` holds still and breathes, and
+ * `aurora` revolves while the whole spectrum slowly cycles hue.
  */
-function PillComposerRim({ active }: { active: boolean }) {
+function PillComposerRim({
+  active,
+  variant = "orbit",
+}: {
+  active: boolean
+  variant?: PillComposerRimVariant
+}) {
   const reducedMotion = useReducedMotion()
   const [present, setPresent] = React.useState(false)
   const ringSpinRef = React.useRef<HTMLSpanElement>(null)
@@ -84,26 +95,68 @@ function PillComposerRim({ active }: { active: boolean }) {
     const ring = ringSpinRef.current
     const glow = glowSpinRef.current
     if (!ring || !glow || !spinning) return
-    const duration = cssDurationInMilliseconds(
+    const ambient = cssDurationInMilliseconds(
       getComputedStyle(ring).getPropertyValue("--nessa-motion-duration-ambient"),
       3200,
     )
-    if (duration === 0) return
-    const keyframes = [{ rotate: "0deg" }, { rotate: "360deg" }]
-    const options = {
-      duration,
-      easing: "linear",
-      iterations: Infinity,
-    } as const
-    const animations = [ring.animate(keyframes, options), glow.animate(keyframes, options)]
+    if (ambient === 0) return
+    const spin = [{ rotate: "0deg" }, { rotate: "360deg" }]
+    const animations: Animation[] = []
+    if (variant !== "pulse") {
+      const duration = variant === "comet" ? ambient * 0.55 : ambient
+      const easing =
+        variant === "comet" ? "cubic-bezier(0.6, 0.15, 0.4, 0.85)" : "linear"
+      const options = { duration, easing, iterations: Infinity }
+      animations.push(ring.animate(spin, options), glow.animate(spin, options))
+    }
+    if (variant === "pulse") {
+      const options = {
+        duration: ambient / 2,
+        easing: "ease-in-out",
+        iterations: Infinity,
+      }
+      animations.push(
+        ring.animate(
+          [{ opacity: 1 }, { opacity: 0.45 }, { opacity: 1 }],
+          options,
+        ),
+        glow.animate(
+          [{ opacity: 0.35 }, { opacity: 0.12 }, { opacity: 0.35 }],
+          options,
+        ),
+      )
+    }
+    if (variant === "aurora") {
+      const options = {
+        duration: ambient * 1.6,
+        easing: "linear",
+        iterations: Infinity,
+      }
+      animations.push(
+        ring.animate(
+          [{ filter: "hue-rotate(0deg)" }, { filter: "hue-rotate(360deg)" }],
+          options,
+        ),
+        // The glow's blur rides along in the keyframes: animating `filter`
+        // replaces the class value for the animation's duration.
+        glow.animate(
+          [
+            { filter: "blur(6px) hue-rotate(0deg)" },
+            { filter: "blur(6px) hue-rotate(360deg)" },
+          ],
+          options,
+        ),
+      )
+    }
     return () => animations.forEach((animation) => animation.cancel())
-  }, [spinning])
+  }, [spinning, variant])
 
   return (
     <span
       aria-hidden="true"
       data-slot="pill-composer-rim"
       data-active={active || undefined}
+      data-variant={variant}
       onTransitionEnd={(event) => {
         if (event.target === event.currentTarget && !active) setPresent(false)
       }}
@@ -137,6 +190,8 @@ export interface PillComposerProps extends React.ComponentProps<"form"> {
    * works. Toggling fades the light in and out rather than switching it.
    */
   generating?: boolean
+  /** Chooses the rim's motion while generating. Defaults to `orbit`. */
+  rimVariant?: PillComposerRimVariant
   /** Sets the preferred width in CSS pixels while preserving host containment. */
   width?: number
   submitOnEnter?: boolean
@@ -151,6 +206,7 @@ export interface PillComposerProps extends React.ComponentProps<"form"> {
  */
 function PillComposer({
   generating = false,
+  rimVariant = "orbit",
   width,
   submitOnEnter = true,
   className,
@@ -194,7 +250,7 @@ function PillComposer({
         }}
         {...props}
       >
-        <PillComposerRim active={generating} />
+        <PillComposerRim active={generating} variant={rimVariant} />
         {children}
       </form>
     </ChatComposerContext.Provider>
