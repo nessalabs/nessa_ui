@@ -500,7 +500,7 @@ function TaskBar({
         <span
           aria-hidden="true"
           data-slot="gantt-chart-milestone-name"
-          className="pointer-events-none absolute top-0 flex h-full max-w-48 items-center truncate text-xs font-medium text-foreground"
+          className="pointer-events-none absolute top-0 flex h-full max-w-48 items-center truncate nessa-text-2 font-medium text-foreground"
           style={{ left: left + MILESTONE_SIZE }}
         >
           {task.name}
@@ -516,7 +516,7 @@ function TaskBar({
       {...sharedButtonProps}
       data-slot="gantt-chart-bar"
       className={cn(
-        "absolute flex cursor-grab items-center overflow-hidden rounded-md px-2 text-start text-xs font-medium leading-4 shadow-xs",
+        "absolute flex cursor-grab items-center overflow-hidden rounded-md px-2 text-start nessa-text-2 font-medium shadow-xs",
         ganttChartToneVariants({ tone }),
         surfaceTransitionClassName,
         insetFocusClassName,
@@ -610,12 +610,12 @@ function DefaultMoveConfirm({
       radius="lg"
       className="flex w-64 flex-col gap-2 p-3"
     >
-      <p className="text-xs font-medium">
+      <p className="nessa-text-2 font-medium">
         {durationChanged
           ? labels.confirmResizeTitle(context.task.name)
           : labels.confirmMoveTitle(context.task.name)}
       </p>
-      <p className="text-xs text-muted-foreground">
+      <p className="nessa-text-2 text-muted-foreground">
         {milestone
           ? formatDayLabel(locale, context.range.start)
           : `${formatDayLabel(locale, context.range.start)} – ${formatDayLabel(
@@ -624,7 +624,7 @@ function DefaultMoveConfirm({
             )}`}
       </p>
       {moveDependents && context.dependentTaskIds.length ? (
-        <p className="text-xs text-muted-foreground">
+        <p className="nessa-text-2 text-muted-foreground">
           {labels.cascadeNote(context.dependentTaskIds.length)}
         </p>
       ) : null}
@@ -1534,7 +1534,7 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
           style={{ height: HEADER_HEIGHT }}
         >
           <div
-            className="sticky left-0 z-10 flex shrink-0 items-end gap-1 border-r border-border bg-background pe-3 ps-3 pb-1 text-xs font-medium text-muted-foreground"
+            className="sticky left-0 z-10 flex shrink-0 items-end gap-1 border-r border-border bg-background pe-3 ps-3 pb-1 nessa-text-2 font-medium text-muted-foreground"
             style={{ width: taskListWidth }}
           >
             <span className="min-w-0 flex-1 truncate">
@@ -1726,11 +1726,11 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
                     through it across the pinned column. */}
                 <div
                   data-slot="gantt-chart-task-cell"
-                  className="sticky left-0 z-20 flex shrink-0 items-center gap-1 border-b border-r border-border/40 border-r-border bg-background pe-3 text-sm"
+                  className="sticky left-0 z-20 flex shrink-0 items-center gap-1 border-b border-r border-border/40 border-r-border bg-background pe-3 ps-(--gantt-row-indent) nessa-text-4"
                   style={{
                     width: taskListWidth,
-                    paddingInlineStart: 8 + row.depth * 16,
-                  }}
+                    "--gantt-row-indent": `${8 + row.depth * 16}px`,
+                  } as React.CSSProperties}
                 >
                   {row.summary ? (
                     <button
@@ -1779,7 +1779,7 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
                       data-slot="gantt-chart-task-cell-column"
                       data-column={column.key}
                       className={cn(
-                        "shrink-0 truncate text-xs tabular-nums text-muted-foreground",
+                        "shrink-0 truncate nessa-text-2 tabular-nums text-muted-foreground",
                         column.align === "end" && "text-end",
                       )}
                       style={{ width: column.width }}

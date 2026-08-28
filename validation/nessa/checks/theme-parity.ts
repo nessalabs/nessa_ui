@@ -21,7 +21,13 @@ export function extractThemeTokens(root: Root): ThemeTokens {
 }
 
 export const typographyLevels = Object.freeze([1, 2, 3, 4, 5, 6, 7] as const)
-export const scalePresets = Object.freeze({ "90": "0.9", "95": "0.95", "100": "1", "105": "1.05", "110": "1.1" })
+/**
+ * Deliberately constrained, Radix-Themes-style. Within ±10–25% the whole
+ * system scales coherently: type stays on its hierarchy and controls keep
+ * legal touch targets. Larger swings are browser zoom's job, which also
+ * scales the tokens that must never follow this factor (borders, radii).
+ */
+export const scalePresets = Object.freeze({ "90": "0.9", "95": "0.95", "100": "1", "105": "1.05", "110": "1.1", "125": "1.25" })
 
 const entries = <Value,>(build: (level: number) => readonly [string, Value]) => Object.fromEntries(typographyLevels.map(build))
 
@@ -41,6 +47,12 @@ const scaleCss = {
     ...entries((level) => [`--_nessa-line-height-${level}`, `var(--nessa-line-height-${level})`]),
     ...entries((level) => [`--_nessa-letter-spacing-${level}`, `var(--nessa-letter-spacing-${level})`]),
   },
+  // Tailwind v4 sizing utilities resolve `--spacing` per element, so this one
+  // redeclaration scales geometry with the same factor as type. The bare
+  // `:root` outranks Tailwind's own `:root, :host` earlier in the theme layer.
+  ":root, :where([data-nessa-root], [data-nessa-theme], [data-nessa-scale])": {
+    "--spacing": "calc(0.25rem * var(--_nessa-scale-factor))",
+  },
   "@layer components": {
     ...entries((level) => [`.nessa-text-${level}`, {
       "font-size": `var(--_nessa-font-size-${level})`,
@@ -52,7 +64,15 @@ const scaleCss = {
       "line-height": "var(--_nessa-line-height-4)",
       "letter-spacing": "var(--_nessa-letter-spacing-4)",
     },
-    "@media (width >= 48rem)": { ".nessa-text-input": { "font-size": "var(--_nessa-font-size-4)" } },
+    ".nessa-text-input-2": {
+      "font-size": "max(1rem, var(--_nessa-font-size-2))",
+      "line-height": "var(--_nessa-line-height-2)",
+      "letter-spacing": "var(--_nessa-letter-spacing-2)",
+    },
+    "@media (width >= 48rem)": {
+      ".nessa-text-input": { "font-size": "var(--_nessa-font-size-4)" },
+      ".nessa-text-input-2": { "font-size": "var(--_nessa-font-size-2)" },
+    },
   },
 }
 

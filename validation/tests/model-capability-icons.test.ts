@@ -28,7 +28,7 @@ test("model capability icons use redistributable Lucide geometry and active stat
   )
 
   assert.match(speed, /<Zap/)
-  assert.match(speed, /className=\{cn\("size-\[18px\]", className\)\}/)
+  assert.match(speed, /className=\{cn\("size-4.5", className\)\}/)
   assert.match(speed, /fill=\{active \? "currentColor" : "none"\}/)
   assert.match(source, /const renderedIcon = typeof icon === "function" \? icon\(\{ pressed \}\) : icon/)
   assert.match(source, /\{renderedIcon \?\? <ModelFastModeIcon aria-hidden="true" active=\{pressed\} \/>\}/)
@@ -106,21 +106,21 @@ test("thinking slider isolates its stateful energy fill from slider behavior", a
   assert.doesNotMatch(fill, /model-thinking-slider-wave/)
   assert.match(fill, /data-slot="model-thinking-slider-ultra-stream"/)
   assert.match(fill, /dir="ltr"[\s\S]*data-slot="model-thinking-slider-ultra-stream"/)
-  assert.match(fill, /className="absolute inset-y-0 left-0 flex w-\[200%\] will-change-transform"/)
+  assert.match(fill, /className="absolute inset-y-0 left-0 flex w-\[200%\] will-change-transform \[filter:saturate\(var\(--model-thinking-stream-saturate\)\)_brightness\(var\(--model-thinking-stream-brightness\)\)\]"/)
   assert.match(fill, /const streamEnergy = isUltra \? 1 : ordinalProgress \* 0\.72/)
   assert.match(fill, /0\.95 - streamEnergy \* 0\.68/)
   assert.match(fill, /surface\.dataset\.motionTension = checkpointEnergy\.toFixed\(2\)/)
   assert.equal(source.match(/radial-gradient\(ellipse/g)?.length ?? 0, 0)
   assert.match(source, /dir === "rtl" \? "270deg" : "90deg"/)
-  assert.match(source, /function thinkingFillGradient/)
-  assert.match(source, /const streamSheenTexture/)
+  assert.match(source, /const thinkingFillGradientClass/)
+  assert.match(source, /const streamSheenTextureClass/)
   assert.match(
     source,
-    /linear-gradient\(90deg, transparent 0%,[\s\S]*transparent 100%\)/,
+    /linear-gradient\(90deg,transparent_0%,[\s\S]*transparent_100%\)/,
   )
   assert.match(
     source,
-    /linear-gradient\(90deg, (.+?) 0%,[\s\S]*\1 100%\)/,
+    /linear-gradient\(90deg,(.+?)_0%,[\s\S]*\1_100%\)/,
   )
   assert.doesNotMatch(source, /repeating-linear-gradient/)
   assert.doesNotMatch(source, /model-thinking-slider-sweep|skewX/)
@@ -130,9 +130,8 @@ test("thinking slider isolates its stateful energy fill from slider behavior", a
       ?.length,
     2,
   )
-  assert.match(fill, /className="h-full w-1\/2 shrink-0"/)
-  assert.match(fill, /\.\.\.thinkingFillGradient\(dir\)/)
-  assert.match(fill, /style=\{streamSheenTexture\}/)
+  assert.match(fill, /cn\("h-full w-1\/2 shrink-0", streamSheenTextureClass\)/)
+  assert.match(fill, /thinkingFillGradientClass/)
   assert.match(fill, /easing: "linear"/)
   assert.match(fill, /iterations: Infinity/)
   assert.match(
