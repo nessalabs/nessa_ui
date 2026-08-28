@@ -420,6 +420,23 @@
       ]
     },
     {
+      "name": "gradient-surface",
+      "type": "registry:ui",
+      "title": "Gradient Surface",
+      "description": "A decorative gradient backdrop for heroes and banners — a deep colour wash from a swappable palette, an optional contour, wave, or ring line overlay, and film grain over the whole frame.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/gradient-surface.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/gradient-surface.tsx"
+        }
+      ]
+    },
+    {
       "name": "mermaid-diagram",
       "type": "registry:ui",
       "title": "Mermaid Diagram",
