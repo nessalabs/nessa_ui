@@ -538,9 +538,13 @@ function KanbanColumnList({
       data-slot="kanban-column-list"
       data-accepts={accepts ? undefined : "false"}
       data-drop-target={gapTop !== null ? "true" : undefined}
+      // The drop-gap class joins after the consumer's className, and only
+      // while a gap is reserved, so a consumer padding utility can neither
+      // merge it away nor linger under an unset custom property.
       className={cn(
         "relative box-border flex min-h-10 flex-col gap-2",
         className,
+        gapHeight !== null && "pb-(--kanban-drop-gap)",
       )}
       // The cards part with transforms, which open the slot without
       // growing the list. Reserving the slot's height as padding lets the
@@ -549,7 +553,7 @@ function KanbanColumnList({
       // insertion index can never chase its own preview.
       style={
         gapHeight !== null
-          ? { ...props.style, paddingBottom: gapHeight }
+          ? ({ ...props.style, "--kanban-drop-gap": `${gapHeight}px` } as React.CSSProperties)
           : props.style
       }
     >

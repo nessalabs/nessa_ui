@@ -455,7 +455,7 @@ function ToolApprovalTitle({ className, ...props }: ToolApprovalTitleProps) {
     <div
       data-slot="tool-approval-title"
       className={cn(
-        "nessa-text-4 font-medium leading-5 text-foreground",
+        "nessa-text-4 font-medium text-foreground",
         className,
       )}
       {...props}
@@ -474,7 +474,7 @@ function ToolApprovalDescription({
   return (
     <div
       data-slot="tool-approval-description"
-      className={cn("nessa-text-4 leading-5 text-muted-foreground", className)}
+      className={cn("nessa-text-4 text-muted-foreground", className)}
       {...props}
     />
   )
@@ -600,6 +600,7 @@ function ToolApprovalCommand({
       return identityKey()
     }
   }, [json, structured])
+  // leading-5 deliberately loosens level 2's ratio for scannable mono JSON.
   const regionClassName = cn(
     "max-h-48 w-full min-w-0 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/40 px-3 py-2 font-mono nessa-text-2 leading-5 text-foreground outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
     className,

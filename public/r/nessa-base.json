@@ -82,7 +82,16 @@
       "nessa-thinking-fill-highlight": "oklch(0.86 0.11 214)",
       "nessa-fast-mode-active": "oklch(0.57 0.22 300)",
       "nessa-diff-addition": "oklch(0.5 0.137 150)",
-      "nessa-diff-deletion": "oklch(0.55 0.19 27)"
+      "nessa-diff-deletion": "oklch(0.55 0.19 27)",
+      "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 20%, transparent)",
+      "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)",
+      "nessa-chat-accent": "#0071e3",
+      "nessa-chat-rim-0": "rgba(245, 158, 11, 0.06)",
+      "nessa-chat-rim-1": "rgba(245, 158, 11, 0.22)",
+      "nessa-chat-rim-2": "rgba(236, 72, 153, 0.42)",
+      "nessa-chat-rim-3": "rgba(168, 85, 247, 0.62)",
+      "nessa-chat-rim-4": "rgba(56, 189, 248, 0.85)",
+      "nessa-chat-rim-head": "#ffffff"
     },
     "dark": {
       "background": "oklch(0.145 0 0)",
@@ -115,7 +124,16 @@
       "nessa-thinking-fill-highlight": "oklch(0.82 0.12 210)",
       "nessa-fast-mode-active": "oklch(0.72 0.185 306)",
       "nessa-diff-addition": "oklch(0.77 0.17 152)",
-      "nessa-diff-deletion": "oklch(0.7 0.19 25)"
+      "nessa-diff-deletion": "oklch(0.7 0.19 25)",
+      "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 40%, transparent)",
+      "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)",
+      "nessa-chat-accent": "#0071e3",
+      "nessa-chat-rim-0": "rgba(245, 158, 11, 0.06)",
+      "nessa-chat-rim-1": "rgba(245, 158, 11, 0.22)",
+      "nessa-chat-rim-2": "rgba(236, 72, 153, 0.42)",
+      "nessa-chat-rim-3": "rgba(168, 85, 247, 0.62)",
+      "nessa-chat-rim-4": "rgba(56, 189, 248, 0.85)",
+      "nessa-chat-rim-head": "#ffffff"
     }
   },
   "css": {
@@ -136,6 +154,9 @@
     },
     ":where([data-nessa-scale=\"110\"])": {
       "--_nessa-scale-factor": "1.1"
+    },
+    ":where([data-nessa-scale=\"125\"])": {
+      "--_nessa-scale-factor": "1.25"
     },
     ":where(:root, [data-nessa-root], [data-nessa-theme], [data-nessa-scale])": {
       "--_nessa-font-size-1": "calc(var(--nessa-font-size-1) * var(--_nessa-scale-factor))",
@@ -159,6 +180,9 @@
       "--_nessa-letter-spacing-5": "var(--nessa-letter-spacing-5)",
       "--_nessa-letter-spacing-6": "var(--nessa-letter-spacing-6)",
       "--_nessa-letter-spacing-7": "var(--nessa-letter-spacing-7)"
+    },
+    ":root, :where([data-nessa-root], [data-nessa-theme], [data-nessa-scale])": {
+      "--spacing": "calc(0.25rem * var(--_nessa-scale-factor))"
     },
     "@layer components": {
       ".nessa-text-1": {
@@ -201,9 +225,17 @@
         "line-height": "var(--_nessa-line-height-4)",
         "letter-spacing": "var(--_nessa-letter-spacing-4)"
       },
+      ".nessa-text-input-2": {
+        "font-size": "max(1rem, var(--_nessa-font-size-2))",
+        "line-height": "var(--_nessa-line-height-2)",
+        "letter-spacing": "var(--_nessa-letter-spacing-2)"
+      },
       "@media (width >= 48rem)": {
         ".nessa-text-input": {
           "font-size": "var(--_nessa-font-size-4)"
+        },
+        ".nessa-text-input-2": {
+          "font-size": "var(--_nessa-font-size-2)"
         }
       }
     },

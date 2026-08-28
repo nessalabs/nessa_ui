@@ -306,10 +306,7 @@ function WorkflowCanvasEdge({
           // coordinate chain — so the surface publishes its zoom and the
           // band divides by it. The fallback keeps a sane band for an edge
           // layer mounted outside a surface.
-          style={{
-            strokeWidth: "calc(16 / var(--nessa-workflow-canvas-zoom, 1))",
-          }}
-          className="stroke-transparent [pointer-events:stroke]"
+          className="stroke-transparent [pointer-events:stroke] [stroke-width:calc(16/var(--nessa-workflow-canvas-zoom,1))]"
         />
       ) : null}
       <path

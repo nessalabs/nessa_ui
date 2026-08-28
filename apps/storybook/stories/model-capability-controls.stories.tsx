@@ -104,8 +104,8 @@ async function verifyUltraStream(canvasElement: HTMLElement) {
   await expect(getComputedStyle(periods[0]!).backgroundImage).toBe(
     getComputedStyle(periods[1]!).backgroundImage,
   )
-  await expect(periods[0]!.style.backgroundImage).toMatch(
-    /^linear-gradient\(90deg, transparent 0%,[\s\S]*transparent 100%\)$/,
+  await expect(getComputedStyle(periods[0]!).backgroundImage).toMatch(
+    /^linear-gradient\(90deg, (?:transparent|rgba\(0, 0, 0, 0\)) 0%,[\s\S]*(?:transparent|rgba\(0, 0, 0, 0\)) 100%\)$/,
   )
   await expect(streamRect.top).toBeGreaterThanOrEqual(trackRect.top)
   await expect(streamRect.bottom).toBeLessThanOrEqual(trackRect.bottom)
@@ -134,7 +134,7 @@ function CapabilityExample() {
   return (
     <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1 text-card-foreground">
       <ModelThinkingControl
-        icon={<ThinkingIcon className="size-[18px]" />}
+        icon={<ThinkingIcon className="size-4.5" />}
         levels={levels}
         value={thinking}
         onValueChange={setThinking}
@@ -145,7 +145,7 @@ function CapabilityExample() {
           pressed: fast,
           onPressedChange: setFast,
           icon: ({ pressed }) => (
-            <FastIcon active={pressed} className="size-[18px]" />
+            <FastIcon active={pressed} className="size-4.5" />
           ),
           streamSpeedMultiplier: fastStreamSpeedMultiplier,
         }}
@@ -179,7 +179,7 @@ function RtlComposedControlExample() {
   return (
     <div dir="rtl">
       <ModelThinkingControl
-        icon={<ThinkingIcon className="size-[18px]" />}
+        icon={<ThinkingIcon className="size-4.5" />}
         dir="rtl"
         levels={levels}
         value={value}
@@ -793,7 +793,7 @@ export const SliderSizes: Story = {
       </div>
       <div data-testid="composed-control">
         <ModelThinkingControl
-          icon={<ThinkingIcon className="size-[18px]" />}
+          icon={<ThinkingIcon className="size-4.5" />}
           levels={levels}
           value="high"
           open
@@ -1358,7 +1358,7 @@ export const FastOnly: Story = {
         <ModelFastMode
           aria-label="Accelerated mode"
           icon={({ pressed }) => (
-            <FastIcon active={pressed} className="size-[18px]" />
+            <FastIcon active={pressed} className="size-4.5" />
           )}
           pressed={fast}
           onPressedChange={setFast}

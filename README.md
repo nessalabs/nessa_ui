@@ -24,6 +24,7 @@ packages/react    components, tokens, and package entrypoints
 public/r          generated shadcn registry artifacts
 registry.json     public registry catalog
 docs/architecture permanent design-system contracts
+skills            task-shaped guides for agents working in this repo
 ```
 
 ## Start Storybook

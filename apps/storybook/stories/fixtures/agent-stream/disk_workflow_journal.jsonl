@@ -1,0 +1,8 @@
+{"type":"started","key":"v2:5d075edeb6971439e94e4998c8c42250b7f6592bb874b89bdc103332641d7483","agentId":"a2a58f6528032defc"}
+{"type":"started","key":"v2:9be8212e46676a2eeec44f600f0d5d50a2c6cfa48ca8cc49cabcfdc321787f0f","agentId":"ade5b4e11407e50e2"}
+{"type":"result","key":"v2:5d075edeb6971439e94e4998c8c42250b7f6592bb874b89bdc103332641d7483","agentId":"a2a58f6528032defc","result":"hello"}
+{"type":"result","key":"v2:9be8212e46676a2eeec44f600f0d5d50a2c6cfa48ca8cc49cabcfdc321787f0f","agentId":"ade5b4e11407e50e2","result":"hola"}
+{"type":"started","key":"v2:2db9775cb997779342ae1895d232488811f9b4c37b1c7eb6a65730e247e074b0","agentId":"a35ea63276cd501aa"}
+{"type":"result","key":"v2:2db9775cb997779342ae1895d232488811f9b4c37b1c7eb6a65730e247e074b0","agentId":"a35ea63276cd501aa","result":"bonjour"}
+{"type":"started","key":"v2:11b09b7ab28b611b5ed2589825cd88b4ef0ec15d319e770e3ba25a2eabc93635","agentId":"adc745a73ba83db5b"}
+{"type":"result","key":"v2:11b09b7ab28b611b5ed2589825cd88b4ef0ec15d319e770e3ba25a2eabc93635","agentId":"adc745a73ba83db5b","result":"hello, hola, bonjour"}
