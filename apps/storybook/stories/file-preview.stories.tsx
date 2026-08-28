@@ -42,6 +42,17 @@ trailer<</Size 4/Root 1 0 R>>
 %%EOF`
 const pdfSrc = `data:application/pdf;base64,${btoa(minimalPdf)}`
 
+
+/**
+ * Every text-based renderer fetches its source before it renders anything,
+ * so a play test waits on fetch, React commit, and the renderer's own async
+ * work — Shiki highlighting, table layout — in one window. testing-library's
+ * default is 1s, which is comfortable alone and marginal when the whole
+ * suite runs in parallel, so these waits get a budget proportional to the
+ * 30s test timeout instead of the default.
+ */
+const settles = { timeout: 15000 } as const
+
 export const ImagePreview: Story = {
   parameters: storyDocumentation(
     "A raster image with header chrome: file name, formatted size, and a download link. The image renderer keeps the picture contained inside the content box.",
@@ -187,7 +198,7 @@ export const ImageError: Story = {
     const canvas = within(canvasElement)
     await waitFor(async () => {
       await expect(canvas.getByText(/Image failed to load/)).toBeVisible()
-    })
+    }, settles)
   },
 }
 
@@ -257,7 +268,7 @@ export const MarkdownPreview: Story = {
       await expect(
         canvas.getByRole("heading", { name: "Release notes" }),
       ).toBeVisible()
-    })
+    }, settles)
     const root = canvasElement.querySelector('[data-slot="file-preview"]')
     await expect(root).toHaveAttribute("data-kind", "markdown")
   },
@@ -277,7 +288,7 @@ export const JsonPreview: Story = {
     const canvas = within(canvasElement)
     await waitFor(async () => {
       await expect(canvas.getByText(/nessa/)).toBeVisible()
-    })
+    }, settles)
     await expect(
       canvasElement.querySelector('[data-slot="file-preview-json"]'),
     ).not.toBeNull()
@@ -300,7 +311,7 @@ export const CsvPreview: Story = {
       await expect(
         canvas.getByRole("columnheader", { name: "population" }),
       ).toBeVisible()
-    })
+    }, settles)
     await expect(canvas.getByRole("cell", { name: "Kathmandu" })).toBeVisible()
   },
 }
@@ -327,7 +338,7 @@ export const CsvPreviewTall: Story = {
       await expect(
         canvas.getByRole("cell", { name: "600" }),
       ).toBeInTheDocument()
-    })
+    }, settles)
     // The regression this guards: percentage caps resolving against an
     // auto-height frame left the container unscrollable and rows clipped.
     const container = canvasElement.querySelector<HTMLElement>(
@@ -356,17 +367,21 @@ export const CodePreview: Story = {
     />
   ),
   play: async ({ canvasElement }) => {
-    // The code draws inside Pierre's <diffs-container> shadow root and
-    // highlighting is async, so wait and read the shadow text directly.
-    await waitFor(
-      async () => {
-        const shadowText = canvasElement
-          .querySelector('[data-slot="file-preview-text"]')
-          ?.querySelector("diffs-container")?.shadowRoot?.textContent
-        await expect(shadowText).toContain("greet")
-      },
-      { timeout: 5000 },
-    )
+    // Two waits, not one: the renderer only mounts once its fetch resolves,
+    // and Pierre then highlights into the <diffs-container> shadow root
+    // asynchronously. Sharing one budget between them is what made this
+    // flake under a full parallel run.
+    await waitFor(async () => {
+      await expect(
+        canvasElement.querySelector('[data-slot="file-preview-text"]'),
+      ).not.toBeNull()
+    }, settles)
+    await waitFor(async () => {
+      const shadowText = canvasElement
+        .querySelector('[data-slot="file-preview-text"]')
+        ?.querySelector("diffs-container")?.shadowRoot?.textContent
+      await expect(shadowText).toContain("greet")
+    }, settles)
     const root = canvasElement.querySelector('[data-slot="file-preview"]')
     await expect(root).toHaveAttribute("data-kind", "text")
   },
