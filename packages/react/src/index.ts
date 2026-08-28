@@ -695,6 +695,7 @@ export {
   filePreviewMarkdownExtensions,
   filePreviewPdfExtensions,
   filePreviewPptxExtensions,
+  filePreviewRawImageExtensions,
   filePreviewTextExtensions,
   filePreviewVideoExtensions,
   filePreviewXlsxExtensions,

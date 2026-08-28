@@ -119,6 +119,18 @@ describe("detectFileKind", () => {
     assert.equal(detectFileKind({ name: "notes.txt" }), "text")
   })
 
+  test("HEIC/HEIF count as images (WebKit renders them natively)", () => {
+    assert.equal(detectFileKind({ name: "IMG_0042.HEIC" }), "image")
+    assert.equal(detectFileKind({ mimeType: "image/heif" }), "image")
+  })
+
+  test("camera RAW is a detection-only kind, even under image/* MIME", () => {
+    assert.equal(detectFileKind({ name: "shot.dng" }), "raw")
+    assert.equal(detectFileKind({ name: "shot.CR2" }), "raw")
+    assert.equal(detectFileKind({ mimeType: "image/x-adobe-dng" }), "raw")
+    assert.equal(detectFileKind({ mimeType: "image/x-sony-arw" }), "raw")
+  })
+
   test("returns unknown without a recognizable signal", () => {
     assert.equal(detectFileKind({}), "unknown")
     assert.equal(detectFileKind({ name: "archive.zip" }), "unknown")

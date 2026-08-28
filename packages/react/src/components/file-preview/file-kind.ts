@@ -23,6 +23,7 @@ export type FilePreviewKind =
   | "docx"
   | "xlsx"
   | "pptx"
+  | "raw"
   | "unknown"
 
 /** A file source described by URL plus optional display metadata. */
@@ -37,15 +38,23 @@ export interface FilePreviewFile {
   size?: number
 }
 
-/** Extensions treated as images, lowercase without the dot. */
+/**
+ * Extensions treated as images, lowercase without the dot. HEIC/HEIF are
+ * included even though only WebKit engines (Safari, WKWebView — e.g. Tauri
+ * on Apple platforms) decode them natively; engines that cannot land on the
+ * image renderer's error fallback rather than a broken glyph.
+ */
 export const filePreviewImageExtensions: readonly string[] = [
   "apng",
   "avif",
   "bmp",
   "gif",
+  "heic",
+  "heif",
   "ico",
   "jpeg",
   "jpg",
+  "jxl",
   "png",
   "svg",
   "webp",
@@ -126,6 +135,23 @@ export const filePreviewTextExtensions: readonly string[] = [
   "yml",
 ]
 
+/**
+ * Camera RAW extensions (detection-only; no browser engine decodes RAW, so
+ * these reach the fallback with the right identity unless the app registers
+ * a renderer backed by its own decoding pipeline).
+ */
+export const filePreviewRawImageExtensions: readonly string[] = [
+  "arw",
+  "cr2",
+  "cr3",
+  "dng",
+  "nef",
+  "orf",
+  "raf",
+  "rw2",
+  "srw",
+]
+
 /** Word-processor extensions (detection-only; no built-in renderer). */
 export const filePreviewDocxExtensions: readonly string[] = ["doc", "docx"]
 /** Spreadsheet extensions (detection-only; no built-in renderer). */
@@ -148,9 +174,24 @@ const officeMimeKinds: Readonly<Record<string, FilePreviewKind>> = {
     "pptx",
 }
 
+// Camera RAW MIME types sit under image/* but no browser decodes them, so
+// they must be caught before the image prefix match.
+const rawImageMimeTypes: readonly string[] = [
+  "image/x-adobe-dng",
+  "image/x-canon-cr2",
+  "image/x-canon-cr3",
+  "image/x-fuji-raf",
+  "image/x-nikon-nef",
+  "image/x-olympus-orf",
+  "image/x-panasonic-rw2",
+  "image/x-samsung-srw",
+  "image/x-sony-arw",
+]
+
 function kindFromMimeType(mimeType: string): FilePreviewKind {
   // Strip parameters ("application/pdf; version=1.7") before matching.
   const normalized = mimeType.split(";", 1)[0].trim().toLowerCase()
+  if (rawImageMimeTypes.includes(normalized)) return "raw"
   if (normalized.startsWith("image/")) return "image"
   if (normalized === "application/pdf") return "pdf"
   if (normalized.startsWith("video/")) return "video"
@@ -193,6 +234,8 @@ const extensionKindTables: readonly (readonly [
   readonly string[],
   FilePreviewKind,
 ])[] = [
+  // RAW before image: both are photos, but only one of them can render.
+  [filePreviewRawImageExtensions, "raw"],
   [filePreviewImageExtensions, "image"],
   [filePreviewPdfExtensions, "pdf"],
   [filePreviewVideoExtensions, "video"],

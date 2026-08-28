@@ -11,6 +11,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
 } from "../table"
 import { delimiterFor, parseDelimitedText } from "./delimited-text"
 import { FilePreviewFallback } from "./file-preview-fallback"
@@ -40,25 +41,33 @@ function FilePreviewCsv({ file }: FilePreviewRendererProps) {
     return <FilePreviewFallback message="The file is empty" />
   }
   return (
-    <div data-slot="file-preview-csv" className="h-full w-full overflow-auto">
-      <Table containerLabel={file.name ?? "Delimited file preview"}>
-        <TableHeader sticky>
-          <TableRow>
-            {header.map((column, index) => (
-              <TableHead key={index}>{column}</TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {body.map((row, rowIndex) => (
-            <TableRow key={rowIndex}>
-              {header.map((_, cellIndex) => (
-                <TableCell key={cellIndex}>{row[cellIndex] ?? ""}</TableCell>
+    <div
+      data-slot="file-preview-csv"
+      className="h-full w-full overflow-hidden p-3"
+    >
+      <TableShell className="max-h-full">
+        <Table
+          containerLabel={file.name ?? "Delimited file preview"}
+          containerClassName="max-h-full scroll-pt-9"
+        >
+          <TableHeader sticky>
+            <TableRow>
+              {header.map((column, index) => (
+                <TableHead key={index}>{column}</TableHead>
               ))}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {body.map((row, rowIndex) => (
+              <TableRow key={rowIndex}>
+                {header.map((_, cellIndex) => (
+                  <TableCell key={cellIndex}>{row[cellIndex] ?? ""}</TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableShell>
     </div>
   )
 }

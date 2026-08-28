@@ -186,7 +186,7 @@ export const ImageError: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     await waitFor(async () => {
-      await expect(canvas.getByText("Image failed to load")).toBeVisible()
+      await expect(canvas.getByText(/Image failed to load/)).toBeVisible()
     })
   },
 }
