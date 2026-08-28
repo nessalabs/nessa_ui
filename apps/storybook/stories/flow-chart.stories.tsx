@@ -5,6 +5,7 @@ import { userEvent } from "storybook/test"
 import {
   Button,
   FlowChart,
+  PopoverSurface,
   type FlowChartLayoutIssue,
   type FlowChartLink,
   type FlowChartNode,
@@ -111,17 +112,18 @@ export const MonthlyBudget: Story = {
     await expect(other).toHaveAttribute("aria-pressed", "false")
     // The clicked ribbon still holds keyboard focus, which isolates its
     // flow just like hover — blur it to reach the true resting state.
+    const ribbonElement = ribbon as unknown as SVGElement
     await userEvent.unhover(ribbon)
-    ;(ribbon as unknown as SVGElement).blur()
+    ribbonElement.blur()
     await waitFor(() =>
       expect(parseFloat(getComputedStyle(other).opacity)).toBeCloseTo(0.5, 1),
     )
     // Keyboard focus alone isolates the flow the way hover does.
-    ;(ribbon as unknown as SVGElement).focus()
+    ribbonElement.focus()
     await waitFor(() =>
       expect(parseFloat(getComputedStyle(other).opacity)).toBeLessThan(0.2),
     )
-    ;(ribbon as unknown as SVGElement).blur()
+    ribbonElement.blur()
     await waitFor(() =>
       expect(parseFloat(getComputedStyle(other).opacity)).toBeCloseTo(0.5, 1),
     )
@@ -139,31 +141,28 @@ export const HoverDetail: Story = {
         {...args}
         formatValue={dollars}
         aria-label="Monthly income and spending flow with hover details"
-        renderHoverDetail={(hover) =>
-          hover.kind === "link" ? (
-            <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
+        renderHoverDetail={(hover) => {
+          const [title, subtitle] =
+            hover.kind === "link"
+              ? [
+                  `${hover.source.label} → ${hover.target.label}`,
+                  dollars(hover.link.value),
+                ]
+              : [
+                  hover.node.label ?? hover.node.id,
+                  `${dollars(hover.context.value)} · ${Math.round(
+                    (hover.context.value / hover.context.columnTotal) * 100,
+                  )}% of column`,
+                ]
+          return (
+            <PopoverSurface className="px-3 py-2">
               <p className="nessa-text-3 font-medium text-popover-foreground">
-                {hover.source.label} → {hover.target.label}
+                {title}
               </p>
-              <p className="nessa-text-2 text-muted-foreground">
-                {dollars(hover.link.value)}
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-md">
-              <p className="nessa-text-3 font-medium text-popover-foreground">
-                {hover.node.label}
-              </p>
-              <p className="nessa-text-2 text-muted-foreground">
-                {dollars(hover.context.value)} ·{" "}
-                {Math.round(
-                  (hover.context.value / hover.context.columnTotal) * 100,
-                )}
-                % of column
-              </p>
-            </div>
+              <p className="nessa-text-2 text-muted-foreground">{subtitle}</p>
+            </PopoverSurface>
           )
-        }
+        }}
       />
     </div>
   ),

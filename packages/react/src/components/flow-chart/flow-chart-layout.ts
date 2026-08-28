@@ -92,7 +92,12 @@ export interface FlowChartLayoutLink {
  * real data error the host should surface.
  */
 export interface FlowChartLayoutIssue {
-  kind: "unknown-endpoint" | "self-link" | "duplicate-node" | "cycle"
+  kind:
+    | "unknown-endpoint"
+    | "self-link"
+    | "duplicate-node"
+    | "cycle"
+    | "invalid-value"
   /** Human-readable summary of what was dropped or repaired. */
   message: string
   /** Index into the input `links` array, for link-scoped issues. */
@@ -225,6 +230,16 @@ export function computeFlowChartLayout(options: FlowChartLayoutOptions): FlowCha
   }
   const activeLinks: Array<FlowChartLinkInput & { index: number }> = []
   links.forEach((link, index) => {
+    // NaN and Infinity would poison every derived coordinate; report and
+    // drop them — a plain non-positive value is just "no flow yet".
+    if (!Number.isFinite(link.value)) {
+      issues.push({
+        kind: "invalid-value",
+        linkIndex: index,
+        message: `link ${link.source} → ${link.target} has a non-finite value; dropped`,
+      })
+      return
+    }
     if (link.value <= 0) return
     if (link.source === link.target) {
       issues.push({
@@ -270,11 +285,20 @@ export function computeFlowChartLayout(options: FlowChartLayoutOptions): FlowCha
   for (const state of states.values()) {
     columnCount = Math.max(columnCount, state.column + 1)
   }
+  const hadCycle = issues.some((issue) => issue.kind === "cycle")
   if (align === "justify" && columnCount > 1) {
     for (const state of states.values()) {
-      if (state.outValue === 0) state.column = columnCount - 1
+      // A node with no flow at all is not a sink — leaving it at its
+      // depth keeps a just-streamed node from teleporting across the
+      // chart until its links arrive.
+      if (state.outValue === 0 && state.inValue > 0) {
+        state.column = columnCount - 1
+      }
     }
-  } else if (align === "right" && columnCount > 1) {
+  } else if (align === "right" && columnCount > 1 && !hadCycle) {
+    // With a cycle, the reversed-graph heights collapse while the forward
+    // fallback inflates columnCount, inverting the chart — fall back to
+    // depth placement instead (the cycle is already reported).
     // Longest path TO a sink, computed on the reversed graph, packs every
     // node as far right as its outputs allow.
     const heights = assignColumns(
@@ -327,22 +351,28 @@ export function computeFlowChartLayout(options: FlowChartLayoutOptions): FlowCha
       }
     }
     reindex()
+    // Adjacency once, so each relax pass touches only a node's own links
+    // instead of scanning every link per node.
+    type Adjacent = { counterpart: string; value: number }
+    const incomingOf = new Map<string, Adjacent[]>()
+    const outgoingOf = new Map<string, Adjacent[]>()
+    for (const link of activeLinks) {
+      let into = incomingOf.get(link.target)
+      if (!into) incomingOf.set(link.target, (into = []))
+      into.push({ counterpart: link.source, value: link.value })
+      let from = outgoingOf.get(link.source)
+      if (!from) outgoingOf.set(link.source, (from = []))
+      from.push({ counterpart: link.target, value: link.value })
+    }
     const relax = (useIncoming: boolean, column: NodeState[]) => {
+      const adjacency = useIncoming ? incomingOf : outgoingOf
       const scores = new Map<string, number>()
       for (const node of column) {
         let weight = 0
         let sum = 0
-        for (const link of activeLinks) {
-          const counterpart = useIncoming
-            ? link.target === node.id
-              ? link.source
-              : null
-            : link.source === node.id
-              ? link.target
-              : null
-          if (counterpart === null) continue
-          sum += link.value * ordinal.get(counterpart)!
-          weight += link.value
+        for (const edge of adjacency.get(node.id) ?? []) {
+          sum += edge.value * ordinal.get(edge.counterpart)!
+          weight += edge.value
         }
         scores.set(node.id, weight > 0 ? sum / weight : ordinal.get(node.id)!)
       }
@@ -373,8 +403,12 @@ export function computeFlowChartLayout(options: FlowChartLayoutOptions): FlowCha
   }
   if (!Number.isFinite(scale)) scale = 0
 
+  // Never negative: in a box narrower than the columns the bars touch
+  // and overflow rightward rather than overlapping into each other.
   const columnGap =
-    columnCount > 1 ? (width - nodeWidth * columnCount) / (columnCount - 1) : 0
+    columnCount > 1
+      ? Math.max(0, (width - nodeWidth * columnCount) / (columnCount - 1))
+      : 0
 
   const positioned = new Map<string, FlowChartLayoutNode>()
   const columnTotals: number[] = []

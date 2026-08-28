@@ -194,6 +194,72 @@ describe("computeFlowChartLayout", () => {
     assert.deepEqual(computeFlowChartLayout(BASE).issues, [])
   })
 
+  it("drops non-finite link values and reports them", () => {
+    const layout = computeFlowChartLayout({
+      ...BASE,
+      links: [
+        { source: "a", target: "x", value: 2 },
+        { source: "a", target: "y", value: NaN },
+        { source: "b", target: "y", value: Infinity },
+      ],
+    })
+    assert.equal(layout.links.length, 1)
+    assert.equal(
+      layout.issues.filter((issue) => issue.kind === "invalid-value").length,
+      2,
+    )
+    for (const node of layout.nodes) {
+      assert.ok(Number.isFinite(node.height) && Number.isFinite(node.y))
+    }
+  })
+
+  it("keeps linkless nodes at their depth instead of justifying them right", () => {
+    const layout = computeFlowChartLayout({
+      ...BASE,
+      nodes: [{ id: "a" }, { id: "b" }, { id: "c" }],
+      links: [{ source: "a", target: "b", value: 1 }],
+    })
+    assert.equal(
+      layout.nodes.find((node) => node.id === "c")!.column,
+      0,
+    )
+  })
+
+  it("clamps the column gap at zero in boxes narrower than the columns", () => {
+    const layout = computeFlowChartLayout({
+      ...BASE,
+      width: 30,
+      nodes: [{ id: "a" }, { id: "b" }, { id: "c" }],
+      links: [
+        { source: "a", target: "b", value: 1 },
+        { source: "b", target: "c", value: 1 },
+      ],
+    })
+    const xs = layout.nodes
+      .sort((first, second) => first.column - second.column)
+      .map((node) => node.x)
+    assert.deepEqual(xs, [0, 10, 20])
+  })
+
+  it("falls back to depth placement for align right when the data has a cycle", () => {
+    const layout = computeFlowChartLayout({
+      ...BASE,
+      align: "right",
+      nodes: ["a", "b", "c", "d", "e"].map((id) => ({ id })),
+      links: [
+        { source: "a", target: "b", value: 1 },
+        { source: "b", target: "c", value: 1 },
+        { source: "c", target: "d", value: 1 },
+        { source: "d", target: "e", value: 1 },
+        { source: "e", target: "d", value: 1 },
+      ],
+    })
+    const column = (id: string) =>
+      layout.nodes.find((node) => node.id === id)!.column
+    assert.equal(column("a"), 0)
+    assert.ok(column("d") > column("c"))
+  })
+
   it("breaks cycles deterministically instead of failing", () => {
     const layout = computeFlowChartLayout({
       ...BASE,

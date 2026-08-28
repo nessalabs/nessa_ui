@@ -8,11 +8,11 @@ import { cn } from "@/lib/utils"
 
 import {
   computeFlowChartLayout,
+  flowChartCenterlinePath,
   flowChartRibbonPath,
   type FlowChartAlign,
   type FlowChartLayout,
   type FlowChartLayoutIssue,
-  type FlowChartLayoutLink,
   type FlowChartLayoutNode,
 } from "./flow-chart-layout"
 
@@ -128,7 +128,8 @@ export interface FlowChartProps
   renderHoverDetail?: (hover: FlowChartHoverContext) => React.ReactNode
   /**
    * Called whenever the set of tolerated data problems changes — dropped
-   * links waiting on absent nodes, duplicate nodes, cycle repairs. While
+   * links waiting on absent nodes, duplicate nodes, cycle repairs — and
+   * once after the first layout to establish the initial state. While
    * data streams in, transient issues come and go; once the stream
    * settles, an empty array is the definitive "everything rendered"
    * signal and anything else is a data error worth surfacing.
@@ -173,7 +174,7 @@ function useMeasuredBox(ref: React.RefObject<HTMLElement | null>) {
   )
   React.useLayoutEffect(() => {
     const element = ref.current
-    if (!element) return
+    if (!element || typeof ResizeObserver === "undefined") return
     const observer = new ResizeObserver((entries) => {
       const rect = entries[entries.length - 1].contentRect
       const width = Math.round(rect.width)
@@ -267,20 +268,37 @@ function FlowChart({
     (focusedLinkId !== null
       ? ({ kind: "link", id: focusedLinkId } as const)
       : null)
-  // Plot-relative pointer position, tracked only while hover detail is on.
-  const [pointer, setPointer] = React.useState<{ x: number; y: number } | null>(
-    null,
-  )
   const [uncontrolledSelection, setUncontrolledSelection] = React.useState<
     readonly string[]
   >(defaultSelectedLinkIds ?? [])
   const selection = selectedLinkIds ?? uncontrolledSelection
   const selectionSet = React.useMemo(() => new Set(selection), [selection])
 
+  // Duplicate ids keep their FIRST occurrence, matching the layout's own
+  // dedupe — labels, tints, and hover detail must describe the node the
+  // geometry was computed from.
+  const uniqueNodes = React.useMemo(() => {
+    const seen = new Set<string>()
+    const result: FlowChartNode[] = []
+    for (const node of nodes) {
+      if (seen.has(node.id)) continue
+      seen.add(node.id)
+      result.push(node)
+    }
+    return result
+  }, [nodes])
   const nodeById = React.useMemo(
-    () => new Map(nodes.map((node) => [node.id, node])),
-    [nodes],
+    () => new Map(uniqueNodes.map((node) => [node.id, node])),
+    [uniqueNodes],
   )
+  const linkIds = React.useMemo(() => links.map(linkIdOf), [links])
+  const linkById = React.useMemo(() => {
+    const map = new Map<string, FlowChartLink>()
+    links.forEach((link, index) => {
+      if (!map.has(linkIds[index])) map.set(linkIds[index], link)
+    })
+    return map
+  }, [links, linkIds])
 
   const vertical = orientation === "vertical"
   const gradientId = React.useId().replace(/:/g, "")
@@ -306,7 +324,12 @@ function FlowChart({
   const onLayoutIssuesRef = React.useRef(onLayoutIssues)
   onLayoutIssuesRef.current = onLayoutIssues
   const issuesKey = layout
-    ? layout.issues.map((issue) => issue.message).join("\n")
+    ? layout.issues
+        .map(
+          (issue) =>
+            `${issue.kind}@${issue.linkIndex ?? ""}@${issue.nodeId ?? ""}:${issue.message}`,
+        )
+        .join("\n")
     : null
   React.useEffect(() => {
     if (issuesKey === null || !layout) return
@@ -321,7 +344,7 @@ function FlowChart({
   const colorOf = React.useMemo(() => {
     const colors = new Map<string, string>()
     let slot = 0
-    for (const node of nodes) {
+    for (const node of uniqueNodes) {
       if (node.color) {
         colors.set(node.id, node.color)
       } else if (palette && palette.length > 0) {
@@ -330,7 +353,7 @@ function FlowChart({
       }
     }
     return colors
-  }, [nodes, palette])
+  }, [uniqueNodes, palette])
 
   const applySelection = (next: string[]) => {
     if (selectedLinkIds === undefined) setUncontrolledSelection(next)
@@ -361,32 +384,48 @@ function FlowChart({
     )
   }
 
-  const linkEmphasis = (link: FlowChartLayoutLink): FlowChartEmphasis => {
-    const id = linkIdOf(links[link.index])
-    if (selectionSet.has(id)) return "active"
-    if (highlighted?.kind === "link") {
-      return highlighted.id === id ? "active" : "dim"
-    }
-    if (highlighted?.kind === "node") {
-      return link.source === highlighted.id || link.target === highlighted.id
-        ? "active"
-        : "dim"
-    }
-    return selection.length > 0 ? "dim" : "rest"
-  }
-
-  const nodeEmphasis = (node: FlowChartLayoutNode): FlowChartEmphasis => {
+  // One pass over the links derives every element's emphasis: links carry
+  // their own state, and a node is active exactly when an active link
+  // touches it (or it is highlighted itself).
+  const { linkEmphasisByIndex, nodeEmphasisById } = React.useMemo(() => {
+    const linkMap = new Map<number, FlowChartEmphasis>()
+    const nodeMap = new Map<string, FlowChartEmphasis>()
+    if (!layout) return { linkEmphasisByIndex: linkMap, nodeEmphasisById: nodeMap }
     const engaged = highlighted !== null || selection.length > 0
-    if (!engaged) return "rest"
-    if (highlighted?.kind === "node" && highlighted.id === node.id)
-      return "active"
-    const touched = layout?.links.some(
-      (link) =>
-        (link.source === node.id || link.target === node.id) &&
-        linkEmphasis(link) === "active",
-    )
-    return touched ? "active" : "dim"
-  }
+    const activeNodes = new Set<string>()
+    for (const link of layout.links) {
+      const id = linkIds[link.index]
+      let emphasis: FlowChartEmphasis
+      if (selectionSet.has(id)) emphasis = "active"
+      else if (highlighted?.kind === "link") {
+        emphasis = highlighted.id === id ? "active" : "dim"
+      } else if (highlighted?.kind === "node") {
+        emphasis =
+          link.source === highlighted.id || link.target === highlighted.id
+            ? "active"
+            : "dim"
+      } else {
+        emphasis = selection.length > 0 ? "dim" : "rest"
+      }
+      linkMap.set(link.index, emphasis)
+      if (emphasis === "active") {
+        activeNodes.add(link.source)
+        activeNodes.add(link.target)
+      }
+    }
+    for (const node of layout.nodes) {
+      nodeMap.set(
+        node.id,
+        !engaged
+          ? "rest"
+          : (highlighted?.kind === "node" && highlighted.id === node.id) ||
+              activeNodes.has(node.id)
+            ? "active"
+            : "dim",
+      )
+    }
+    return { linkEmphasisByIndex: linkMap, nodeEmphasisById: nodeMap }
+  }, [layout, linkIds, selectionSet, selection.length, highlighted])
 
   const defaultLinkLabel = (link: FlowChartLink) => {
     const sourceLabel = nodeById.get(link.source)?.label ?? link.source
@@ -404,13 +443,78 @@ function FlowChart({
     columnTotal: layout!.columnTotals[node.column],
   })
 
+  // Geometry-derived strings are stable between interaction renders.
+  const ribbonPaths = React.useMemo(
+    () =>
+      layout
+        ? layout.links.map((link) =>
+            flowChartRibbonPath(link, curvature, vertical),
+          )
+        : [],
+    [layout, curvature, vertical],
+  )
+
+  // The hover-detail card follows the pointer imperatively: routing raw
+  // pointer coordinates through React state would re-render every ribbon
+  // per mousemove just to move a floating card.
+  const hoverDetailRef = React.useRef<HTMLDivElement>(null)
+  const lastPointerRef = React.useRef<{ x: number; y: number } | null>(null)
+  const positionHoverDetail = React.useCallback(() => {
+    const element = hoverDetailRef.current
+    const point = lastPointerRef.current
+    if (!element || !point || !box) return
+    // Flip away from the pointer near the plot's far edges so the card
+    // stays inside the chart.
+    const flipX = point.x > box.width / 2
+    const flipY = point.y > box.height / 2
+    element.style.left = `${point.x + (flipX ? -12 : 12)}px`
+    element.style.top = `${point.y + (flipY ? -12 : 12)}px`
+    element.style.transform = `translate(${flipX ? "-100%" : "0"}, ${flipY ? "-100%" : "0"})`
+  }, [box])
+
+  const gradientDefs = React.useMemo(() => {
+    if (!layout || linkColor !== "gradient") return null
+    return (
+      <defs>
+        {layout.links.map((layoutLink) => {
+          const sourceTint = colorOf.get(layoutLink.source)
+          const targetTint = colorOf.get(layoutLink.target)
+          return (
+            <linearGradient
+              key={layoutLink.index}
+              id={`${gradientId}-${layoutLink.index}`}
+              gradientUnits="userSpaceOnUse"
+              x1={vertical ? 0 : layoutLink.sourceX}
+              y1={vertical ? layoutLink.sourceX : 0}
+              x2={vertical ? 0 : layoutLink.targetX}
+              y2={vertical ? layoutLink.targetX : 0}
+            >
+              <stop
+                offset="0"
+                stopColor={sourceTint}
+                className={
+                  sourceTint ? undefined : "[stop-color:var(--muted-foreground)]"
+                }
+              />
+              <stop
+                offset="1"
+                stopColor={targetTint}
+                className={
+                  targetTint ? undefined : "[stop-color:var(--muted-foreground)]"
+                }
+              />
+            </linearGradient>
+          )
+        })}
+      </defs>
+    )
+  }, [layout, linkColor, colorOf, vertical, gradientId])
+
   const hoverDetail =
     renderHoverDetail && hovered && layout
       ? (() => {
           if (hovered.kind === "link") {
-            const link = links.find(
-              (candidate) => linkIdOf(candidate) === hovered.id,
-            )
+            const link = linkById.get(hovered.id)
             if (!link) return null
             return renderHoverDetail({
               kind: "link",
@@ -479,79 +583,47 @@ function FlowChart({
               renderHoverDetail
                 ? (event) => {
                     const rect = event.currentTarget.getBoundingClientRect()
-                    setPointer({
+                    lastPointerRef.current = {
                       x: event.clientX - rect.left,
                       y: event.clientY - rect.top,
-                    })
+                    }
+                    positionHoverDetail()
                   }
                 : undefined
             }
-            onPointerLeave={renderHoverDetail ? () => setPointer(null) : undefined}
           >
-            {linkColor === "gradient" ? (
-              <defs>
-                {layout.links.map((layoutLink) => {
-                  const sourceTint = colorOf.get(layoutLink.source)
-                  const targetTint = colorOf.get(layoutLink.target)
-                  return (
-                    <linearGradient
-                      key={layoutLink.index}
-                      id={`${gradientId}-${layoutLink.index}`}
-                      gradientUnits="userSpaceOnUse"
-                      x1={vertical ? 0 : layoutLink.sourceX}
-                      y1={vertical ? layoutLink.sourceX : 0}
-                      x2={vertical ? 0 : layoutLink.targetX}
-                      y2={vertical ? layoutLink.targetX : 0}
-                    >
-                      <stop
-                        offset="0"
-                        stopColor={sourceTint}
-                        className={
-                          sourceTint
-                            ? undefined
-                            : "[stop-color:var(--muted-foreground)]"
-                        }
-                      />
-                      <stop
-                        offset="1"
-                        stopColor={targetTint}
-                        className={
-                          targetTint
-                            ? undefined
-                            : "[stop-color:var(--muted-foreground)]"
-                        }
-                      />
-                    </linearGradient>
-                  )
-                })}
-              </defs>
-            ) : null}
-            {layout.links.map((layoutLink) => {
+            {gradientDefs}
+            {layout.links.map((layoutLink, renderIndex) => {
               const link = links[layoutLink.index]
-              const id = linkIdOf(link)
+              const id = linkIds[layoutLink.index]
               // The ribbon's paint: its anchor node's tint, or a gradient
               // blending source into target. Either lands in the same
               // custom property the fill classes read.
+              const anchorTint = colorOf.get(
+                linkColor === "target" ? link.target : link.source,
+              )
               const tinted =
                 linkColor === "gradient"
                   ? colorOf.has(link.source) || colorOf.has(link.target)
-                  : colorOf.has(linkColor === "target" ? link.target : link.source)
+                  : anchorTint !== undefined
               const paint =
                 linkColor === "gradient"
                   ? `url(#${gradientId}-${layoutLink.index})`
-                  : colorOf.get(linkColor === "target" ? link.target : link.source)
+                  : anchorTint
               return (
                 <path
-                  key={id}
+                  // Parallel links between the same pair share the default
+                  // id, so the input index keeps keys unique regardless.
+                  key={`${id}#${layoutLink.index}`}
                   data-slot="flow-chart-link"
                   data-link-id={id}
                   data-tinted={tinted ? "true" : "false"}
-                  data-emphasis={linkEmphasis(layoutLink)}
+                  data-emphasis={linkEmphasisByIndex.get(layoutLink.index)}
                   role="button"
                   tabIndex={0}
                   aria-pressed={selectionSet.has(id)}
                   aria-label={(linkLabel ?? defaultLinkLabel)(link)}
-                  d={flowChartRibbonPath(layoutLink, curvature, vertical)}
+                  d={ribbonPaths[renderIndex]}
                   className={RIBBON_CLASSES}
                   style={
                     paint
@@ -588,13 +660,27 @@ function FlowChart({
                 />
               )
             })}
+            {/* A selected flow keeps a distinct mark — a centerline
+                stroke — so it stays readable while other flows hover. */}
+            {layout.links.map((layoutLink) =>
+              selectionSet.has(linkIds[layoutLink.index]) ? (
+                <path
+                  key={`centerline-${layoutLink.index}`}
+                  data-slot="flow-chart-centerline"
+                  aria-hidden="true"
+                  d={flowChartCenterlinePath(layoutLink, vertical)}
+                  className="pointer-events-none fill-none stroke-foreground opacity-60 stroke-[1.5]"
+                  strokeLinecap="round"
+                />
+              ) : null,
+            )}
             {layout.nodes.map((node) => (
               <rect
                 key={node.id}
                 data-slot="flow-chart-node"
                 data-node-id={node.id}
                 data-tinted={colorOf.has(node.id) ? "true" : "false"}
-                data-emphasis={nodeEmphasis(node)}
+                data-emphasis={nodeEmphasisById.get(node.id)}
                 aria-hidden="true"
                 x={vertical ? node.y : node.x}
                 y={vertical ? node.x : node.y}
@@ -632,6 +718,10 @@ function FlowChart({
                 : formatValue(node.value)
               const first = node.column === 0
               const last = node.column === layout.columnCount - 1
+              // Vertical labels always read inline (they sit above or
+              // below a bar, where stacking would collide with ribbons);
+              // horizontal labels read inline only at the sinks.
+              const inline = vertical ? true : last
               // Flow-space coordinates: node.x runs along the flow axis,
               // node.y across it. Horizontal charts label into the side
               // gutters; vertical ones into the top/bottom gutters,
@@ -641,7 +731,7 @@ function FlowChart({
                 ? {
                     left: barCross,
                     top: first ? node.x - 8 : node.x + node.width + 8,
-                    maxWidth: 160,
+                    maxWidth: Math.max(labelWidth, 96),
                   }
                 : {
                     top: barCross,
@@ -656,19 +746,17 @@ function FlowChart({
                 <div
                   key={node.id}
                   data-slot="flow-chart-label"
-                  data-emphasis={nodeEmphasis(node)}
+                  data-emphasis={nodeEmphasisById.get(node.id)}
                   className={cn(
                     LABEL_CLASSES,
                     first ? "items-end text-right" : "items-start text-left",
-                    // Sink labels read inline — "Browsing · 22%" — while
-                    // source and middle labels stack name over detail.
-                    last && "flex-row items-baseline gap-1",
+                    // Inline labels read "Browsing · 22%"; stacked ones
+                    // put the name over the detail.
+                    inline && "flex-row items-baseline gap-1",
                     vertical &&
                       cn(
                         "-translate-x-1/2 items-center text-center",
-                        first
-                          ? "-translate-y-full"
-                          : "translate-y-0 flex-row items-baseline gap-1",
+                        first ? "-translate-y-full" : "translate-y-0",
                       ),
                   )}
                   style={style}
@@ -678,27 +766,24 @@ function FlowChart({
                   </span>
                   {detail == null ? null : (
                     <span className="nessa-text-2 shrink-0 truncate">
-                      {last ? <>&middot; {detail}</> : detail}
+                      {inline ? <>&middot; {detail}</> : detail}
                     </span>
                   )}
                 </div>
               )
             })
           : null}
-        {hoverDetail != null && pointer && box ? (
+        {hoverDetail != null ? (
           <div
-            data-slot="flow-chart-hover-detail"
-            className={cn(
-              "pointer-events-none absolute w-max",
-              // Flip away from the pointer near the plot's far edges so
-              // the detail stays inside the chart.
-              pointer.x > box.width / 2 && "-translate-x-full",
-              pointer.y > box.height / 2 && "-translate-y-full",
-            )}
-            style={{
-              left: pointer.x + (pointer.x > box.width / 2 ? -12 : 12),
-              top: pointer.y + (pointer.y > box.height / 2 ? -12 : 12),
+            ref={(element) => {
+              hoverDetailRef.current = element
+              // Position immediately on mount so the card never flashes
+              // at a stale spot before the next pointer move.
+              if (element) positionHoverDetail()
             }}
+            data-slot="flow-chart-hover-detail"
+            className="pointer-events-none absolute w-max"
+            style={{ left: -9999, top: 0 }}
           >
             {hoverDetail}
           </div>

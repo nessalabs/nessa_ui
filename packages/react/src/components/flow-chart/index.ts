@@ -18,4 +18,6 @@ export {
   type FlowChartLayoutLink,
   type FlowChartLayoutNode,
   type FlowChartLayoutOptions,
+  type FlowChartLinkInput,
+  type FlowChartNodeInput,
 } from "./flow-chart-layout"

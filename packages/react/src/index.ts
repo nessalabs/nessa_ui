@@ -688,6 +688,8 @@ export {
   type FlowChartLayoutLink,
   type FlowChartLayoutNode,
   type FlowChartLayoutOptions,
+  type FlowChartLinkInput,
+  type FlowChartNodeInput,
 } from "./components/flow-chart"
 export {
   FilePreview,
