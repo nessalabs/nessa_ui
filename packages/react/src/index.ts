@@ -319,6 +319,7 @@ export {
   ChatComposerSubmit,
   ChatComposerTrigger,
   type ChatComposerBorderMode,
+  type ChatComposerFileDrop,
   type ChatComposerActionProps,
   type ChatComposerAttachmentKind,
   type ChatComposerAttachmentProps,
@@ -356,6 +357,14 @@ export {
   type FileDiffListToggleProps,
   type FileDiffPathProps,
 } from "./components/file-diff-list"
+export {
+  FileDropZone,
+  fileDropZoneDefaultLabel,
+  type FileDropRejection,
+  type FileDropRejectionReason,
+  type FileDropZoneProps,
+  type FileDropZoneState,
+} from "./components/file-drop-zone"
 export {
   ComposerDeliveryMode,
   ComposerQueue,

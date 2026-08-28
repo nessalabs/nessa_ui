@@ -741,12 +741,13 @@
       "name": "chat-composer",
       "type": "registry:ui",
       "title": "Chat Composer",
-      "description": "A compound chat-entry surface with input, footer, action, and submit primitives, plus attachment pills, paste-to-attachment capture, and key-triggered menus anchored above the composer.",
+      "description": "A compound chat-entry surface with input, footer, action, and submit primitives, plus attachment pills, paste-to-attachment capture, an opt-in fileDrop capability that attaches files dropped anywhere over the composer, and key-triggered menus anchored above the composer.",
       "dependencies": [
         "lucide-react",
         "radix-ui"
       ],
       "registryDependencies": [
+        "nessalabs/nessa_ui/file-drop-zone",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
       ],
@@ -839,6 +840,26 @@
           "path": "packages/react/src/components/file-diff-list.tsx",
           "type": "registry:ui",
           "target": "components/ui/file-diff-list.tsx"
+        }
+      ]
+    },
+    {
+      "name": "file-drop-zone",
+      "type": "registry:ui",
+      "title": "File Drop Zone",
+      "description": "A wrapper that gives any children file drag-and-drop: nested-child drag tracking, accept, size and count rules, recursive folder expansion, and refusals reported with their reason — handing the host a filtered File list to store and render as attachments however it likes. It draws nothing and owns no controls, and asChild merges the whole protocol onto the child element.",
+      "dependencies": [
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/file-drop-zone.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-drop-zone.tsx"
         }
       ]
     },
