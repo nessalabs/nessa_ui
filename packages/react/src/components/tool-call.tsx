@@ -427,13 +427,14 @@ function ToolCallDiff({
         className,
       )}
       // Custom properties inherit through Pierre's shadow root. The dark
-      // addition green is deepened from Pierre's #5ecc71, and the dark row
-      // washes carry a stronger share of the change color than Pierre's 80/20
-      // mix so added and deleted lines read clearly green and red on the
-      // near-black ground; hosts can override any of these via style.
+      // addition green is deepened from Pierre's #5ecc71 (the
+      // --nessa-diff-dark-addition token), and the dark row washes carry a
+      // stronger share of the change color than Pierre's 80/20 mix so added
+      // and deleted lines read clearly green and red on the near-black
+      // ground; hosts can override any of these via style or the theme.
       style={
         {
-          "--diffs-dark-addition-color": "#2ea043",
+          "--diffs-dark-addition-color": "var(--nessa-diff-dark-addition)",
           "--diffs-bg-addition-override":
             "light-dark(color-mix(in lab, var(--diffs-bg) 88%, var(--diffs-addition-base)), color-mix(in lab, var(--diffs-bg) 68%, var(--diffs-addition-base)))",
           "--diffs-bg-deletion-override":
