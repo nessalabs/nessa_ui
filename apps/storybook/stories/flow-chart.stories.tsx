@@ -273,10 +273,11 @@ export const DeepBranching: Story = {
     ],
   },
   render: (args) => (
-    <div className="h-[560px] w-full max-w-4xl">
+    <div className="h-[680px] w-full max-w-5xl">
       <FlowChart
         {...args}
-        labelWidth={190}
+        nodeGap={32}
+        labelWidth={210}
         formatValue={(value) => `$${value}k`}
         renderNodeDetail={({ value, columnTotal, column, columnCount }) =>
           column === columnCount - 1

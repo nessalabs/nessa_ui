@@ -209,7 +209,7 @@ function FlowChart({
   nodes,
   links,
   nodeWidth = 12,
-  nodeGap = 12,
+  nodeGap = 20,
   curvature = 0.7,
   align = "justify",
   labelWidth = 132,
