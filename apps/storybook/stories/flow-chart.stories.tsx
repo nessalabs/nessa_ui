@@ -178,6 +178,87 @@ export const HoverDetail: Story = {
   },
 }
 
+export const GradientLinks: Story = {
+  parameters: storyDocumentation(
+    "`linkColor=\"gradient\"` blends each ribbon from its source's tint into its target's — the canonical Sankey link styling — with \"source\" (the default) and \"target\" as the solid alternatives. Paired here with `iterations` running d3-style barycenter passes that reorder each column to untangle ribbon crossings. The play test reads a ribbon's computed fill and proves it resolves to an SVG gradient.",
+  ),
+  args: {
+    nodes: BUDGET_NODES,
+    links: BUDGET_LINKS,
+    linkColor: "gradient",
+    iterations: 6,
+  },
+  render: (args) => (
+    <div className="h-[440px] w-full max-w-3xl">
+      <FlowChart
+        {...args}
+        formatValue={dollars}
+        aria-label="Monthly budget with gradient flows"
+      />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const ribbon = await canvas.findByRole("button", {
+      name: "Salary to Housing, $1,450",
+    })
+    await waitFor(() =>
+      expect(getComputedStyle(ribbon).fill).toContain("url("),
+    )
+  },
+}
+
+export const Vertical: Story = {
+  parameters: storyDocumentation(
+    "`orientation=\"vertical\"` runs the flow top-to-bottom: columns become rows, ribbons fall instead of sweep, source labels sit above the first row and sink labels below the last. Everything else — tints, hover isolation, selection, hover detail — behaves identically. The play test proves the transpose by measured geometry: three distinct row positions and bars wider than they are tall.",
+  ),
+  args: {
+    nodes: [
+      { id: "product", label: "Product" },
+      { id: "services", label: "Services" },
+      { id: "cogs", label: "Costs" },
+      { id: "gross", label: "Gross" },
+      { id: "opex", label: "Opex" },
+      { id: "net", label: "Net" },
+    ],
+    links: [
+      { source: "product", target: "gross", value: 540 },
+      { source: "product", target: "cogs", value: 220 },
+      { source: "services", target: "gross", value: 260 },
+      { source: "services", target: "cogs", value: 140 },
+      { source: "gross", target: "opex", value: 430 },
+      { source: "gross", target: "net", value: 370 },
+    ],
+    orientation: "vertical",
+    labelWidth: 28,
+  },
+  render: (args) => (
+    <div className="h-[480px] w-full max-w-xl">
+      <FlowChart
+        {...args}
+        formatValue={(value) => `$${value}k`}
+        aria-label="Income statement flowing downward"
+      />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    await waitFor(() => {
+      expect(
+        canvasElement.querySelectorAll('[data-slot="flow-chart-node"]').length,
+      ).toBe(6)
+    })
+    const bars = Array.from(
+      canvasElement.querySelectorAll('[data-slot="flow-chart-node"]'),
+    ) as SVGRectElement[]
+    const rows = new Set(bars.map((bar) => bar.y.baseVal.value))
+    expect(rows.size).toBe(3)
+    for (const bar of bars) {
+      expect(bar.height.baseVal.value).toBe(12)
+      expect(bar.width.baseVal.value).toBeGreaterThan(12)
+    }
+  },
+}
+
 export const MultiStage: Story = {
   parameters: storyDocumentation(
     "A three-stage income statement — revenue streams through gross profit into what remains — showing the longest-path column layout: middle columns need no configuration and their labels sit beside the bars over the ribbons. The play test proves three distinct bar columns by measured x positions.",

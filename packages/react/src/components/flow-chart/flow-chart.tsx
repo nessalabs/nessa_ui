@@ -81,8 +81,21 @@ export interface FlowChartProps
   nodeGap?: number
   /** Ribbon bend, 0 (straight taper) to 1 (full S curve). */
   curvature?: number
-  /** Column placement for nodes without outgoing flow. */
+  /** Column placement: "justify" (default), "left", "right", or "center". */
   align?: FlowChartAlign
+  /**
+   * Crossing-minimization passes over each column's node order (d3-style
+   * barycenter relaxation). 0 (default) keeps the input order.
+   */
+  iterations?: number
+  /** Flow direction: columns left-to-right (default) or top-to-bottom. */
+  orientation?: "horizontal" | "vertical"
+  /**
+   * How ribbons take color: "source" (default) inherits the source node's
+   * tint, "target" the target's, and "gradient" blends source into target
+   * along the ribbon.
+   */
+  linkColor?: "source" | "target" | "gradient"
   /**
    * Width of the label gutters reserved left and right of the diagram.
    * Zero hides the labels entirely.
@@ -223,6 +236,9 @@ function FlowChart({
   nodeGap = 20,
   curvature = 0.7,
   align = "justify",
+  iterations = 0,
+  orientation = "horizontal",
+  linkColor = "source",
   labelWidth = 132,
   formatValue = (value) => String(value),
   renderNodeDetail,
@@ -258,18 +274,24 @@ function FlowChart({
     [nodes],
   )
 
+  const vertical = orientation === "vertical"
+  const gradientId = React.useId().replace(/:/g, "")
+  // Layout runs in flow space: `width` is the flow axis, `height` the
+  // cross axis. Vertical charts swap the box into that space and swap
+  // back at render time.
   const layout: FlowChartLayout | null = React.useMemo(() => {
     if (!box || box.width <= 0 || box.height <= 0) return null
     return computeFlowChartLayout({
       nodes,
       links,
-      width: box.width,
-      height: box.height,
+      width: vertical ? box.height : box.width,
+      height: vertical ? box.width : box.height,
       nodeWidth,
       nodeGap,
       align,
+      iterations,
     })
-  }, [box, nodes, links, nodeWidth, nodeGap, align])
+  }, [box, nodes, links, nodeWidth, nodeGap, align, iterations, vertical])
 
   // Report tolerated data problems whenever their set changes — including
   // the change back to none, which is the "stream rendered cleanly" signal.
@@ -418,7 +440,12 @@ function FlowChart({
     >
       <div
         ref={plotRef}
-        className="mx-(--nessa-flow-chart-label-width) relative min-h-0 min-w-0 flex-1"
+        className={cn(
+          "relative min-h-0 min-w-0 flex-1",
+          vertical
+            ? "my-(--nessa-flow-chart-label-width)"
+            : "mx-(--nessa-flow-chart-label-width)",
+        )}
         style={
           {
             "--nessa-flow-chart-label-width": `${labelWidth > 0 ? labelWidth : 0}px`,
@@ -452,26 +479,74 @@ function FlowChart({
             }
             onPointerLeave={renderHoverDetail ? () => setPointer(null) : undefined}
           >
+            {linkColor === "gradient" ? (
+              <defs>
+                {layout.links.map((layoutLink) => {
+                  const sourceTint = colorOf.get(layoutLink.source)
+                  const targetTint = colorOf.get(layoutLink.target)
+                  return (
+                    <linearGradient
+                      key={layoutLink.index}
+                      id={`${gradientId}-${layoutLink.index}`}
+                      gradientUnits="userSpaceOnUse"
+                      x1={vertical ? 0 : layoutLink.sourceX}
+                      y1={vertical ? layoutLink.sourceX : 0}
+                      x2={vertical ? 0 : layoutLink.targetX}
+                      y2={vertical ? layoutLink.targetX : 0}
+                    >
+                      <stop
+                        offset="0"
+                        stopColor={sourceTint}
+                        className={
+                          sourceTint
+                            ? undefined
+                            : "[stop-color:var(--muted-foreground)]"
+                        }
+                      />
+                      <stop
+                        offset="1"
+                        stopColor={targetTint}
+                        className={
+                          targetTint
+                            ? undefined
+                            : "[stop-color:var(--muted-foreground)]"
+                        }
+                      />
+                    </linearGradient>
+                  )
+                })}
+              </defs>
+            ) : null}
             {layout.links.map((layoutLink) => {
               const link = links[layoutLink.index]
               const id = linkIdOf(link)
-              const color = colorOf.get(link.source)
+              // The ribbon's paint: its anchor node's tint, or a gradient
+              // blending source into target. Either lands in the same
+              // custom property the fill classes read.
+              const tinted =
+                linkColor === "gradient"
+                  ? colorOf.has(link.source) || colorOf.has(link.target)
+                  : colorOf.has(linkColor === "target" ? link.target : link.source)
+              const paint =
+                linkColor === "gradient"
+                  ? `url(#${gradientId}-${layoutLink.index})`
+                  : colorOf.get(linkColor === "target" ? link.target : link.source)
               return (
                 <path
                   key={id}
                   data-slot="flow-chart-link"
                   data-link-id={id}
-                  data-tinted={color ? "true" : "false"}
+                  data-tinted={tinted ? "true" : "false"}
                   data-emphasis={linkEmphasis(layoutLink)}
                   role="button"
                   tabIndex={0}
                   aria-pressed={selectionSet.has(id)}
                   aria-label={(linkLabel ?? defaultLinkLabel)(link)}
-                  d={flowChartRibbonPath(layoutLink, curvature)}
+                  d={flowChartRibbonPath(layoutLink, curvature, vertical)}
                   className={RIBBON_CLASSES}
                   style={
-                    color
-                      ? ({ "--nessa-flow-chart-color": color } as React.CSSProperties)
+                    paint
+                      ? ({ "--nessa-flow-chart-color": paint } as React.CSSProperties)
                       : undefined
                   }
                   onPointerEnter={() => {
@@ -506,10 +581,10 @@ function FlowChart({
                 data-tinted={colorOf.has(node.id) ? "true" : "false"}
                 data-emphasis={nodeEmphasis(node)}
                 aria-hidden="true"
-                x={node.x}
-                y={node.y}
-                width={node.width}
-                height={Math.max(node.height, 1)}
+                x={vertical ? node.y : node.x}
+                y={vertical ? node.x : node.y}
+                width={vertical ? Math.max(node.height, 1) : node.width}
+                height={vertical ? node.width : Math.max(node.height, 1)}
                 rx={Math.min(4, node.width / 2)}
                 className={BAR_CLASSES}
                 style={
@@ -542,6 +617,26 @@ function FlowChart({
                 : formatValue(node.value)
               const first = node.column === 0
               const last = node.column === layout.columnCount - 1
+              // Flow-space coordinates: node.x runs along the flow axis,
+              // node.y across it. Horizontal charts label into the side
+              // gutters; vertical ones into the top/bottom gutters,
+              // centered on the bar.
+              const barCross = node.y + Math.max(node.height, 1) / 2
+              const style: React.CSSProperties = vertical
+                ? {
+                    left: barCross,
+                    top: first ? node.x - 8 : node.x + node.width + 8,
+                    maxWidth: 160,
+                  }
+                : {
+                    top: barCross,
+                    width: labelWidth - 8,
+                    left: first ? node.x - labelWidth : node.x + node.width + 8,
+                    // Middle-column labels overlay the ribbons beside
+                    // their bar; only the outer columns get the reserved
+                    // gutters.
+                    maxWidth: first || last ? undefined : labelWidth - 8,
+                  }
               return (
                 <div
                   key={node.id}
@@ -553,18 +648,15 @@ function FlowChart({
                     // Sink labels read inline — "Browsing · 22%" — while
                     // source and middle labels stack name over detail.
                     last && "flex-row items-baseline gap-1",
+                    vertical &&
+                      cn(
+                        "-translate-x-1/2 items-center text-center",
+                        first
+                          ? "-translate-y-full"
+                          : "translate-y-0 flex-row items-baseline gap-1",
+                      ),
                   )}
-                  style={{
-                    top: node.y + Math.max(node.height, 1) / 2,
-                    width: labelWidth - 8,
-                    left: first
-                      ? node.x - labelWidth
-                      : node.x + node.width + 8,
-                    // Middle-column labels overlay the ribbons to the
-                    // right of their bar; only the outer columns get the
-                    // reserved gutters.
-                    maxWidth: first || last ? undefined : labelWidth - 8,
-                  }}
+                  style={style}
                 >
                   <span className="max-w-full truncate">
                     {input.label ?? input.id}

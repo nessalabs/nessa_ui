@@ -56,6 +56,55 @@ describe("computeFlowChartLayout", () => {
     )
   })
 
+  it("right packs late sources toward the end; center parks them before their targets", () => {
+    // Chain a → m → z spans three columns; p feeds z directly.
+    const options: FlowChartLayoutOptions = {
+      ...BASE,
+      nodes: [{ id: "a" }, { id: "m" }, { id: "z" }, { id: "p" }],
+      links: [
+        { source: "a", target: "m", value: 2 },
+        { source: "m", target: "z", value: 2 },
+        { source: "p", target: "z", value: 1 },
+      ],
+    }
+    const column = (align: "left" | "right" | "center") => {
+      const layout = computeFlowChartLayout({ ...options, align })
+      return layout.nodes.find((node) => node.id === "p")!.column
+    }
+    assert.equal(column("left"), 0)
+    assert.equal(column("right"), 1)
+    assert.equal(column("center"), 1)
+  })
+
+  it("barycenter iterations reorder columns to remove crossings", () => {
+    // Input order stacks a over b and x over y, but the heavy links run
+    // a → y and b → x: a guaranteed crossing until the order relaxes.
+    const options: FlowChartLayoutOptions = {
+      ...BASE,
+      nodes: [{ id: "a" }, { id: "b" }, { id: "x" }, { id: "y" }],
+      links: [
+        { source: "a", target: "y", value: 4 },
+        { source: "b", target: "x", value: 4 },
+      ],
+    }
+    const orderOf = (iterations: number) =>
+      computeFlowChartLayout({ ...options, iterations })
+        .nodes.filter((node) => node.column === 1)
+        .sort((first, second) => first.y - second.y)
+        .map((node) => node.id)
+    assert.deepEqual(orderOf(0), ["x", "y"])
+    assert.deepEqual(orderOf(2), ["y", "x"])
+  })
+
+  it("emits vertical paths with the axes swapped", () => {
+    const layout = computeFlowChartLayout(BASE)
+    const link = layout.links[0]
+    const horizontal = flowChartRibbonPath(link, 0.6)
+    const vertical = flowChartRibbonPath(link, 0.6, true)
+    assert.ok(horizontal.startsWith(`M ${link.sourceX} ${link.sourceY}`))
+    assert.ok(vertical.startsWith(`M ${link.sourceY} ${link.sourceX}`))
+  })
+
   it("sizes bars proportionally to flow and fills the column height", () => {
     const layout = computeFlowChartLayout(BASE)
     const a = nodeById(layout, "a")

@@ -16,8 +16,13 @@ export interface FlowChartLinkInput {
   value: number
 }
 
-/** How nodes without outgoing flow choose their column. */
-export type FlowChartAlign = "left" | "justify"
+/**
+ * How nodes choose their column when the flow leaves slack: "justify"
+ * pushes sinks to the last column, "left"/"right" pack nodes toward an
+ * edge by longest path from that edge, and "center" keeps depth order but
+ * pulls late-starting sources up against their targets.
+ */
+export type FlowChartAlign = "left" | "justify" | "right" | "center"
 
 /** Inputs the layout is computed from. */
 export interface FlowChartLayoutOptions {
@@ -33,9 +38,16 @@ export interface FlowChartLayoutOptions {
   nodeGap: number
   /**
    * "justify" (default) pushes nodes without outgoing links into the last
-   * column; "left" keeps every node at the earliest column its inputs allow.
+   * column; "left" keeps every node at the earliest column its inputs
+   * allow; "right" packs nodes toward the last column by longest path to a
+   * sink; "center" pulls late-starting sources up against their targets.
    */
   align?: FlowChartAlign
+  /**
+   * Crossing-minimization passes over each column's node order (d3-style
+   * barycenter relaxation). 0 (default) keeps the input order.
+   */
+  iterations?: number
 }
 
 /** A positioned node bar. */
@@ -262,6 +274,34 @@ export function computeFlowChartLayout(options: FlowChartLayoutOptions): FlowCha
     for (const state of states.values()) {
       if (state.outValue === 0) state.column = columnCount - 1
     }
+  } else if (align === "right" && columnCount > 1) {
+    // Longest path TO a sink, computed on the reversed graph, packs every
+    // node as far right as its outputs allow.
+    const heights = assignColumns(
+      nodes,
+      activeLinks.map((link) => ({ ...link, source: link.target, target: link.source })),
+      [],
+    )
+    for (const state of states.values()) {
+      state.column = columnCount - 1 - (heights.get(state.id) ?? 0)
+    }
+  } else if (align === "center" && columnCount > 1) {
+    // Late-starting sources sit one column before their earliest target
+    // instead of at the far left.
+    for (const state of states.values()) {
+      if (state.inValue > 0 || state.outValue === 0) continue
+      let earliestTarget = Infinity
+      for (const link of activeLinks) {
+        if (link.source !== state.id) continue
+        earliestTarget = Math.min(
+          earliestTarget,
+          states.get(link.target)!.column,
+        )
+      }
+      if (Number.isFinite(earliestTarget)) {
+        state.column = Math.max(0, earliestTarget - 1)
+      }
+    }
   }
 
   const byColumn: NodeState[][] = Array.from({ length: columnCount }, () => [])
@@ -270,6 +310,57 @@ export function computeFlowChartLayout(options: FlowChartLayoutOptions): FlowCha
   }
   for (const column of byColumn) {
     column.sort((a, b) => a.order - b.order)
+  }
+
+  // Barycenter relaxation: each pass re-sorts every column by the mean
+  // position of the nodes it is linked to, alternating sweep direction —
+  // the d3-sankey recipe for untangling ribbon crossings. Zero passes
+  // keeps the host's input order.
+  const iterations = Math.max(0, Math.floor(options.iterations ?? 0))
+  if (iterations > 0 && columnCount > 1) {
+    const ordinal = new Map<string, number>()
+    const reindex = () => {
+      for (const column of byColumn) {
+        column.forEach((node, index) => {
+          ordinal.set(node.id, (index + 0.5) / column.length)
+        })
+      }
+    }
+    reindex()
+    const relax = (useIncoming: boolean, column: NodeState[]) => {
+      const scores = new Map<string, number>()
+      for (const node of column) {
+        let weight = 0
+        let sum = 0
+        for (const link of activeLinks) {
+          const counterpart = useIncoming
+            ? link.target === node.id
+              ? link.source
+              : null
+            : link.source === node.id
+              ? link.target
+              : null
+          if (counterpart === null) continue
+          sum += link.value * ordinal.get(counterpart)!
+          weight += link.value
+        }
+        scores.set(node.id, weight > 0 ? sum / weight : ordinal.get(node.id)!)
+      }
+      column.sort(
+        (a, b) =>
+          scores.get(a.id)! - scores.get(b.id)! || a.order - b.order,
+      )
+    }
+    for (let pass = 0; pass < iterations; pass += 1) {
+      for (let index = 1; index < columnCount; index += 1) {
+        relax(true, byColumn[index])
+        reindex()
+      }
+      for (let index = columnCount - 2; index >= 0; index -= 1) {
+        relax(false, byColumn[index])
+        reindex()
+      }
+    }
   }
 
   // The tightest column sets the value-to-pixel scale so every column fits.
@@ -370,11 +461,15 @@ export function computeFlowChartLayout(options: FlowChartLayoutOptions): FlowCha
 /**
  * SVG path for a link's filled ribbon. `curvature` in [0, 1] moves the
  * bezier control points from the bar edges (0, straight taper) toward the
- * horizontal midpoint (1, the classic S curve).
+ * flow-axis midpoint (1, the classic S curve). Layout coordinates live in
+ * flow space — sourceX/targetX along the flow axis, sourceY/targetY across
+ * it; `vertical` emits each point with the axes swapped so the same
+ * geometry renders top-to-bottom.
  */
 export function flowChartRibbonPath(
   link: FlowChartLayoutLink,
   curvature: number,
+  vertical = false,
 ): string {
   const { sourceX, targetX, sourceY, targetY } = link
   // Ribbons thinner than a hairline stay visible.
@@ -385,24 +480,31 @@ export function flowChartRibbonPath(
   const s1 = sourceY + thickness
   const t0 = targetY
   const t1 = targetY + thickness
+  const at = (flow: number, cross: number) =>
+    vertical ? `${cross} ${flow}` : `${flow} ${cross}`
   return [
-    `M ${sourceX} ${s0}`,
-    `C ${c0} ${s0} ${c1} ${t0} ${targetX} ${t0}`,
-    `L ${targetX} ${t1}`,
-    `C ${c1} ${t1} ${c0} ${s1} ${sourceX} ${s1}`,
+    `M ${at(sourceX, s0)}`,
+    `C ${at(c0, s0)} ${at(c1, t0)} ${at(targetX, t0)}`,
+    `L ${at(targetX, t1)}`,
+    `C ${at(c1, t1)} ${at(c0, s1)} ${at(sourceX, s1)}`,
     "Z",
   ].join(" ")
 }
 
 /**
- * SVG path for the ribbon's center line — the emphasis stroke drawn along a
- * selected link.
+ * SVG path for the ribbon's center line — an emphasis stroke along a
+ * link. Same flow-space semantics as `flowChartRibbonPath`.
  */
-export function flowChartCenterlinePath(link: FlowChartLayoutLink): string {
+export function flowChartCenterlinePath(
+  link: FlowChartLayoutLink,
+  vertical = false,
+): string {
   const { sourceX, targetX, sourceY, targetY } = link
   const thickness = Math.max(link.thickness, 1)
   const mid = (sourceX + targetX) / 2
   const s = sourceY + thickness / 2
   const t = targetY + thickness / 2
-  return `M ${sourceX} ${s} C ${mid} ${s} ${mid} ${t} ${targetX} ${t}`
+  const at = (flow: number, cross: number) =>
+    vertical ? `${cross} ${flow}` : `${flow} ${cross}`
+  return `M ${at(sourceX, s)} C ${at(mid, s)} ${at(mid, t)} ${at(targetX, t)}`
 }
