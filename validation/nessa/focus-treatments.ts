@@ -30,6 +30,8 @@ type FocusComponent =
   | "event-calendar"
   | "gantt-chart/gantt-chart-grid"
   | "file-diff-list"
+  | "file-preview/file-preview"
+  | "file-preview/file-preview-fallback"
   | "kanban/kanban-card"
   | "kanban/kanban-column"
   | "questionnaire"
@@ -180,6 +182,27 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     state: "focus-visible",
     className: "focus-visible:outline-ring",
     count: 3,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The header download link sits in a padded header row and the fallback's
+  // download link sits on a padded empty-state surface, so both keep the
+  // standard outset outline.
+  {
+    component: "file-preview/file-preview",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  {
+    component: "file-preview/file-preview-fallback",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -359,6 +382,10 @@ export const focusGeometryClasses = Object.freeze([
   { component: "file-diff-list", className: "focus-visible:outline-2", count: 3 },
   { component: "file-diff-list", className: "focus-visible:outline-offset-2", count: 2 },
   { component: "file-diff-list", className: "focus-visible:-outline-offset-2", count: 1 },
+  { component: "file-preview/file-preview", className: "focus-visible:outline-2", count: 1 },
+  { component: "file-preview/file-preview", className: "focus-visible:outline-offset-2", count: 1 },
+  { component: "file-preview/file-preview-fallback", className: "focus-visible:outline-2", count: 1 },
+  { component: "file-preview/file-preview-fallback", className: "focus-visible:outline-offset-2", count: 1 },
   // The pager buttons and the scrollable excerpt region sit at the card
   // edge, so their outlines draw inset like file-diff-list's list region;
   // chip and links keep the outset offset.
