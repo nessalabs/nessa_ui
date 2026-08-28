@@ -1142,8 +1142,20 @@ export const Replay: Story = {
   args: { initialCapture: "todos", autoplay: true },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
+    // Assert the player is actually advancing…
     await waitFor(async () => {
-      await expect(canvas.getByTestId("progress")).toHaveTextContent(/\d+\/\d+ lines/)
+      await expect(canvas.getByTestId("progress")).toHaveTextContent(/[1-9]\d*\/\d+ lines/)
+    })
+    // …then stop it. The runner shares one browser across every story file,
+    // and a story that leaves a timer ticking keeps re-rendering — and keeps
+    // taking main-thread time — for the rest of the run, which shows up as a
+    // *different* file's animation-settling assertion reading a mid-flight
+    // value on a slower machine.
+    await userEvent.click(canvas.getByRole("button", { name: "End" }))
+    await waitFor(async () => {
+      const progress = canvas.getByTestId("progress").textContent ?? ""
+      const [seen, total] = progress.split("/")
+      await expect(seen?.trim()).toBe(total?.replace(" lines", "").trim())
     })
   },
 }
