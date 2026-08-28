@@ -69,6 +69,15 @@ describe("detectFileKind", () => {
       detectFileKind({ src: "data:application/zstd,payload.png" }),
       "unknown",
     )
+    // A generic data-URL media type falls through to the name, never to the
+    // payload's dots.
+    assert.equal(
+      detectFileKind({
+        src: "data:application/octet-stream;base64,AAAA",
+        name: "notes.md",
+      }),
+      "markdown",
+    )
   })
 
   test("generic MIME types fall through to the extension", () => {

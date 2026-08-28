@@ -27,7 +27,11 @@ export function useFileText(src: string): FileTextState {
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
         return response.text()
       })
-      .then((text) => setState({ status: "loaded", text }))
+      .then((text) => {
+        // abort() cannot reject an already-settled chain, so a stale
+        // response that resolved before the src changed is dropped here.
+        if (!controller.signal.aborted) setState({ status: "loaded", text })
+      })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return
         void error

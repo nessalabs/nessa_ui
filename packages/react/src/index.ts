@@ -682,6 +682,7 @@ export {
   FilePreviewMarkdown,
   FilePreviewPdf,
   FilePreviewText,
+  FilePreviewTextLoading,
   FilePreviewVideo,
   defaultFilePreviewRenderers,
   delimiterFor,

@@ -29,7 +29,6 @@ function FilePreviewCsv({ file }: FilePreviewRendererProps) {
         : [],
     // delimiterFor reads only name and mimeType, so an inline file object
     // does not re-parse every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, file.name, file.mimeType],
   )
   if (state.status === "loading") return <FilePreviewTextLoading />
@@ -43,12 +42,14 @@ function FilePreviewCsv({ file }: FilePreviewRendererProps) {
   return (
     <div
       data-slot="file-preview-csv"
-      className="h-full w-full overflow-hidden p-3"
+      className="flex h-full w-full flex-col overflow-hidden p-3"
     >
-      <TableShell className="max-h-full">
+      {/* min-h-0 lets the shell hug a short file but shrink to the host's
+          box for a tall one, at which point the table body scrolls. */}
+      <TableShell className="min-h-0">
         <Table
           containerLabel={file.name ?? "Delimited file preview"}
-          containerClassName="max-h-full scroll-pt-9"
+          containerClassName="scroll-pt-9"
         >
           <TableHeader sticky>
             <TableRow>

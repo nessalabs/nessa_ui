@@ -286,13 +286,18 @@ export function detectFileKind(input: {
     const kind = kindFromMimeType(input.mimeType)
     if (kind !== "unknown") return kind
   }
-  // A data: URL carries its media type inline; its payload can contain dots,
-  // so it must never reach the extension path.
-  if (input.src?.startsWith("data:")) {
-    const mediaType = mimeTypeOfDataUrl(input.src)
-    return mediaType ? kindFromMimeType(mediaType) : "unknown"
+  const isDataUrl = input.src?.startsWith("data:") ?? false
+  if (isDataUrl) {
+    // A data: URL carries its media type inline. A generic one still falls
+    // through to the name below — but never to the src, whose payload can
+    // contain dots that read as a bogus extension.
+    const mediaType = mimeTypeOfDataUrl(input.src!)
+    if (mediaType) {
+      const kind = kindFromMimeType(mediaType)
+      if (kind !== "unknown") return kind
+    }
   }
-  for (const candidate of [input.name, input.src]) {
+  for (const candidate of [input.name, isDataUrl ? undefined : input.src]) {
     if (!candidate) continue
     const extension = extensionOf(candidate)
     if (!extension) continue

@@ -302,6 +302,46 @@ export const CsvPreview: Story = {
   },
 }
 
+const tallCsv = [
+  "index,value",
+  ...Array.from({ length: 60 }, (_, i) => `${i + 1},${(i + 1) * 10}`),
+].join("\n")
+const tallCsvSrc = `data:text/csv;utf8,${encodeURIComponent(tallCsv)}`
+
+export const CsvPreviewTall: Story = {
+  parameters: storyDocumentation(
+    "A delimited file taller than the host's box scrolls inside the table shell — the body scrolls under the sticky header row instead of clipping at the shell edge.",
+  ),
+  render: () => (
+    <FilePreview
+      file={{ src: tallCsvSrc, name: "readings.csv" }}
+      className="h-80 w-[28rem]"
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await waitFor(async () => {
+      await expect(
+        canvas.getByRole("cell", { name: "600" }),
+      ).toBeInTheDocument()
+    })
+    // The regression this guards: percentage caps resolving against an
+    // auto-height frame left the container unscrollable and rows clipped.
+    const container = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="table-container"]',
+    )!
+    await waitFor(async () => {
+      await expect(container.scrollHeight).toBeGreaterThan(
+        container.clientHeight,
+      )
+    })
+    container.scrollTop = container.scrollHeight
+    await waitFor(async () => {
+      await expect(container.scrollTop).toBeGreaterThan(0)
+    })
+  },
+}
+
 export const CodePreview: Story = {
   parameters: storyDocumentation(
     "Text and code files delegate to CodeBlock with the file extension as the language, so code previews get syntax highlighting for free.",
