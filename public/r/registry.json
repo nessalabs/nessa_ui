@@ -424,7 +424,7 @@
       "name": "generating-surface",
       "type": "registry:ui",
       "title": "Generating Surface",
-      "description": "An ambient placeholder for content that takes a while to generate \u2014 drifting smoke and a shimmering status label reserve the space, then morph into the finished content when generation completes.",
+      "description": "An ambient placeholder for content that takes a while to generate — drifting smoke and a shimmering status label reserve the space, then morph into the finished content when generation completes.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -441,7 +441,7 @@
       "name": "mermaid-diagram",
       "type": "registry:ui",
       "title": "Mermaid Diagram",
-      "description": "Mermaid diagrams \u2014 flowcharts, sequence diagrams, and every other Mermaid grammar \u2014 rendered to SVG with app-wide light and dark theming and a fullscreen pan-and-zoom viewer.",
+      "description": "Mermaid diagrams — flowcharts, sequence diagrams, and every other Mermaid grammar — rendered to SVG with app-wide light and dark theming and a fullscreen pan-and-zoom viewer.",
       "dependencies": [
         "lucide-react",
         "mermaid"
@@ -1031,7 +1031,7 @@
       "name": "timeline-header",
       "type": "registry:ui",
       "title": "Timeline header",
-      "description": "The band a horizontal scale lives on: pixel-offset cells with hairline dividers, and labels that pin at a chosen inset while any part of their cell is in view \u2014 the GanttChart's two-tier time header, extracted for any horizontally scrolled surface.",
+      "description": "The band a horizontal scale lives on: pixel-offset cells with hairline dividers, and labels that pin at a chosen inset while any part of their cell is in view — the GanttChart's two-tier time header, extracted for any horizontally scrolled surface.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -1207,7 +1207,7 @@
       "name": "workflow-canvas",
       "type": "registry:ui",
       "title": "WorkflowCanvas",
-      "description": "An infinite (or bounded) pan-and-zoom workflow canvas with draggable nodes that render any content, side handles for drawing connections, and edges that follow their endpoint nodes \u2014 built to stay responsive with thousands of nodes.",
+      "description": "An infinite (or bounded) pan-and-zoom workflow canvas with draggable nodes that render any content, side handles for drawing connections, and edges that follow their endpoint nodes — built to stay responsive with thousands of nodes.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -1383,6 +1383,61 @@
           "path": "packages/react/src/components/random-avatar.tsx",
           "type": "registry:ui",
           "target": "components/ui/random-avatar.tsx"
+        }
+      ]
+    },
+    {
+      "name": "file-preview",
+      "type": "registry:ui",
+      "title": "File preview",
+      "description": "A composable file previewer that delegates each file type to a renderer registry: images through a script-inert img element with loading and error states, PDFs through the browser's built-in viewer with a download fallback, and unknown kinds through a fallback surface. Consumers extend or override renderers per kind without library changes.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/file-preview/index.ts",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/index.ts"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-kind.ts",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-kind.ts"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-context.ts",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-context.ts"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-fallback.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-fallback.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-image.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-image.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-pdf.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-pdf.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-renderers.ts",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-renderers.ts"
         }
       ]
     }

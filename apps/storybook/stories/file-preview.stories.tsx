@@ -1,0 +1,217 @@
+import * as React from "react"
+import type { Meta, StoryObj } from "@storybook/react-vite"
+import { expect, waitFor, within } from "storybook/test"
+import {
+  FilePreview,
+  FilePreviewContent,
+  FilePreviewHeader,
+  type FilePreviewRendererProps,
+} from "@nessa-ui/react"
+
+import { storyDocumentation } from "./story-documentation"
+
+const meta = {
+  title: "Components/FilePreview",
+  component: FilePreview,
+  tags: ["autodocs", "test"],
+  parameters: {
+    layout: "centered",
+    docs: {
+      description: {
+        component:
+          "A composable file previewer built around a renderer registry: the root detects the file's kind (MIME type first, extension fallback) and delegates rendering to the strategy registered for that kind. Images render through a script-inert img element with loading and error states; PDFs render through the browser's built-in viewer via an object embed with a download fallback for environments without an inline viewer; unknown kinds fall back to a surface that keeps the file reachable through a download link. Consumers override built-in renderers or register whole new kinds through the renderers prop — no library change needed. Sources can be plain URLs (file) or a File/Blob (blob), whose object URL lifecycle is managed internally.",
+      },
+    },
+  },
+} satisfies Meta<typeof FilePreview>
+
+export default meta
+type Story = StoryObj<typeof meta>
+
+const sampleSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="320"><rect width="480" height="320" fill="#e4e4e7"/><circle cx="240" cy="160" r="90" fill="#71717a"/></svg>`
+const svgSrc = `data:image/svg+xml;utf8,${encodeURIComponent(sampleSvg)}`
+
+const minimalPdf = `%PDF-1.4
+1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
+2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
+3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj
+xref
+0 4
+0000000000 65535 f
+trailer<</Size 4/Root 1 0 R>>
+%%EOF`
+const pdfSrc = `data:application/pdf;base64,${btoa(minimalPdf)}`
+
+export const ImagePreview: Story = {
+  parameters: storyDocumentation(
+    "A raster image with header chrome: file name, formatted size, and a download link. The image renderer keeps the picture contained inside the content box.",
+  ),
+  render: () => (
+    <FilePreview
+      file={{
+        src: svgSrc,
+        name: "team-photo.png",
+        mimeType: "image/png",
+        size: 1_234_567,
+      }}
+      className="h-80 w-[28rem]"
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const image = await canvas.findByRole("img", { name: "team-photo.png" })
+    await waitFor(() => expect(image).toBeVisible())
+    await expect(canvas.getByText("team-photo.png")).toBeVisible()
+    await expect(canvas.getByText("1.2 MB")).toBeVisible()
+    const download = canvas.getByRole("link", {
+      name: "Download team-photo.png",
+    })
+    await expect(download).toHaveAttribute("href", svgSrc)
+  },
+}
+
+export const SvgPreview: Story = {
+  parameters: storyDocumentation(
+    "SVG sources render through the same img-based renderer, which keeps any scripts inside the SVG inert.",
+  ),
+  render: () => (
+    <FilePreview
+      file={{ src: svgSrc, name: "diagram.svg", mimeType: "image/svg+xml" }}
+      className="h-80 w-[28rem]"
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const image = await canvas.findByRole("img", { name: "diagram.svg" })
+    await waitFor(() => expect(image).toBeVisible())
+    const root = canvasElement.querySelector('[data-slot="file-preview"]')
+    await expect(root).toHaveAttribute("data-kind", "image")
+  },
+}
+
+export const PdfPreview: Story = {
+  parameters: storyDocumentation(
+    "PDFs delegate to the browser's built-in viewer through an object embed — Chromium, WebView2, and WKWebView all render inline, and environments without an inline viewer see the embed's download fallback instead.",
+  ),
+  render: () => (
+    <FilePreview
+      file={{
+        src: pdfSrc,
+        name: "quarterly-report.pdf",
+        mimeType: "application/pdf",
+        size: 84_500,
+      }}
+      className="h-96 w-[28rem]"
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    // Scope to the header: browsers without an inline PDF viewer also render
+    // the embed's fallback, which repeats the file name.
+    const header = within(
+      canvasElement.querySelector<HTMLElement>(
+        '[data-slot="file-preview-header"]',
+      )!,
+    )
+    await expect(header.getByText("quarterly-report.pdf")).toBeVisible()
+    await expect(header.getByText("85 KB")).toBeVisible()
+    const embed = canvasElement.querySelector('[data-slot="file-preview-pdf"]')
+    await expect(embed).toHaveAttribute("type", "application/pdf")
+    await expect(embed).toHaveAttribute("aria-label", "quarterly-report.pdf")
+  },
+}
+
+export const UnknownFileFallback: Story = {
+  parameters: storyDocumentation(
+    "A file with no registered renderer falls back to a surface that names the file and keeps it reachable through a download link.",
+  ),
+  render: () => (
+    <FilePreview
+      file={{ src: "/files/archive.zip", name: "archive.zip", size: 9_000_000 }}
+      className="h-72 w-[28rem]"
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByText("No preview available")).toBeVisible()
+    const links = canvas.getAllByRole("link")
+    for (const link of links) {
+      await expect(link).toHaveAttribute("href", "/files/archive.zip")
+    }
+  },
+}
+
+function PlainTextRenderer({ file }: FilePreviewRendererProps) {
+  return (
+    <pre
+      data-slot="file-preview-text"
+      className="h-full w-full overflow-auto bg-muted/30 p-4 font-mono nessa-text-2 text-foreground"
+    >
+      Custom text renderer for {file.name}
+    </pre>
+  )
+}
+
+export const CustomRenderer: Story = {
+  parameters: storyDocumentation(
+    "The registry is open: registering a renderer under a new kind (here \"text\", paired with the kind prop) delegates that file type to consumer code without any library change. The same mechanism overrides the built-in image or pdf strategies.",
+  ),
+  render: () => (
+    <FilePreview
+      file={{ src: "/files/notes.txt", name: "notes.txt", size: 2_300 }}
+      kind="text"
+      renderers={{ text: PlainTextRenderer }}
+      className="h-72 w-[28rem]"
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(
+      canvas.getByText(/Custom text renderer for/),
+    ).toBeVisible()
+    const root = canvasElement.querySelector('[data-slot="file-preview"]')
+    await expect(root).toHaveAttribute("data-kind", "text")
+  },
+}
+
+export const ImageError: Story = {
+  parameters: storyDocumentation(
+    "A source that fails to load surfaces the fallback with an error message and a download link, instead of a broken image glyph.",
+  ),
+  render: () => (
+    <FilePreview
+      file={{ src: "data:image/png;base64,AAAA", name: "missing.png" }}
+      className="h-72 w-[28rem]"
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await waitFor(async () => {
+      await expect(canvas.getByText("Image failed to load")).toBeVisible()
+    })
+  },
+}
+
+export const ComposedParts: Story = {
+  parameters: storyDocumentation(
+    "Explicit children opt into composition: the header takes extra action content, and the content part hosts the resolved renderer wherever it is placed.",
+  ),
+  render: () => (
+    <FilePreview
+      file={{ src: svgSrc, name: "cover.png", mimeType: "image/png" }}
+      className="h-80 w-[28rem]"
+    >
+      <FilePreviewHeader>
+        <span className="nessa-text-1 rounded-full bg-accent px-2 py-0.5 text-accent-foreground">
+          Draft
+        </span>
+      </FilePreviewHeader>
+      <FilePreviewContent />
+    </FilePreview>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByText("Draft")).toBeVisible()
+    const image = await canvas.findByRole("img", { name: "cover.png" })
+    await waitFor(() => expect(image).toBeVisible())
+  },
+}
