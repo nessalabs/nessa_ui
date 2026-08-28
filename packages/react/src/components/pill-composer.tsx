@@ -34,11 +34,11 @@ function cssDurationInMilliseconds(value: string, fallback: number) {
 }
 
 /**
- * One revolution of iridescence: a long transparent stretch, a soft
- * spectral tail that brightens toward the direction of travel, and a crisp
- * near-white head that cuts off sharply so the light reads as led rather
- * than smeared. The stops are the --nessa-chat-rim-* tokens, which hold
- * the same values in both themes — the effect is a light source.
+ * One revolution of iridescence: a long transparent stretch, then the
+ * Apple-Intelligence-style spectrum — amber through pink and purple into
+ * cyan — brightening toward a crisp near-white head that cuts off sharply
+ * so the light reads as led rather than smeared. The stops are the
+ * --nessa-chat-rim-* tokens, identical in both themes — a light source.
  */
 const pillComposerRimSpinnerClassName =
   "absolute left-1/2 top-1/2 aspect-square w-[200%] -translate-x-1/2 -translate-y-1/2 bg-[conic-gradient(from_0deg,transparent_0deg,transparent_190deg,var(--nessa-chat-rim-0)_190deg,var(--nessa-chat-rim-1)_252deg,var(--nessa-chat-rim-2)_288deg,var(--nessa-chat-rim-3)_318deg,var(--nessa-chat-rim-4)_342deg,var(--nessa-chat-rim-head)_356deg,transparent_360deg)]"
