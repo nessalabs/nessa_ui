@@ -1,0 +1,73 @@
+/** @responsibility Re-exports the agent stream parser: the shared contract, the shared folds, and the providers that feed them. */
+
+// ---------- the contract every provider maps onto ----------
+export {
+  AgentEventType,
+  PlanStepStatus,
+  TaskKind,
+  isEvent,
+  isMainThread,
+  pathKey,
+  type AgentEvent,
+  type AgentEventPayload,
+  type AgentStreamMapper,
+  type AgentPath,
+  type BlockRef,
+  type DeltaPayload,
+  type MapperOptions,
+  type PlanStep,
+  type SessionInfo,
+  type ToolKind,
+  type ToolResult,
+  type TurnStatus,
+  type Usage,
+  type WorkflowAgentProgress,
+  type WorkflowPhaseProgress,
+} from "./events"
+export {
+  asArray,
+  asBoolean,
+  asNumber,
+  asObject,
+  asOneOf,
+  asRecord,
+  asString,
+  asStrings,
+  type JsonValue,
+} from "./json"
+
+// ---------- optional folds over the contract ----------
+export { TranscriptBuilder } from "./builder"
+export {
+  GROUP_MIN,
+  applyDeltas,
+  assembleTurn,
+  buildTranscript,
+  groupTools,
+  isToolGroup,
+  previewOf,
+  rendersRow,
+  runKey,
+  type DelegatedRun,
+  type DeltaBuffers,
+  type ToolGroup,
+  type Transcript,
+  type Turn,
+  type WorkItem,
+} from "./transcript"
+
+// ---------- providers ----------
+/**
+ * Namespaced, not flattened.
+ *
+ * A provider's surface is full of names a second provider wants too —
+ * `parseWireLine`, `toolKind`, `SessionCapabilities`, `TranscriptRef`. Two
+ * star-exports sharing a name silently elide the symbol, so flattening would
+ * make adding `codex/` a breaking change to this module's public API: exactly
+ * the "nothing else moves" claim the layering exists to keep.
+ */
+export * as claude from "./claude"
+
+// The two entry points are also exported flat, because reaching for a parser by
+// name is the common case and `claude.ClaudeStreamMapper` stutters.
+export { ClaudeStreamMapper, mapClaudeStream } from "./claude/mapper"

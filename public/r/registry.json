@@ -604,6 +604,74 @@
       ]
     },
     {
+      "name": "agent-stream",
+      "type": "registry:lib",
+      "title": "Agent stream parser",
+      "description": "A framework-free parser for coding-agent output streams: decodes Claude Code's stream-json lines, normalizes them into a harness-agnostic event log, and folds that log into the turns, tool groups, delegated runs and plan a transcript UI draws.",
+      "files": [
+        {
+          "path": "packages/react/src/lib/agent-stream/index.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/index.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/json.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/json.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/events.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/events.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/transcript.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/transcript.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/builder.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/builder.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/claude/index.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/claude/index.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/claude/wire.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/claude/wire.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/claude/mapping.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/claude/mapping.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/claude/mapper.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/claude/mapper.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/claude/tools.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/claude/tools.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/claude/capabilities.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/claude/capabilities.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/claude/store.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/claude/store.ts"
+        }
+      ]
+    },
+    {
       "name": "app-shell-layout",
       "type": "registry:lib",
       "title": "AppShell layout model",

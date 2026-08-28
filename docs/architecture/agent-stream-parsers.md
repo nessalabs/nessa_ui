@@ -1,0 +1,487 @@
+# Parsing coding-agent output streams
+
+This document is a working guide for building a parser over a coding agent's
+output stream, and a record of what a live Claude Code stream actually contains.
+Everything asserted here was observed in a capture, and every capture named is
+checked in under
+`apps/storybook/stories/fixtures/agent-stream/`. The reference implementation is
+`packages/react/src/lib/agent-stream/`, and the Storybook story
+**Composites/AgentStream** renders each capture next to its raw bytes.
+
+If you are an agent asked to build one of these: read this file, then read the
+fixtures. Do not design against remembered field names — the wire moves, and the
+fixtures are what tell you where it moved to. One of the findings below
+(`TodoWrite` becoming `TaskCreate`/`TaskUpdate`) was caught only because a
+capture disagreed with the design.
+
+> **Using the parser rather than changing it?** Read
+> [`skills/agent-stream/SKILL.md`](../../skills/agent-stream/SKILL.md) instead —
+> it is the task-shaped guide (entry points, live versus finished sessions,
+> reading events, opening a delegated run's transcript, adding a provider).
+> This document is the *why*: what the wire actually contains, and which of its
+> shapes will mislead you.
+
+## 0. What this library is, and what it is not
+
+**The deliverable is the conversion: bytes in, structured events out.** Wire
+decoding, normalization, the event contract, and the disk locators are the
+product. A host builds its own transcript, its own sidebar, its own everything.
+
+```
+lib/agent-stream/
+  json.ts          JsonValue and the narrowing readers      ← shared
+  events.ts        AgentEvent, AgentEventPayload, the       ← shared: THE CONTRACT
+                   vocabularies every provider maps onto
+  transcript.ts    one-shot fold                            ← shared, optional
+  builder.ts       incremental fold                         ← shared, optional
+  claude/
+    wire.ts        Claude Code's line shapes + vocabularies ← provider
+    mapping.ts     Claude's kinds → contract kinds, as data ← provider
+    mapper.ts      ClaudeStreamMapper                       ← provider
+    tools.ts       Claude's tool names → ToolKind           ← provider
+    capabilities.ts  Claude's init → pickers                ← provider
+    store.ts       Claude Code's on-disk layout             ← provider
+  codex/           ← a second harness is a folder, nothing else moves
+```
+
+The Storybook story is a demo, not a shipped component.
+
+`buildTranscript` and `TranscriptBuilder` are offered because turn boundaries,
+tool-run grouping and pending-versus-abandoned are genuinely subtle and every
+consumer would re-derive them — but they are a **helper, not a requirement**. A
+host that wants a different shape reads the event log directly; nothing in the
+mapper depends on the fold. The chat transcript in Storybook is a demonstration
+that the events are sufficient to render from, and is not shipped as a
+component.
+
+### Why the payload vocabulary is shared, not per-provider
+
+The obvious instinct is to make `payload.type` provider-specific — Claude's own
+names for Claude's own events. Resist it. **The discriminator is the contract.**
+A component switches on `payload.type`; if that vocabulary is Claude's, then a
+Codex or ACP session needs its own components rather than merely its own mapper,
+and the extensibility the layering exists for is gone.
+
+Provider-specific vocabularies belong exactly one layer down, in each wire
+module, where a name *should* be provider-shaped:
+
+| layer | vocabulary | scope |
+| --- | --- | --- |
+| `claude/wire.ts` | `ClaudeWireType`, `ClaudeSystemSubtype`, `ClaudeStreamFrameType`, `ClaudeContentDeltaType`, `ClaudeContentBlockType`, `ClaudeTaskType` | **per provider** |
+| `events.ts` | `AgentEventType`, `TaskKind`, `PlanStepStatus`, `ToolKind` | **shared by all providers** |
+
+The directory says which is which. A provider name may appear inside
+`claude/` as often as it likes — that is the folder's whole job — and must not
+appear in a shared module at all. `claude/mapping.ts` is where the two meet:
+`CLAUDE_TASK_KIND`, `CLAUDE_PLAN_STATUS` and `CLAUDE_EVENT_MAPPING` are lookup
+tables from the provider's words to ours, written as **data rather than
+control flow**, so the translation can be read at a glance and checked by the
+compiler against the provider's own union.
+
+Both are frozen objects with a derived union rather than TypeScript `enum`s. An
+`enum` is a nominal type that does not survive JSON: a value read off the wire
+could never *be* one without a cast, which defeats the point of naming it. The
+`as const` object gives the same autocomplete and exhaustiveness checking, and
+its values are the literals themselves — so `AgentEventType.ToolCallStarted`
+and `"tool_call_started"` are interchangeable, and a `switch` over the union
+still fails to compile when a variant is unhandled.
+
+**Naming a provider's vocabulary must not close it.** The CLI adds subtypes
+between releases, so `ClaudeSystemSubtype` is a checklist of what is *handled*,
+never a claim about what exists — anything unlisted falls through to an
+`unknown` event carrying its raw line.
+
+## 1. Layer the parser in three
+
+```
+wire        line  →  tagged union            no state at all
+mapper      wire  →  normalized event log    the only stateful piece
+fold        log   →  turns, groups, runs     pure, re-runs on every render
+```
+
+The middle layer's output — a harness-agnostic `AgentEvent` — is the contract
+components render against. Getting this boundary right is what lets a second
+harness (Codex, an ACP-speaking agent) reuse every component by supplying a
+different wire layer and mapper.
+
+**Never let a component read the wire directly.** The wire's shape is a fact
+about a CLI release; the event model is a fact about your product.
+
+### What state the mapper actually needs
+
+Small, and each piece earns its place:
+
+| State | Why |
+| --- | --- |
+| `currentMessageId` | Stream frames address blocks by index *within the open message*, and the id arrives only on `message_start`. |
+| committed block count per message id | Committed `assistant` lines carry **no index**; it is derived by counting. |
+| `pathByCall` | Maps a tool call id to the agent path its children belong to, so nesting is a path rather than a flat id. |
+| `seq` | The only ordering key. Most lines carry no timestamp. |
+| plan steps | The incremental plan tools put a step's id in the tool *result*, not the call. |
+| last `init` | A model change is only visible as a difference between two inits. |
+
+## 2. What a Claude Code stream contains
+
+Run with `--output-format stream-json --include-partial-messages --verbose`.
+Four kinds of line arrive interleaved on one stdout:
+
+1. **`stream_event`** — raw Anthropic SSE frames: `message_start`,
+   `content_block_start` / `_delta` / `_stop`, `message_delta`, `message_stop`.
+2. **`assistant` / `user`** — committed messages, and everything the CLI feeds
+   back to the model (tool results, abort notices).
+3. **`system`**, tagged by `subtype` — `init`, `status`, `task_started`,
+   `task_progress`, `task_updated`, `task_notification`, `task_summary`,
+   `thinking_tokens`, `hook_started`, `hook_response`, `post_turn_summary`,
+   `background_tasks_changed`, `compact_boundary`, `permission_denied`.
+4. **`result`** — the turn terminator, carrying usage, cost, `stop_reason`,
+   `terminal_reason`, `permission_denials` and a per-model usage breakdown.
+
+Plus `rate_limit_event`, and — only when the child was spawned with
+`--permission-prompt-tool stdio` — `control_request`, the one inbound line that
+**blocks the agent until answered**.
+
+### The stream is not one event per line, and must not be
+
+In the `tools` capture, 43 lines produce 34 events. Every line that produces
+none does so for a stated reason:
+
+| Line | Why it maps to nothing |
+| --- | --- |
+| `message_start` | Its only payload is the id, which becomes the mapper's join key. |
+| `message_delta`, `message_stop` | Terminal metadata `result` already carries. |
+| `signature_delta` | A signature over a thinking block, not display content. |
+| `rate_limit_event` with `status: "allowed"` | The steady state, reported constantly, with nothing to act on. |
+| `task_summary` with no `detail` | Nothing to show. |
+
+Keep that list closed and test it. A new entry appearing in it is a line the
+parser has started dropping silently — which is the failure mode that matters,
+because it looks like nothing at all.
+
+## 3. The five things that are easy to get wrong
+
+**Deltas vs. committed content.** Both arrive for the same content. Deltas are a
+*preview*; the committed event for the same block supersedes them. The join key
+is `{ messageId, index }`. Committed lines carry no index, and Claude Code emits
+**one `assistant` line per content block** — several sharing one message id — so
+you derive the index by counting blocks per id in arrival order. A wrong index
+attaches streamed text to the wrong block and never errors.
+
+**Deltas are optional.** Subagent output is not streamed. Codex streams nothing
+of this shape. Every component must render correctly with zero deltas.
+
+**`input_json_delta` is not parseable.** Fragments only form valid JSON once all
+of them are concatenated. But `content_block_start` names the tool up front, so
+a row can say "Editing…" while arguments are still arriving — a two-phase
+affordance worth building for.
+
+**Delegated work interleaves on the same stdout.** `parent_tool_use_id` is the
+discriminator, and it equals the `call_id` of the spawning `tool_call_started`.
+Resolve it *through the spawning call* so depth accumulates into a path
+(`[outerCallId, innerCallId]`) rather than a flat id. Even if you only ever
+observe one level, model it as a path — retrofitting depth after components read
+a flat id is expensive, and Codex's equivalent field is already called
+`agent_path`.
+
+**Order by `seq`, never by time.** Most lines carry no `ts`. Use one monotonic
+counter per session, shared by mapped lines and anything the app synthesizes,
+seeded from the persisted log on resume — it is also the reconnect cursor.
+
+## 4. Wire traps, each observed
+
+- **`"iterations": null`** — an explicit null, not an absent key. A reader that
+  only handles absence fails the whole line, and since those lines are the
+  replies to built-in commands, the commands appear to do nothing.
+- **`stop_reason` is null** on the `result` that closes a compaction. Requiring
+  it kills the turn terminator, and the session then sits on "in progress"
+  forever.
+- **`user` lines are two unrelated things** — the human's prompt (a bare string)
+  and the CLI's own feedback (a block array). Discriminate by JSON type.
+- **`isReplay` / `isSynthetic`** separate the CLI's bookkeeping from real
+  conversation. Neither implies the other.
+- **`<tool_use_error>` wrapping** on failed tool results is wire framing;
+  `is_error` already carries the fact. Strip only an exact whole-string wrap — a
+  result that merely *mentions* the tag (a grep hit) must survive intact.
+- **Interrupts** arrive as prose (`[Request interrupted by user…`). Matching
+  prose is acceptable *here only* because `result.terminal_reason` carries the
+  truth: a reworded notice costs one stray row, never a missed turn end.
+- **Images arrive twice** — as an API image block and on the `tool_use_result`
+  sidecar. Read one, archive to disk, carry a path. A session of screenshots is
+  otherwise megabytes of base64 in the log.
+- **A turn's `result` can arrive while background tasks are open.** "Idle" is
+  `result` **and** an empty `background_tasks_changed`.
+
+## 5. Findings that contradict the obvious design
+
+These are the ones a from-memory design gets wrong.
+
+### The plan tool is incremental now
+
+`TodoWrite` published the whole list on every call. The current CLI uses
+`TaskCreate { subject, description, activeForm }` and
+`TaskUpdate { taskId, status }` — and **a step's id exists only in the tool
+result text** (`"Task #2 created successfully"`). So the plan cannot be derived
+from tool arguments alone: the mapper parks a creation on its call id, settles it
+when the result arrives, and patches by id thereafter. Support both shapes; fall
+back to creation order if the result wording moves.
+
+### `init` is per turn, not per session — so "resumed" is not on the wire
+
+A resumed process reuses the session id and replays none of the earlier turns.
+A *workflow run emits two inits from one process*. So neither the session id nor
+the init count can tell you a session was resumed — only the host, which chose
+whether to pass `--resume`, knows. What the stream *can* prove is a **model
+change**, as a difference between consecutive inits, which is exactly what
+`--model` on a resume looks like. Report that; do not infer resumption.
+
+### A workflow's agents write no events — but they are not invisible
+
+Two separate facts, and conflating them costs you the whole feature.
+
+**No event carries `parent_tool_use_id` for a workflow's agents.** Their
+transcripts — the tool calls they make, the text they produce — never reach the
+stream. So there is no way to expand a workflow agent and read its work, the way
+a subagent can be expanded.
+
+**But `task_progress` carries a structured board.** Alongside the flat
+`description` (`"Greet: hola"`) and the accumulating `usage.total_tokens`, some
+progress lines carry `workflow_progress`: a flat array mixing `workflow_phase`
+and `workflow_agent` entries, where each agent names its phase by index. Per
+agent it gives `label`, `model`, `state` (`start` → `done`), `agentId`,
+`queuedAt` / `startedAt` / `durationMs`, `attempt`, `tokens`, `toolCalls`, a
+`promptPreview` of what it was asked and a `resultPreview` of what it returned.
+
+That is enough for a real progress board: phases in order, agents within them,
+each with live state, cost and result. Rebuild the nesting the flat array
+implies, and treat each array as a **full snapshot** — latest wins, and the array
+rides on only *some* progress lines, so keep the last one you saw rather than
+expecting one per update.
+
+Three more things the multi-phase capture (`workflow_phases`) establishes:
+
+- **Every phase is declared in the first snapshot**, before any of its agents
+  exist. A three-phase run opens with three `workflow_phase` entries and two
+  agents. So a board can show what is still to come instead of growing a phase
+  at a time — render an agent-less phase as pending rather than hiding it.
+- **`state` has at least three values** — `start`, `progress`, `done`. Treating
+  it as a two-value flag mislabels every running agent.
+- **An agent's `agentId` is absent until it actually starts.** A queued agent has
+  a `label`, a `phaseIndex` and a `queuedAt` and nothing else, so identity for
+  rendering must come from `index`, which is stable across snapshots.
+
+The honest framing for a UI: a workflow's agents can be *watched*, not *read*.
+
+**Draw the board as a row in its own right, not inside the `Workflow` call's
+disclosure.** A workflow is a unit of work rather than an argument to a tool
+call, and the board is the only view of its agents that exists — filing it one
+expand deep under a row labelled "Orchestrated Workflow" hides the whole
+feature. Keep the call's raw payload reachable underneath it.
+
+By contrast a **subagent** (`task_type: "local_agent"`) does report its own
+events, tagged with the spawning call id, so its work can be nested and expanded
+— but it gets no board, and two further things are true of it:
+
+- **A subagent's content is never streamed.** Every `stream_event` line in the
+  captures is main-thread; a subagent emits committed `assistant` and `user`
+  lines only. So its prose arrives in whole blocks and can never type itself
+  out — its liveness has to come from `task_progress` instead. This is the
+  concrete reason "deltas are optional" is a rule and not a nicety.
+- **A subagent's final report is not one of its own events.** It arrives as the
+  *spawning call's* tool result, on the main thread. A card built only from the
+  run's events ends with its last tool call and no conclusion.
+
+Both limits are limits *of the stream*. Section 6 covers where the full
+transcripts actually live.
+
+### Headless never echoes the prompt
+
+`claude -p` opens with `init`; the prompt the user typed appears nowhere. The
+host supplied it, so the host must render it. A transcript built only from the
+stream is missing the half the reader wrote.
+
+## 6. What the stream withholds, the disk keeps
+
+Everything a delegated run refuses to put on the stream is written down. Under
+`~/.claude/projects/<slug>/`, where `<slug>` is the working directory with every
+non-alphanumeric character replaced by `-`:
+
+```
+<sessionId>.jsonl                                     the main conversation
+<sessionId>/
+  subagents/agent-<taskId>.jsonl                      a subagent's full transcript
+  subagents/agent-<taskId>.meta.json                  agentType, description, toolUseId, spawnDepth
+  subagents/workflows/<runId>/agent-<agentId>.jsonl   one workflow agent's full transcript
+  subagents/workflows/<runId>/journal.jsonl           each agent's start and whole result
+  workflows/<runId>.json                              the run record: script, phases, result, totals
+  workflows/scripts/<name>-<runId>.js                 the script as executed
+```
+
+Three things make this usable rather than merely present:
+
+- **The transcripts are the same line shapes the stream uses.** `user` and
+  `assistant` lines with the familiar content blocks, marked `isSidechain: true`
+  and carrying an `agentId`. The stream parser reads them unchanged — the only
+  new line type is `attachment`, which falls through to `unknown` exactly as an
+  unmodelled subtype should. No second parser, no second event model.
+- **The wire hands you the keys.** A subagent's file is named by the `task_id`
+  from `system/task_started`; a workflow agent's by the `agentId` from the
+  progress board. Both are known the moment the run starts, so a UI can offer
+  "open the transcript" while the run is still going.
+- **`runId` is the one exception** — it never appears on the stream. Read the
+  records in `<sessionId>/workflows/` and match their own `taskId` field against
+  the `task_id` you saw.
+
+The `.meta.json` sidecar also carries `toolUseId`, so a file can be matched back
+to the row that spawned it without trusting the filename, and `spawnDepth`,
+which is the disk's version of the agent path.
+
+`store.ts` is the path contract as pure functions — no filesystem access, so it
+runs in a browser as readily as in a host process. Reading the files is the
+host's job (Node, Tauri, Electron); parsing what comes back is `mapClaudeStream`,
+same as always.
+
+**This changes what a UI can promise.** The stream alone supports "watch a
+subagent, read its report". With the store, both a subagent and a workflow agent
+can be opened and read in full — the fan-out stops being a black box.
+
+### Hand the host a pointer, not a transcript
+
+Do not inline a delegated run's conversation into the row that spawned it. It is
+another chat stream and reads as one, so the parser's job ends at a pointer and
+the shell opens it in its own surface:
+
+```ts
+const location = sessionLocationOf("~/.claude/projects", transcript.session)
+const refs = collectTranscriptRefs(location, transcript.runs, runIdByTaskId)
+```
+
+`collectTranscriptRefs` returns one list covering the main conversation and
+every delegated run, each entry carrying `kind`, `label`, `key`, the `callId`
+that links it back to its row, and either a `path` or — when the path cannot be
+built yet — `resolved: false` with a `blockedBy` naming what is missing. Two
+things are routinely missing, and both are honest states rather than errors: an
+agent that has not started has no id, and a workflow agent's `runId` has to be
+matched off the records in `workflows/`. A ref that says why it is blocked is
+worth more than a plausible path that resolves to nothing.
+
+## 7. What the session tells you about itself
+
+`system/init` is the whole capability advertisement, and it is what a composer's
+pickers should be built from: `tools`, `mcp_servers` (with per-server `status`),
+`slash_commands`, `terminal_slash_commands`, `skills`, `agents`, `plugins`,
+`permissionMode`, `model`, `output_style`.
+
+Two things to know before consuming it:
+
+- **The tool list grows between inits.** Deferred tools load on demand, so merge
+  across every `init` rather than replacing. What was absent from the first init
+  is a tool that arrived late — worth surfacing as such.
+- **MCP server names and tool prefixes disagree.** A server displayed as
+  `example Mail` contributes `mcp__example_Mail__get_message`. Match by
+  flattening both to the same alphabet, not by string equality.
+
+`sessionCapabilities()` in the reference implementation does both, and classifies
+each slash command as `skill`, `plugin` (`plugin:command`), `session`, or
+`terminal` — the grouping a picker wants.
+
+## 8. Folding the log for rendering
+
+Above the event log sits a purely derived pass:
+
+- **Turns** — prompt → work → `turn_completed`. A prompt typed *into* a running
+  turn folds into it rather than opening a new one, and does not abandon the
+  tool calls open in front of it.
+- **Tool groups** — runs of ≥2 consecutive same-tool calls collapse to one row,
+  counting *distinct targets* ("Edited 1 file", not 3).
+- **Pending vs. abandoned** — a call with no result is pending only while a
+  process could still produce one. With the process gone it is abandoned;
+  drawing it as in-flight leaves a row shimmering forever.
+- **`finalText` duplicates the last message.** `result.result` is a verbatim copy
+  of the turn's last `assistant_text`; render one or the other, never both.
+- **Carry a stable identity for every run and agent.** A delegated run has the
+  harness's `taskId`, a workflow agent has an `agentId` once it starts and a
+  stable `index` before that. Anything painted from identity — a seeded avatar,
+  a colour — needs a key that survives a reload and a replay, and the label is
+  not one: two agents in a fan-out can share it.
+- **Keep an explicit set of payload types that draw a row.** What a collapse
+  reveals, and what breaks a tool run, is a function of that set — and things
+  that render elsewhere (the plan) must stay out of it, or a run of plan calls
+  splits down the middle for no visible cause.
+
+## 9. Speed, and the one thing that is actually slow
+
+Measured on the checked-in captures (Node 22, M-series laptop):
+
+| | cost |
+| --- | --- |
+| `parseWireLine` | ~0.98 µs/line — nearly all of it `JSON.parse` |
+| `mapper.push` | **1.22 µs/line** end to end, so the mapper's own work is ~0.24 µs |
+| Mapping a 50k-line session | 87 ms — ~575 lines/ms |
+| `buildTranscript` over 43k events | 19 ms |
+
+Per-line cost is a non-issue: a line takes about a microsecond to become
+events, against milliseconds between lines. **The thing that is slow is folding
+the whole log again for every line that arrives** — a linear fold run per event
+over a log that grows per event is quadratic, and it is the shape a naive live
+UI falls into.
+
+Measured, same capture, per-line re-fold versus incremental:
+
+| lines | re-fold everything | incremental | |
+| --- | --- | --- | --- |
+| 1,000 | 123 ms | 14 ms | 9× |
+| 4,000 | 1,399 ms | 27 ms | 52× |
+| 16,000 | 24,065 ms | 82 ms | **293×** |
+
+Worst single line tells the same story from the user's side: the re-fold path
+reaches 14.85 ms per line at 16k and keeps climbing, while the incremental path
+stays flat. Over a 200,000-line session the incremental path holds **p50 5 µs,
+p99 45 µs** per line, 1.6 s in total.
+
+So the rule: **`buildTranscript` is for a persisted log you read once.
+`TranscriptBuilder` is for a session that is still running.** Push new events,
+snapshot when you render. `applyDeltas` takes the same shape: pass it your
+running buffer and only the new events, since delta strings only ever grow.
+
+There is **one fold implementation**: `buildTranscript` sorts, then delegates to
+`TranscriptBuilder`. Two implementations of the same rules kept in agreement by
+tests drift the first time someone patches one, and the drift shows up as a live
+session disagreeing with the same session reloaded — the hardest class of bug to
+see.
+
+Two properties make the incremental path hold its shape:
+
+- **Work is grouped as it arrives.** Re-running the tool-run grouping over the
+  open turn on every frame is quadratic *within* a turn, and an autonomous turn
+  with hundreds of calls is the ordinary case, not the tail.
+- **A closed turn is assembled once.** It can never change, so it is never
+  recomputed.
+
+A **replayed** event is absorbed once and costs nothing — any at-least-once
+transport re-sends its last chunk on reconnect, and making that fatal would
+force a full re-fold precisely when the connection is flaky. An event arriving
+from *before* everything seen is refused, because it would land in whichever
+turn happened to be open, silently; a genuinely shuffled log is what
+`buildTranscript` is for.
+
+Snapshots hand back the builder's own append-only collections rather than
+copies — copying a session's events per frame is the cost the class exists to
+avoid — so a consumer memoizes on `transcript.revision`, which changes when the
+content does. Anything still being written to (a run's own events) *is* copied.
+
+## 10. Capturing your own fixtures
+
+```bash
+claude -p --output-format stream-json --include-partial-messages --verbose \
+  --model sonnet "<prompt>" --allowed-tools Bash Read Write > capture.jsonl
+```
+
+Put the prompt **before** `--allowed-tools`: the flag is variadic and will
+swallow it otherwise. Capture at least: plain text, tool calls, a failing tool, a
+plan, a subagent, a workflow, a web search, and a resume with a different model.
+Those eight are what the checked-in fixtures cover, and each one broke something
+in the parser that the others did not.
+
+Two shapes remain uncaptured and are therefore unimplemented rather than
+guessed: `control_request` permission prompts (they need
+`--permission-prompt-tool stdio`) and `compact_boundary`. Capture before
+modelling.

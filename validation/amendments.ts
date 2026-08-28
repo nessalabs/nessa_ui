@@ -116,4 +116,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-008",
+    kind: "transition",
+    contractId: "PARSE-001",
+    baseRevision: "b7e70bb1978337a35d8f5435e86c3b16f65c90d6",
+    targets: ["validation/contracts.ts", "validation/nessa/check-metadata.ts"],
+    beforeFingerprint: "dbbadc4c36c3c2329a059d255a1246a569876159bd27d9320de5ba4ea178fb6e",
+    afterFingerprint: "bcd57383ecd6ab2c42f2eaf5480642f42747767794eb485bf26fbc36ae3ce5eb",
+    rationale: "Nessa now ships parsers that read untrusted bytes from a third-party CLI whose shapes change between releases, and the three failure modes that surface introduces are all silent: a TypeScript enum cannot hold a value decoded from JSON without a cast, an exported vocabulary that is only `as const` is mutable at runtime, and hand-rolled `typeof` narrowing drifts until a malformed line becomes a crash or a wrong value rather than an absent one. PARSE-001, PARSE-002 and PARSE-003 make each structurally visible; the checker caught seven violations in the parser that introduced it.",
+    compatibility: "Strictly adds validation with no consumer runtime API change and no rendered output change. The rules are scoped to packages/react/src/lib/agent-stream, and test files are exempt from PARSE-003 because asserting a runtime shape there is the assertion rather than a narrowing shortcut. No existing requirement is weakened, and the contracts carry no exception ledger.",
+    migration: "New parser code declares wire vocabularies as Object.freeze objects with derived unions, exports them frozen, and narrows every decoded value through the shared readers in lib/agent-stream/json.ts. A second provider inherits the same three rules by living under the same path.",
+    supersedes: null,
+    pullRequest: null,
+  },
 ])

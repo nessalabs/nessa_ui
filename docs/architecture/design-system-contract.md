@@ -1069,6 +1069,36 @@ flowchart TB
     DEFAULT_ICON --> ACCORDION
 ```
 
+## Wire parsing discipline
+
+Nessa ships parsers for coding-agent output streams, which read untrusted bytes
+from a third-party CLI whose shapes change between releases. Three invariants
+keep that surface honest, and they are contracts rather than conventions
+because each one fails silently when it is broken.
+
+1. **Wire vocabularies are frozen objects with derived unions, never
+   TypeScript enums (PARSE-001).** An `enum` is a nominal type that does not
+   survive JSON: a value decoded from a wire could never *be* one without a
+   cast, so the naming that was supposed to add safety adds a cast instead. A
+   frozen object with a derived union gives the same autocomplete and
+   exhaustiveness checking while its values remain the literals the wire
+   actually carries.
+2. **Exported vocabularies are frozen at runtime, not only at compile time
+   (PARSE-002).** `as const` and `satisfies` describe a literal without
+   changing what it is, so an exported vocabulary a consumer can mutate is a
+   shared global anyone can corrupt.
+3. **Values decoded from a wire are narrowed through the shared readers, never
+   by hand (PARSE-003).** Everything past `JSON.parse` is unknown at runtime —
+   a declared type is a claim about the bytes, not a check on them — so
+   narrowing happens once, behind names, in one module. Scattered `typeof`
+   comparisons are the failure this forbids: they drift, they disagree, and
+   each one is a place a malformed line becomes a crash or a wrong value
+   instead of an absent one.
+
+The parsers themselves, and what the wire actually contains, are documented in
+[agent stream parsers](./agent-stream-parsers.md); this section governs only
+the discipline the gate enforces.
+
 ## Canonical source and generated files
 
 ```text
@@ -1163,6 +1193,9 @@ This table is the exhaustive machine-mirrored index of normative rule groups. De
 | STYLE-001 | Component class surfaces use semantic tokens only, never raw palette scales or literal color values. | `#styling-discipline-and-inline-style-escape-hatch` |
 | STYLE-002 | Class-surface stacking utilities stay on the frozen z-0 through z-50 scale. | `#styling-discipline-and-inline-style-escape-hatch` |
 | STYLE-003 | Inline style declarations are limited to custom properties and the computed-geometry allowlist. | `#styling-discipline-and-inline-style-escape-hatch` |
+| PARSE-001 | Wire vocabularies are frozen objects with derived unions rather than TypeScript enums. | `#wire-parsing-discipline` |
+| PARSE-002 | Exported const vocabularies are frozen at runtime, not only at compile time. | `#wire-parsing-discipline` |
+| PARSE-003 | Values decoded from a wire are narrowed through the shared readers, never by hand. | `#wire-parsing-discipline` |
 | PROVIDER-001 | Provider, scope, mode, SSR, wrapper, and context boundaries activate together under their frozen contract. | `#simplified-color-mode-api` |
 | ICON-001 | Semantic icons activate only with a real consuming component and frozen resolution/accessibility ownership. | `#real-icon-consumer-before-api-stability` |
 
