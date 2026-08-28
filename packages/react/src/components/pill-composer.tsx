@@ -34,14 +34,14 @@ function cssDurationInMilliseconds(value: string, fallback: number) {
 }
 
 /**
- * One revolution of iridescence: a long transparent stretch, then the
+ * One revolution of iridescence wrapping the whole rim: the
  * Apple-Intelligence-style spectrum — amber through pink and purple into
- * cyan — brightening toward a crisp near-white head that cuts off sharply
- * so the light reads as led rather than smeared. The stops are the
+ * cyan — decays continuously from the crisp near-white head all the way
+ * around, faintest just behind the head's sharp cutoff. The stops are the
  * --nessa-chat-rim-* tokens, identical in both themes — a light source.
  */
 const pillComposerRimSpinnerClassName =
-  "absolute left-1/2 top-1/2 aspect-square w-[200%] -translate-x-1/2 -translate-y-1/2 bg-[conic-gradient(from_0deg,transparent_0deg,transparent_190deg,var(--nessa-chat-rim-0)_190deg,var(--nessa-chat-rim-1)_252deg,var(--nessa-chat-rim-2)_288deg,var(--nessa-chat-rim-3)_318deg,var(--nessa-chat-rim-4)_342deg,var(--nessa-chat-rim-head)_356deg,transparent_360deg)]"
+  "absolute left-1/2 top-1/2 aspect-square w-[200%] -translate-x-1/2 -translate-y-1/2 bg-[conic-gradient(from_0deg,var(--nessa-chat-rim-0)_0deg,var(--nessa-chat-rim-1)_90deg,var(--nessa-chat-rim-2)_180deg,var(--nessa-chat-rim-3)_260deg,var(--nessa-chat-rim-4)_320deg,var(--nessa-chat-rim-head)_356deg,transparent_360deg)]"
 
 /** Masks a full-bleed layer down to an edge band `inset` pixels deep. */
 function rimBandMask(inset: number): React.CSSProperties {
