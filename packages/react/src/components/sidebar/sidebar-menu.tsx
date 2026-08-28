@@ -196,7 +196,7 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
         {description ? (
           <span
             data-slot="sidebar-menu-item-description"
-            className="w-full truncate nessa-text-2 font-normal leading-4 text-sidebar-foreground/60"
+            className="w-full truncate nessa-text-2 font-normal text-sidebar-foreground/60"
           >
             {description}
           </span>

@@ -129,7 +129,7 @@ function Table({
       >
         <table
           data-slot="table"
-          className={cn("w-full caption-bottom font-sans text-xs", className)}
+          className={cn("w-full caption-bottom font-sans nessa-text-2", className)}
           {...props}
         />
       </div>
@@ -256,7 +256,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "h-9 whitespace-nowrap px-3 text-left align-middle text-[11px] font-semibold text-muted-foreground",
+        "h-9 whitespace-nowrap px-3 text-left align-middle nessa-text-1 font-semibold text-muted-foreground",
         className,
       )}
       {...props}
@@ -283,7 +283,7 @@ function TableCaption({
   return (
     <caption
       data-slot="table-caption"
-      className={cn("my-3 px-3 text-xs text-muted-foreground", className)}
+      className={cn("my-3 px-3 nessa-text-2 text-muted-foreground", className)}
       {...props}
     />
   )
@@ -365,7 +365,7 @@ function TableSortButton({
       data-slot="table-sort-button"
       data-direction={direction}
       className={cn(
-        "-mx-1.5 inline-flex cursor-pointer appearance-none items-center gap-1 rounded-md border-0 bg-transparent px-1.5 py-1 font-sans text-[11px] font-semibold text-muted-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-accent hover:text-accent-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none",
+        "-mx-1.5 inline-flex cursor-pointer appearance-none items-center gap-1 rounded-md border-0 bg-transparent px-1.5 py-1 font-sans nessa-text-1 font-semibold text-muted-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-accent hover:text-accent-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none",
         className,
       )}
       {...props}

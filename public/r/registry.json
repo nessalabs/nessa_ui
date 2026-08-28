@@ -97,7 +97,9 @@
           "nessa-thinking-fill-highlight": "oklch(0.86 0.11 214)",
           "nessa-fast-mode-active": "oklch(0.57 0.22 300)",
           "nessa-diff-addition": "oklch(0.5 0.137 150)",
-          "nessa-diff-deletion": "oklch(0.55 0.19 27)"
+          "nessa-diff-deletion": "oklch(0.55 0.19 27)",
+          "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 20%, transparent)",
+          "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)"
         },
         "dark": {
           "background": "oklch(0.145 0 0)",
@@ -130,7 +132,9 @@
           "nessa-thinking-fill-highlight": "oklch(0.82 0.12 210)",
           "nessa-fast-mode-active": "oklch(0.72 0.185 306)",
           "nessa-diff-addition": "oklch(0.77 0.17 152)",
-          "nessa-diff-deletion": "oklch(0.7 0.19 25)"
+          "nessa-diff-deletion": "oklch(0.7 0.19 25)",
+          "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 40%, transparent)",
+          "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)"
         }
       },
       "css": {
@@ -151,6 +155,9 @@
         },
         ":where([data-nessa-scale=\"110\"])": {
           "--_nessa-scale-factor": "1.1"
+        },
+        ":where([data-nessa-scale=\"125\"])": {
+          "--_nessa-scale-factor": "1.25"
         },
         ":where(:root, [data-nessa-root], [data-nessa-theme], [data-nessa-scale])": {
           "--_nessa-font-size-1": "calc(var(--nessa-font-size-1) * var(--_nessa-scale-factor))",
@@ -174,6 +181,9 @@
           "--_nessa-letter-spacing-5": "var(--nessa-letter-spacing-5)",
           "--_nessa-letter-spacing-6": "var(--nessa-letter-spacing-6)",
           "--_nessa-letter-spacing-7": "var(--nessa-letter-spacing-7)"
+        },
+        ":root, :where([data-nessa-root], [data-nessa-theme], [data-nessa-scale])": {
+          "--spacing": "calc(0.25rem * var(--_nessa-scale-factor))"
         },
         "@layer components": {
           ".nessa-text-1": {
@@ -216,9 +226,17 @@
             "line-height": "var(--_nessa-line-height-4)",
             "letter-spacing": "var(--_nessa-letter-spacing-4)"
           },
+          ".nessa-text-input-2": {
+            "font-size": "max(1rem, var(--_nessa-font-size-2))",
+            "line-height": "var(--_nessa-line-height-2)",
+            "letter-spacing": "var(--_nessa-letter-spacing-2)"
+          },
           "@media (width >= 48rem)": {
             ".nessa-text-input": {
               "font-size": "var(--_nessa-font-size-4)"
+            },
+            ".nessa-text-input-2": {
+              "font-size": "var(--_nessa-font-size-2)"
             }
           }
         },
@@ -406,7 +424,7 @@
       "name": "generating-surface",
       "type": "registry:ui",
       "title": "Generating Surface",
-      "description": "An ambient placeholder for content that takes a while to generate — drifting smoke and a shimmering status label reserve the space, then morph into the finished content when generation completes.",
+      "description": "An ambient placeholder for content that takes a while to generate \u2014 drifting smoke and a shimmering status label reserve the space, then morph into the finished content when generation completes.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -423,7 +441,7 @@
       "name": "mermaid-diagram",
       "type": "registry:ui",
       "title": "Mermaid Diagram",
-      "description": "Mermaid diagrams — flowcharts, sequence diagrams, and every other Mermaid grammar — rendered to SVG with app-wide light and dark theming and a fullscreen pan-and-zoom viewer.",
+      "description": "Mermaid diagrams \u2014 flowcharts, sequence diagrams, and every other Mermaid grammar \u2014 rendered to SVG with app-wide light and dark theming and a fullscreen pan-and-zoom viewer.",
       "dependencies": [
         "lucide-react",
         "mermaid"
@@ -1013,7 +1031,7 @@
       "name": "timeline-header",
       "type": "registry:ui",
       "title": "Timeline header",
-      "description": "The band a horizontal scale lives on: pixel-offset cells with hairline dividers, and labels that pin at a chosen inset while any part of their cell is in view — the GanttChart's two-tier time header, extracted for any horizontally scrolled surface.",
+      "description": "The band a horizontal scale lives on: pixel-offset cells with hairline dividers, and labels that pin at a chosen inset while any part of their cell is in view \u2014 the GanttChart's two-tier time header, extracted for any horizontally scrolled surface.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -1189,7 +1207,7 @@
       "name": "workflow-canvas",
       "type": "registry:ui",
       "title": "WorkflowCanvas",
-      "description": "An infinite (or bounded) pan-and-zoom workflow canvas with draggable nodes that render any content, side handles for drawing connections, and edges that follow their endpoint nodes — built to stay responsive with thousands of nodes.",
+      "description": "An infinite (or bounded) pan-and-zoom workflow canvas with draggable nodes that render any content, side handles for drawing connections, and edges that follow their endpoint nodes \u2014 built to stay responsive with thousands of nodes.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"

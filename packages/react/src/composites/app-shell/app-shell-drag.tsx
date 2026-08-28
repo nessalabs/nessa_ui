@@ -406,8 +406,7 @@ function AppShellDragProvider({
           aria-hidden
           inert
           data-slot="app-shell-drag-ghost"
-          className="pointer-events-none fixed left-0 top-0 z-50 overflow-hidden rounded-md border border-border bg-background opacity-90 shadow-lg"
-          style={{ visibility: "hidden" }}
+          className="pointer-events-none invisible fixed left-0 top-0 z-50 overflow-hidden rounded-md border border-border bg-background opacity-90 shadow-lg"
         />
       ) : null}
     </AppShellDragContext.Provider>
