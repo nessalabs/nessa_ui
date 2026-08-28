@@ -1370,29 +1370,29 @@
       ]
     },
     {
-      "name": "sankey-chart",
+      "name": "flow-chart",
       "type": "registry:ui",
-      "title": "Sankey chart",
-      "description": "A flow diagram: node bars in columns joined by ribbons whose thickness is proportional to the flow they carry. Neutral by default with optional per-node color, it fills the host's box on both axes, lays out any number of stages via longest-path columns, and makes every ribbon a keyboard-focusable button with hover emphasis and host-controllable link selection drawn as a centerline stroke.",
+      "title": "Flow chart",
+      "description": "A flow (Sankey) diagram: node bars in columns joined by ribbons whose thickness is proportional to the flow they carry. Bars take soft tints from a built-in palette (overridable per node or disableable to a neutral wash) and every ribbon inherits its source's tint, so each origin's flows read as one family. It fills the host's box on both axes, lays out any number of stages via longest-path columns, floats host-supplied hover detail content beside the pointer, and makes every ribbon a keyboard-focusable button with hover isolation and host-controllable link selection.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
         {
-          "path": "packages/react/src/components/sankey-chart/index.ts",
+          "path": "packages/react/src/components/flow-chart/index.ts",
           "type": "registry:ui",
-          "target": "components/ui/sankey-chart/index.ts"
+          "target": "components/ui/flow-chart/index.ts"
         },
         {
-          "path": "packages/react/src/components/sankey-chart/sankey-chart.tsx",
+          "path": "packages/react/src/components/flow-chart/flow-chart.tsx",
           "type": "registry:ui",
-          "target": "components/ui/sankey-chart/sankey-chart.tsx"
+          "target": "components/ui/flow-chart/flow-chart.tsx"
         },
         {
-          "path": "packages/react/src/components/sankey-chart/sankey-chart-layout.ts",
+          "path": "packages/react/src/components/flow-chart/flow-chart-layout.ts",
           "type": "registry:ui",
-          "target": "components/ui/sankey-chart/sankey-chart-layout.ts"
+          "target": "components/ui/flow-chart/flow-chart-layout.ts"
         }
       ]
     },

@@ -2,13 +2,13 @@ import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
 import {
-  computeSankeyLayout,
-  sankeyCenterlinePath,
-  sankeyRibbonPath,
-  type SankeyLayoutOptions,
-} from "./sankey-chart-layout"
+  computeFlowChartLayout,
+  flowChartCenterlinePath,
+  flowChartRibbonPath,
+  type FlowChartLayoutOptions,
+} from "./flow-chart-layout"
 
-const BASE: SankeyLayoutOptions = {
+const BASE: FlowChartLayoutOptions = {
   nodes: [{ id: "a" }, { id: "b" }, { id: "x" }, { id: "y" }],
   links: [
     { source: "a", target: "x", value: 3 },
@@ -21,15 +21,15 @@ const BASE: SankeyLayoutOptions = {
   nodeGap: 12,
 }
 
-function nodeById(layout: ReturnType<typeof computeSankeyLayout>, id: string) {
+function nodeById(layout: ReturnType<typeof computeFlowChartLayout>, id: string) {
   const node = layout.nodes.find((candidate) => candidate.id === id)
   assert.ok(node, `node ${id} missing from layout`)
   return node
 }
 
-describe("computeSankeyLayout", () => {
+describe("computeFlowChartLayout", () => {
   it("places sources in the first column and sinks in the last", () => {
-    const layout = computeSankeyLayout(BASE)
+    const layout = computeFlowChartLayout(BASE)
     assert.equal(layout.columnCount, 2)
     assert.equal(nodeById(layout, "a").column, 0)
     assert.equal(nodeById(layout, "b").column, 0)
@@ -40,7 +40,7 @@ describe("computeSankeyLayout", () => {
   })
 
   it("justify pushes pass-through sinks to the last column; left keeps them", () => {
-    const options: SankeyLayoutOptions = {
+    const options: FlowChartLayoutOptions = {
       ...BASE,
       nodes: [{ id: "a" }, { id: "m" }, { id: "z" }, { id: "s" }],
       links: [
@@ -49,15 +49,15 @@ describe("computeSankeyLayout", () => {
         { source: "a", target: "s", value: 1 },
       ],
     }
-    assert.equal(nodeById(computeSankeyLayout(options), "s").column, 2)
+    assert.equal(nodeById(computeFlowChartLayout(options), "s").column, 2)
     assert.equal(
-      nodeById(computeSankeyLayout({ ...options, align: "left" }), "s").column,
+      nodeById(computeFlowChartLayout({ ...options, align: "left" }), "s").column,
       1,
     )
   })
 
   it("sizes bars proportionally to flow and fills the column height", () => {
-    const layout = computeSankeyLayout(BASE)
+    const layout = computeFlowChartLayout(BASE)
     const a = nodeById(layout, "a")
     const b = nodeById(layout, "b")
     // a carries 4 units, b carries 2: exactly double the height.
@@ -72,14 +72,14 @@ describe("computeSankeyLayout", () => {
   })
 
   it("keeps at least the requested gap between bars", () => {
-    const layout = computeSankeyLayout({ ...BASE, height: 40 })
+    const layout = computeFlowChartLayout({ ...BASE, height: 40 })
     const a = nodeById(layout, "a")
     const b = nodeById(layout, "b")
     assert.ok(b.y - (a.y + a.height) >= 12 - 1e-9)
   })
 
   it("stacks link slots contiguously along both endpoint bars", () => {
-    const layout = computeSankeyLayout(BASE)
+    const layout = computeFlowChartLayout(BASE)
     const a = nodeById(layout, "a")
     const y = nodeById(layout, "y")
     const fromA = layout.links.filter((link) => link.source === "a")
@@ -100,7 +100,7 @@ describe("computeSankeyLayout", () => {
   })
 
   it("ignores non-positive links and centers a lone bar in its column", () => {
-    const layout = computeSankeyLayout({
+    const layout = computeFlowChartLayout({
       ...BASE,
       nodes: [{ id: "a" }, { id: "x" }],
       links: [
@@ -115,22 +115,22 @@ describe("computeSankeyLayout", () => {
 
   it("rejects unknown endpoints, self links, duplicate ids, and cycles", () => {
     assert.throws(() =>
-      computeSankeyLayout({
+      computeFlowChartLayout({
         ...BASE,
         links: [{ source: "a", target: "ghost", value: 1 }],
       }),
     )
     assert.throws(() =>
-      computeSankeyLayout({
+      computeFlowChartLayout({
         ...BASE,
         links: [{ source: "a", target: "a", value: 1 }],
       }),
     )
     assert.throws(() =>
-      computeSankeyLayout({ ...BASE, nodes: [...BASE.nodes, { id: "a" }] }),
+      computeFlowChartLayout({ ...BASE, nodes: [...BASE.nodes, { id: "a" }] }),
     )
     assert.throws(() =>
-      computeSankeyLayout({
+      computeFlowChartLayout({
         ...BASE,
         links: [
           { source: "a", target: "x", value: 1 },
@@ -142,7 +142,7 @@ describe("computeSankeyLayout", () => {
   })
 
   it("survives a zero-height box without NaN geometry", () => {
-    const layout = computeSankeyLayout({ ...BASE, height: 0 })
+    const layout = computeFlowChartLayout({ ...BASE, height: 0 })
     for (const node of layout.nodes) {
       assert.ok(Number.isFinite(node.y) && Number.isFinite(node.height))
     }
@@ -154,18 +154,18 @@ describe("computeSankeyLayout", () => {
 
 describe("ribbon paths", () => {
   it("draws a closed band between the bar edges", () => {
-    const layout = computeSankeyLayout(BASE)
+    const layout = computeFlowChartLayout(BASE)
     const link = layout.links[0]
-    const path = sankeyRibbonPath(link, 0.6)
+    const path = flowChartRibbonPath(link, 0.6)
     assert.ok(path.startsWith(`M ${link.sourceX} ${link.sourceY}`))
     assert.ok(path.endsWith("Z"))
     assert.ok(path.includes(`${link.targetX} ${link.targetY}`))
   })
 
   it("centerline runs through the ribbon middle", () => {
-    const layout = computeSankeyLayout(BASE)
+    const layout = computeFlowChartLayout(BASE)
     const link = layout.links[0]
-    const path = sankeyCenterlinePath(link)
+    const path = flowChartCenterlinePath(link)
     assert.ok(
       path.startsWith(`M ${link.sourceX} ${link.sourceY + link.thickness / 2}`),
     )

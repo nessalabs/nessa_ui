@@ -1,13 +1,13 @@
-/** @responsibility Pure Sankey geometry: assigns nodes to columns, scales heights to flow values, stacks columns to fill the box, allocates link slots along each node, and draws ribbon paths. No React, no DOM. */
+/** @responsibility Pure flow-diagram (Sankey) geometry: assigns nodes to columns, scales heights to flow values, stacks columns to fill the box, allocates link slots along each node, and draws ribbon paths. No React, no DOM. */
 
 /** A flow endpoint supplied by the host. */
-export interface SankeyNodeInput {
+export interface FlowChartNodeInput {
   /** Unique id links refer to. */
   id: string
 }
 
 /** A weighted flow between two nodes. */
-export interface SankeyLinkInput {
+export interface FlowChartLinkInput {
   /** Id of the node the flow leaves. */
   source: string
   /** Id of the node the flow enters. */
@@ -17,12 +17,12 @@ export interface SankeyLinkInput {
 }
 
 /** How nodes without outgoing flow choose their column. */
-export type SankeyAlign = "left" | "justify"
+export type FlowChartAlign = "left" | "justify"
 
 /** Inputs the layout is computed from. */
-export interface SankeyLayoutOptions {
-  nodes: readonly SankeyNodeInput[]
-  links: readonly SankeyLinkInput[]
+export interface FlowChartLayoutOptions {
+  nodes: readonly FlowChartNodeInput[]
+  links: readonly FlowChartLinkInput[]
   /** Pixel width of the area the diagram fills. */
   width: number
   /** Pixel height of the area the diagram fills. */
@@ -35,11 +35,11 @@ export interface SankeyLayoutOptions {
    * "justify" (default) pushes nodes without outgoing links into the last
    * column; "left" keeps every node at the earliest column its inputs allow.
    */
-  align?: SankeyAlign
+  align?: FlowChartAlign
 }
 
 /** A positioned node bar. */
-export interface SankeyLayoutNode {
+export interface FlowChartLayoutNode {
   id: string
   /** Zero-based column, left to right. */
   column: number
@@ -56,7 +56,7 @@ export interface SankeyLayoutNode {
 }
 
 /** A positioned ribbon between two node bars. */
-export interface SankeyLayoutLink {
+export interface FlowChartLayoutLink {
   /** Index into the original `links` input. */
   index: number
   source: string
@@ -75,9 +75,9 @@ export interface SankeyLayoutLink {
 }
 
 /** The computed diagram geometry. */
-export interface SankeyLayout {
-  nodes: SankeyLayoutNode[]
-  links: SankeyLayoutLink[]
+export interface FlowChartLayout {
+  nodes: FlowChartLayoutNode[]
+  links: FlowChartLayoutLink[]
   columnCount: number
   /** Sum of node values per column, in column order. */
   columnTotals: number[]
@@ -98,12 +98,12 @@ interface NodeState {
  * fix, not states to render.
  */
 function assignColumns(
-  nodes: readonly SankeyNodeInput[],
-  links: readonly SankeyLinkInput[],
+  nodes: readonly FlowChartNodeInput[],
+  links: readonly FlowChartLinkInput[],
 ): Map<string, number> {
   const known = new Set(nodes.map((node) => node.id))
   if (known.size !== nodes.length) {
-    throw new Error("SankeyChart: duplicate node id")
+    throw new Error("FlowChart: duplicate node id")
   }
   const outgoing = new Map<string, string[]>()
   const indegree = new Map<string, number>()
@@ -114,11 +114,11 @@ function assignColumns(
   for (const link of links) {
     if (!known.has(link.source) || !known.has(link.target)) {
       throw new Error(
-        `SankeyChart: link ${link.source} → ${link.target} references an unknown node`,
+        `FlowChart: link ${link.source} → ${link.target} references an unknown node`,
       )
     }
     if (link.source === link.target) {
-      throw new Error(`SankeyChart: link ${link.source} targets itself`)
+      throw new Error(`FlowChart: link ${link.source} targets itself`)
     }
     if (link.value <= 0) continue
     outgoing.get(link.source)!.push(link.target)
@@ -146,7 +146,7 @@ function assignColumns(
     }
   }
   if (visited !== nodes.length) {
-    throw new Error("SankeyChart: the links form a cycle")
+    throw new Error("FlowChart: the links form a cycle")
   }
   return columns
 }
@@ -157,7 +157,7 @@ function assignColumns(
  * column and stretched vertically so every column fills the height, with
  * the slack shared evenly between its gaps.
  */
-export function computeSankeyLayout(options: SankeyLayoutOptions): SankeyLayout {
+export function computeFlowChartLayout(options: FlowChartLayoutOptions): FlowChartLayout {
   const { nodes, links, nodeWidth, nodeGap } = options
   const width = Math.max(options.width, nodeWidth)
   const height = Math.max(options.height, 0)
@@ -218,7 +218,7 @@ export function computeSankeyLayout(options: SankeyLayoutOptions): SankeyLayout 
   const columnGap =
     columnCount > 1 ? (width - nodeWidth * columnCount) / (columnCount - 1) : 0
 
-  const positioned = new Map<string, SankeyLayoutNode>()
+  const positioned = new Map<string, FlowChartLayoutNode>()
   const columnTotals: number[] = []
   byColumn.forEach((column, columnIndex) => {
     const total = column.reduce((sum, node) => sum + node.value, 0)
@@ -275,7 +275,7 @@ export function computeSankeyLayout(options: SankeyLayoutOptions): SankeyLayout 
     inCursor.set(link.target, offset + link.value * scale)
   }
 
-  const layoutLinks: SankeyLayoutLink[] = activeLinks.map((link) => {
+  const layoutLinks: FlowChartLayoutLink[] = activeLinks.map((link) => {
     const source = positioned.get(link.source)!
     const target = positioned.get(link.target)!
     return {
@@ -304,8 +304,8 @@ export function computeSankeyLayout(options: SankeyLayoutOptions): SankeyLayout 
  * bezier control points from the bar edges (0, straight taper) toward the
  * horizontal midpoint (1, the classic S curve).
  */
-export function sankeyRibbonPath(
-  link: SankeyLayoutLink,
+export function flowChartRibbonPath(
+  link: FlowChartLayoutLink,
   curvature: number,
 ): string {
   const { sourceX, targetX, sourceY, targetY } = link
@@ -330,7 +330,7 @@ export function sankeyRibbonPath(
  * SVG path for the ribbon's center line — the emphasis stroke drawn along a
  * selected link.
  */
-export function sankeyCenterlinePath(link: SankeyLayoutLink): string {
+export function flowChartCenterlinePath(link: FlowChartLayoutLink): string {
   const { sourceX, targetX, sourceY, targetY } = link
   const thickness = Math.max(link.thickness, 1)
   const mid = (sourceX + targetX) / 2

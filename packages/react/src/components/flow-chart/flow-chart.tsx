@@ -1,0 +1,577 @@
+"use client"
+
+/** @responsibility Renders a flow (Sankey) diagram — node bars, proportional ribbons, and labels — that fills its host's box, with hover emphasis and controllable link selection. Geometry comes from flow-chart-layout. */
+
+import * as React from "react"
+
+import { cn } from "@/lib/utils"
+
+import {
+  computeFlowChartLayout,
+  flowChartRibbonPath,
+  type FlowChartAlign,
+  type FlowChartLayout,
+  type FlowChartLayoutLink,
+  type FlowChartLayoutNode,
+} from "./flow-chart-layout"
+
+/** A flow endpoint. */
+export interface FlowChartNode {
+  /** Unique id links refer to. */
+  id: string
+  /** Text shown beside the node bar. Defaults to the id. */
+  label?: string
+  /**
+   * Optional CSS color for the bar and the ribbons leaving it. Omitted,
+   * nodes cycle through the chart's `palette`.
+   */
+  color?: string
+}
+
+/**
+ * Soft tints node bars cycle through by default — dilute enough that
+ * overlapping ribbons stay readable, distinct enough that each origin's
+ * flows read as one family.
+ */
+export const flowChartPalette: readonly string[] = Object.freeze([
+  "oklch(0.85 0.08 168)",
+  "oklch(0.82 0.09 300)",
+  "oklch(0.88 0.09 92)",
+  "oklch(0.83 0.07 250)",
+  "oklch(0.85 0.08 350)",
+  "oklch(0.84 0.08 200)",
+  "oklch(0.86 0.09 55)",
+])
+
+/** A weighted flow between two nodes. */
+export interface FlowChartLink {
+  /**
+   * Stable id for selection. Defaults to `${source}→${target}`, so parallel
+   * links between the same pair need explicit ids.
+   */
+  id?: string
+  source: string
+  target: string
+  value: number
+}
+
+/** Everything known about a node when a label or detail is rendered. */
+export interface FlowChartNodeContext {
+  node: FlowChartNode
+  /** Flow through the node: max of incoming and outgoing sums. */
+  value: number
+  inValue: number
+  outValue: number
+  /** Zero-based column the node landed in. */
+  column: number
+  columnCount: number
+  /** Sum of node values in this node's column. */
+  columnTotal: number
+}
+
+/** Properties accepted by the FlowChart. */
+export interface FlowChartProps
+  extends Omit<React.ComponentProps<"div">, "onSelect"> {
+  nodes: readonly FlowChartNode[]
+  links: readonly FlowChartLink[]
+  /** Pixel width of each node bar. */
+  nodeWidth?: number
+  /** Minimum vertical gap between bars in a column. */
+  nodeGap?: number
+  /** Ribbon bend, 0 (straight taper) to 1 (full S curve). */
+  curvature?: number
+  /** Column placement for nodes without outgoing flow. */
+  align?: FlowChartAlign
+  /**
+   * Width of the label gutters reserved left and right of the diagram.
+   * Zero hides the labels entirely.
+   */
+  labelWidth?: number
+  /** Formats a flow value wherever one is shown. */
+  formatValue?: (value: number) => string
+  /**
+   * Second label line under a node's name — defaults to the formatted node
+   * value. Return null to drop the line for that node.
+   */
+  renderNodeDetail?: (context: FlowChartNodeContext) => React.ReactNode
+  /** Accessible name for a link. Defaults to "source to target, value". */
+  linkLabel?: (link: FlowChartLink) => string
+  /**
+   * Tints nodes cycle through in input order; a node's own `color` wins.
+   * Pass null for the all-neutral wash.
+   */
+  palette?: readonly string[] | null
+  /** Called as the pointer enters or leaves a ribbon. */
+  onHoveredLinkChange?: (
+    linkId: string | null,
+    link: FlowChartLink | null,
+  ) => void
+  /**
+   * Arbitrary content floated beside the pointer while a ribbon or bar is
+   * hovered — a stat line, a Card, anything. Return null to skip a
+   * particular hover.
+   */
+  renderHoverDetail?: (hover: FlowChartHoverContext) => React.ReactNode
+  /** Controlled selected link ids; empty for no selection. */
+  selectedLinkIds?: readonly string[]
+  /** Initial selection when uncontrolled. */
+  defaultSelectedLinkIds?: readonly string[]
+  /**
+   * Called when the selection changes. A plain click (or Enter or Space)
+   * selects just that link; with Command or Ctrl held it toggles the link
+   * into the existing selection instead.
+   */
+  onSelectedLinksChange?: (
+    linkIds: string[],
+    links: FlowChartLink[],
+  ) => void
+}
+
+/** What the pointer is over when hover detail is rendered. */
+export type FlowChartHoverContext =
+  | {
+      kind: "link"
+      linkId: string
+      link: FlowChartLink
+      source: FlowChartNode
+      target: FlowChartNode
+    }
+  | { kind: "node"; node: FlowChartNode; context: FlowChartNodeContext }
+
+/** Emphasis a bar, ribbon, or label is drawn with. */
+type FlowChartEmphasis = "rest" | "active" | "dim"
+
+function linkIdOf(link: FlowChartLink): string {
+  return link.id ?? `${link.source}→${link.target}`
+}
+
+function useMeasuredBox(ref: React.RefObject<HTMLElement | null>) {
+  const [box, setBox] = React.useState<{ width: number; height: number } | null>(
+    null,
+  )
+  React.useLayoutEffect(() => {
+    const element = ref.current
+    if (!element) return
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[entries.length - 1].contentRect
+      const width = Math.round(rect.width)
+      const height = Math.round(rect.height)
+      setBox((previous) =>
+        previous && previous.width === width && previous.height === height
+          ? previous
+          : { width, height },
+      )
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [ref])
+  return box
+}
+
+const RIBBON_CLASSES = cn(
+  "cursor-pointer fill-[var(--nessa-flow-chart-color,var(--muted-foreground))] opacity-15 outline-none",
+  "transition-opacity [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
+  "hover:opacity-35",
+  "data-[emphasis=active]:opacity-55 data-[emphasis=dim]:opacity-[0.06] data-[emphasis=dim]:hover:opacity-25",
+  // Tinted ribbons run a stronger ramp: the dilute pigments read paler
+  // than the gray wash at equal opacity.
+  "data-[tinted=true]:opacity-50 data-[tinted=true]:hover:opacity-75",
+  "data-[tinted=true]:data-[emphasis=active]:opacity-90 data-[tinted=true]:data-[emphasis=dim]:opacity-15 data-[tinted=true]:data-[emphasis=dim]:hover:opacity-40",
+  "focus-visible:stroke-ring focus-visible:stroke-2",
+)
+
+const BAR_CLASSES = cn(
+  "fill-[var(--nessa-flow-chart-color,var(--muted-foreground))] opacity-45",
+  "transition-opacity [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
+  "data-[emphasis=active]:fill-[var(--nessa-flow-chart-color,var(--foreground))] data-[emphasis=active]:opacity-100 data-[emphasis=dim]:opacity-30",
+  "data-[tinted=true]:opacity-95 data-[tinted=true]:data-[emphasis=active]:opacity-100 data-[tinted=true]:data-[emphasis=dim]:opacity-40",
+)
+
+const LABEL_CLASSES = cn(
+  "pointer-events-none absolute flex -translate-y-1/2 flex-col justify-center",
+  "nessa-text-3 leading-tight text-muted-foreground",
+  "transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
+  "data-[emphasis=active]:font-medium data-[emphasis=active]:text-foreground",
+)
+
+/**
+ * A flow diagram: node bars in columns joined by ribbons whose thickness is
+ * proportional to the flow they carry. The chart fills the box the host
+ * gives it on both axes. Ribbons are keyboard-focusable buttons; hovering a
+ * ribbon or bar isolates the connected flow, and clicking (or Enter or
+ * Space) selects a link so the isolation sticks — with Command or Ctrl
+ * held, further links toggle into the selection. Selection is
+ * host-controllable through `selectedLinkIds`; Escape or a background
+ * click clears it. Node bars take soft tints from the palette and every
+ * ribbon inherits its source's tint.
+ */
+function FlowChart({
+  nodes,
+  links,
+  nodeWidth = 12,
+  nodeGap = 12,
+  curvature = 0.7,
+  align = "justify",
+  labelWidth = 132,
+  formatValue = (value) => String(value),
+  renderNodeDetail,
+  linkLabel,
+  palette = flowChartPalette,
+  onHoveredLinkChange,
+  renderHoverDetail,
+  selectedLinkIds,
+  defaultSelectedLinkIds,
+  onSelectedLinksChange,
+  className,
+  ...props
+}: FlowChartProps) {
+  const plotRef = React.useRef<HTMLDivElement>(null)
+  const box = useMeasuredBox(plotRef)
+
+  const [hovered, setHovered] = React.useState<
+    { kind: "link"; id: string } | { kind: "node"; id: string } | null
+  >(null)
+  // Plot-relative pointer position, tracked only while hover detail is on.
+  const [pointer, setPointer] = React.useState<{ x: number; y: number } | null>(
+    null,
+  )
+  const [uncontrolledSelection, setUncontrolledSelection] = React.useState<
+    readonly string[]
+  >(defaultSelectedLinkIds ?? [])
+  const selection = selectedLinkIds ?? uncontrolledSelection
+  const selectionSet = React.useMemo(() => new Set(selection), [selection])
+
+  const nodeById = React.useMemo(
+    () => new Map(nodes.map((node) => [node.id, node])),
+    [nodes],
+  )
+
+  const layout: FlowChartLayout | null = React.useMemo(() => {
+    if (!box || box.width <= 0 || box.height <= 0) return null
+    return computeFlowChartLayout({
+      nodes,
+      links,
+      width: box.width,
+      height: box.height,
+      nodeWidth,
+      nodeGap,
+      align,
+    })
+  }, [box, nodes, links, nodeWidth, nodeGap, align])
+
+  // Nodes cycle through the palette in input order; a node's own color
+  // always wins.
+  const colorOf = React.useMemo(() => {
+    const colors = new Map<string, string>()
+    let slot = 0
+    for (const node of nodes) {
+      if (node.color) {
+        colors.set(node.id, node.color)
+      } else if (palette && palette.length > 0) {
+        colors.set(node.id, palette[slot % palette.length])
+        slot += 1
+      }
+    }
+    return colors
+  }, [nodes, palette])
+
+  const applySelection = (next: string[]) => {
+    if (selectedLinkIds === undefined) setUncontrolledSelection(next)
+    const chosen = new Set(next)
+    onSelectedLinksChange?.(
+      next,
+      links.filter((link) => chosen.has(linkIdOf(link))),
+    )
+  }
+
+  /**
+   * A plain activation selects just this link (or clears a lone
+   * selection of it); an additive one — Command or Ctrl held — toggles
+   * the link within the existing selection.
+   */
+  const activateLink = (link: FlowChartLink, additive: boolean) => {
+    const id = linkIdOf(link)
+    if (additive) {
+      applySelection(
+        selectionSet.has(id)
+          ? selection.filter((candidate) => candidate !== id)
+          : [...selection, id],
+      )
+      return
+    }
+    applySelection(
+      selection.length === 1 && selection[0] === id ? [] : [id],
+    )
+  }
+
+  const linkEmphasis = (link: FlowChartLayoutLink): FlowChartEmphasis => {
+    const id = linkIdOf(links[link.index])
+    if (selectionSet.has(id)) return "active"
+    if (hovered?.kind === "link") {
+      return hovered.id === id ? "active" : "dim"
+    }
+    if (hovered?.kind === "node") {
+      return link.source === hovered.id || link.target === hovered.id
+        ? "active"
+        : "dim"
+    }
+    return selection.length > 0 ? "dim" : "rest"
+  }
+
+  const nodeEmphasis = (node: FlowChartLayoutNode): FlowChartEmphasis => {
+    const engaged = hovered !== null || selection.length > 0
+    if (!engaged) return "rest"
+    if (hovered?.kind === "node" && hovered.id === node.id) return "active"
+    const touched = layout?.links.some(
+      (link) =>
+        (link.source === node.id || link.target === node.id) &&
+        linkEmphasis(link) === "active",
+    )
+    return touched ? "active" : "dim"
+  }
+
+  const defaultLinkLabel = (link: FlowChartLink) => {
+    const sourceLabel = nodeById.get(link.source)?.label ?? link.source
+    const targetLabel = nodeById.get(link.target)?.label ?? link.target
+    return `${sourceLabel} to ${targetLabel}, ${formatValue(link.value)}`
+  }
+
+  const nodeContext = (node: FlowChartLayoutNode): FlowChartNodeContext => ({
+    node: nodeById.get(node.id)!,
+    value: node.value,
+    inValue: node.inValue,
+    outValue: node.outValue,
+    column: node.column,
+    columnCount: layout!.columnCount,
+    columnTotal: layout!.columnTotals[node.column],
+  })
+
+  const hoverDetail =
+    renderHoverDetail && hovered && layout
+      ? (() => {
+          if (hovered.kind === "link") {
+            const link = links.find(
+              (candidate) => linkIdOf(candidate) === hovered.id,
+            )
+            if (!link) return null
+            return renderHoverDetail({
+              kind: "link",
+              linkId: hovered.id,
+              link,
+              source: nodeById.get(link.source)!,
+              target: nodeById.get(link.target)!,
+            })
+          }
+          const layoutNode = layout.nodes.find(
+            (candidate) => candidate.id === hovered.id,
+          )
+          if (!layoutNode) return null
+          return renderHoverDetail({
+            kind: "node",
+            node: nodeById.get(hovered.id)!,
+            context: nodeContext(layoutNode),
+          })
+        })()
+      : null
+
+  return (
+    <div
+      data-slot="flow-chart"
+      className={cn(
+        "relative flex h-full min-h-0 w-full min-w-0 font-sans text-foreground",
+        className,
+      )}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && selection.length > 0) {
+          event.stopPropagation()
+          applySelection([])
+        }
+      }}
+      {...props}
+    >
+      <div
+        ref={plotRef}
+        className="mx-(--nessa-flow-chart-label-width) relative min-h-0 min-w-0 flex-1"
+        style={
+          {
+            "--nessa-flow-chart-label-width": `${labelWidth > 0 ? labelWidth : 0}px`,
+          } as React.CSSProperties
+        }
+      >
+        {layout ? (
+          <svg
+            className="absolute inset-0 size-full overflow-visible"
+            width={box!.width}
+            height={box!.height}
+            onPointerDown={(event) => {
+              // A press on empty background clears the selection.
+              if (
+                event.target === event.currentTarget &&
+                selection.length > 0
+              ) {
+                applySelection([])
+              }
+            }}
+            onPointerMove={
+              renderHoverDetail
+                ? (event) => {
+                    const rect = event.currentTarget.getBoundingClientRect()
+                    setPointer({
+                      x: event.clientX - rect.left,
+                      y: event.clientY - rect.top,
+                    })
+                  }
+                : undefined
+            }
+            onPointerLeave={renderHoverDetail ? () => setPointer(null) : undefined}
+          >
+            {layout.links.map((layoutLink) => {
+              const link = links[layoutLink.index]
+              const id = linkIdOf(link)
+              const color = colorOf.get(link.source)
+              return (
+                <path
+                  key={id}
+                  data-slot="flow-chart-link"
+                  data-link-id={id}
+                  data-tinted={color ? "true" : "false"}
+                  data-emphasis={linkEmphasis(layoutLink)}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={selectionSet.has(id)}
+                  aria-label={(linkLabel ?? defaultLinkLabel)(link)}
+                  d={flowChartRibbonPath(layoutLink, curvature)}
+                  className={RIBBON_CLASSES}
+                  style={
+                    color
+                      ? ({ "--nessa-flow-chart-color": color } as React.CSSProperties)
+                      : undefined
+                  }
+                  onPointerEnter={() => {
+                    setHovered({ kind: "link", id })
+                    onHoveredLinkChange?.(id, link)
+                  }}
+                  onPointerLeave={() => {
+                    setHovered((previous) =>
+                      previous?.kind === "link" && previous.id === id
+                        ? null
+                        : previous,
+                    )
+                    onHoveredLinkChange?.(null, null)
+                  }}
+                  onClick={(event) =>
+                    activateLink(link, event.metaKey || event.ctrlKey)
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault()
+                      activateLink(link, event.metaKey || event.ctrlKey)
+                    }
+                  }}
+                />
+              )
+            })}
+            {layout.nodes.map((node) => (
+              <rect
+                key={node.id}
+                data-slot="flow-chart-node"
+                data-node-id={node.id}
+                data-tinted={colorOf.has(node.id) ? "true" : "false"}
+                data-emphasis={nodeEmphasis(node)}
+                aria-hidden="true"
+                x={node.x}
+                y={node.y}
+                width={node.width}
+                height={Math.max(node.height, 1)}
+                rx={Math.min(4, node.width / 2)}
+                className={BAR_CLASSES}
+                style={
+                  colorOf.has(node.id)
+                    ? ({
+                        "--nessa-flow-chart-color": colorOf.get(node.id),
+                      } as React.CSSProperties)
+                    : undefined
+                }
+                onPointerEnter={() =>
+                  setHovered({ kind: "node", id: node.id })
+                }
+                onPointerLeave={() =>
+                  setHovered((previous) =>
+                    previous?.kind === "node" && previous.id === node.id
+                      ? null
+                      : previous,
+                  )
+                }
+              />
+            ))}
+          </svg>
+        ) : null}
+        {layout && labelWidth > 0
+          ? layout.nodes.map((node) => {
+              const input = nodeById.get(node.id)!
+              const context = nodeContext(node)
+              const detail = renderNodeDetail
+                ? renderNodeDetail(context)
+                : formatValue(node.value)
+              const first = node.column === 0
+              const last = node.column === layout.columnCount - 1
+              return (
+                <div
+                  key={node.id}
+                  data-slot="flow-chart-label"
+                  data-emphasis={nodeEmphasis(node)}
+                  className={cn(
+                    LABEL_CLASSES,
+                    first ? "items-end text-right" : "items-start text-left",
+                    // Sink labels read inline — "Browsing · 22%" — while
+                    // source and middle labels stack name over detail.
+                    last && "flex-row items-baseline gap-1",
+                  )}
+                  style={{
+                    top: node.y + Math.max(node.height, 1) / 2,
+                    width: labelWidth - 8,
+                    left: first
+                      ? node.x - labelWidth
+                      : node.x + node.width + 8,
+                    // Middle-column labels overlay the ribbons to the
+                    // right of their bar; only the outer columns get the
+                    // reserved gutters.
+                    maxWidth: first || last ? undefined : labelWidth - 8,
+                  }}
+                >
+                  <span className="max-w-full truncate">
+                    {input.label ?? input.id}
+                  </span>
+                  {detail == null ? null : (
+                    <span className="nessa-text-2 shrink-0 truncate">
+                      {last ? <>&middot; {detail}</> : detail}
+                    </span>
+                  )}
+                </div>
+              )
+            })
+          : null}
+        {hoverDetail != null && pointer && box ? (
+          <div
+            data-slot="flow-chart-hover-detail"
+            className={cn(
+              "pointer-events-none absolute w-max",
+              // Flip away from the pointer near the plot's far edges so
+              // the detail stays inside the chart.
+              pointer.x > box.width / 2 && "-translate-x-full",
+              pointer.y > box.height / 2 && "-translate-y-full",
+            )}
+            style={{
+              left: pointer.x + (pointer.x > box.width / 2 ? -12 : 12),
+              top: pointer.y + (pointer.y > box.height / 2 ? -12 : 12),
+            }}
+          >
+            {hoverDetail}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+export { FlowChart, linkIdOf as flowChartLinkId }
