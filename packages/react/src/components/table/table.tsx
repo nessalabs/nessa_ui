@@ -100,7 +100,13 @@ function Table({
   return (
     <div
       data-slot="table-scroll-frame"
-      className="relative w-full min-w-0"
+      // The flex column with min-h-0 on frame and container gives the scroll
+      // container a real height path: when an ancestor (a TableShell inside a
+      // height-capped host, say) constrains the frame, the container shrinks
+      // with it and scrolls, instead of percentage caps resolving against an
+      // auto-height frame and silently clipping. Auto-height usages lay out
+      // exactly as before.
+      className="relative flex min-h-0 w-full min-w-0 flex-col"
     >
       <div
         ref={containerRef}
@@ -122,7 +128,7 @@ function Table({
           // beside `overflow-x-auto`, which is what lets a host cap the
           // height through `containerClassName` and get a scrolling body.
           // Setting it explicitly to `visible` or `hidden` would clip rows.
-          "peer w-full min-w-0 overflow-x-auto outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
+          "peer min-h-0 w-full min-w-0 overflow-x-auto outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
           tableScrollbarClassName,
           containerClassName,
         )}

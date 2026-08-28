@@ -26,7 +26,11 @@ function FilePreviewImage({ file }: FilePreviewRendererProps) {
   }, [])
 
   if (status === "error") {
-    return <FilePreviewFallback message="Image failed to load" />
+    // Covers both a dead source and a format this engine cannot decode
+    // (e.g. HEIC outside WebKit).
+    return (
+      <FilePreviewFallback message="Image failed to load or isn't supported by this browser" />
+    )
   }
   return (
     <div

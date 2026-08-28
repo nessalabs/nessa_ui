@@ -64,7 +64,20 @@ describe("detectFileKind", () => {
       "image",
     )
     assert.equal(detectFileKind({ src: "data:application/pdf;base64,AAAA" }), "pdf")
-    assert.equal(detectFileKind({ src: "data:text/plain,hello.png" }), "unknown")
+    assert.equal(detectFileKind({ src: "data:text/plain,hello.png" }), "text")
+    assert.equal(
+      detectFileKind({ src: "data:application/zstd,payload.png" }),
+      "unknown",
+    )
+    // A generic data-URL media type falls through to the name, never to the
+    // payload's dots.
+    assert.equal(
+      detectFileKind({
+        src: "data:application/octet-stream;base64,AAAA",
+        name: "notes.md",
+      }),
+      "markdown",
+    )
   })
 
   test("generic MIME types fall through to the extension", () => {
@@ -72,6 +85,59 @@ describe("detectFileKind", () => {
       detectFileKind({ mimeType: "application/octet-stream", name: "a.gif" }),
       "image",
     )
+  })
+
+  test("media MIME prefixes map to video and audio", () => {
+    assert.equal(detectFileKind({ mimeType: "video/mp4" }), "video")
+    assert.equal(detectFileKind({ mimeType: "audio/mpeg" }), "audio")
+  })
+
+  test("text-family MIME types map to their specific kinds first", () => {
+    assert.equal(detectFileKind({ mimeType: "text/markdown" }), "markdown")
+    assert.equal(detectFileKind({ mimeType: "text/csv" }), "csv")
+    assert.equal(
+      detectFileKind({ mimeType: "text/tab-separated-values" }),
+      "csv",
+    )
+    assert.equal(detectFileKind({ mimeType: "application/json" }), "json")
+    assert.equal(detectFileKind({ mimeType: "application/geo+json" }), "json")
+    assert.equal(detectFileKind({ mimeType: "text/plain" }), "text")
+    assert.equal(detectFileKind({ mimeType: "application/xml" }), "text")
+  })
+
+  test("Office MIME types and extensions are detection-only kinds", () => {
+    assert.equal(
+      detectFileKind({
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      }),
+      "docx",
+    )
+    assert.equal(detectFileKind({ name: "report.docx" }), "docx")
+    assert.equal(detectFileKind({ name: "book.xls" }), "xlsx")
+    assert.equal(detectFileKind({ name: "deck.pptx" }), "pptx")
+  })
+
+  test("new extensions resolve specific kinds before the text table", () => {
+    assert.equal(detectFileKind({ name: "clip.webm" }), "video")
+    assert.equal(detectFileKind({ name: "song.flac" }), "audio")
+    assert.equal(detectFileKind({ name: "README.md" }), "markdown")
+    assert.equal(detectFileKind({ name: "config.json" }), "json")
+    assert.equal(detectFileKind({ name: "data.tsv" }), "csv")
+    assert.equal(detectFileKind({ name: "main.tsx" }), "text")
+    assert.equal(detectFileKind({ name: "notes.txt" }), "text")
+  })
+
+  test("HEIC/HEIF count as images (WebKit renders them natively)", () => {
+    assert.equal(detectFileKind({ name: "IMG_0042.HEIC" }), "image")
+    assert.equal(detectFileKind({ mimeType: "image/heif" }), "image")
+  })
+
+  test("camera RAW is a detection-only kind, even under image/* MIME", () => {
+    assert.equal(detectFileKind({ name: "shot.dng" }), "raw")
+    assert.equal(detectFileKind({ name: "shot.CR2" }), "raw")
+    assert.equal(detectFileKind({ mimeType: "image/x-adobe-dng" }), "raw")
+    assert.equal(detectFileKind({ mimeType: "image/x-sony-arw" }), "raw")
   })
 
   test("returns unknown without a recognizable signal", () => {
