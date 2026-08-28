@@ -259,6 +259,14 @@ function FlowChart({
   const [hovered, setHovered] = React.useState<
     { kind: "link"; id: string } | { kind: "node"; id: string } | null
   >(null)
+  // Keyboard focus isolates a flow exactly like hover, so Tabbing through
+  // the ribbons reads the same as sweeping them with the pointer.
+  const [focusedLinkId, setFocusedLinkId] = React.useState<string | null>(null)
+  const highlighted =
+    hovered ??
+    (focusedLinkId !== null
+      ? ({ kind: "link", id: focusedLinkId } as const)
+      : null)
   // Plot-relative pointer position, tracked only while hover detail is on.
   const [pointer, setPointer] = React.useState<{ x: number; y: number } | null>(
     null,
@@ -356,11 +364,11 @@ function FlowChart({
   const linkEmphasis = (link: FlowChartLayoutLink): FlowChartEmphasis => {
     const id = linkIdOf(links[link.index])
     if (selectionSet.has(id)) return "active"
-    if (hovered?.kind === "link") {
-      return hovered.id === id ? "active" : "dim"
+    if (highlighted?.kind === "link") {
+      return highlighted.id === id ? "active" : "dim"
     }
-    if (hovered?.kind === "node") {
-      return link.source === hovered.id || link.target === hovered.id
+    if (highlighted?.kind === "node") {
+      return link.source === highlighted.id || link.target === highlighted.id
         ? "active"
         : "dim"
     }
@@ -368,9 +376,10 @@ function FlowChart({
   }
 
   const nodeEmphasis = (node: FlowChartLayoutNode): FlowChartEmphasis => {
-    const engaged = hovered !== null || selection.length > 0
+    const engaged = highlighted !== null || selection.length > 0
     if (!engaged) return "rest"
-    if (hovered?.kind === "node" && hovered.id === node.id) return "active"
+    if (highlighted?.kind === "node" && highlighted.id === node.id)
+      return "active"
     const touched = layout?.links.some(
       (link) =>
         (link.source === node.id || link.target === node.id) &&
@@ -548,6 +557,12 @@ function FlowChart({
                     paint
                       ? ({ "--nessa-flow-chart-color": paint } as React.CSSProperties)
                       : undefined
+                  }
+                  onFocus={() => setFocusedLinkId(id)}
+                  onBlur={() =>
+                    setFocusedLinkId((previous) =>
+                      previous === id ? null : previous,
+                    )
                   }
                   onPointerEnter={() => {
                     setHovered({ kind: "link", id })

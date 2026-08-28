@@ -109,7 +109,19 @@ export const MonthlyBudget: Story = {
     await userEvent.keyboard("{Escape}")
     await expect(ribbon).toHaveAttribute("aria-pressed", "false")
     await expect(other).toHaveAttribute("aria-pressed", "false")
+    // The clicked ribbon still holds keyboard focus, which isolates its
+    // flow just like hover — blur it to reach the true resting state.
     await userEvent.unhover(ribbon)
+    ;(ribbon as unknown as SVGElement).blur()
+    await waitFor(() =>
+      expect(parseFloat(getComputedStyle(other).opacity)).toBeCloseTo(0.5, 1),
+    )
+    // Keyboard focus alone isolates the flow the way hover does.
+    ;(ribbon as unknown as SVGElement).focus()
+    await waitFor(() =>
+      expect(parseFloat(getComputedStyle(other).opacity)).toBeLessThan(0.2),
+    )
+    ;(ribbon as unknown as SVGElement).blur()
     await waitFor(() =>
       expect(parseFloat(getComputedStyle(other).opacity)).toBeCloseTo(0.5, 1),
     )
