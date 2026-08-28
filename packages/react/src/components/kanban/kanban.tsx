@@ -1547,7 +1547,14 @@ function KanbanBoard({
         {...props}
         ref={composedRef}
         data-slot="kanban-board"
-        className={cn("relative flex items-start gap-4 pe-(--kanban-reserved-column)", className)}
+        // The reserve class joins after the consumer's className, and only
+        // while a reserve is active, so a consumer padding utility can
+        // neither merge it away nor linger under an unset custom property.
+        className={cn(
+          "relative flex items-start gap-4",
+          className,
+          reservedColumnWidth > 0 && "pe-(--kanban-reserved-column)",
+        )}
         style={
           reservedColumnWidth > 0
             ? ({ ...props.style, "--kanban-reserved-column": `${reservedColumnWidth}px` } as React.CSSProperties)

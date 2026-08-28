@@ -57,14 +57,27 @@ test("literal color values inside arbitrary utilities are detected", () => {
 test("named colors and paint arbitrary properties are literal color values", () => {
   assert.equal(usesLiteralColorValue("bg-[red]"), true)
   assert.equal(usesLiteralColorValue("text-[white]"), true)
+  assert.equal(usesLiteralColorValue("text-[canvasText]"), true)
   assert.equal(usesLiteralColorValue("shadow-[0_0_1px_rebeccapurple]"), true)
   assert.equal(usesLiteralColorValue("bg-[transparent]"), false)
   assert.equal(usesLiteralColorValue("text-[inherit]"), false)
+  assert.equal(usesLiteralColorValue("text-[larger]"), false)
+  assert.equal(usesLiteralColorValue("caret-[auto]"), false)
   assert.equal(usesLiteralColorValue("[color:red]"), true)
+  assert.equal(usesLiteralColorValue("[border:1px_solid_red]"), true)
+  assert.equal(usesLiteralColorValue("[outline:2px_solid_crimson]"), true)
+  assert.equal(usesLiteralColorValue("[text-decoration:underline_wavy_red]"), true)
+  assert.equal(usesLiteralColorValue("[border-inline-start-color:tan]"), true)
+  assert.equal(usesLiteralColorValue("[stop-color:red]"), true)
+  assert.equal(usesLiteralColorValue("[--brand:red]"), true)
+  assert.equal(usesLiteralColorValue("[--brand:#f00]"), true)
+  assert.equal(usesLiteralColorValue("[--brand:light-dark(red,blue)]"), true)
+  assert.equal(usesLiteralColorValue("[--nessa-rail-boost-state:1]"), false)
   assert.equal(usesLiteralColorValue("[background:linear-gradient(to_right,red,blue)]"), true)
   assert.equal(usesLiteralColorValue("[color:var(--nessa-x)]"), false)
   assert.equal(usesLiteralColorValue("[transition-duration:var(--nessa-motion-duration-fast)]"), false)
   assert.equal(usesLiteralColorValue("[scrollbar-color:var(--color-border)_transparent]"), false)
+  assert.equal(usesLiteralColorValue("[grid-area:pink]"), false)
   assert.equal(usesLiteralColorValue("fill-[url(#a1b2c3)]"), false)
   assert.equal(usesLiteralColorValue("fill-[url(#fade)]"), false)
   assert.equal(containsLiteralColor("var(--nessa-red-tone)"), false)
@@ -156,6 +169,46 @@ test("dynamically keyed style properties are surfaced instead of silently droppe
   `)
   assert.equal(unresolvableInlineStyleKeys(ast), 1)
   assert.deepEqual(forbiddenInlineStyleProperties(ast), [])
+})
+
+test("parameters and destructuring shadow same-named module objects", () => {
+  const source = `
+    const marker = { zIndex: 60 }
+    export const A = ({ marker }: { marker?: object }) => <div style={marker} />
+    export const B = (marker: object) => <div style={marker} />
+    export const C = (props: { s?: object }) => {
+      const { s } = props
+      return <div style={s} />
+    }
+  `
+  assert.deepEqual(forbiddenInlineStyleProperties(parse(source)), [])
+})
+
+test("nested map access, spread style attributes, and useMemo factories are audited", () => {
+  const nested = forbiddenInlineStyleProperties(parse(`
+    const styles = { compact: { header: { zIndex: 9999, top: 0 } } }
+    export const Component = () => <div style={styles.compact.header} />
+  `))
+  assert.deepEqual(nested, ["zIndex"])
+  const spread = forbiddenInlineStyleProperties(parse(`
+    export const Component = () => <div {...{ style: { boxShadow: "0 0 1px red" } }} />
+  `))
+  assert.deepEqual(spread, ["boxShadow"])
+  const factory = forbiddenInlineStyleProperties(parse(`
+    const makeStyle = () => ({ backgroundColor: "red", left: 0 })
+    export const Component = () => <div style={React.useMemo(makeStyle, [])} />
+  `))
+  assert.deepEqual(factory, ["backgroundColor"])
+})
+
+test("literal-color custom property values resolve through conditionals and const aliases", () => {
+  const props = literalColorCustomProperties(parse(`
+    const accent = "#ff0000"
+    export const Component = ({ hot }: { hot: boolean }) => (
+      <div style={{ "--a": hot ? "#ff0000" : "#0000ff", "--b": accent, "--c": hot ? "var(--x)" : "var(--y)" }} />
+    )
+  `))
+  assert.deepEqual([...props].sort(), ["--a", "--b"])
 })
 
 test("inline custom properties carrying literal colors are detected", () => {

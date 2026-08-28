@@ -26,7 +26,9 @@ const rawPalettePattern = new RegExp(
   `(?:^|[:!])!?(?:${COLOR_UTILITY_ROOTS.join("|")})-(?:${PALETTE_SCALES.join("|")})-\\d{2,3}${OPACITY_MODIFIER}!?$`,
 )
 
-// CSS named colors (Level 4) minus the token-neutral keywords listed in NEUTRAL_COLOR_KEYWORDS.
+// CSS named colors (Level 4) minus the token-neutral keywords (transparent,
+// currentColor, and the cascade-wide keywords), which defer to context
+// instead of naming paint and are deliberately absent from this list.
 const NAMED_COLORS = [
   "aliceblue", "antiquewhite", "aqua", "aquamarine", "azure", "beige", "bisque", "black", "blanchedalmond", "blue",
   "blueviolet", "brown", "burlywood", "cadetblue", "chartreuse", "chocolate", "coral", "cornflowerblue", "cornsilk",
@@ -45,20 +47,27 @@ const NAMED_COLORS = [
   "rebeccapurple", "red", "rosybrown", "royalblue", "saddlebrown", "salmon", "sandybrown", "seagreen", "seashell",
   "sienna", "silver", "skyblue", "slateblue", "slategray", "slategrey", "snow", "springgreen", "steelblue", "tan",
   "teal", "thistle", "tomato", "turquoise", "violet", "wheat", "white", "whitesmoke", "yellow", "yellowgreen",
+  // CSS system colors resolve to UA-theme paint, which still bypasses the token chain.
+  "canvas", "canvastext", "linktext", "visitedtext", "activetext", "buttonface", "buttontext", "buttonborder",
+  "field", "fieldtext", "highlight", "highlighttext", "selecteditem", "selecteditemtext", "mark", "marktext",
+  "graytext", "accentcolor", "accentcolortext",
 ] as const
-
-// Keywords that defer to the cascade or current context instead of naming a color.
-const NEUTRAL_COLOR_KEYWORDS = new Set(["transparent", "currentcolor", "inherit", "initial", "unset", "revert", "none"])
 
 const namedColorPattern = new RegExp(`(?<![A-Za-z0-9#-])(?:${NAMED_COLORS.join("|")})(?![A-Za-z0-9-])`, "i")
 
 const colorConstructorPattern = /#[0-9a-fA-F]{3,8}\b|(?<![A-Za-z0-9-])(?:rgba?|hsla?|hwb|oklch|oklab|lab|lch|color)\(/
 
 const PAINT_PROPERTIES = new Set([
-  "color", "background", "background-color", "background-image", "border-color", "border-top-color",
-  "border-right-color", "border-bottom-color", "border-left-color", "border-inline-color", "border-block-color",
-  "outline-color", "box-shadow", "text-shadow", "fill", "stroke", "caret-color", "accent-color",
-  "text-decoration-color", "column-rule-color", "scrollbar-color",
+  "color", "background", "background-color", "background-image",
+  "border", "border-top", "border-right", "border-bottom", "border-left", "border-inline", "border-block",
+  "border-inline-start", "border-inline-end", "border-block-start", "border-block-end",
+  "border-color", "border-top-color", "border-right-color", "border-bottom-color", "border-left-color",
+  "border-inline-color", "border-block-color", "border-inline-start-color", "border-inline-end-color",
+  "border-block-start-color", "border-block-end-color",
+  "outline", "outline-color", "box-shadow", "text-shadow", "fill", "stroke", "caret-color", "accent-color",
+  "text-decoration", "text-decoration-color", "text-emphasis", "text-emphasis-color",
+  "column-rule", "column-rule-color", "scrollbar-color",
+  "stop-color", "flood-color", "lighting-color",
 ])
 
 function stripPaintServerReferences(value: string): string {
@@ -79,18 +88,17 @@ const arbitraryPropertyPattern = /(?:^|[:!])!?\[([a-zA-Z-]+):([^\]]+)\]!?$/
 
 export function usesLiteralColorValue(token: string): boolean {
   const colorRoot = token.match(colorRootArbitraryPattern)
-  if (colorRoot) {
-    const value = colorRoot[1]!
-    if (containsLiteralColor(value)) return true
-    // A bare bracketed word on a color root (bg-[red] and any future keyword) is a color
-    // literal unless it is a variable reference or a token-neutral keyword.
-    if (/^[a-zA-Z]+$/.test(value) && !NEUTRAL_COLOR_KEYWORDS.has(value.toLowerCase())) return true
-  }
+  if (colorRoot && containsLiteralColor(colorRoot[1]!)) return true
   const property = token.match(arbitraryPropertyPattern)
-  if (property && PAINT_PROPERTIES.has(property[1]!.toLowerCase()) && containsLiteralColor(property[2]!)) return true
-  // Literal color constructors anywhere else in an arbitrary value (e.g. gradients on
-  // non-color roots) are still literals; named colors outside color surfaces are too
-  // ambiguous to match (grid areas, animation names), so only constructors apply here.
+  if (property) {
+    const name = property[1]!.toLowerCase()
+    // Paint properties and custom-property definitions in class surfaces both
+    // carry color; named colors elsewhere (grid areas, animation names) are
+    // too ambiguous to match, so only those two surfaces use the named list.
+    if ((PAINT_PROPERTIES.has(name) || name.startsWith("--")) && containsLiteralColor(property[2]!)) return true
+  }
+  // Literal color constructors anywhere else in an arbitrary value (e.g.
+  // gradients on non-color roots) are still literals.
   return colorConstructorPattern.test(stripPaintServerReferences(token))
 }
 
@@ -131,10 +139,12 @@ export function inlineStyleDeclarations(ast: ts.SourceFile): InlineStyleDeclarat
     return current
   }
 
-  // Scope-aware const/let bindings: a name resolves to the innermost declaration whose
-  // enclosing scope contains the use site, so a local style object never leaks across
-  // components that reuse the name.
-  const bindings = new Map<string, Array<{ initializer: ts.Expression; scope: ts.Node; depth: number }>>()
+  // Scope-aware bindings: a name resolves to the innermost declaration whose
+  // enclosing scope contains the use site, so a local style object never leaks
+  // across components that reuse the name. Parameters and destructured names
+  // register with a null initializer — they shadow outer declarations into
+  // unresolvability instead of letting the audit read the wrong object.
+  const bindings = new Map<string, Array<{ initializer: ts.Expression | null; scope: ts.Node; depth: number }>>()
   const scopeFor = (node: ts.Node): { scope: ts.Node; depth: number } => {
     let current: ts.Node | undefined = node.parent
     while (current && !ts.isSourceFile(current)) {
@@ -147,11 +157,18 @@ export function inlineStyleDeclarations(ast: ts.SourceFile): InlineStyleDeclarat
     }
     return { scope: ast, depth: 0 }
   }
-  ast.forEachChild(function collect(node) {
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
-      const { scope, depth } = scopeFor(node)
-      bindings.set(node.name.text, [...(bindings.get(node.name.text) ?? []), { initializer: node.initializer, scope, depth }])
+  const addBinding = (name: ts.BindingName, initializer: ts.Expression | null, owner: ts.Node): void => {
+    if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
+      for (const element of name.elements) if (ts.isBindingElement(element)) addBinding(element.name, null, owner)
+      return
     }
+    const { scope, depth } = scopeFor(owner)
+    bindings.set(name.text, [...(bindings.get(name.text) ?? []), { initializer, scope, depth }])
+  }
+  ast.forEachChild(function collect(node) {
+    if (ts.isVariableDeclaration(node)) addBinding(node.name, ts.isIdentifier(node.name) ? node.initializer ?? null : null, node)
+    if (ts.isParameter(node)) addBinding(node.name, null, node)
+    if (ts.isCatchClause(node) && node.variableDeclaration) addBinding(node.variableDeclaration.name, null, node.variableDeclaration)
     ts.forEachChild(node, collect)
   })
   const bindingFor = (node: ts.Identifier): ts.Expression | null =>
@@ -160,24 +177,45 @@ export function inlineStyleDeclarations(ast: ts.SourceFile): InlineStyleDeclarat
       .sort((left, right) => right.depth - left.depth)[0]?.initializer ?? null
 
   const callbackResults = (expression: ts.Expression): ts.Expression[] => {
-    const callback = unwrap(expression)
+    let callback = unwrap(expression)
+    if (ts.isIdentifier(callback)) {
+      const initializer = bindingFor(callback)
+      if (!initializer) return []
+      callback = unwrap(initializer)
+    }
     if (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback)) return []
     if (ts.isArrowFunction(callback) && !ts.isBlock(callback.body)) return [callback.body]
     const results: ts.Expression[] = []
+    const resolved = callback
     const walk = (node: ts.Node): void => {
       if (ts.isReturnStatement(node) && node.expression) results.push(node.expression)
-      if (!ts.isFunctionLike(node) || node === callback) ts.forEachChild(node, walk)
+      if (!ts.isFunctionLike(node) || node === resolved) ts.forEachChild(node, walk)
     }
     walk(callback.body)
     return results
   }
 
+  // Resolves statically knowable string values: literals, conditional and
+  // logical branches, and identifier chains through in-scope bindings.
+  const staticStringValues = (node: ts.Expression, seen: Set<ts.Node>): string[] => {
+    const expression = unwrap(node)
+    if (seen.has(expression)) return []
+    seen.add(expression)
+    if (ts.isStringLiteral(expression) || ts.isNoSubstitutionTemplateLiteral(expression)) return [expression.text]
+    if (ts.isConditionalExpression(expression)) return [...staticStringValues(expression.whenTrue, seen), ...staticStringValues(expression.whenFalse, seen)]
+    if (ts.isBinaryExpression(expression) && [ts.SyntaxKind.BarBarToken, ts.SyntaxKind.AmpersandAmpersandToken, ts.SyntaxKind.QuestionQuestionToken].includes(expression.operatorToken.kind)) {
+      return [...staticStringValues(expression.left, seen), ...staticStringValues(expression.right, seen)]
+    }
+    if (ts.isIdentifier(expression)) {
+      const initializer = bindingFor(expression)
+      return initializer ? staticStringValues(initializer, seen) : []
+    }
+    return []
+  }
+
   const record = (name: string, initializer: ts.Expression | null): void => {
-    const literal = initializer ? unwrap(initializer) : null
-    declarations.push({
-      name,
-      literalValue: literal && (ts.isStringLiteral(literal) || ts.isNoSubstitutionTemplateLiteral(literal)) ? literal.text : null,
-    })
+    const values = initializer ? staticStringValues(initializer, new Set()) : []
+    declarations.push({ name, literalValue: values.length ? values.join(" ") : null })
   }
 
   const recordObject = (object: ts.ObjectLiteralExpression, seen: Set<ts.Node>): void => {
@@ -228,22 +266,67 @@ export function inlineStyleDeclarations(ast: ts.SourceFile): InlineStyleDeclarat
         for (const result of callbackResults(expression.arguments[0])) recordExpression(result, seen)
       }
     } else if (ts.isElementAccessExpression(expression) || ts.isPropertyAccessExpression(expression)) {
-      // A map lookup (sizeStyles[size], sizeStyles.compact) is audited against every
-      // object-literal value of the resolved map, covering all reachable variants.
-      const base = unwrap(expression.expression)
-      const initializer = ts.isIdentifier(base) ? bindingFor(base) : ts.isObjectLiteralExpression(base) ? base : null
-      const map = initializer ? unwrap(initializer) : null
-      if (map && ts.isObjectLiteralExpression(map)) {
-        for (const property of map.properties) {
-          if (ts.isPropertyAssignment(property)) recordExpression(property.initializer, seen)
+      // A map lookup (sizeStyles[size], styles.compact.header) is audited
+      // against every object-literal value reachable through the access
+      // chain, covering all statically visible variants at any depth. The
+      // node re-enters the visited set inside objectCandidates, so release
+      // the pre-dispatch entry first.
+      seen.delete(expression)
+      for (const object of objectCandidates(expression, seen)) recordObject(object, seen)
+    }
+  }
+
+  // Resolves an expression to the object literals it can statically denote:
+  // the literal itself, an in-scope binding's initializer, either branch of a
+  // conditional, or — for property/element accesses — the named property of
+  // each base candidate when the key is a literal, otherwise every
+  // property-assignment value of each base candidate.
+  function objectCandidates(node: ts.Expression, seen: Set<ts.Node>): ts.ObjectLiteralExpression[] {
+    const expression = unwrap(node)
+    if (ts.isObjectLiteralExpression(expression)) return [expression]
+    if (seen.has(expression)) return []
+    seen.add(expression)
+    if (ts.isConditionalExpression(expression)) return [...objectCandidates(expression.whenTrue, seen), ...objectCandidates(expression.whenFalse, seen)]
+    if (ts.isIdentifier(expression)) {
+      const initializer = bindingFor(expression)
+      return initializer ? objectCandidates(initializer, seen) : []
+    }
+    if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
+      const key = ts.isPropertyAccessExpression(expression)
+        ? expression.name.text
+        : expression.argumentExpression && (ts.isStringLiteral(expression.argumentExpression) || ts.isNoSubstitutionTemplateLiteral(expression.argumentExpression))
+          ? expression.argumentExpression.text
+          : null
+      const results: ts.ObjectLiteralExpression[] = []
+      for (const base of objectCandidates(expression.expression, seen)) {
+        for (const property of base.properties) {
+          if (!ts.isPropertyAssignment(property)) continue
+          const name = property.name
+          const propertyName = ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNoSubstitutionTemplateLiteral(name) ? name.text : null
+          if (key === null || propertyName === null || propertyName === key) results.push(...objectCandidates(property.initializer, seen))
         }
       }
+      return results
     }
+    return []
   }
 
   function visit(node: ts.Node): void {
     if (ts.isJsxAttribute(node) && node.name.getText() === "style" && node.initializer && ts.isJsxExpression(node.initializer) && node.initializer.expression) {
       recordExpression(node.initializer.expression, new Set())
+    }
+    // A literal props object spread onto an element ({...{ style: {...} }})
+    // declares its style at the site; deeper indirection stays a documented
+    // resolver limit.
+    if (ts.isJsxSpreadAttribute(node)) {
+      const spread = unwrap(node.expression)
+      if (ts.isObjectLiteralExpression(spread)) {
+        for (const property of spread.properties) {
+          if (ts.isPropertyAssignment(property) && (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) && property.name.text === "style") {
+            recordExpression(property.initializer, new Set())
+          }
+        }
+      }
     }
     ts.forEachChild(node, visit)
   }
