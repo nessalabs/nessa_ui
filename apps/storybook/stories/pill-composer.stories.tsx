@@ -56,7 +56,7 @@ import {
   type ModelPickerGroup,
   type ModelPickerValue,
 } from "@nessa-ui/react"
-import { Braces, Check, ChevronLeft, ChevronRight, FileText, Folder, Image as ImageIcon, Paperclip, Plus, SlidersHorizontal, Sparkles, Puzzle, Square, X } from "lucide-react"
+import { Braces, Check, ChevronLeft, ChevronRight, FileText, Folder, Image as ImageIcon, Paperclip, Pencil, Plus, SlidersHorizontal, Sparkles, Puzzle, Square, X } from "lucide-react"
 
 import { ChatAddIcon, CommentIcon } from "./icons/nucleo"
 import { storyDocumentation } from "./story-documentation"
@@ -519,8 +519,8 @@ function StopAction({
 interface PendingQuote {
   /** The passage lifted from the document. */
   text: string
-  /** The note attached to it from the selection tooltip, if any. */
-  comment?: string
+  /** The user's comments on it — the first from the selection tooltip, the rest added later from the annotation view. */
+  comments?: string[]
   /** The slash item whose document the passage came from. */
   sourceId?: string
 }
@@ -740,6 +740,50 @@ function SubagentChip({
   )
 }
 
+/** The inline editor a user bubble swaps into from the context menu's Edit. */
+function EditMessageRow({
+  text,
+  onSave,
+  onCancel,
+}: {
+  text: string
+  onSave: (text: string) => void
+  onCancel: () => void
+}) {
+  const [draft, setDraft] = React.useState(text)
+  const commit = () => {
+    if (draft.trim()) onSave(draft.trim())
+    else onCancel()
+  }
+  return (
+    <span className="flex w-full items-center gap-1">
+      <Input
+        autoFocus
+        aria-label="Edit message"
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault()
+            commit()
+          }
+          if (event.key === "Escape") {
+            event.preventDefault()
+            onCancel()
+          }
+        }}
+        className="h-8 flex-1 rounded-2xl"
+      />
+      <ChatComposerAction aria-label="Save message" title="Save" onClick={commit} className="size-7">
+        <Check aria-hidden="true" />
+      </ChatComposerAction>
+      <ChatComposerAction aria-label="Cancel edit" title="Cancel" onClick={onCancel} className="size-7">
+        <X aria-hidden="true" />
+      </ChatComposerAction>
+    </span>
+  )
+}
+
 /**
  * Maps one demo message onto the ChatBubbles kit: attachments (single tile
  * or fanned stack), reply quote, the bubble itself as the reply control,
@@ -758,6 +802,10 @@ function DemoBubble({
   onQuotePress,
   onQuoteSourceOpen,
   onQuotesOpen,
+  editing = false,
+  onEditStart,
+  onEditSave,
+  onEditCancel,
   menuBoundary,
 }: {
   message: DemoMessage
@@ -783,12 +831,21 @@ function DemoBubble({
   onQuoteSourceOpen?: (sourceId: string) => void
   /** Opens the read-only list of this message's annotations. */
   onQuotesOpen?: (quotes: PendingQuote[]) => void
+  /** True while this user message's bubble is swapped for the editor. */
+  editing?: boolean
+  /** Enters edit mode for this user message (context-menu Edit). */
+  onEditStart?: () => void
+  /** Commits the edited text. */
+  onEditSave?: (text: string) => void
+  /** Leaves edit mode without changes. */
+  onEditCancel?: () => void
   /** Flips the tapback menu above the press point at this element's edges. */
   menuBoundary?: Element | null
 }) {
   // Reply commits after the menu closes: Radix's close-autofocus would
   // otherwise return focus to the bubble and undo the composer focus.
   const replyChosenRef = React.useRef(false)
+  const editChosenRef = React.useRef(false)
   const attachments = message.attachments ?? []
   // Tiles inside the stack must be non-interactive: the stack's own button
   // is the control, and a button cannot nest buttons.
@@ -870,7 +927,13 @@ function DemoBubble({
             : `${message.quotes.length} annotations`}
         </ChatMessageQuote>
       ) : null}
-      {message.text ? (
+      {editing ? (
+        <EditMessageRow
+          text={message.text}
+          onSave={(text) => onEditSave?.(text)}
+          onCancel={() => onEditCancel?.()}
+        />
+      ) : message.text ? (
         /* Right-click / long-press raises the ContextMenu with the tapback
            row and a Reply action. Opening it never frosts the transcript —
            the frosted thread view belongs to reply mode, entered via Reply. */
@@ -905,6 +968,12 @@ function DemoBubble({
             collisionBoundary={menuBoundary ?? undefined}
             collisionPadding={8}
             onCloseAutoFocus={(event) => {
+              if (editChosenRef.current) {
+                editChosenRef.current = false
+                event.preventDefault()
+                onEditStart?.()
+                return
+              }
               if (!replyChosenRef.current) return
               replyChosenRef.current = false
               event.preventDefault()
@@ -943,6 +1012,15 @@ function DemoBubble({
             >
               Reply
             </ContextMenuItem>
+            {message.role === "user" && onEditStart ? (
+              <ContextMenuItem
+                onSelect={() => {
+                  editChosenRef.current = true
+                }}
+              >
+                Edit
+              </ContextMenuItem>
+            ) : null}
           </ContextMenuContent>
         </ContextMenu>
       ) : null}
@@ -1055,79 +1133,193 @@ function attachmentSummary(attachments: DemoAttachment[]) {
 const seededAnnotations: PendingQuote[] = [
   {
     text: "Gather the relevant context from the current chat.",
-    comment: "This should spell out how much history counts as relevant.",
+    comments: ["This should spell out how much history counts as relevant."],
     sourceId: "skill-creator",
   },
-  { text: "Apply the checklist this skill carries." },
+  { text: "Apply the checklist this skill carries.", sourceId: "skill-creator" },
   {
     text: "Report the result back into the thread. The report should stay short enough to read in the transcript, with the full detail behind a link, so the conversation keeps moving while the evidence stays reachable for whoever wants to dig in later.",
-    comment:
+    comments: [
       "Way too long for one step — split the summary rule and the linking rule into separate steps, and give each a concrete length budget so agents stop guessing.",
+      "Also decide who owns the link target.",
+    ],
+    sourceId: "skill-creator",
   },
-  { text: "Invoke with /skill-creator from any conversation.", comment: "Mention the trigger menu too." },
   {
-    text: "Draft a reusable skill from this conversation.",
+    text: "Invoke with /skill-creator from any conversation.",
+    comments: ["Mention the trigger menu too."],
+    sourceId: "skill-creator",
   },
+  { text: "Draft a reusable skill from this conversation.", sourceId: "skill-creator" },
   {
     text: "The checklist this skill carries should include accessibility, performance, and error handling, each with at least one concrete check the reviewer can run without leaving the editor.",
-    comment: "a11y first.",
+    comments: ["a11y first."],
+    sourceId: "code-review",
   },
-  { text: "When to use" },
+  { text: "When to use", sourceId: "skill-creator" },
   {
     text: "Steps",
-    comment:
+    comments: [
       "The whole Steps section reads as written for humans; add a machine-readable variant so the runner can verify each step actually happened.",
+    ],
+    sourceId: "skill-creator",
   },
 ]
 
+
+/** A sent-style comment bubble that can swap into an inline editor. */
+function EditableCommentBubble({
+  text,
+  onSave,
+}: {
+  text: string
+  /** Omitted in read-only views; present, it enables the hover edit control. */
+  onSave?: (text: string) => void
+}) {
+  const [editing, setEditing] = React.useState(false)
+  const [draft, setDraft] = React.useState(text)
+  if (editing && onSave) {
+    const commit = () => {
+      if (draft.trim()) onSave(draft.trim())
+      setEditing(false)
+    }
+    return (
+      <span className="flex w-full items-center justify-end gap-1">
+        <Input
+          autoFocus
+          aria-label="Edit comment"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault()
+              commit()
+            }
+            if (event.key === "Escape") {
+              event.preventDefault()
+              setDraft(text)
+              setEditing(false)
+            }
+          }}
+          className="h-8 flex-1 rounded-2xl"
+        />
+        <ChatComposerAction aria-label="Save edit" title="Save" onClick={commit} className="size-7">
+          <Check aria-hidden="true" />
+        </ChatComposerAction>
+        <ChatComposerAction
+          aria-label="Cancel edit"
+          title="Cancel"
+          onClick={() => {
+            setDraft(text)
+            setEditing(false)
+          }}
+          className="size-7"
+        >
+          <X aria-hidden="true" />
+        </ChatComposerAction>
+      </span>
+    )
+  }
+  return (
+    <span className="group/comment flex max-w-full items-center gap-1 self-end">
+      {onSave ? (
+        <button
+          type="button"
+          aria-label="Edit comment"
+          title="Edit comment"
+          onClick={() => {
+            setDraft(text)
+            setEditing(true)
+          }}
+          className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground opacity-0 outline-none transition-opacity hover:text-foreground focus-visible:opacity-100 focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring group-hover/comment:opacity-100 [&_svg]:size-3"
+        >
+          <Pencil aria-hidden="true" />
+        </button>
+      ) : null}
+      <ChatBubble>{text}</ChatBubble>
+    </span>
+  )
+}
+
 /**
- * One pending quote in the full-list view, styled as a message: the lifted
- * passage as a received-style bubble, the comment beneath it, a remove
- * control beside.
+ * One annotation in the full-list view, read as a tiny thread: the lifted
+ * passage is the document's message, the user's comments are their replies.
+ * In the pending view the passage selects for follow-up comments, comments
+ * edit in place, and the row removes; the sent view is read-only.
  */
-function QuoteRow({
+function AnnotationThread({
   quote,
+  selected = false,
+  onSelect,
   onRemove,
   onOpenSource,
+  onEditComment,
 }: {
   quote: PendingQuote
+  /** Marks this annotation as the one the composer replies to. */
+  selected?: boolean
+  /** Selects (or deselects) this annotation for follow-up comments. */
+  onSelect?: () => void
   /** Omitted in the read-only view of a sent message's annotations. */
   onRemove?: () => void
   /** Opens the document this passage was lifted from. */
   onOpenSource?: () => void
+  /** Replaces one comment's text; omitted in the read-only view. */
+  onEditComment?: (index: number, text: string) => void
 }) {
+  const sourceName = quote.sourceId
+    ? slashItemForId(quote.sourceId)
+    : undefined
   return (
     <div className="flex items-start gap-2">
-      <ChatMessage tone="received" className="max-w-full flex-1">
-        {quote.comment ? (
-          // A commented annotation reads as a reply: the lifted passage as
-          // the quote chip — tap it to revisit the document it came from —
-          // and the comment as the bubble beneath it.
-          <>
-            <ChatMessageQuote
-              role={onOpenSource ? "button" : undefined}
-              tabIndex={onOpenSource ? 0 : undefined}
-              title={onOpenSource ? "Open the source document" : undefined}
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 flex-col gap-1 rounded-2xl p-1 transition-colors",
+          selected && "bg-(--nessa-chat-accent)/10",
+        )}
+      >
+        <ChatMessage tone="received" className="max-w-full">
+          <ChatBubble
+            role={onSelect ? "button" : undefined}
+            tabIndex={onSelect ? 0 : undefined}
+            title={onSelect ? "Reply to this annotation" : undefined}
+            onClick={onSelect}
+            onKeyDown={
+              onSelect
+                ? (event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return
+                    event.preventDefault()
+                    onSelect()
+                  }
+                : undefined
+            }
+            className={onSelect ? "cursor-pointer" : undefined}
+          >
+            {quote.text}
+          </ChatBubble>
+          {sourceName && onOpenSource ? (
+            <button
+              type="button"
               onClick={onOpenSource}
-              onKeyDown={
-                onOpenSource
-                  ? (event) => {
-                      if (event.key !== "Enter" && event.key !== " ") return
-                      event.preventDefault()
-                      onOpenSource()
-                    }
+              className="self-start rounded-full border-0 bg-transparent p-0 px-1 font-sans nessa-text-1 text-(--nessa-chat-accent) outline-none hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              {chipFileMock(sourceName).name}
+            </button>
+          ) : null}
+        </ChatMessage>
+        {quote.comments?.map((comment, index) => (
+          <ChatMessage key={index} tone="sent" className="max-w-full self-end">
+            <EditableCommentBubble
+              text={comment}
+              onSave={
+                onEditComment
+                  ? (next) => onEditComment(index, next)
                   : undefined
               }
-              className={onOpenSource ? "cursor-pointer hover:bg-accent" : undefined}
-            >
-              {quote.text}
-            </ChatMessageQuote>
-            <ChatBubble>{quote.comment}</ChatBubble>
-          </>
-        ) : (
-          <ChatBubble>{quote.text}</ChatBubble>
-        )}
-      </ChatMessage>
+            />
+          </ChatMessage>
+        ))}
+      </div>
       {onRemove ? (
         <button
           type="button"
@@ -1193,6 +1385,12 @@ function PlaygroundExample({
   const [viewedQuotes, setViewedQuotes] = React.useState<
     PendingQuote[] | null
   >(null)
+  // The pending annotation the composer replies to while the list is open.
+  const [selectedQuote, setSelectedQuote] = React.useState<number | null>(null)
+  // The user message whose bubble is currently swapped for the editor.
+  const [editingMessageId, setEditingMessageId] = React.useState<number | null>(
+    null,
+  )
   // Chips open their file directly: plain press previews in the current
   // tab, a modified press (Cmd/Ctrl) parks the file as its own tab.
   const openChipFromLabel = (label: string, newTab: boolean) => {
@@ -1526,6 +1724,7 @@ function PlaygroundExample({
           setQuotesOpen(false)
           setViewedQuotes(null)
           setFocusedThreadId(null)
+          setEditingMessageId(null)
         }}
         onClose={(id) => {
           if (id === generatingTabId) {
@@ -1594,7 +1793,7 @@ function PlaygroundExample({
           onComment={(text, comment) =>
             setQuotes((current) => [
               ...current,
-              { text, comment, sourceId: activeFileItem.id },
+              { text, comments: [comment], sourceId: activeFileItem.id },
             ])
           }
         />
@@ -1651,6 +1850,21 @@ function PlaygroundExample({
               if (item) openChipPreview(item, false)
             }}
             onQuotesOpen={setViewedQuotes}
+            editing={editingMessageId === entry.id}
+            onEditStart={
+              entry.role === "user"
+                ? () => setEditingMessageId(entry.id)
+                : undefined
+            }
+            onEditSave={(text) => {
+              updateMessages(activeTabId, (current) =>
+                current.map((message) =>
+                  message.id === entry.id ? { ...message, text } : message,
+                ),
+              )
+              setEditingMessageId(null)
+            }}
+            onEditCancel={() => setEditingMessageId(null)}
             onReact={(emoji) => {
               updateMessages(activeTabId, (current) =>
                 current.map((message) =>
@@ -1699,9 +1913,18 @@ function PlaygroundExample({
         <div className="absolute inset-0 z-10 flex flex-col bg-background">
           <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto py-2 text-left [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {(viewedQuotes ?? quotes).map((entry, at) => (
-              <QuoteRow
+              <AnnotationThread
                 key={at}
                 quote={entry}
+                selected={!viewedQuotes && selectedQuote === at}
+                onSelect={
+                  viewedQuotes
+                    ? undefined
+                    : () =>
+                        setSelectedQuote((current) =>
+                          current === at ? null : at,
+                        )
+                }
                 onRemove={
                   viewedQuotes
                     ? undefined
@@ -1710,6 +1933,7 @@ function PlaygroundExample({
                           (_, index2) => index2 !== at,
                         )
                         setQuotes(next)
+                        setSelectedQuote(null)
                         if (next.length === 0) setQuotesOpen(false)
                       }
                 }
@@ -1718,9 +1942,28 @@ function PlaygroundExample({
                     ? () => {
                         setQuotesOpen(false)
                         setViewedQuotes(null)
+                        setSelectedQuote(null)
                         openChipPreview(slashItemForId(entry.sourceId!)!, false)
                       }
                     : undefined
+                }
+                onEditComment={
+                  viewedQuotes
+                    ? undefined
+                    : (index, text) =>
+                        setQuotes((current) =>
+                          current.map((quote, index2) =>
+                            index2 === at
+                              ? {
+                                  ...quote,
+                                  comments: quote.comments?.map(
+                                    (comment, index3) =>
+                                      index3 === index ? text : comment,
+                                  ),
+                                }
+                              : quote,
+                          ),
+                        )
                 }
               />
             ))}
@@ -1730,6 +1973,7 @@ function PlaygroundExample({
             onClick={() => {
               setQuotesOpen(false)
               setViewedQuotes(null)
+              setSelectedQuote(null)
             }}
             className="mx-auto shrink-0 cursor-pointer rounded-full border-0 bg-transparent px-3 py-1.5 font-sans nessa-text-2 font-medium text-(--nessa-chat-accent) outline-none hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
@@ -1756,8 +2000,8 @@ function PlaygroundExample({
           <button
             type="button"
             title={
-              quotes[0]!.comment
-                ? `${quotes[0]!.comment} — “${quotes[0]!.text}”`
+              quotes[0]!.comments?.length
+                ? `${quotes[0]!.comments[0]} — “${quotes[0]!.text}”`
                 : quotes[0]!.text
             }
             aria-label={`Quoted selection: ${quotes[0]!.text}`}
@@ -1765,7 +2009,7 @@ function PlaygroundExample({
             className="inline-flex min-w-0 cursor-pointer items-center rounded-full border-0 bg-transparent p-0 text-start font-sans outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
             <ChatMessageQuote className="m-0 inline-block max-w-52 truncate whitespace-nowrap">
-              {quotes[0]!.comment ?? quotes[0]!.text}
+              {quotes[0]!.comments?.[0] ?? quotes[0]!.text}
             </ChatMessageQuote>
           </button>
           {quotes.length > 1 ? (
@@ -1795,6 +2039,21 @@ function PlaygroundExample({
           event.preventDefault()
           const content = inputRef.current?.getContent()
           const text = (content?.text ?? message).trim()
+          // With the annotation list open and one selected, the send is a
+          // follow-up comment attaching to that annotation, not a message.
+          if (quotesOpen && selectedQuote !== null) {
+            if (!text) return
+            setQuotes((current) =>
+              current.map((quote, index) =>
+                index === selectedQuote
+                  ? { ...quote, comments: [...(quote.comments ?? []), text] }
+                  : quote,
+              ),
+            )
+            inputRef.current?.clear()
+            setMessage("")
+            return
+          }
           if (
             (!text && attachments.length === 0 && quotes.length === 0) ||
             generatingTabId !== null ||
@@ -1889,11 +2148,13 @@ function PlaygroundExample({
             onContentChange={(content) => setMessage(content.text)}
             onChipPress={(chip) => openChipFromLabel(chip.label, false)}
             placeholder={
-              replyTarget
-                ? "Reply"
-                : activeSubagent
-                  ? `Message ${activeSubagent.name}…`
-                  : "Ask me anything"
+              quotesOpen && selectedQuote !== null
+                ? "Reply to the annotation…"
+                : replyTarget
+                  ? "Reply"
+                  : activeSubagent
+                    ? `Message ${activeSubagent.name}…`
+                    : "Ask me anything"
             }
             className={cn("self-center", listening && "text-muted-foreground")}
           />
@@ -2653,7 +2914,7 @@ export const Subagents: Story = {
 export const Annotations: Story = {
   tags: ["reduced-motion"],
   parameters: storyDocumentation(
-    "The pending-annotation surfaces under load: the playground opens on the Repo audit conversation with eight selections already lifted from documents — one-liners, full paragraphs, some carrying comments of very different lengths, some bare. The row above the pill stays one truncated pill plus '+ 7 others'; opening it shows every selection as a message bubble with its comment beneath, scrolling within the transcript area, each removable, with Back to chat underneath. Sending delivers the whole set on one message.",
+    "The pending-annotation surfaces under load: the playground opens on the Repo audit conversation with eight selections already lifted from documents — one-liners, full paragraphs, comments of very different lengths, some bare. The row above the pill stays one truncated pill plus '+ 7 others'; opening it shows each annotation as a tiny thread — the passage as the document's message with its source file linked beneath, the user's comments as their replies. Tapping a passage selects it and the pill composer replies to it, attaching follow-up comments; hovering a comment reveals its edit control and the comment edits in place. Sending delivers the whole set as one compact 'N annotations' pill on the message, and user messages in the transcript edit in place too, from the context menu's Edit.",
   ),
   render: () => (
     <PlaygroundExample
