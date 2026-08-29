@@ -256,9 +256,13 @@ function StockQuote({
 
   // A map of windows is its own list of ranges: the data decides what the
   // control can offer, so the two can never disagree.
-  const seriesByRange = Array.isArray(seriesProp)
-    ? null
-    : (seriesProp as Readonly<Record<string, readonly PriceChartBar[]>>)
+  const seriesByRange = React.useMemo(
+    () =>
+      Array.isArray(seriesProp)
+        ? null
+        : (seriesProp as Readonly<Record<string, readonly PriceChartBar[]>>),
+    [seriesProp],
+  )
   const ranges: readonly StockQuoteRange[] = React.useMemo(
     () =>
       rangesProp ??
@@ -279,12 +283,17 @@ function StockQuote({
   const [selection, setSelection] =
     React.useState<PriceChartSelectionContext | null>(null)
 
+  // The window actually on screen. A `range` the map does not carry falls
+  // back to the first one, and everything measured against the window — the
+  // bars and the reference close alike — reads this rather than `range`.
+  const activeRange =
+    seriesByRange && !(range in seriesByRange) ? (ranges[0]?.id ?? range) : range
   const series = React.useMemo<readonly PriceChartBar[]>(
     () =>
       seriesByRange
-        ? (seriesByRange[range] ?? seriesByRange[ranges[0]?.id ?? ""] ?? [])
+        ? (seriesByRange[activeRange] ?? [])
         : (seriesProp as readonly PriceChartBar[]),
-    [seriesByRange, seriesProp, range, ranges],
+    [seriesByRange, seriesProp, activeRange],
   )
 
   const changeRange = (next: string) => {
@@ -300,16 +309,30 @@ function StockQuote({
   notifySelection.current = onSelectionChange
   const notifyScrub = React.useRef(onScrubChange)
   notifyScrub.current = onScrubChange
+  // What was open when the window last changed, read in the effect rather
+  // than inside a state updater: React may call an updater twice, and a host
+  // must hear "cleared" exactly once.
+  const openReadings = React.useRef({ selection, scrubIndex })
+  openReadings.current = { selection, scrubIndex }
+
+  const dropReadings = React.useCallback(() => {
+    const open = openReadings.current
+    setSelection(null)
+    setScrubIndex(null)
+    if (open.selection) notifySelection.current?.(null)
+    if (open.scrubIndex !== null) notifyScrub.current?.(null)
+  }, [])
+
+  // A window and a cursor are indices into one window's bars; they mean
+  // nothing once different bars are on screen. This covers the controlled
+  // host that changes `range` itself, which the control's own handler never
+  // sees, and the host that swaps the bars under a fixed range.
+  const plottedBars = React.useRef(series)
   React.useEffect(() => {
-    setSelection((current) => {
-      if (current) notifySelection.current?.(null)
-      return null
-    })
-    setScrubIndex((current) => {
-      if (current !== null) notifyScrub.current?.(null)
-      return null
-    })
-  }, [range])
+    if (plottedBars.current === series) return
+    plottedBars.current = series
+    dropReadings()
+  }, [series, dropReadings])
 
   const currencyFormatter = React.useMemo(
     () =>
@@ -389,7 +412,7 @@ function StockQuote({
   const rangeClose =
     typeof previousClose === "number" || previousClose === undefined
       ? previousClose
-      : previousClose[range]
+      : previousClose[activeRange]
   const baseline = rangeClose ?? firstValue ?? undefined
 
   const scrubbedBar =
@@ -405,7 +428,9 @@ function StockQuote({
   // is derived here so the headline, its colour, and the chart agree.
   // Read back through the current series rather than the bars the callback
   // captured: a streaming host appends to `series` while a window is open,
-  // and a stale snapshot would let the headline disagree with the plot.
+  // and a stale snapshot would let the headline disagree with the plot. A
+  // window past the end cannot survive — the effect above drops it — so this
+  // only guards the render between the swap and that effect.
   const selectionWindow =
     selection && selection.end < series.length ? selection : null
   const selectionValue = selectionWindow
@@ -456,19 +481,20 @@ function StockQuote({
             >
               {symbol}
             </span>
-            {statusLabel ? (
-              // The trading state carries no chrome: the pulsing marker on
-              // the newest bar is the visible tell, and this is what a
-              // screen reader hears in its place.
-              <span
-                data-slot="stock-quote-status"
-                data-status={status}
-                role="status"
-                className="sr-only"
-              >
-                {statusLabel}
-              </span>
-            ) : null}
+            {/* The trading state carries no chrome: the pulsing marker on the
+                newest bar is the visible tell, and this is what a screen
+                reader hears in its place. Mounted whether or not there is a
+                state yet — a live region is only observed from the moment it
+                exists, so one that appears with its text already in it says
+                nothing. */}
+            <span
+              data-slot="stock-quote-status"
+              data-status={status}
+              role="status"
+              className="sr-only"
+            >
+              {statusLabel ?? ""}
+            </span>
           </div>
           {name ? (
             <h2

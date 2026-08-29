@@ -129,11 +129,19 @@ export const Playground: Story = {
       await expect(["38", "39"]).toContain(cursor.getAttribute("aria-valuenow"))
     })
 
-    // The streaming marker sits on the newest bar, not merely somewhere.
+    // The streaming marker sits on the newest bar — the right-hand edge of
+    // the plot — rather than merely somewhere on it.
     const marker = canvasElement.querySelector(
-      '[data-slot="price-chart"] svg circle:not([class])',
+      '[data-slot="price-chart-live-marker"]',
     ) as SVGCircleElement
-    await expect(Number(marker.getAttribute("cx"))).toBeGreaterThan(0)
+    const plotWidth = (
+      canvasElement.querySelector(
+        '[data-slot="price-chart"] svg',
+      ) as SVGSVGElement
+    ).getBoundingClientRect().width
+    await expect(
+      Math.abs(Number(marker.getAttribute("cx")) - plotWidth),
+    ).toBeLessThanOrEqual(1)
 
     // Leaving the plot returns the cursor to the newest bar, which is where
     // the next arrow press starts.

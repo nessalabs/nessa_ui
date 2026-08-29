@@ -41,10 +41,18 @@ export type PriceChartTone = "gain" | "loss" | "neutral"
  * line path treats as a break in the series.
  */
 export function priceChartBarValue(bar: PriceChartBar): number | null {
-  for (const value of [bar.value, bar.close, bar.open]) {
-    // Each candidate is tested rather than coalesced: a NaN price is as
-    // absent as a missing one, and must fall through to the next.
-    if (typeof value === "number" && Number.isFinite(value)) return value
+  // Each candidate is tested rather than coalesced: a NaN price is as absent
+  // as a missing one and must fall through to the next. Written as branches
+  // rather than a loop over a literal array — this runs once per bar per
+  // pass, several passes per render.
+  if (typeof bar.value === "number" && Number.isFinite(bar.value)) {
+    return bar.value
+  }
+  if (typeof bar.close === "number" && Number.isFinite(bar.close)) {
+    return bar.close
+  }
+  if (typeof bar.open === "number" && Number.isFinite(bar.open)) {
+    return bar.open
   }
   return null
 }
@@ -221,7 +229,7 @@ export function priceChartLinePath(
     const value = priceChartBarValue(series[0] as PriceChartBar)
     if (value === null) return ""
     const y = priceChartValueY(value, geometry).toFixed(2)
-    return `M0,${y}L${geometry.width.toFixed(2)},${y}`
+    return `M0.00,${y}L${geometry.width.toFixed(2)},${y}`
   }
   return pathRuns(series, geometry).join("")
 }
@@ -446,13 +454,18 @@ export function priceChartSelectionChange(
   series: readonly PriceChartBar[],
   selection: PriceChartSelection,
 ): PriceChartChange | null {
+  // Bounds-checked rather than trusting the window: this is a public helper,
+  // and a host holding a window it saved earlier can hand it a series that
+  // has since grown shorter.
+  const first = Math.max(0, selection.start)
+  const last = Math.min(series.length - 1, selection.end)
   let from: number | null = null
-  for (let index = selection.start; index <= selection.end; index += 1) {
+  for (let index = first; index <= last; index += 1) {
     from = priceChartBarValue(series[index] as PriceChartBar)
     if (from !== null) break
   }
   let to: number | null = null
-  for (let index = selection.end; index >= selection.start; index -= 1) {
+  for (let index = last; index >= first; index -= 1) {
     to = priceChartBarValue(series[index] as PriceChartBar)
     if (to !== null) break
   }
@@ -555,7 +568,7 @@ export function priceChartTimeTicks(
     ticks.push({
       value: (series[index] as PriceChartBar).time,
       offset,
-      ratio: geometry.width === 0 ? 0 : offset / geometry.width,
+      ratio: offset / geometry.width,
     })
   }
   return ticks

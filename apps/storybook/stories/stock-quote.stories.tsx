@@ -202,12 +202,15 @@ export const Playground: Story = {
       end: number
       startBar: { time: number }
       endBar: { time: number }
-      changePercent: number
+      changeAmount: number
     }
     await expect(reported.end).toBeGreaterThan(reported.start)
     await expect(reported.startBar.time).toBe(SESSION[reported.start]?.time)
     await expect(reported.endBar.time).toBe(SESSION[reported.end]?.time)
-    await expect(Number.isFinite(reported.changePercent)).toBe(true)
+    // The reported move is the one between the window's own ends.
+    const openPrice = SESSION[reported.start]?.close as number
+    const closePrice = SESSION[reported.end]?.close as number
+    await expect(reported.changeAmount).toBeCloseTo(closePrice - openPrice, 6)
 
     const zoomedHeadline = canvasElement.querySelector(
       '[data-slot="stock-quote-price"]',
@@ -287,6 +290,10 @@ export const Watchlist: Story = {
     symbol: WATCHLIST[0]?.symbol as string,
     price: WATCHLIST[0]?.price as number,
     series: WATCHLIST[0]?.series ?? [],
+    // Every card below is built from its own row; these satisfy the required
+    // props on the story's own type and are not what the story renders.
+    ranges: [],
+    status: "live",
   },
   parameters: storyDocumentation(
     "Three panels in a responsive grid, the shape an agent answering “how did my watchlist do today?” produces. Each card sizes its own chart, and each takes its colour from its own data — no shared tone, no per-card configuration. The ranges are dropped here because one control above the grid would own them in a real screen.",
@@ -346,6 +353,8 @@ function StreamingQuote() {
 }
 
 export const Streaming: Story = {
+  // The replay owns every prop, so the story renders `StreamingQuote` rather
+  // than the args; these satisfy the required props on the story's type.
   args: {
     symbol: "HOOD",
     price: LAST,

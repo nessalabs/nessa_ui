@@ -134,7 +134,7 @@ test("the area closes every run to the floor, never across a gap", () => {
 test("a single bar draws a flat line across the box", () => {
   const single = [{ time: 0, value: 4 }]
   const geometry = geometryFor(single)
-  assert.equal(priceChartLinePath(single, geometry), "M0,50.00L100.00,50.00")
+  assert.equal(priceChartLinePath(single, geometry), "M0.00,50.00L100.00,50.00")
 })
 
 test("the area path closes the line down to the bottom edge", () => {
@@ -294,4 +294,33 @@ test("time ticks always include both ends of the window", () => {
   // More labels than bars collapses to one per bar, never duplicates.
   assert.equal(priceChartTimeTicks(line, geometry, 9).length, 3)
   assert.deepEqual(priceChartTimeTicks([], geometry, 4), [])
+})
+
+test("a window's change scans inward past gaps at either end", () => {
+  const gapped: PriceChartBar[] = [
+    { time: 0 },
+    { time: 1, value: 10 },
+    { time: 2, value: 14 },
+    { time: 3 },
+  ]
+  // The outer bars carry no price, so the move is the one its prices made.
+  assert.deepEqual(priceChartSelectionChange(gapped, { start: 0, end: 3 }), {
+    amount: 4,
+    percent: 40,
+  })
+  // A window that reaches past the series it is measured against is clamped
+  // rather than throwing: a host can hold a window a shorter feed outgrew.
+  assert.deepEqual(priceChartSelectionChange(line, { start: 0, end: 99 }), {
+    amount: 5,
+    percent: 50,
+  })
+  assert.equal(priceChartSelectionChange(line, { start: 7, end: 9 }), null)
+})
+
+test("a single-bar window of time ticks reports that one bar", () => {
+  const only = [line[0] as PriceChartBar]
+  const ticks = priceChartTimeTicks(only, geometryFor(only), 4)
+  assert.equal(ticks.length, 1)
+  assert.equal(ticks[0]?.value, 0)
+  assert.equal(ticks[0]?.offset, 50)
 })

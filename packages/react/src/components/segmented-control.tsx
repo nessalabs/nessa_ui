@@ -49,11 +49,6 @@ const segmentedShellVariants = cva(
 export interface SegmentedControlProps
   extends Omit<React.ComponentProps<"div">, "onChange">,
     VariantProps<typeof segmentedShellVariants> {
-  /**
-   * The strip the options sit in: `outlined` (default) draws a bordered
-   * pill, `bare` draws none.
-   */
-  variant?: "outlined" | "bare"
   /** Controlled selected option value. */
   value?: string
   /** Initial selected option when uncontrolled. */

@@ -58,6 +58,12 @@ export interface PriceChartLabels {
    * referenced by the cursor's `aria-describedby`.
    */
   selectionHint: string
+  /**
+   * Names the window being drawn, as part of the cursor's announced value —
+   * the band itself is drawn, so this is what a person who cannot see it
+   * hears while it grows. Receives the formatted span.
+   */
+  selecting: (span: string) => string
   /** Announces a committed window. Receives the formatted span. */
   zoomed: (span: string) => string
   /** Announces a return to the full series. */
@@ -72,6 +78,7 @@ export const priceChartDefaultLabels: PriceChartLabels = Object.freeze({
   clearSelection: "Clear selection",
   selectionHint:
     "Drag across the chart, or hold Shift and press the arrow keys and then Enter, to zoom into a window. Escape returns to the full series.",
+  selecting: (span: string) => `Selecting ${span}`,
   zoomed: (span: string) => `Zoomed to ${span}`,
   cleared: "Showing the full series",
 })
@@ -112,9 +119,11 @@ export interface PriceChartSelectionContext extends PriceChartSelection {
 
 /**
  * The measured content box of an element, or `null` before the first
- * measurement. Deliberately identical to the hooks RadarChart and PieChart
- * carry, so a chart's plot never paints at a stale size and the three can be
- * lifted into one shared module without behaviour drift.
+ * measurement. The same hook RadarChart and PieChart carry, plus one
+ * synchronous first measurement — see the comment below for why this chart
+ * needs it. Lifting the three into one shared module means adopting that
+ * measurement everywhere, which is strictly safer than the observer-only
+ * form; nothing else about them differs.
  */
 function useMeasuredBox(ref: React.RefObject<HTMLElement | null>) {
   const [box, setBox] = React.useState<{ width: number; height: number } | null>(
@@ -324,6 +333,11 @@ function PriceChart({
   labelsRef.current = labels
   const formatTimeRef = React.useRef(formatTime)
   formatTimeRef.current = formatTime
+  // The commit reads the series through a ref as well: a feed that appends a
+  // bar per tick would otherwise rebuild the commit, and with it the window
+  // listener that ends a drag, on every tick — including mid-drag.
+  const seriesRef = React.useRef(series)
+  seriesRef.current = series
   const gradientId = React.useId()
   const hintId = React.useId()
   const box = useMeasuredBox(plotRef) ?? { width: 0, height: 0 }
@@ -352,8 +366,8 @@ function PriceChart({
   // render, so an object dependency would defeat this memo (and the geometry
   // and candle memos below it) for the whole time a zoom is active.
   const visible = React.useMemo(
-    () => (windowEnd >= 0 ? series.slice(offset, windowEnd + 1) : series),
-    [series, offset, windowEnd],
+    () => (zoomed ? series.slice(offset, windowEnd + 1) : series),
+    [series, offset, windowEnd, zoomed],
   )
 
   // The window gesture rides the cursor overlay, so it cannot outlive it.
@@ -413,23 +427,24 @@ function PriceChart({
 
   const commitSelection = React.useCallback(
     (next: PriceChartSelection | null) => {
-      const normalized = priceChartNormalizeSelection(next, series.length)
+      const bars = seriesRef.current
+      const normalized = priceChartNormalizeSelection(next, bars.length)
       if (selectionProp === undefined) setUncontrolledSelection(normalized)
       if (!onSelectionChange) return
       if (!normalized) {
         onSelectionChange(null)
         return
       }
-      const change = priceChartSelectionChange(series, normalized)
+      const change = priceChartSelectionChange(bars, normalized)
       onSelectionChange({
         ...normalized,
-        startBar: series[normalized.start] as PriceChartBar,
-        endBar: series[normalized.end] as PriceChartBar,
+        startBar: bars[normalized.start] as PriceChartBar,
+        endBar: bars[normalized.end] as PriceChartBar,
         changeAmount: change?.amount ?? 0,
         changePercent: change?.percent ?? 0,
       })
     },
-    [series, selectionProp, onSelectionChange],
+    [selectionProp, onSelectionChange],
   )
 
   // The pointer session lives in a ref as well as state: the first move of a
@@ -543,6 +558,16 @@ function PriceChart({
     ) {
       return
     }
+    // The frame the anchor was taken in has to still be the frame on screen.
+    // If a host re-zoomed or the feed re-based the window mid-gesture, the
+    // anchor means something else now, so the drag is abandoned rather than
+    // committed against coordinates it never saw.
+    if (session.offset !== offset || session.count !== visible.length) {
+      dragRef.current = null
+      setDragging(false)
+      setDraft(null)
+      return
+    }
     session.drawing = true
     const next = { start: session.anchorIndex, end: index }
     session.draft = next
@@ -551,7 +576,7 @@ function PriceChart({
 
   // Pointer capture routes a release back to the plot wherever it happens,
   // so "was it over the plot" has to be measured, never assumed.
-  const isOverPlot = (clientX: number, clientY: number) => {
+  const isOverPlot = React.useCallback((clientX: number, clientY: number) => {
     const bounds = plotRef.current?.getBoundingClientRect()
     return Boolean(
       bounds &&
@@ -560,10 +585,7 @@ function PriceChart({
         clientY >= bounds.top &&
         clientY <= bounds.bottom,
     )
-  }
-
-  const isOverPlotRef = React.useRef(isOverPlot)
-  isOverPlotRef.current = isOverPlot
+  }, [])
 
   const endDrag = React.useCallback(
     (pointerId: number, pointerType: string, overPlot: boolean) => {
@@ -574,7 +596,7 @@ function PriceChart({
       release(session.target, pointerId)
       const drawn = priceChartNormalizeSelection(session.draft, session.count)
       setDraft(null)
-      if (session.drawing && drawn && drawn.end > drawn.start) {
+      if (drawn && drawn.end > drawn.start) {
         keyboardAnchorRef.current = null
         setScrubIndex(null)
         commitSelection({
@@ -600,7 +622,7 @@ function PriceChart({
       endDrag(
         event.pointerId,
         event.pointerType,
-        isOverPlotRef.current(event.clientX, event.clientY),
+        isOverPlot(event.clientX, event.clientY),
       )
     }
     window.addEventListener("pointerup", finish)
@@ -609,7 +631,7 @@ function PriceChart({
       window.removeEventListener("pointerup", finish)
       window.removeEventListener("pointercancel", finish)
     }
-  }, [dragging, endDrag])
+  }, [dragging, endDrag, isOverPlot])
 
   const clearSelection = () => {
     keyboardAnchorRef.current = null
@@ -630,6 +652,10 @@ function PriceChart({
     const moves: Record<string, number> = {
       ArrowRight: Math.min(lastVisible, current + 1),
       ArrowLeft: Math.max(0, current - 1),
+      // A horizontal slider still owes Up and Down: they are the same step,
+      // and a person reaching for them should not fall through to the page.
+      ArrowUp: Math.min(lastVisible, current + 1),
+      ArrowDown: Math.max(0, current - 1),
       PageUp: Math.min(lastVisible, current + bigStep),
       PageDown: Math.max(0, current - bigStep),
       Home: 0,
@@ -638,9 +664,10 @@ function PriceChart({
     if (event.key === "Escape") {
       // Escape only belongs to the chart while it has something to drop;
       // otherwise it stays available to whatever layer contains the chart.
-      if (!draft && !selection && activeIndex === null) return
+      const clearable = canSelect && (draft || selection)
+      if (!clearable && activeIndex === null) return
       event.preventDefault()
-      if (draft || selection) clearSelection()
+      if (clearable) clearSelection()
       else setScrubIndex(null)
       return
     }
@@ -668,13 +695,6 @@ function PriceChart({
       const anchor = keyboardAnchorRef.current ?? current
       keyboardAnchorRef.current = anchor
       setDraft({ start: anchor, end: next })
-      const from = visible[Math.min(anchor, next)]
-      const to = visible[Math.max(anchor, next)]
-      if (from && to) {
-        setAnnouncement(
-          `${formatTime(from.time)} – ${formatTime(to.time)}`,
-        )
-      }
       return
     }
     keyboardAnchorRef.current = null
@@ -688,11 +708,11 @@ function PriceChart({
   )
   const drawable =
     geometry.width > 0 && geometry.height > 0 && visible.length > 0
+  // In the candle view every visible bar has a candle — the view falls back
+  // to a line otherwise — so a bar's mark is its own index, not a lookup.
   const newestX =
-    resolvedView === "candle"
-      ? (candles[candles.length - 1]?.center ??
-        priceChartPointX(lastVisibleIndex, geometry))
-      : priceChartPointX(lastVisibleIndex, geometry)
+    candles[lastVisibleIndex]?.center ??
+    priceChartPointX(lastVisibleIndex, geometry)
   // A zoomed window usually ends before the series does, and a marker that
   // says "live" has to sit on the bar that actually is.
   const showsNewestBar = offset + lastVisibleIndex === series.length - 1
@@ -736,21 +756,8 @@ function PriceChart({
   const cursorX =
     localActive === null
       ? 0
-      : resolvedView === "candle"
-        ? ((candles.find((candle) => candle.index === localActive)?.center ??
-            priceChartPointX(localActive, geometry)))
-        : priceChartPointX(localActive, geometry)
-  // A slider always owes a value, so with no cursor showing it announces the
-  // newest bar — the one an arrow press starts from.
-  const announcedIndex =
-    activeIndex ?? Math.max(0, offset + lastVisibleIndex)
-  const announcedBar = series[announcedIndex]
-  const announcedValue = announcedBar ? priceChartBarValue(announcedBar) : null
-  const valueText =
-    announcedBar && announcedValue !== null
-      ? `${formatTime(announcedBar.time)}, ${formatValue(announcedValue)}`
-      : undefined
-
+      : (candles[localActive]?.center ??
+        priceChartPointX(localActive, geometry))
   const draftWindow = drawable
     ? priceChartNormalizeSelection(draft, visible.length)
     : null
@@ -775,6 +782,23 @@ function PriceChart({
       : []
   const axisTime = formatAxisTime ?? formatTime
   const axisValue = formatAxisValue ?? formatValue
+  // A slider always owes a value, so with no cursor showing it announces the
+  // newest bar — the one an arrow press starts from.
+  const announcedIndex =
+    activeIndex ?? Math.max(0, offset + lastVisibleIndex)
+  const announcedBar = series[announcedIndex]
+  const announcedValue = announcedBar ? priceChartBarValue(announcedBar) : null
+  const barText =
+    announcedBar && announcedValue !== null
+      ? `${formatTime(announcedBar.time)}, ${formatValue(announcedValue)}`
+      : undefined
+  const draftFrom = draftWindow ? visible[draftWindow.start] : undefined
+  const draftTo = draftWindow ? visible[draftWindow.end] : undefined
+  const valueText =
+    draftFrom && draftTo
+      ? `${labels.selecting(`${formatTime(draftFrom.time)} – ${formatTime(draftTo.time)}`)}${barText ? `, ${barText}` : ""}`
+      : barText
+
   // The summary rides its own width: centred over the band in the middle of
   // the plot, and progressively pulled back as the band nears an edge, so a
   // window drawn at the very end still shows the whole label.
@@ -789,6 +813,7 @@ function PriceChart({
   // One control, two homes: the corner the two scales leave empty, or the
   // plot's own corner when the chart is drawn without scales. It never sits
   // over the bars either way.
+  const showClear = Boolean(selection) && canSelect
   const clearControl = (
     <button
       type="button"
@@ -970,6 +995,7 @@ function PriceChart({
                   className="origin-center [transform-box:fill-box] motion-safe:animate-ping"
                 />
                 <circle
+                  data-slot="price-chart-live-marker"
                   cx={newestX}
                   cy={priceChartValueY(lastValue, geometry)}
                   r={3}
@@ -1060,7 +1086,13 @@ function PriceChart({
             onPointerLeave={() => {
               if (dragRef.current === null) setScrubIndex(null)
             }}
-            onBlur={() => setScrubIndex(null)}
+            onBlur={() => {
+              // A keyboard-drawn band has nothing driving it once focus
+              // leaves, exactly like a pointer band after its release.
+              keyboardAnchorRef.current = null
+              setDraft(null)
+              setScrubIndex(null)
+            }}
             onKeyDown={handleKeyDown}
           />
         ) : null}
@@ -1084,7 +1116,7 @@ function PriceChart({
             ) : null}
           </div>
         ) : null}
-        {selection && canSelect && !axes ? clearControl : null}
+        {showClear && !axes ? clearControl : null}
       </div>
         {axes ? (
           <div
@@ -1141,9 +1173,7 @@ function PriceChart({
           </div>
         ) : null}
         {axes ? (
-          <div className="relative">
-            {selection && canSelect ? clearControl : null}
-          </div>
+          <div className="relative">{showClear ? clearControl : null}</div>
         ) : null}
       </div>
       {canSelect ? (
@@ -1151,9 +1181,11 @@ function PriceChart({
           {labels.selectionHint}
         </span>
       ) : null}
-      <span role="status" className="sr-only">
-        {announcement}
-      </span>
+      {canSelect ? (
+        <span role="status" className="sr-only">
+          {announcement}
+        </span>
+      ) : null}
       {children}
     </div>
   )
