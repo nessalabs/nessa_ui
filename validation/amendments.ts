@@ -130,4 +130,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-009",
+    kind: "transition",
+    contractId: "ICON-001",
+    baseRevision: "758901ac945ba3305e677823ec2af8f65b8d3e3b",
+    targets: ["validation/contracts.ts", "validation/exceptions.ts"],
+    beforeFingerprint: "bcd57383ecd6ab2c42f2eaf5480642f42747767794eb485bf26fbc36ae3ce5eb",
+    afterFingerprint: "240b9b6065b08b9a3d1dfa99387d7025c32a47a674194f860ac3b075e1824918",
+    rationale: "Narrows the ICON-001 activation probe to the icons module (packages/react/src/icons/use-icon.ts) so Accordion can ship as a transitional lucide-consuming primitive exactly like Select and DropdownMenu, without prematurely activating the still-planned semantic icon system; also ledgers Textarea's exact transitional light-mode focus-contrast measurements, which mirror Input's existing entries because Textarea deliberately shares Input's field treatment (including the semantic --nessa-invalid-ring token).",
+    compatibility: "ICON-001 keeps guarding semantic icon activation through its real surface, the icons module, and no icon API becomes public; Textarea introduces no new focus behavior, only the same ledgered translucent focus treatment Input already carries, so no requirement weakens.",
+    migration: "When packages/react/src/icons/use-icon.ts lands, ICON-001 activates and Accordion must migrate its chevron to the chevronDown semantic role; Textarea's focus-contrast entries retire together with Input's during the semantic focus token migration.",
+    supersedes: null,
+    pullRequest: null,
+  },
 ])

@@ -64,8 +64,9 @@ export const activationProbes = Object.freeze({
     "packages/react/src/provider/nessa-provider.tsx",
     "packages/react/src/theme/nessa-theme-scope.tsx",
   ],
-  "icon-consumer-surface": [
-    "packages/react/src/components/accordion.tsx",
-    "packages/react/src/icons/use-icon.ts",
-  ],
+  // Accordion ships ahead of the semantic icon system as a transitional
+  // lucide-consuming primitive (like Select and DropdownMenu), so the icon
+  // activation surface is the icons module itself; Accordion migrates to the
+  // chevronDown semantic role when that surface lands (AMEND-009).
+  "icon-consumer-surface": ["packages/react/src/icons/use-icon.ts"],
 } satisfies Record<string, readonly string[]>)

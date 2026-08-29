@@ -1,0 +1,22 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "status-dot",
+  "title": "Status dot",
+  "description": "A small colored dot conveying run state at a glance, in four statuses.",
+  "dependencies": [
+    "class-variance-authority"
+  ],
+  "registryDependencies": [
+    "nessalabs/nessa_ui/nessa-base",
+    "nessalabs/nessa_ui/utils"
+  ],
+  "files": [
+    {
+      "path": "packages/react/src/components/status-dot.tsx",
+      "content": "import * as React from \"react\"\nimport { cva, type VariantProps } from \"class-variance-authority\"\n\nimport { cn } from \"@/lib/utils\"\n\nconst statusDotVariants = cva(\"inline-block size-2 shrink-0 rounded-full\", {\n  variants: {\n    status: {\n      running: \"bg-nessa-thinking-fill-current animate-pulse\",\n      success: \"bg-nessa-diff-addition\",\n      error: \"bg-destructive\",\n      idle: \"bg-muted-foreground/50\",\n    },\n  },\n  defaultVariants: {\n    status: \"idle\",\n  },\n})\n\nexport interface StatusDotProps\n  extends React.ComponentProps<\"span\">,\n    VariantProps<typeof statusDotVariants> {}\n\n/**\n * A small colored dot conveying run state at a glance. Pair it with a text\n * label; the dot alone is not accessible. Decorative by default — pass an\n * `aria-label` only when no visible label accompanies it.\n */\nfunction StatusDot({ className, status, ...props }: StatusDotProps) {\n  return (\n    <span\n      data-slot=\"status-dot\"\n      aria-hidden={props[\"aria-label\"] ? undefined : true}\n      className={cn(statusDotVariants({ status }), className)}\n      {...props}\n    />\n  )\n}\n\nexport { StatusDot, statusDotVariants }\n",
+      "type": "registry:ui",
+      "target": "components/ui/status-dot.tsx"
+    }
+  ],
+  "type": "registry:ui"
+}

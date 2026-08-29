@@ -1,0 +1,23 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "tooltip",
+  "title": "Tooltip",
+  "description": "A plain hover/focus tooltip on Nessa's popover surface: a compact label pill for icon buttons and chips, with a provider-shared open delay that skips when moving between neighboring triggers.",
+  "dependencies": [
+    "radix-ui"
+  ],
+  "registryDependencies": [
+    "nessalabs/nessa_ui/nessa-base",
+    "nessalabs/nessa_ui/popover-surface",
+    "nessalabs/nessa_ui/utils"
+  ],
+  "files": [
+    {
+      "path": "packages/react/src/components/tooltip.tsx",
+      "content": "\"use client\"\n\nimport * as React from \"react\"\nimport { Tooltip as TooltipPrimitive } from \"radix-ui\"\n\nimport { cn } from \"@/lib/utils\"\nimport { popoverSurfaceVariants } from \"./popover-surface\"\n\n/**\n * Shares tooltip timing across a region. Tooltips inside one provider skip\n * the open delay when the pointer moves between neighboring triggers — wrap\n * a toolbar of icon buttons in one so only the first tooltip waits. Optional:\n * a bare Tooltip provides its own.\n */\nfunction TooltipProvider({\n  delayDuration = 300,\n  ...props\n}: React.ComponentProps<typeof TooltipPrimitive.Provider>) {\n  return (\n    <TooltipPrimitive.Provider\n      data-slot=\"tooltip-provider\"\n      delayDuration={delayDuration}\n      {...props}\n    />\n  )\n}\n\n/**\n * The tooltip root: a hover/focus label naming or explaining its trigger.\n * Opens after the surrounding provider's delay and coordinates the trigger\n * with the floating content. Purely supplementary — the trigger still needs\n * its own accessible name. For the floating selection-action pill, see\n * SelectionTooltip; this is the plain hover tooltip.\n */\nfunction Tooltip({\n  ...props\n}: React.ComponentProps<typeof TooltipPrimitive.Root>) {\n  return (\n    <TooltipProvider>\n      <TooltipPrimitive.Root data-slot=\"tooltip\" {...props} />\n    </TooltipProvider>\n  )\n}\n\n/**\n * The element the tooltip describes. Renders its child as the trigger via\n * `asChild`, so any Nessa button or chip can carry a tooltip.\n */\nfunction TooltipTrigger({\n  ...props\n}: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {\n  return <TooltipPrimitive.Trigger data-slot=\"tooltip-trigger\" {...props} />\n}\n\nexport interface TooltipContentProps\n  extends React.ComponentProps<typeof TooltipPrimitive.Content> {\n  /** Portal container for the floating content; defaults to the body. */\n  portalContainer?: HTMLElement | null\n}\n\n/**\n * The floating label: a compact popover-surface pill portalled into\n * `portalContainer` (or the body). Keep the content to a short phrase —\n * anything interactive belongs in a popover or menu, not a tooltip.\n */\nfunction TooltipContent({\n  className,\n  sideOffset = 6,\n  collisionPadding = 12,\n  portalContainer,\n  ...props\n}: TooltipContentProps) {\n  return (\n    <TooltipPrimitive.Portal container={portalContainer}>\n      <TooltipPrimitive.Content\n        data-slot=\"tooltip-content\"\n        sideOffset={sideOffset}\n        collisionPadding={collisionPadding}\n        className={cn(\n          popoverSurfaceVariants({ elevation: \"md\", radius: \"lg\" }),\n          \"z-50 max-w-72 origin-(--radix-tooltip-content-transform-origin) text-balance px-2.5 py-1 nessa-text-2 data-[state=closed]:animate-out data-[state=delayed-open]:animate-in data-[state=instant-open]:animate-in data-[state=closed]:fade-out-0 data-[state=delayed-open]:fade-in-0 data-[state=instant-open]:fade-in-0\",\n          className,\n        )}\n        {...props}\n      />\n    </TooltipPrimitive.Portal>\n  )\n}\n\nexport { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger }\n",
+      "type": "registry:ui",
+      "target": "components/ui/tooltip.tsx"
+    }
+  ],
+  "type": "registry:ui"
+}
