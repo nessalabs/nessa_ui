@@ -112,6 +112,12 @@ export {
 } from "./components/gantt-chart"
 export { Input } from "./components/input"
 export {
+  PageOutline,
+  type PageOutlineItemData,
+  type PageOutlineMarkerState,
+  type PageOutlineProps,
+} from "./components/page-outline"
+export {
   Pagination,
   PaginationContent,
   PaginationEllipsis,
