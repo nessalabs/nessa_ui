@@ -51,7 +51,7 @@ import {
   type ModelPickerGroup,
   type ModelPickerValue,
 } from "@nessa-ui/react"
-import { ChevronLeft, ChevronRight, Folder, Image as ImageIcon, Paperclip, Plus, SlidersHorizontal, Sparkles, Puzzle, Square, X } from "lucide-react"
+import { Braces, ChevronLeft, ChevronRight, FileText, Folder, Image as ImageIcon, Paperclip, Plus, SlidersHorizontal, Sparkles, Puzzle, Square, X } from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"
 import {
@@ -225,7 +225,8 @@ function ChipCard({
 }: {
   item: SlashItem
   onClose: () => void
-  onPreview: () => void
+  /** Receives true when the press asked for a new tab (Cmd/Ctrl-click). */
+  onPreview: (newTab: boolean) => void
 }) {
   const ref = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => {
@@ -275,7 +276,8 @@ function ChipCard({
       </p>
       <button
         type="button"
-        onClick={onPreview}
+        onClick={(event) => onPreview(event.metaKey || event.ctrlKey)}
+        title="Click to preview here; Cmd-click for a new tab"
         className="self-start rounded-full border-0 bg-transparent p-0 font-sans nessa-text-2 font-medium text-(--nessa-chat-accent) outline-none hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         Preview {chipFileMock(item).name}
@@ -956,29 +958,33 @@ function PlaygroundExample({
         />
       )),
     })
-  const openChipPreview = (item: SlashItem) => {
-    const file = chipFileMock(item)
+  // Files previewed from chips live in the tab strip like subagents do:
+  // one tab per file, the file-type glyph as the icon, closeable.
+  const [fileTabs, setFileTabs] = React.useState<Record<string, SlashItem>>({})
+  // A plain click previews in the current tab, replacing the transcript;
+  // Cmd/Ctrl-click parks the file as its own tab instead.
+  const [inlinePreview, setInlinePreview] = React.useState<SlashItem | null>(
+    null,
+  )
+  const openChipPreview = (item: SlashItem, newTab: boolean) => {
     setChipCardItem(null)
-    const previewFile = {
-      src: `data:${file.mimeType};charset=utf-8,${encodeURIComponent(file.content)}`,
-      name: file.name,
-      mimeType: file.mimeType,
+    if (!newTab) {
+      setInlinePreview(item)
+      return
     }
-    // The bare renderer, not the framed FilePreview: no filename header, no
-    // card — just the file's content over the chat surface.
-    setOverlay({
-      summary: file.name,
-      body: (
-        <div className="min-h-0 w-full flex-1 overflow-auto text-left">
-          {item.kind === "plugin" ? (
-            <FilePreviewJson file={previewFile} kind="json" />
-          ) : (
-            <FilePreviewMarkdown file={previewFile} kind="markdown" />
-          )}
-        </div>
-      ),
-    })
+    const tabId = `file:${item.id}`
+    setFileTabs((current) => ({ ...current, [tabId]: item }))
+    setTabs((current) =>
+      current.some((tab) => tab.id === tabId)
+        ? current
+        : [
+            ...current,
+            { id: tabId, title: chipFileMock(item).name, closeable: true },
+          ],
+    )
+    setActiveTabId(tabId)
   }
+  const activeFileItem = fileTabs[activeTabId] ?? inlinePreview ?? undefined
   const [menuTargetId, setMenuTargetId] = React.useState<number | null>(null)
   const attachmentCounters = React.useRef<Record<DemoAttachmentKind, number>>({ photo: 0, file: 0, folder: 0, skill: 0, plugin: 0 })
   const inputRef = React.useRef<ChatComposerEditorHandle>(null)
@@ -1074,6 +1080,7 @@ function PlaygroundExample({
     setOverlay(null)
     setModelCardOpen(false)
     setChipCardItem(null)
+    setInlinePreview(null)
   }
 
   const addAttachment = (kind: DemoAttachmentKind) => {
@@ -1176,9 +1183,17 @@ function PlaygroundExample({
           const sub = tab.id.startsWith("sub:")
             ? demoSubagents[tab.id.slice("sub:".length)]
             : undefined
+          const fileItem = fileTabs[tab.id]
           return {
             ...tab,
-            icon: sub ? (
+            icon: fileItem ? (
+              // The file-type glyph names the tab's content at a glance.
+              fileItem.kind === "plugin" ? (
+                <Braces aria-hidden="true" />
+              ) : (
+                <FileText aria-hidden="true" />
+              )
+            ) : sub ? (
               // On the tab you are already inside, hovering swaps the
               // avatar for a back glyph: clicking the active subagent tab
               // returns to the conversation that spawned it (handled in
@@ -1206,6 +1221,11 @@ function PlaygroundExample({
         })}
         value={activeTabId}
         onValueChange={(id) => {
+          // Any tab click leaves an in-place file preview first.
+          if (inlinePreview) {
+            setInlinePreview(null)
+            if (id === activeTabId) return
+          }
           // Re-selecting the subagent tab you are inside goes back to the
           // conversation that spawned it — the hover back glyph's action.
           const target =
@@ -1231,6 +1251,10 @@ function PlaygroundExample({
             return next
           })
           setMessagesByTab((current) => {
+            const { [id]: _closed, ...rest } = current
+            return rest
+          })
+          setFileTabs((current) => {
             const { [id]: _closed, ...rest } = current
             return rest
           })
@@ -1261,6 +1285,25 @@ function PlaygroundExample({
         // the tab strip and the pill stay visible and usable around it.
         className="relative flex min-h-0 flex-1 flex-col"
       >
+      {activeFileItem ? (
+        // A file tab replaces the transcript with the bare file content —
+        // no viewer chrome; the tab itself is the navigation.
+        <div className="min-h-0 flex-1 overflow-y-auto text-left [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {(() => {
+            const file = chipFileMock(activeFileItem)
+            const previewFile = {
+              src: `data:${file.mimeType};charset=utf-8,${encodeURIComponent(file.content)}`,
+              name: file.name,
+              mimeType: file.mimeType,
+            }
+            return activeFileItem.kind === "plugin" ? (
+              <FilePreviewJson file={previewFile} kind="json" />
+            ) : (
+              <FilePreviewMarkdown file={previewFile} kind="markdown" />
+            )
+          })()}
+        </div>
+      ) : (
       <div
         ref={logRef}
         aria-label="Conversation"
@@ -1332,6 +1375,7 @@ function PlaygroundExample({
           <ChatTypingIndicator label="Assistant is typing" />
         ) : null}
       </div>
+      )}
       {overlay ? (
         <ChatAttachmentViewer
           summary={overlay.summary}
@@ -1345,7 +1389,7 @@ function PlaygroundExample({
         <ChipCard
           item={chipCardItem}
           onClose={() => setChipCardItem(null)}
-          onPreview={() => openChipPreview(chipCardItem)}
+          onPreview={(newTab) => openChipPreview(chipCardItem, newTab)}
         />
       ) : null}
       {modelCardOpen ? (
@@ -1359,13 +1403,18 @@ function PlaygroundExample({
           onClose={() => setModelCardOpen(false)}
         />
       ) : null}
+      {activeFileItem ? null : (
       <PillComposer
         generating={generating}
         onSubmit={(event) => {
           event.preventDefault()
           const content = inputRef.current?.getContent()
           const text = (content?.text ?? message).trim()
-          if ((!text && attachments.length === 0) || generatingTabId !== null)
+          if (
+            (!text && attachments.length === 0) ||
+            generatingTabId !== null ||
+            activeFileItem !== undefined
+          )
             return
           // Chips travel with the message: the bubble re-renders them with
           // their icons instead of flattening to plain text.
@@ -1583,6 +1632,7 @@ function PlaygroundExample({
           )}
         </ChatComposerTrigger>
       </PillComposer>
+      )}
     </div>
   )
 }
