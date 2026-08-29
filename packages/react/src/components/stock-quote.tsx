@@ -329,8 +329,20 @@ function StockQuote({
   // sees, and the host that swaps the bars under a fixed range.
   const plottedBars = React.useRef(series)
   React.useEffect(() => {
-    if (plottedBars.current === series) return
+    const previous = plottedBars.current
     plottedBars.current = series
+    if (previous === series) return
+    // A feed appending prints is the same window still growing: the indices
+    // a window and a cursor hold still name the same bars, so they survive.
+    // Anything else — a shorter series, a different first bar — re-bases
+    // every index, and a reading kept across it would point at bars nobody
+    // chose.
+    const grew =
+      series.length >= previous.length &&
+      previous[0]?.time === series[0]?.time &&
+      previous[previous.length - 1]?.time ===
+        series[previous.length - 1]?.time
+    if (grew) return
     dropReadings()
   }, [series, dropReadings])
 
@@ -630,7 +642,7 @@ function StockQuote({
         {ranges.length ? (
           <SegmentedControl
             aria-label={labels.ranges}
-            value={range}
+            value={activeRange}
             onValueChange={changeRange}
             variant="bare"
             className="min-w-0 flex-wrap"

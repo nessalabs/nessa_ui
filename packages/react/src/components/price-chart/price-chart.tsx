@@ -338,6 +338,8 @@ function PriceChart({
   // listener that ends a drag, on every tick — including mid-drag.
   const seriesRef = React.useRef(series)
   seriesRef.current = series
+  // The window on screen right now, for the callbacks that outlive a render.
+  const offsetRef = React.useRef(0)
   const gradientId = React.useId()
   const hintId = React.useId()
   const box = useMeasuredBox(plotRef) ?? { width: 0, height: 0 }
@@ -352,6 +354,10 @@ function PriceChart({
   // lives beside the committed zoom so releasing the drag is what changes
   // what the chart plots.
   const [draft, setDraft] = React.useState<PriceChartSelection | null>(null)
+  // A draft is in the plotted window's own coordinates, so it cannot outlive
+  // that window: a keyboard band drawn before a re-zoom would otherwise
+  // commit against bars it never covered.
+  const draftFrameRef = React.useRef<number | null>(null)
 
   // Everything below plots the visible window, not the whole series, so a
   // zoom needs no second code path: the offset maps a visible bar back to
@@ -362,6 +368,7 @@ function PriceChart({
   // so anything downstream that only needs "is a zoom open" must depend on
   // this instead, or it defeats its own memo.
   const zoomed = windowEnd >= 0
+  offsetRef.current = offset
   // Keyed on the window's own bounds: `selection` is normalised fresh on every
   // render, so an object dependency would defeat this memo (and the geometry
   // and candle memos below it) for the whole time a zoom is active.
@@ -504,6 +511,17 @@ function PriceChart({
     [indexAtClientX, offset, scrubIndex, setScrubIndex],
   )
 
+  // Ends a gesture without committing anything: the session goes, its capture
+  // goes with it, and the marks it left behind go too.
+  const abandonDrag = (session: { pointerId: number; target: HTMLElement }) => {
+    dragRef.current = null
+    setDragging(false)
+    release(session.target, session.pointerId)
+    draftFrameRef.current = null
+    setDraft(null)
+    setScrubIndex(null)
+  }
+
   const capture = (element: HTMLElement, pointerId: number) => {
     try {
       element.setPointerCapture(pointerId)
@@ -559,18 +577,19 @@ function PriceChart({
       return
     }
     // The frame the anchor was taken in has to still be the frame on screen.
-    // If a host re-zoomed or the feed re-based the window mid-gesture, the
-    // anchor means something else now, so the drag is abandoned rather than
-    // committed against coordinates it never saw.
-    if (session.offset !== offset || session.count !== visible.length) {
-      dragRef.current = null
-      setDragging(false)
-      setDraft(null)
+    // A feed appending bars is not a new frame — the anchor still names the
+    // same bar — but a re-zoom or a shorter series re-bases every index, so
+    // the drag is abandoned rather than committed against coordinates it
+    // never saw.
+    if (session.offset !== offset || visible.length < session.count) {
+      abandonDrag(session)
       return
     }
+    session.count = visible.length
     session.drawing = true
     const next = { start: session.anchorIndex, end: index }
     session.draft = next
+    draftFrameRef.current = offset
     setDraft(next)
   }
 
@@ -594,7 +613,14 @@ function PriceChart({
       dragRef.current = null
       setDragging(false)
       release(session.target, pointerId)
+      if (session.offset !== offsetRef.current) {
+        draftFrameRef.current = null
+        setDraft(null)
+        setScrubIndex(null)
+        return
+      }
       const drawn = priceChartNormalizeSelection(session.draft, session.count)
+      draftFrameRef.current = null
       setDraft(null)
       if (drawn && drawn.end > drawn.start) {
         keyboardAnchorRef.current = null
@@ -635,6 +661,7 @@ function PriceChart({
 
   const clearSelection = () => {
     keyboardAnchorRef.current = null
+    draftFrameRef.current = null
     setDraft(null)
     setScrubIndex(null)
     // Only a committed window is worth reporting as cleared; an abandoned
@@ -676,6 +703,7 @@ function PriceChart({
     if (event.key === "Enter" && draft) {
       event.preventDefault()
       const drawn = priceChartNormalizeSelection(draft, visible.length)
+      draftFrameRef.current = null
       setDraft(null)
       if (drawn && drawn.end > drawn.start) {
         keyboardAnchorRef.current = null
@@ -694,10 +722,12 @@ function PriceChart({
     if (canSelect && event.shiftKey) {
       const anchor = keyboardAnchorRef.current ?? current
       keyboardAnchorRef.current = anchor
+      draftFrameRef.current = offset
       setDraft({ start: anchor, end: next })
       return
     }
     keyboardAnchorRef.current = null
+    draftFrameRef.current = null
     setDraft(null)
   }
 
@@ -721,9 +751,19 @@ function PriceChart({
   // which for a freshly mounted cursor is the plot's left edge. The glide is
   // therefore enabled only once the cursor is already on screen.
   const cursorWasVisible = React.useRef(false)
-  const glideCursor = cursorWasVisible.current && activeIndex !== null
+  // A resize re-derives every coordinate in the plot at once. Gliding through
+  // that would send the cursor drifting across the chart, off its own line,
+  // for the length of the transition — so the glide is only for a cursor that
+  // was already on screen in a box that has not just changed size.
+  const measuredBoxRef = React.useRef(box)
+  const boxChanged =
+    measuredBoxRef.current.width !== box.width ||
+    measuredBoxRef.current.height !== box.height
+  const glideCursor =
+    cursorWasVisible.current && activeIndex !== null && !boxChanged
   React.useEffect(() => {
     cursorWasVisible.current = activeIndex !== null
+    measuredBoxRef.current = box
   })
   // A live region that exists from first paint (an assistive technology only
   // observes regions it was already watching) and speaks once per committed
@@ -733,6 +773,15 @@ function PriceChart({
   // a controlled host that declines to apply a window must not be told the
   // chart zoomed, and a re-commit of the same window changes nothing to say.
   const announcedWindowRef = React.useRef<string | null | undefined>(undefined)
+  // A draft only means something in the window it was drawn in.
+  React.useEffect(() => {
+    if (draftFrameRef.current === null || draftFrameRef.current === offset) {
+      return
+    }
+    setDraft(null)
+    draftFrameRef.current = null
+  }, [offset])
+
   React.useEffect(() => {
     const key = zoomed ? `${offset}:${windowEnd}` : null
     if (announcedWindowRef.current === key) return
@@ -1063,7 +1112,9 @@ function PriceChart({
             aria-disabled={visible.length === 0 || undefined}
             aria-describedby={canSelect ? hintId : undefined}
             aria-keyshortcuts={
-              canSelect ? "Shift+ArrowLeft Shift+ArrowRight Enter Escape" : undefined
+              canSelect
+                ? "Shift+ArrowLeft Shift+ArrowRight Shift+Home Shift+End Enter Escape"
+                : undefined
             }
             data-slot="price-chart-cursor"
             // Horizontal drags scrub, vertical drags still scroll the page.
@@ -1090,6 +1141,7 @@ function PriceChart({
               // A keyboard-drawn band has nothing driving it once focus
               // leaves, exactly like a pointer band after its release.
               keyboardAnchorRef.current = null
+              draftFrameRef.current = null
               setDraft(null)
               setScrubIndex(null)
             }}

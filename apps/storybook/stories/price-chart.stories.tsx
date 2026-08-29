@@ -159,11 +159,12 @@ export const Playground: Story = {
 
 export const Candlesticks: Story = {
   parameters: storyDocumentation(
-    "The same geometry drawn as open/high/low/close bars: each candle is toned by its own direction, so a red body inside a rising stretch stays legible. Candles are slot-centred rather than edge-to-edge, and the cursor resolves to the candle under the pointer. The play test walks to the last candle and reads its announced close.",
+    "The same geometry drawn as open/high/low/close bars: each candle is toned by its own direction, so a red body inside a rising stretch stays legible. Candles are slot-centred rather than edge-to-edge, and both the cursor and the streaming marker follow that spacing. The play test walks to the last candle, reads its announced close, and checks the marker sits at the centre of its slot.",
   ),
   args: {
     series: DAILY_CANDLES,
     view: "candle",
+    live: true,
     formatValue: (value: number) => `$${value.toFixed(2)}`,
     formatTime: (time: number) => dayFormatter.format(new Date(time)),
   },
@@ -187,6 +188,21 @@ export const Candlesticks: Story = {
       "aria-valuetext",
       `${dayFormatter.format(new Date(last?.time as number))}, $${last?.close?.toFixed(2)}`,
     )
+
+    // The streaming marker follows the view's own spacing: on candles it
+    // sits at the centre of the last slot, not at the plot's edge.
+    const marker = canvasElement.querySelector(
+      '[data-slot="price-chart-live-marker"]',
+    ) as SVGCircleElement
+    const plotWidth = (
+      canvasElement.querySelector(
+        '[data-slot="price-chart"] svg',
+      ) as SVGSVGElement
+    ).getBoundingClientRect().width
+    const slot = plotWidth / DAILY_CANDLES.length
+    await expect(
+      Math.abs(Number(marker.getAttribute("cx")) - (plotWidth - slot / 2)),
+    ).toBeLessThanOrEqual(1)
   },
 }
 
