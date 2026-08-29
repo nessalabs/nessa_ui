@@ -114,6 +114,8 @@
           "nessa-chart-series-8-strong": "oklch(0.72 0.1 230)",
           "nessa-diff-addition": "oklch(0.5 0.137 150)",
           "nessa-diff-deletion": "oklch(0.55 0.19 27)",
+          "nessa-market-gain": "oklch(0.5 0.135 148)",
+          "nessa-market-loss": "oklch(0.55 0.19 27)",
           "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 20%, transparent)",
           "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)",
           "nessa-chat-accent": "#0071e3",
@@ -172,6 +174,8 @@
           "nessa-chart-series-8-strong": "oklch(0.68 0.1 230)",
           "nessa-diff-addition": "oklch(0.77 0.17 152)",
           "nessa-diff-deletion": "oklch(0.7 0.19 25)",
+          "nessa-market-gain": "oklch(0.8 0.19 150)",
+          "nessa-market-loss": "oklch(0.7 0.19 25)",
           "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 40%, transparent)",
           "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)",
           "nessa-chat-accent": "#0071e3",
@@ -1878,6 +1882,59 @@
           "path": "packages/react/src/components/file-preview/file-preview-csv.tsx",
           "type": "registry:ui",
           "target": "components/ui/file-preview/file-preview-csv.tsx"
+        }
+      ]
+    },
+    {
+      "name": "price-chart",
+      "type": "registry:ui",
+      "title": "Price chart",
+      "description": "A brokerage-style price plot: one hairline stroke in the market's colour with an optional tone wash, a dotted reference rule, a price scale over faint gridlines and a time scale that re-label themselves when a drag zooms into a window, a candle view over the same geometry, a pulsing marker for a streaming quote, and a cursor that scrubs by pointer, finger, or arrow key.",
+      "dependencies": [
+        "class-variance-authority",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/price-chart/index.ts",
+          "type": "registry:ui",
+          "target": "components/ui/price-chart/index.ts"
+        },
+        {
+          "path": "packages/react/src/components/price-chart/price-chart.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/price-chart/price-chart.tsx"
+        },
+        {
+          "path": "packages/react/src/components/price-chart/price-chart-math.ts",
+          "type": "registry:ui",
+          "target": "components/ui/price-chart/price-chart-math.ts"
+        }
+      ]
+    },
+    {
+      "name": "stock-quote",
+      "type": "registry:ui",
+      "title": "Stock quote",
+      "description": "A brokerage-style quote panel: ticker, name and trading status, the price in large type with its change in the market's colour, a scrubbable and zoomable price chart with line and candle views, range controls that switch windows on their own, an after-hours line, and a strip of key figures — built for agents streaming live market data into a card or a full-width page.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/price-chart",
+        "nessalabs/nessa_ui/segmented-control",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/stock-quote.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/stock-quote.tsx"
         }
       ]
     }
