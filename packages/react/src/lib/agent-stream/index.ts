@@ -89,16 +89,10 @@ export {
  */
 export * as claude from "./claude"
 export * as codex from "./codex"
-<<<<<<< HEAD
 export * as opencode from "./opencode"
-=======
->>>>>>> origin/main
 
 // The two entry points are also exported flat, because reaching for a parser by
 // name is the common case and `claude.ClaudeStreamMapper` stutters.
 export { ClaudeStreamMapper, mapClaudeStream } from "./claude/mapper"
 export { CodexStreamMapper, mapCodexStream } from "./codex/mapper"
-<<<<<<< HEAD
 export { OpencodeStreamMapper, mapOpencodeStream } from "./opencode/mapper"
-=======
->>>>>>> origin/main

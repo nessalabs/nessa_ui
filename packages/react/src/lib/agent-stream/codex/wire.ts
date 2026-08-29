@@ -2,7 +2,6 @@
 
 import { parseJsonLine } from "../json"
 import type { JsonValue } from "../json"
-<<<<<<< HEAD
 import type { WireProvenance } from "../events"
 
 /**
@@ -18,8 +17,6 @@ export const CODEX_WIRE_PROVENANCE: WireProvenance = Object.freeze({
   command: "codex exec --json",
   capturedOn: "2026-08-29",
 })
-=======
->>>>>>> origin/main
 
 /** Re-exported so one import gives a consumer this wire's whole vocabulary. */
 export type { JsonValue }

@@ -6,15 +6,10 @@ import {
   Button,
   ClaudeStreamMapper,
   CodexStreamMapper,
-<<<<<<< HEAD
   OpencodeStreamMapper,
   claude,
   codex,
   opencode,
-=======
-  claude,
-  codex,
->>>>>>> origin/main
   mapClaudeStream,
   JsonTree,
   Message,
@@ -82,7 +77,6 @@ import { storyDocumentation } from "./story-documentation"
 // is authored transcript data.
 import failing from "./fixtures/agent-stream/failing.jsonl?raw"
 import approvalAllow from "./fixtures/agent-stream/approval_allow.jsonl?raw"
-<<<<<<< HEAD
 import opencodeFailing from "./fixtures/agent-stream/opencode/failing.jsonl?raw"
 import opencodePrinted from "./fixtures/agent-stream/opencode/printed.jsonl?raw"
 import opencodeRejected from "./fixtures/agent-stream/opencode/rejected.jsonl?raw"
@@ -91,8 +85,6 @@ import opencodeResumeTwo from "./fixtures/agent-stream/opencode/resume_turn2.jso
 import opencodeSubagent from "./fixtures/agent-stream/opencode/subagent.jsonl?raw"
 import opencodeTodos from "./fixtures/agent-stream/opencode/todos.jsonl?raw"
 import opencodeTools from "./fixtures/agent-stream/opencode/tools.jsonl?raw"
-=======
->>>>>>> origin/main
 import compaction from "./fixtures/agent-stream/compaction.jsonl?raw"
 import approvalDeny from "./fixtures/agent-stream/approval_deny.jsonl?raw"
 import printed from "./fixtures/agent-stream/printed.jsonl?raw"
@@ -116,25 +108,18 @@ import codexTools from "./fixtures/agent-stream/codex/tools.jsonl?raw"
 import codexWebsearch from "./fixtures/agent-stream/codex/websearch.jsonl?raw"
 // What the interactive app-server answers that the one-way stream never sends.
 import codexAppServerCapabilities from "./fixtures/agent-stream/codex/appserver_capabilities.json"
-<<<<<<< HEAD
 import opencodeCliAgents from "./fixtures/agent-stream/opencode/cli_agents.txt?raw"
 import opencodeExportSubagent from "./fixtures/agent-stream/opencode/export_subagent.json?raw"
 import opencodeSsePrinted from "./fixtures/agent-stream/opencode/sse_printed.jsonl?raw"
 import opencodeSseTools from "./fixtures/agent-stream/opencode/sse_tools.jsonl?raw"
 import opencodeCliModels from "./fixtures/agent-stream/opencode/cli_models.txt?raw"
-=======
->>>>>>> origin/main
 // The transcripts the *stream* refuses to carry, read back from the files
 // Claude Code writes under ~/.claude/projects. Keyed by the ids the stream does
 // give: a subagent by its `task_id`, a workflow agent by its `agentId`.
 import diskSubagent from "./fixtures/agent-stream/disk_subagent_a37fefefbc61e13e3.jsonl?raw"
 import diskWorkflowAgent from "./fixtures/agent-stream/disk_workflow_agent_a35ea63276cd501aa.jsonl?raw"
 
-<<<<<<< HEAD
 type ProviderId = "claude" | "codex" | "opencode"
-=======
-type ProviderId = "claude" | "codex"
->>>>>>> origin/main
 
 /**
  * What a provider is, and what it supports.
@@ -153,7 +138,6 @@ interface Transport {
     readonly capabilities: boolean
     readonly approvals: boolean
     readonly steering: boolean
-<<<<<<< HEAD
     /**
      * Token-level previews.
      *
@@ -163,8 +147,6 @@ interface Transport {
      * not stream, and must not be drawn as though it were.
      */
     readonly streaming: boolean | null
-=======
->>>>>>> origin/main
   }
   readonly note: string
 }
@@ -176,7 +158,6 @@ interface Provider {
   /** The provider's own mapper, behind the shared interface. */
   readonly createMapper: () => { push(line: string): readonly AgentEvent[] }
   /**
-<<<<<<< HEAD
    * Why some of this provider's lines produce no event.
    *
    * Owned here rather than branched on the id in the pane: written as an
@@ -185,8 +166,6 @@ interface Provider {
    */
   readonly silentLinesNote: string
   /**
-=======
->>>>>>> origin/main
    * How you reach this agent. A provider can speak more than one, and they do
    * not carry the same things — Codex's one-way stream and its interactive
    * app-server differ enough that a reader comparing them should see which is
@@ -194,11 +173,6 @@ interface Provider {
    */
   readonly transports: readonly Transport[]
   readonly supports: {
-<<<<<<< HEAD
-=======
-    /** Token-level previews. Claude streams; Codex, in this mode, does not. */
-    readonly streaming: boolean
->>>>>>> origin/main
     /** A session advertisement worth building composer pickers from. */
     readonly capabilities: boolean
     /** Structured file edits rather than opaque file tool calls. */
@@ -221,11 +195,7 @@ const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
         label: "stream-json",
         command: "claude -p --output-format stream-json",
         interactive: false,
-<<<<<<< HEAD
         supports: { capabilities: true, approvals: false, steering: false, streaming: true },
-=======
-        supports: { capabilities: true, approvals: false, steering: false },
->>>>>>> origin/main
         note: "One-way. The opening line advertises the whole session, so pickers can be built from the stream alone.",
       },
       {
@@ -233,22 +203,14 @@ const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
         label: "stream-json, both ways",
         command: "claude -p --input-format stream-json --output-format stream-json",
         interactive: true,
-<<<<<<< HEAD
         supports: { capabilities: true, approvals: true, steering: true, streaming: true },
-=======
-        supports: { capabilities: true, approvals: true, steering: true },
->>>>>>> origin/main
         note: "The same stream with stdin open: prompts and steering go in, control requests answer approvals and change model or permission mode mid-turn.",
       },
     ],
     createMapper: () => new ClaudeStreamMapper(),
-<<<<<<< HEAD
     silentLinesNote:
       "message_start is the mapper's join key, message_stop and message_delta repeat what result carries, signature_delta signs a thinking block, and a steady-state rate limit has nothing to act on.",
     supports: { capabilities: true, fileEdits: false, workflowBoard: true, transcriptsOnDisk: true },
-=======
-    supports: { streaming: true, capabilities: true, fileEdits: false, workflowBoard: true, transcriptsOnDisk: true },
->>>>>>> origin/main
   },
   codex: {
     id: "codex",
@@ -260,11 +222,7 @@ const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
         label: "exec --json",
         command: "codex exec --json",
         interactive: false,
-<<<<<<< HEAD
         supports: { capabilities: false, approvals: false, steering: false, streaming: false },
-=======
-        supports: { capabilities: false, approvals: false, steering: false },
->>>>>>> origin/main
         note: "One-way. The opening line carries a thread id and nothing else, so nothing here can populate a picker.",
       },
       {
@@ -272,19 +230,14 @@ const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
         label: "app-server",
         command: "codex app-server",
         interactive: true,
-<<<<<<< HEAD
         // Streaming is unrecorded here: the app-server was driven for its
         // capability replies and its approval exchange, never for a long
         // answer, so claiming either way would be a guess.
         supports: { capabilities: true, approvals: true, steering: true, streaming: null },
-=======
-        supports: { capabilities: true, approvals: true, steering: true },
->>>>>>> origin/main
         note: "Interactive JSON-RPC. Answers model, skill, plugin and hook lists on request, asks for approval before running untrusted commands, and takes steer and interrupt mid-turn.",
       },
     ],
     createMapper: () => new CodexStreamMapper(),
-<<<<<<< HEAD
     silentLinesNote:
       "turn.started is a bare marker, and an item that is reported whole on completion says nothing when it opens.",
     supports: { capabilities: false, fileEdits: true, workflowBoard: false, transcriptsOnDisk: true },
@@ -318,15 +271,11 @@ const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
     // wire and `opencode export <id>` reads it, where Claude's must be derived
     // and Codex's cannot be read at all.
     supports: { capabilities: false, fileEdits: true, workflowBoard: false, transcriptsOnDisk: true },
-=======
-    supports: { streaming: false, capabilities: false, fileEdits: true, workflowBoard: false, transcriptsOnDisk: true },
->>>>>>> origin/main
   },
 }
 
 interface Capture {
   readonly provider: ProviderId
-<<<<<<< HEAD
   /**
    * The transport this was recorded from, when it only exists on one.
    *
@@ -335,8 +284,6 @@ interface Capture {
    * means the recording is representative of every transport the provider has.
    */
   readonly transport?: string
-=======
->>>>>>> origin/main
   readonly id: string
   readonly label: string
   readonly blurb: string
@@ -372,7 +319,6 @@ const CAPTURES: readonly Capture[] = [
   { provider: "codex", id: "codex-failing", label: "Failed command", blurb: "A non-zero exit code, so failure is a fact the wire states rather than something inferred from prose.", prompt: "Run 'cat /nonexistent/definitely-missing-file' and tell me what happened.", source: codexFailing },
   { provider: "codex", id: "codex-websearch", label: "Web search", blurb: "A search item, which opens and settles like any other call.", prompt: "Search the web for the current version of the TypeScript compiler.", source: codexWebsearch },
   { provider: "codex", id: "codex-resume", label: "Resume", blurb: "Two processes, one thread id — a resume is no more visible here than it is on Claude.", prompt: "Remember the number 47… then, resumed: what number did I ask you to remember?", source: `${codexResumeOne}\n${codexResumeTwo}` },
-<<<<<<< HEAD
 
   // ---------- opencode ----------
   { provider: "opencode", transport: "run", id: "oc-printed", label: "Plain text", blurb: "Three lines for a whole turn. No init, no deltas, no terminator of its own — a step opens, a part carries the answer, a step finishes.", prompt: "Reply with exactly: hello world. Do not use any tools.", source: opencodePrinted },
@@ -385,8 +331,6 @@ const CAPTURES: readonly Capture[] = [
 
   { provider: "opencode", transport: "serve", id: "oc-sse-printed", label: "Streamed answer", blurb: "The server's bus, where opencode does stream: 254 token deltas for one paragraph, each joinable to the part that supersedes it. Its `/event` endpoint is server-wide, so this capture carries a second session too.", prompt: "Write one paragraph of four sentences about the tide. Do not use tools.", source: opencodeSsePrinted },
   { provider: "opencode", transport: "serve", id: "oc-sse-tools", label: "Streamed + refused", blurb: "The same bus with a tool call: arguments stream as partial JSON, the session names its model, and a permission ask is held open and answered rather than auto-rejected.", prompt: "Create sse-notes.txt with two lines, then run 'wc -l sse-notes.txt'.", source: opencodeSseTools },
-=======
->>>>>>> origin/main
 ]
 
 const LINES = new Map(CAPTURES.map((capture) => [capture.id, capture.source.split("\n").filter((line) => line.trim().length > 0)]))
@@ -426,44 +370,26 @@ interface LiveState {
  * the raw pane.
  */
 function ProviderSupport({ provider, transport }: { provider: Provider; transport: Transport }) {
-<<<<<<< HEAD
   const features: readonly (readonly [string, boolean | null])[] = [
     // What the wire carries, whichever transport is used…
-=======
-  const features = [
-    // What the wire carries, whichever transport is used…
-    ["streams tokens", provider.supports.streaming],
->>>>>>> origin/main
     ["structured file edits", provider.supports.fileEdits],
     ["workflow board", provider.supports.workflowBoard],
     ["transcripts on disk", provider.supports.transcriptsOnDisk],
     // …and what this transport in particular can do.
-<<<<<<< HEAD
     ["streams tokens", transport.supports.streaming],
     ["session capabilities", transport.supports.capabilities],
     ["approvals", transport.supports.approvals],
     ["steering", transport.supports.steering],
   ]
-=======
-    ["session capabilities", transport.supports.capabilities],
-    ["approvals", transport.supports.approvals],
-    ["steering", transport.supports.steering],
-  ] as const
->>>>>>> origin/main
 
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="provider-support">
       <code className="text-muted-foreground">{transport.command}</code>
       {features.map(([label, supported]) => (
-<<<<<<< HEAD
         <Badge key={label} variant={supported === true ? "secondary" : "outline"} className={supported === true ? "" : "opacity-60"}>
           {/* Three states, because "nobody has captured this" is not the same
               answer as "it cannot". */}
           {supported === true ? label : supported === false ? `no ${label}` : `${label}: unrecorded`}
-=======
-        <Badge key={label} variant={supported ? "secondary" : "outline"} className={supported ? "" : "opacity-60"}>
-          {supported ? label : `no ${label}`}
->>>>>>> origin/main
         </Badge>
       ))}
     </div>
@@ -547,7 +473,6 @@ const DISK_TRANSCRIPTS: Readonly<Record<string, string>> = {
   a35ea63276cd501aa: diskWorkflowAgent,
 }
 
-<<<<<<< HEAD
 /**
  * opencode's exported sessions, by the child session id its own stream names.
  *
@@ -559,8 +484,6 @@ const OPENCODE_EXPORTS: Readonly<Record<string, string>> = {
   ses_fb47fb139ffeWc3UUbQebXLJ1h: opencodeExportSubagent,
 }
 
-=======
->>>>>>> origin/main
 const TOOL_ICONS: Partial<Record<ToolKind, React.ReactNode>> = {
   shell: <BashIcon />,
   file_edit: <EditIcon />,
@@ -959,7 +882,6 @@ function compactionSummary(transcript: Transcript, seq: number): string | null {
   return null
 }
 
-<<<<<<< HEAD
 /**
  * A turn's cost, at the precision it actually has.
  *
@@ -971,8 +893,6 @@ function formatCost(usd: number): string {
   return usd < 0.01 ? `$${usd.toFixed(4)}` : `$${usd.toFixed(2)}`
 }
 
-=======
->>>>>>> origin/main
 /** A field a provider left unset, so the surface can omit it rather than print a placeholder. */
 function known(value: string | null | undefined): string | null {
   return value === undefined || value === null || value === "" || value === "unknown" ? null : value
@@ -1516,7 +1436,6 @@ function InspectorView({
         : null,
     [provider.id, transport.supports.capabilities],
   )
-<<<<<<< HEAD
   // opencode answers on a third channel again: not the stream, not a server,
   // but its own CLI listings. Captured from `opencode models` and
   // `opencode agent list`, which is all a host has to build a picker from.
@@ -1527,8 +1446,6 @@ function InspectorView({
         : null,
     [provider.id, transport.supports.capabilities],
   )
-=======
->>>>>>> origin/main
   const selected = pane === "events" ? selectedByPane.events : selectedByPane.raw
   const setSelected = (index: number) =>
     setSelectedByPane((current) => ({ ...current, [pane === "events" ? "events" : "raw"]: index }))
@@ -1564,11 +1481,7 @@ function InspectorView({
           aria-label="Session capabilities"
         >
           {/* One pane, two sources: whichever the provider filled. */}
-<<<<<<< HEAD
           <CapabilitiesView capabilities={capabilities ?? codexCaps ?? opencodeCaps} />
-=======
-          <CapabilitiesView capabilities={capabilities ?? codexCaps} />
->>>>>>> origin/main
         </div>
       ) : shownPane === "raw" ? (
         <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -1596,13 +1509,7 @@ function InspectorView({
           </ul>
           <p className="text-muted-foreground text-xs">
             {`→ n is how many events the line produced. ${produced.filter((entry) => entry === 0).length} of ${produced.length} produce none: `}
-<<<<<<< HEAD
             {provider.silentLinesNote}
-=======
-            {provider.id === "claude"
-              ? "message_start is the mapper's join key, message_stop and message_delta repeat what result carries, signature_delta signs a thinking block, and a steady-state rate limit has nothing to act on."
-              : "turn.started is a bare marker, and an item that is reported whole on completion says nothing when it opens."}
->>>>>>> origin/main
           </p>
           <div className="border-border min-h-0 flex-1 overflow-auto rounded-xl border p-3">
             {decoded === null ? null : <JsonTree value={decoded} collapsible defaultExpandedDepth={2} />}
@@ -1728,7 +1635,6 @@ function OpenedTranscript({ ref_, onClose }: { ref_: claude.TranscriptRef; onClo
 function Explorer({ initialCapture = "tools", autoplay = false }: { initialCapture?: string; autoplay?: boolean }) {
   const [captureId, setCaptureId] = React.useState(initialCapture)
   const provider = PROVIDERS[providerOf(captureId)]
-<<<<<<< HEAD
   const [transportId, setTransportId] = React.useState(provider.transports[0]!.id)
   const transport = provider.transports.find((entry) => entry.id === transportId) ?? provider.transports[0]!
   // A capture recorded from one transport is only offered on that transport:
@@ -1751,11 +1657,6 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
       setCaptureId(available[0].id)
     }
   }
-=======
-  const captures = CAPTURES.filter((entry) => entry.provider === provider.id)
-  const [transportId, setTransportId] = React.useState(provider.transports[0]!.id)
-  const transport = provider.transports.find((entry) => entry.id === transportId) ?? provider.transports[0]!
->>>>>>> origin/main
 
   // Switching provider lands on that provider's first capture, so the two
   // sides are compared on the same scenario rather than on whatever the old
@@ -1862,11 +1763,7 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
       </div>
       <p className="text-muted-foreground text-xs">{capture?.blurb}</p>
       <div className="flex flex-wrap items-center gap-2">
-<<<<<<< HEAD
         <SegmentedControl aria-label="Transport" value={transport.id} onValueChange={switchTransport} className="shrink-0">
-=======
-        <SegmentedControl aria-label="Transport" value={transport.id} onValueChange={setTransportId} className="shrink-0">
->>>>>>> origin/main
           {provider.transports.map((entry) => (
             <SegmentedControlOption key={entry.id} value={entry.id}>
               {entry.label}
