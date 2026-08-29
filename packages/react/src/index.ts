@@ -112,6 +112,12 @@ export {
 } from "./components/gantt-chart"
 export { Input } from "./components/input"
 export {
+  PageOutline,
+  type PageOutlineItemData,
+  type PageOutlineMarkerState,
+  type PageOutlineProps,
+} from "./components/page-outline"
+export {
   Pagination,
   PaginationContent,
   PaginationEllipsis,
@@ -212,6 +218,13 @@ export {
   GeneratingSurface,
   type GeneratingSurfaceProps,
 } from "./components/generating-surface"
+export {
+  GradientSurface,
+  gradientSurfacePatterns,
+  gradientSurfacePresets,
+  type GradientSurfacePattern,
+  type GradientSurfaceProps,
+} from "./components/gradient-surface"
 export {
   MermaidDiagram,
   type MermaidDiagramProps,

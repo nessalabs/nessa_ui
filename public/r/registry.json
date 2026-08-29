@@ -452,6 +452,23 @@
       ]
     },
     {
+      "name": "gradient-surface",
+      "type": "registry:ui",
+      "title": "Gradient Surface",
+      "description": "A decorative gradient backdrop for heroes and banners — a deep colour wash from a swappable palette, an optional contour, wave, or ring line overlay, and film grain over the whole frame.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/gradient-surface.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/gradient-surface.tsx"
+        }
+      ]
+    },
+    {
       "name": "mermaid-diagram",
       "type": "registry:ui",
       "title": "Mermaid Diagram",
@@ -1529,6 +1546,23 @@
           "path": "packages/react/src/components/dropdown-menu.tsx",
           "type": "registry:ui",
           "target": "components/ui/dropdown-menu.tsx"
+        }
+      ]
+    },
+    {
+      "name": "page-outline",
+      "type": "registry:ui",
+      "title": "Page outline",
+      "description": "A scroll-spy section outline drawn along a rail that jogs to trace the heading hierarchy, with a comet pulse — or a host-supplied marker — that travels the rail to the section being read. Sections come from props or are derived from the headings of rendered content such as a markdown surface, and an auto-collapse mode folds deep branches away except where the reader has settled.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/page-outline.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/page-outline.tsx"
         }
       ]
     },
