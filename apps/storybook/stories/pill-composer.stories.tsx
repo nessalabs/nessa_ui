@@ -12,7 +12,8 @@ import {
   ChatComposerAttachments,
   ChatComposerInput,
   ChatComposerAttachmentIcon,
-  FilePreview,
+  FilePreviewJson,
+  FilePreviewMarkdown,
   ChatComposerEditor,
   ChatComposerTrigger,
   type ChatComposerContentPart,
@@ -958,18 +959,23 @@ function PlaygroundExample({
   const openChipPreview = (item: SlashItem) => {
     const file = chipFileMock(item)
     setChipCardItem(null)
+    const previewFile = {
+      src: `data:${file.mimeType};charset=utf-8,${encodeURIComponent(file.content)}`,
+      name: file.name,
+      mimeType: file.mimeType,
+    }
+    // The bare renderer, not the framed FilePreview: no filename header, no
+    // card — just the file's content over the chat surface.
     setOverlay({
       summary: file.name,
       body: (
-        <FilePreview
-          file={{
-            src: `data:${file.mimeType};charset=utf-8,${encodeURIComponent(file.content)}`,
-            name: file.name,
-            mimeType: file.mimeType,
-            size: file.content.length,
-          }}
-          className="h-full max-h-full w-full"
-        />
+        <div className="min-h-0 w-full flex-1 overflow-auto text-left">
+          {item.kind === "plugin" ? (
+            <FilePreviewJson file={previewFile} kind="json" />
+          ) : (
+            <FilePreviewMarkdown file={previewFile} kind="markdown" />
+          )}
+        </div>
       ),
     })
   }
@@ -1251,7 +1257,9 @@ function PlaygroundExample({
         id={`chat-tab-panel-${activeTabId}`}
         aria-labelledby={`chat-tab-${activeTabId}`}
         role="tabpanel"
-        className="flex min-h-0 flex-1 flex-col"
+        // Positioned, so the overlay replaces only the transcript surface —
+        // the tab strip and the pill stay visible and usable around it.
+        className="relative flex min-h-0 flex-1 flex-col"
       >
       <div
         ref={logRef}
@@ -1324,7 +1332,6 @@ function PlaygroundExample({
           <ChatTypingIndicator label="Assistant is typing" />
         ) : null}
       </div>
-      </div>
       {overlay ? (
         <ChatAttachmentViewer
           summary={overlay.summary}
@@ -1333,6 +1340,7 @@ function PlaygroundExample({
           {overlay.body}
         </ChatAttachmentViewer>
       ) : null}
+      </div>
       {chipCardItem ? (
         <ChipCard
           item={chipCardItem}
