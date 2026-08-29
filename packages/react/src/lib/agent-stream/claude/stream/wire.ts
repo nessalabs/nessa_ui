@@ -1,7 +1,32 @@
 /** @responsibility Describes Claude Code's `stream-json` wire shapes and decodes one line into them without interpreting it. */
 
-import { parseJsonLine } from "../json"
-import type { JsonValue } from "../json"
+import { parseJsonLine } from "../../json"
+import type { JsonValue } from "../../json"
+import type { WireProvenance } from "../../events"
+
+/**
+ * The build these shapes were read from.
+ *
+ * Claude Code stamps its own version on this stream — `system/init` carries it
+ * — so a consumer can compare what it is reading against this and know when the
+ * two have drifted apart. Its other two transports are elsewhere: the duplex
+ * mode is this same wire with stdin open, and ACP is a different protocol
+ * entirely, read by `acp/`.
+ */
+export const CLAUDE_STREAM_PROVENANCE: WireProvenance = Object.freeze({
+  cli: "Claude Code",
+  /**
+   * The newest build any checked-in capture came from.
+   *
+   * The fixtures span two: the approval and compaction captures are 2.1.251,
+   * the earlier ones 2.1.233. Nothing about the shapes differed between them —
+   * which is only knowable because this wire stamps its own version on
+   * `system/init`, and a test compares the two.
+   */
+  version: "2.1.251",
+  command: "claude -p --output-format stream-json --include-partial-messages --verbose",
+  capturedOn: "2026-08-29",
+})
 
 /** Re-exported so one import gives a consumer this wire's whole vocabulary. */
 export type { JsonValue }
@@ -22,6 +47,14 @@ export const ClaudeWireType = Object.freeze({
   User: "user",
   Result: "result",
   RateLimit: "rate_limit_event",
+  /**
+   * The CLI's own bookkeeping, written into a saved transcript.
+   *
+   * Not part of the conversation: a `deferred_tools_delta` naming tools that
+   * became available mid-session. It reaches a consumer as `unknown` with the
+   * raw line attached rather than being dropped.
+   */
+  Attachment: "attachment",
   ControlRequest: "control_request",
   ControlResponse: "control_response",
 } as const)

@@ -1,5 +1,6 @@
-/** @responsibility Re-exports everything specific to reading Codex, so a consumer takes the provider in one import. */
+/** @responsibility Re-exports everything specific to reading Codex, so a consumer takes the provider — and the transport it is on — in one import. */
 
+// ---------- `codex exec --json` ----------
 export {
   CODEX_EVENT_MAPPING,
   CODEX_FILE_CHANGE,
@@ -12,13 +13,29 @@ export {
   codexWireKind,
   type CodexMappingEntry,
   type CodexWireKind,
-} from "./mapping"
+} from "./exec/mapping"
+export { CodexStreamMapper, mapCodexStream } from "./exec/mapper"
+export * from "./exec/wire"
+
+// ---------- `codex app-server` ----------
+export {
+  CODEX_APP_SERVER_PROVENANCE,
+  CodexAppServerItemType,
+  CodexAppServerNotification,
+  CodexAppServerRequest,
+  parseCodexAppServer,
+  parseCodexAppServerLine,
+  type CodexAppServerFrame,
+  type CodexAppServerParseResult,
+} from "./app-server/wire"
+export {
+  CODEX_APP_SERVER_MAPPING,
+  codexAppServerKind,
+  codexAppServerMappingFor,
+} from "./app-server/mapping"
+export { CodexAppServerMapper, mapCodexAppServerStream } from "./app-server/mapper"
 export {
   CODEX_CAPABILITY_METHODS,
   codexCapabilities,
   type CodexCapabilityMethod,
-} from "./capabilities"
-export { CodexStreamMapper, mapCodexStream } from "./mapper"
-// The whole wire surface, so a consumer holding a `CodexWireEvent` can name
-// every arm it narrows to. A hand-kept list drifts — this one already had.
-export * from "./wire"
+} from "./app-server/capabilities"

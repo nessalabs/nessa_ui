@@ -7,11 +7,16 @@ import test from "node:test"
 
 import { TranscriptBuilder } from "./builder"
 import { AgentEventType, isEvent } from "./events"
-import { CODEX_EVENT_MAPPING, codexWireKind } from "./codex/mapping"
-import { CODEX_CAPABILITY_METHODS, codexCapabilities } from "./codex/capabilities"
-import { CodexStreamMapper, mapCodexStream } from "./codex/mapper"
-import { CodexItemType, CodexWireType, parseCodexLines } from "./codex/wire"
-import { applyDeltas, buildTranscript, isToolGroup } from "./transcript"
+import { CODEX_EVENT_MAPPING, codexWireKind } from "./codex/exec/mapping"
+import { CODEX_CAPABILITY_METHODS, codexCapabilities } from "./codex/app-server/capabilities"
+import { CodexStreamMapper, mapCodexStream } from "./codex/exec/mapper"
+import { CODEX_APP_SERVER_MAPPING, codexAppServerKind, codexAppServerMappingFor } from "./codex/app-server/mapping"
+import { mapCodexAppServerStream } from "./codex/app-server/mapper"
+import { CODEX_APP_SERVER_PROVENANCE, parseCodexAppServer } from "./codex/app-server/wire"
+import type { JsonValue } from "./json"
+import { transportOf } from "./transports"
+import { CODEX_EXEC_PROVENANCE, CodexItemType, CodexWireType, parseCodexLines } from "./codex/exec/wire"
+import { applyDeltas, buildTranscript, isToolGroup, previewOf } from "./transcript"
 
 const FIXTURES = fileURLToPath(new URL("../../../../../apps/storybook/stories/fixtures/agent-stream/codex/", import.meta.url))
 
@@ -204,11 +209,15 @@ test("the app-server answers what the exec stream cannot", () => {
   assert.equal(CODEX_CAPABILITY_METHODS.includes("model/list"), true)
 })
 
-test("a host that asks for only some capabilities gets the rest empty, not an error", () => {
-  const partial = codexCapabilities({ "model/list": { data: [{ id: "gpt-5", displayName: "GPT-5" }] } } as never)
+test("a host that asks for only some capabilities gets the rest as unreported", () => {
+  const partial = codexCapabilities({
+    "model/list": { data: [{ id: "gpt-5", displayName: "GPT-5" }] },
+  } as Record<string, JsonValue>)
   assert.equal(partial.models!.length, 1)
-  assert.deepEqual(partial.skills, [])
-  assert.deepEqual(partial.pluginSources, [])
+  // Null, not empty. This test used to pin the opposite, which is how a picker
+  // came to render "no skills" for a host that had simply not asked.
+  assert.equal(partial.skills, null)
+  assert.equal(partial.pluginSources, null)
 })
 
 test("one spawned agent is one run, and its result is the run's result", () => {
@@ -277,4 +286,171 @@ test("a search reports what was searched, and only once it settles", () => {
   // the query lives where a detail view can read it.
   assert.equal(result!.text, "")
   assert.match(JSON.stringify(result!.structured), /TypeScript/)
+})
+
+/**
+ * The other Codex transport.
+ *
+ * `codex app-server` is JSON-RPC, not a stream of lines, and it reports the
+ * same agent's work differently enough that it needs its own reader: it
+ * carries the prompt, streams the answer, and settles items rather than
+ * publishing them once.
+ */
+test("the app-server carries what exec never does", () => {
+  const events = mapCodexAppServerStream(
+    readFileSync(`${FIXTURES}appserver_tools.jsonl`, "utf8"),
+  )
+
+  // The prompt, which `exec --json` never echoes — it is in the client's own
+  // `turn/start` request.
+  const prompts = events.filter((event) => event.payload.type === "user_message")
+  assert.equal(prompts.length, 1)
+  assert.match((prompts[0]!.payload as { text: string }).text, /notes\.txt/)
+
+  // And the token stream, which exec does not send at all.
+  const deltas = events.filter((event) => event.payload.type === "delta")
+  assert.ok(deltas.length > 5, "the answer arrived a token at a time")
+
+  // The committed message supersedes those deltas, joined on the same block.
+  const committed = events.find((event) => event.payload.type === "assistant_text")!
+  const block = (committed.payload as { block: { messageId: string; index: number } }).block
+  assert.equal(previewOf(applyDeltas(events), block), (committed.payload as { text: string }).text)
+
+  assert.equal(events.filter((event) => event.payload.type === "session_started").length, 1)
+})
+
+test("every app-server frame kind the capture contains is declared in its own table", () => {
+  for (const result of parseCodexAppServer(readFileSync(`${FIXTURES}appserver_tools.jsonl`, "utf8"))) {
+    if (!result.ok) continue
+    const frame = result.line as { method?: string; params?: { item?: { type?: string } } }
+    if (frame.method === undefined) continue
+    const kind = codexAppServerKind(frame.method, frame.params?.item?.type ?? null)
+    assert.notEqual(codexAppServerMappingFor(kind), null, `${kind} is not in CODEX_APP_SERVER_MAPPING`)
+  }
+})
+
+test("the two Codex transports are described separately, with their own commands", () => {
+  // They were one module until the app-server turned out to be a different
+  // protocol with a schema of its own.
+  assert.equal(CODEX_EXEC_PROVENANCE.command, "codex exec --json")
+  assert.equal(CODEX_APP_SERVER_PROVENANCE.command, "codex app-server")
+  assert.equal(CODEX_EVENT_MAPPING["thread/started"], undefined)
+  assert.equal(CODEX_APP_SERVER_MAPPING[CodexWireType.ThreadStarted], undefined)
+
+  // Streaming is now a recorded fact for the app-server rather than an
+  // unrecorded guess.
+  assert.equal(transportOf("codex", "exec")?.supports.streaming, false)
+  assert.equal(transportOf("codex", "app-server")?.supports.streaming, true)
+})
+
+/**
+ * A table may only promise what something has seen.
+ *
+ * The conformance checks are one-directional: they prove a mapper never
+ * exceeds its table, not that a declared row is real. A row no capture
+ * exercises is a claim about a wire nobody has read — which is how
+ * `item.completed/error` came to declare an `error` event the mapper never
+ * emitted. Each such row is acknowledged here or it fails.
+ */
+const EXEC_UNEXERCISED: ReadonlyMap<string, string> = new Map([
+  ["turn.failed", "needs a turn the model itself aborts"],
+  ["error", "a thread-level failure outside any item"],
+  ["item.started/agent_message", "the captures open and settle a message in one line"],
+  ["item.started/reasoning", "the same"],
+  ["item.completed/reasoning", "these models emitted no disclosed reasoning"],
+  ["item.updated/agent_message", "no capture ran long enough to be updated mid-item"],
+  ["item.updated/reasoning", "the same"],
+  ["item.updated/command_execution", "needs a command slow enough to report partial output"],
+  ["item.updated/file_change", "the same"],
+  ["item.updated/web_search", "the same"],
+  ["item.updated/collab_tool_call", "needs a spawned agent watched while it works"],
+  ["item.started/mcp_tool_call", "no MCP server was configured for the captures"],
+  ["item.completed/mcp_tool_call", "the same"],
+  ["item.started/error", "an error opens and settles in one line"],
+  ["item.completed/error", "no capture produced an item-level failure; the row is checked by a synthetic line below"],
+])
+
+test("every codex exec row the captures never reach is acknowledged as unexercised", () => {
+  const seen = new Set<string>()
+  for (const name of NAMES) {
+    for (const result of parseCodexLines(capture(name))) {
+      if (result.ok) seen.add(codexWireKind(result.line))
+    }
+  }
+  const declared = Object.keys(CODEX_EVENT_MAPPING)
+  assert.deepEqual(
+    declared.filter((kind) => !seen.has(kind) && !EXEC_UNEXERCISED.has(kind)).sort(),
+    [],
+    "a table row no fixture exercises must be listed in EXEC_UNEXERCISED",
+  )
+  for (const kind of EXEC_UNEXERCISED.keys()) {
+    assert.ok(!seen.has(kind), `${kind} is listed as unexercised but a fixture reaches it`)
+    assert.ok(declared.includes(kind), `${kind} is listed as unexercised but is not a row in the table`)
+  }
+})
+
+test("a declared row with no capture is still checked, where a line can be written by hand", () => {
+  // The cheapest defence against a fictional row: feed the shape the table
+  // describes and assert it produces what the table promises. This one was
+  // fiction — the item fell through to the tool-call default and settled as a
+  // *successful* call with no text, so a failed turn read as a silent one.
+  const events = mapCodexStream(
+    JSON.stringify({ type: "item.completed", item: { id: "item_9", type: "error", message: "the model refused" } }),
+  )
+  assert.deepEqual(
+    events.map((event) => event.payload.type),
+    CODEX_EVENT_MAPPING[`${CodexWireType.ItemCompleted}/${CodexItemType.Error}`]!.emits,
+  )
+  assert.equal((events[0]!.payload as { message: string }).message, "the model refused")
+})
+
+/**
+ * The app-server's table is written from the schema the CLI publishes, not
+ * from a capture, so most of it is unexercised by design. Listing the ones a
+ * capture *does* reach is the honest direction here.
+ */
+test("the app-server capture reaches the rows it should, and the rest are schema-only", () => {
+  const seen = new Set<string>()
+  for (const result of parseCodexAppServer(readFileSync(`${FIXTURES}appserver_tools.jsonl`, "utf8"))) {
+    if (!result.ok) continue
+    const frame = result.line as { method?: string; params?: { item?: { type?: string } } }
+    if (frame.method === undefined) continue
+    seen.add(codexAppServerKind(frame.method, frame.params?.item?.type ?? null))
+  }
+  for (const kind of ["thread/started", "turn/start", "item/agentMessage/delta", "item/completed/agentMessage"]) {
+    assert.ok(seen.has(kind), `the capture should reach ${kind}`)
+  }
+  // Everything declared but unseen comes from `codex app-server
+  // generate-json-schema`. That is a weaker warrant than a capture, and saying
+  // how much weaker is the point of this assertion.
+  const declared = Object.keys(CODEX_APP_SERVER_MAPPING)
+  const schemaOnly = declared.filter((kind) => !seen.has(kind))
+  assert.ok(schemaOnly.length > 0)
+  assert.ok(
+    schemaOnly.length <= declared.length - 8,
+    "at least eight rows should be backed by a capture rather than by the schema alone",
+  )
+})
+
+test("the app-server session says what its own reply says", () => {
+  // The `thread/started` notification names the thread; the `thread/start`
+  // reply describes it, with the model beside the thread rather than inside
+  // it. Reading only the notification reported null for all three.
+  const session = mapCodexAppServerStream(readFileSync(`${FIXTURES}appserver_tools.jsonl`, "utf8")).flatMap(
+    (event) => (event.payload.type === "session_started" ? [event.payload.session] : []),
+  )
+  assert.equal(session.length, 1)
+  assert.equal(session[0]!.model, "gpt-5.6-luna")
+  assert.equal(session[0]!.version, "0.144.1")
+  assert.ok((session[0]!.cwd ?? "").length > 0)
+})
+
+test("a capability nobody asked about is unreported, not empty", () => {
+  // The shared contract reserves null for "this provider cannot report it".
+  // Returning `[]` for a method the host never called told a picker the
+  // installation has no models.
+  assert.equal(codexCapabilities({}).models, null)
+  assert.equal(codexCapabilities({}).skills, null)
+  // A reply that really came back empty stays empty.
+  assert.deepEqual(codexCapabilities({ "model/list": { data: [] } }).models, [])
 })

@@ -1,8 +1,8 @@
 /** @responsibility States, as data, which Codex line kind becomes which normalized event. */
 
-import { AgentEventType, FileChange, PlanStepStatus, TaskKind, ToolKind } from "../events"
-import { asRecord, asString } from "../json"
-import type { JsonValue } from "../json"
+import { AgentEventType, FileChange, PlanStepStatus, TaskKind, ToolKind } from "../../events"
+import { asRecord, asString } from "../../json"
+import type { JsonValue } from "../../json"
 import { CodexFileChangeKind, CodexItemType, CodexWireType } from "./wire"
 import type { CodexRawLine } from "./wire"
 
@@ -149,6 +149,10 @@ export const CODEX_EVENT_MAPPING: Readonly<Record<CodexWireKind, CodexMappingEnt
   },
 
   // ---------- fallback ----------
+  [`${CodexWireType.ItemStarted}/${CodexItemType.Error}`]: {
+    emits: [],
+    note: "an error opens and settles in one step; the completion carries the message",
+  },
   [`${CodexWireType.ItemCompleted}/${CodexItemType.Error}`]: {
     emits: [AgentEventType.Error],
     note: "an item-level failure",

@@ -11,9 +11,9 @@ import type {
   SessionInfo,
   ToolResult,
   Usage,
-} from "../events"
-import { asArray, asBoolean, asNumber, asObject, asRecord, asString, asStrings, shortenPath } from "../json"
-import type { JsonValue } from "../json"
+} from "../../events"
+import { asArray, asBoolean, asNumber, asObject, asRecord, asString, asStrings, shortenPath } from "../../json"
+import type { JsonValue } from "../../json"
 import {
   CODEX_TASK_KIND,
   codexFileChange,
@@ -311,6 +311,13 @@ export class CodexStreamMapper implements AgentStreamMapper {
         if (!completed) return []
         return [this.build({ type: "assistant_text", text: asString(item.text) ?? "", block: null }, [], raw)]
 
+      // An item that *is* the failure. Without this it fell through to the
+      // tool-call default and settled as a successful call with no text, so a
+      // failed turn read as a silent one.
+      case CodexItemType.Error:
+        if (!completed) return []
+        return [this.build({ type: "error", message: asString(item.message) ?? "error" }, [], raw)]
+
       case CodexItemType.Reasoning:
         if (!completed) return []
         return [this.build({ type: "reasoning", text: asString(item.text) ?? "", block: null }, [], raw)]
@@ -357,6 +364,9 @@ export class CodexStreamMapper implements AgentStreamMapper {
                   label: asString(item.tool),
                   description: asString(item.prompt) ?? "",
                   prompt: asString(item.prompt),
+                  // Codex names the receiver thread but exposes no way to read
+                  // it, so there is no transcript to point a consumer at.
+                  transcriptId: null,
                 },
                 [],
                 raw,

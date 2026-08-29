@@ -13,6 +13,7 @@ interface MutableRun {
   kind: DelegatedRun["kind"]
   label: string | null
   description: string | null
+  transcriptId: string | null
   status: string | null
   lastTool: string | null
   done: boolean
@@ -69,10 +70,26 @@ export class TranscriptBuilder {
   private lowestSeq = Number.POSITIVE_INFINITY
   /** Bumped on every absorbed event, so a consumer can memoize on a value that actually changes. */
   private revision = 0
+  /**
+   * The one session this fold is for, when a stream carries several.
+   *
+   * A transcript is one conversation. Most wires give exactly that, but
+   * opencode's server bus publishes every session on the machine — including
+   * a subagent's own — onto one connection, and folding those together merges
+   * two conversations' turns, plans and asks into one. Naming the session is
+   * how a consumer reads the one it is showing; leaving it unset folds
+   * whatever arrives, which is right for every one-session wire.
+   */
+  private readonly only: string | null
+
+  constructor(options: { readonly sessionId?: string } = {}) {
+    this.only = options.sessionId ?? null
+  }
 
   /** Feeds newly mapped events in arrival order. */
   push(incoming: readonly AgentEvent[]): void {
     for (const event of incoming) {
+      if (this.only !== null && event.sessionId !== this.only) continue
       // A re-delivered event is the ordinary shape of a reconnect: any
       // at-least-once transport replays its last chunk. Since `seq` is dense
       // per session, anything inside the range already absorbed is a replay and
@@ -165,6 +182,7 @@ export class TranscriptBuilder {
         kind: "other",
         label: null,
         description: null,
+        transcriptId: null,
         status: null,
         lastTool: null,
         done: false,
@@ -201,6 +219,7 @@ export class TranscriptBuilder {
       run.kind = payload.taskKind
       run.label = payload.label
       run.description = payload.description
+      run.transcriptId = payload.transcriptId
       return
     }
     if (payload.type === "task_progress") {

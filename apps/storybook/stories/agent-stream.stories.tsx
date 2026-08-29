@@ -6,8 +6,16 @@ import {
   Button,
   ClaudeStreamMapper,
   CodexStreamMapper,
+  AcpMapper,
+  CodexAppServerMapper,
+  OpencodeRunMapper,
+  OpencodeServerMapper,
+  AGENT_TRANSPORTS,
   claude,
   codex,
+  opencode,
+  transportOf,
+  transportsOf,
   mapClaudeStream,
   JsonTree,
   Message,
@@ -55,7 +63,9 @@ import {
   type WorkflowAgentProgress,
   type AgentCapabilities,
   type JsonValue,
+  type Supported,
   type Transcript,
+  type TransportDescriptor,
   type WorkItem,
 } from "@nessa-ui/react"
 
@@ -75,6 +85,14 @@ import { storyDocumentation } from "./story-documentation"
 // is authored transcript data.
 import failing from "./fixtures/agent-stream/failing.jsonl?raw"
 import approvalAllow from "./fixtures/agent-stream/approval_allow.jsonl?raw"
+import opencodeFailing from "./fixtures/agent-stream/opencode/failing.jsonl?raw"
+import opencodePrinted from "./fixtures/agent-stream/opencode/printed.jsonl?raw"
+import opencodeRejected from "./fixtures/agent-stream/opencode/rejected.jsonl?raw"
+import opencodeResumeOne from "./fixtures/agent-stream/opencode/resume_turn1.jsonl?raw"
+import opencodeResumeTwo from "./fixtures/agent-stream/opencode/resume_turn2.jsonl?raw"
+import opencodeSubagent from "./fixtures/agent-stream/opencode/subagent.jsonl?raw"
+import opencodeTodos from "./fixtures/agent-stream/opencode/todos.jsonl?raw"
+import opencodeTools from "./fixtures/agent-stream/opencode/tools.jsonl?raw"
 import compaction from "./fixtures/agent-stream/compaction.jsonl?raw"
 import approvalDeny from "./fixtures/agent-stream/approval_deny.jsonl?raw"
 import printed from "./fixtures/agent-stream/printed.jsonl?raw"
@@ -98,13 +116,32 @@ import codexTools from "./fixtures/agent-stream/codex/tools.jsonl?raw"
 import codexWebsearch from "./fixtures/agent-stream/codex/websearch.jsonl?raw"
 // What the interactive app-server answers that the one-way stream never sends.
 import codexAppServerCapabilities from "./fixtures/agent-stream/codex/appserver_capabilities.json"
+import opencodeCliAgents from "./fixtures/agent-stream/opencode/cli_agents.txt?raw"
+import opencodeExportSubagent from "./fixtures/agent-stream/opencode/export_subagent.json?raw"
+import acpClaudeTools from "./fixtures/agent-stream/acp/claude_tools.jsonl?raw"
+import acpCodexTools from "./fixtures/agent-stream/acp/codex_tools.jsonl?raw"
+import codexAppServerTools from "./fixtures/agent-stream/codex/appserver_tools.jsonl?raw"
+import opencodeAcpPermission from "./fixtures/agent-stream/opencode/acp_permission.jsonl?raw"
+import opencodeAcpPlan from "./fixtures/agent-stream/opencode/acp_plan.jsonl?raw"
+import opencodeAcpSubagent from "./fixtures/agent-stream/opencode/acp_subagent.jsonl?raw"
+import opencodeAcpWebsearch from "./fixtures/agent-stream/opencode/acp_websearch.jsonl?raw"
+import opencodeSsePlan from "./fixtures/agent-stream/opencode/sse_plan.jsonl?raw"
+import opencodeSseSubagent from "./fixtures/agent-stream/opencode/sse_subagent.jsonl?raw"
+import opencodeSseWebsearch from "./fixtures/agent-stream/opencode/sse_websearch.jsonl?raw"
+import opencodeOverflow from "./fixtures/agent-stream/opencode/overflow.jsonl?raw"
+import opencodeWebsearch from "./fixtures/agent-stream/opencode/websearch.jsonl?raw"
+import opencodeAcpPrinted from "./fixtures/agent-stream/opencode/acp_printed.jsonl?raw"
+import opencodeAcpTools from "./fixtures/agent-stream/opencode/acp_tools.jsonl?raw"
+import opencodeSsePrinted from "./fixtures/agent-stream/opencode/sse_printed.jsonl?raw"
+import opencodeSseTools from "./fixtures/agent-stream/opencode/sse_tools.jsonl?raw"
+import opencodeCliModels from "./fixtures/agent-stream/opencode/cli_models.txt?raw"
 // The transcripts the *stream* refuses to carry, read back from the files
 // Claude Code writes under ~/.claude/projects. Keyed by the ids the stream does
 // give: a subagent by its `task_id`, a workflow agent by its `agentId`.
 import diskSubagent from "./fixtures/agent-stream/disk_subagent_a37fefefbc61e13e3.jsonl?raw"
 import diskWorkflowAgent from "./fixtures/agent-stream/disk_workflow_agent_a35ea63276cd501aa.jsonl?raw"
 
-type ProviderId = "claude" | "codex"
+type ProviderId = "claude" | "codex" | "opencode"
 
 /**
  * What a provider is, and what it supports.
@@ -114,42 +151,39 @@ type ProviderId = "claude" | "codex"
  * provider report capabilities" is a question a third provider answers for
  * itself without this file learning its name.
  */
-interface Transport {
-  readonly id: string
-  readonly label: string
-  readonly command: string
-  readonly interactive: boolean
-  readonly supports: {
-    readonly capabilities: boolean
-    readonly approvals: boolean
-    readonly steering: boolean
-  }
-  readonly note: string
-}
-
 interface Provider {
   readonly id: ProviderId
   readonly label: string
   readonly command: string
   /** The provider's own mapper, behind the shared interface. */
-  readonly createMapper: () => { push(line: string): readonly AgentEvent[] }
   /**
-   * How you reach this agent. A provider can speak more than one, and they do
-   * not carry the same things — Codex's one-way stream and its interactive
-   * app-server differ enough that a reader comparing them should see which is
-   * which rather than a single blurred answer.
+   * The provider's own mapper for one transport, behind the shared interface.
+   *
+   * Takes the transport because a provider can have more than one wire, and
+   * opencode's two are different protocols — reading a bus capture with the
+   * one-way mapper would decode every frame as unknown.
    */
-  readonly transports: readonly Transport[]
+  readonly createMapper: (transportId: string) => { push(line: string): readonly AgentEvent[] }
+  /**
+   * Why some of this provider's lines produce no event.
+   *
+   * Owned here rather than branched on the id in the pane: written as an
+   * if/else, a third provider silently inherits the second one's sentence and
+   * the surface states something untrue about the stream it is showing.
+   */
+  readonly silentLinesNote: string
+  /**
+   * How you reach this agent, read from the library rather than restated here.
+   *
+   * A provider is not one wire, and what a wire can do is a fact about the
+   * transport — so it lives with the parser that established it. A surface that
+   * kept its own copy would drift from what was actually captured.
+   */
+  readonly transports: readonly TransportDescriptor[]
   readonly supports: {
-    /** Token-level previews. Claude streams; Codex, in this mode, does not. */
-    readonly streaming: boolean
-    /** A session advertisement worth building composer pickers from. */
-    readonly capabilities: boolean
-    /** Structured file edits rather than opaque file tool calls. */
-    readonly fileEdits: boolean
-    /** A phase-and-agent board for a fan-out. */
+    /** A phase-and-agent board for a fan-out. Not a property of any one wire. */
     readonly workflowBoard: boolean
-    /** Delegated transcripts addressable on disk from ids the wire gave. */
+    /** Delegated transcripts a host can open, however it addresses them. */
     readonly transcriptsOnDisk: boolean
   }
 }
@@ -159,56 +193,60 @@ const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
     id: "claude",
     label: "Claude Code",
     command: "claude -p --output-format stream-json --include-partial-messages",
-    transports: [
-      {
-        id: "stream",
-        label: "stream-json",
-        command: "claude -p --output-format stream-json",
-        interactive: false,
-        supports: { capabilities: true, approvals: false, steering: false },
-        note: "One-way. The opening line advertises the whole session, so pickers can be built from the stream alone.",
-      },
-      {
-        id: "pipe",
-        label: "stream-json, both ways",
-        command: "claude -p --input-format stream-json --output-format stream-json",
-        interactive: true,
-        supports: { capabilities: true, approvals: true, steering: true },
-        note: "The same stream with stdin open: prompts and steering go in, control requests answer approvals and change model or permission mode mid-turn.",
-      },
-    ],
-    createMapper: () => new ClaudeStreamMapper(),
-    supports: { streaming: true, capabilities: true, fileEdits: false, workflowBoard: true, transcriptsOnDisk: true },
+    transports: transportsOf("claude")!.transports,
+    createMapper: (transportId: string) =>
+      transportId === "acp" ? new AcpMapper() : new ClaudeStreamMapper(),
+    silentLinesNote:
+      "message_start is the mapper's join key, message_stop and message_delta repeat what result carries, signature_delta signs a thinking block, and a steady-state rate limit has nothing to act on.",
+    supports: { workflowBoard: true, transcriptsOnDisk: true },
   },
   codex: {
     id: "codex",
     label: "Codex",
     command: "codex exec --json",
-    transports: [
-      {
-        id: "exec",
-        label: "exec --json",
-        command: "codex exec --json",
-        interactive: false,
-        supports: { capabilities: false, approvals: false, steering: false },
-        note: "One-way. The opening line carries a thread id and nothing else, so nothing here can populate a picker.",
-      },
-      {
-        id: "app-server",
-        label: "app-server",
-        command: "codex app-server",
-        interactive: true,
-        supports: { capabilities: true, approvals: true, steering: true },
-        note: "Interactive JSON-RPC. Answers model, skill, plugin and hook lists on request, asks for approval before running untrusted commands, and takes steer and interrupt mid-turn.",
-      },
-    ],
-    createMapper: () => new CodexStreamMapper(),
-    supports: { streaming: false, capabilities: false, fileEdits: true, workflowBoard: false, transcriptsOnDisk: true },
+    transports: transportsOf("codex")!.transports,
+    createMapper: (transportId: string) =>
+      transportId === "acp"
+        ? new AcpMapper()
+        : transportId === "app-server"
+          ? new CodexAppServerMapper()
+          : new CodexStreamMapper(),
+    silentLinesNote:
+      "turn.started is a bare marker, and an item that is reported whole on completion says nothing when it opens.",
+    supports: { workflowBoard: false, transcriptsOnDisk: true },
+  },
+  opencode: {
+    id: "opencode",
+    label: "opencode",
+    command: "opencode run --format json",
+    transports: transportsOf("opencode")!.transports,
+    createMapper: (transportId: string) =>
+      // Two wires, two mappers: the bus is a different protocol, not the same
+      // one with more on it.
+      transportId === "serve"
+        ? new OpencodeServerMapper()
+        : transportId === "acp"
+          ? new AcpMapper()
+          : new OpencodeRunMapper(),
+    silentLinesNote:
+      "a step opening says only that a model call began, and the steps that finish mid-turn are the tool loop rather than the end of the answer — only the one that stops for its own sake closes the turn.",
+    // Its delegated runs are the readable ones: the child session id is on the
+    // wire and `opencode export <id>` reads it, where Claude's must be derived
+    // and Codex's cannot be read at all.
+    supports: { workflowBoard: false, transcriptsOnDisk: true },
   },
 }
 
 interface Capture {
   readonly provider: ProviderId
+  /**
+   * The transport this was recorded from, when it only exists on one.
+   *
+   * opencode streams tokens on its server bus and nothing at all on its
+   * one-way stream, so a capture of one is not a capture of the other. Absent
+   * means the recording is representative of every transport the provider has.
+   */
+  readonly transport?: string
   readonly id: string
   readonly label: string
   readonly blurb: string
@@ -223,27 +261,55 @@ interface Capture {
 }
 
 const CAPTURES: readonly Capture[] = [
-  { provider: "claude", id: "printed", label: "Plain text", blurb: "One streamed message and nothing else — the delta path with no tools in the way.", prompt: "Print exactly: hello world. Do not use any tools.", source: printed },
-  { provider: "claude", id: "tools", label: "Tools", blurb: "Write, read and a shell command: three calls, three results, one reasoning block.", prompt: "Create a file notes.txt containing three lines of text, then read it back, then run 'wc -l notes.txt'. Keep it brief.", source: tools },
-  { provider: "claude", id: "todos", label: "Plan", blurb: "The incremental plan tools — TaskCreate and TaskUpdate — folded into one checklist.", prompt: "Use your todo list to plan and then do these three steps: create a.txt with 'a', create b.txt with 'b', then run 'ls *.txt'. Track each step in your todos.", source: todos },
-  { provider: "claude", id: "subagent", label: "Subagent", blurb: "An Explore subagent, its own events filed under the call that spawned it.", prompt: "Use the Explore subagent to find out what files are in this directory, then tell me what it found in one line.", source: subagent },
-  { provider: "claude", id: "workflow", label: "Workflow", blurb: "Three parallel agents behind one Workflow call: no inner transcripts, but a full phase-and-agent board with state, cost and results.", prompt: "Use a workflow to run three agents in parallel, each printing a different greeting (hello, hola, bonjour), then summarize what they returned. Keep it tiny.", source: workflow },
-  { provider: "claude", id: "phases", label: "Multi-phase workflow", blurb: "Three phases, four agents. Every phase is declared up front, so the ones not reached yet render as pending rather than appearing late.", prompt: "Use a workflow with THREE phases: 'Greet' runs two agents in parallel (hello, hola); 'Translate' runs one (bonjour); 'Summarize' lists all three.", source: workflowPhases },
-  { provider: "claude", id: "failing", label: "Failed tool", blurb: "A command that exits non-zero, with the wire's error framing stripped off.", prompt: "Run the command 'cat /nonexistent/definitely-missing-file' and then tell me what happened in one sentence.", source: failing },
-  { provider: "claude", id: "websearch", label: "Web search", blurb: "Server-side tools, whose results arrive as structured blocks rather than text.", prompt: "Search the web for the current version of the TypeScript compiler and tell me in one line.", source: websearch },
-  { provider: "claude", id: "approval-allow", label: "Approval — allowed", blurb: "The one place the wire is a conversation: the harness stops and asks, and nothing moves until an answer is written back. Recorded against a sandbox whose settings escalate the shell.", prompt: "Run the shell command `echo approved-and-ran` using the Bash tool, then tell me its output. (Answered: allow)", source: approvalAllow },
-  { provider: "claude", id: "approval-deny", label: "Approval — refused", blurb: "The same ask, answered no. The refusal text becomes the tool's error, and the turn still completes — a declined tool is not a failed run.", prompt: "The same prompt, answered: deny.", source: approvalDeny },
-  { provider: "claude", id: "compaction", label: "Context compaction", blurb: "The window fills and history is summarised away — twice. The transcript keeps everything; only the model forgets. Forced by reading a generated corpus on Haiku with a 100k window.", prompt: "Read fifteen generated files in full, one at a time, answering with only each filename.", source: compaction },
-  { provider: "claude", id: "resume", label: "Resume + model swap", blurb: "Two processes, one session id: a second init, and a model change derived from it.", prompt: "Remember the number 47. Create marker.txt containing it. Then, resumed on Haiku: what number did I ask you to remember?", source: `${resumeOne}\n${resumeTwo}` },
+  { provider: "claude", transport: "stream", id: "printed", label: "Plain text", blurb: "One streamed message and nothing else — the delta path with no tools in the way.", prompt: "Print exactly: hello world. Do not use any tools.", source: printed },
+  { provider: "claude", transport: "stream", id: "tools", label: "Tools", blurb: "One shell command doing the whole job, its result, and a reasoning block — the model chained it rather than making three calls.", prompt: "Create a file notes.txt containing three lines of text, then read it back, then run 'wc -l notes.txt'. Keep it brief.", source: tools },
+  { provider: "claude", transport: "stream", id: "todos", label: "Plan", blurb: "The incremental plan tools — TaskCreate and TaskUpdate — folded into one checklist.", prompt: "Use your todo list to plan and then do these three steps: create a.txt with 'a', create b.txt with 'b', then run 'ls *.txt'. Track each step in your todos.", source: todos },
+  { provider: "claude", transport: "stream", id: "subagent", label: "Subagent", blurb: "An Explore subagent, its own events filed under the call that spawned it.", prompt: "Use the Explore subagent to find out what files are in this directory, then tell me what it found in one line.", source: subagent },
+  { provider: "claude", transport: "stream", id: "workflow", label: "Workflow", blurb: "Three parallel agents behind one Workflow call: no inner transcripts, but a full phase-and-agent board with state, cost and results.", prompt: "Use a workflow to run three agents in parallel, each printing a different greeting (hello, hola, bonjour), then summarize what they returned. Keep it tiny.", source: workflow },
+  { provider: "claude", transport: "stream", id: "phases", label: "Multi-phase workflow", blurb: "Three phases, four agents. Every phase is declared up front, so the ones not reached yet render as pending rather than appearing late.", prompt: "Use a workflow with THREE phases: 'Greet' runs two agents in parallel (hello, hola); 'Translate' runs one (bonjour); 'Summarize' lists all three.", source: workflowPhases },
+  { provider: "claude", transport: "stream", id: "failing", label: "Failed tool", blurb: "A command that exits non-zero, with the wire's error framing stripped off.", prompt: "Run the command 'cat /nonexistent/definitely-missing-file' and then tell me what happened in one sentence.", source: failing },
+  { provider: "claude", transport: "stream", id: "websearch", label: "Web search", blurb: "Server-side tools, whose results arrive as structured blocks rather than text.", prompt: "Search the web for the current version of the TypeScript compiler and tell me in one line.", source: websearch },
+  { provider: "claude", transport: "stream", id: "approval-allow", label: "Approval — allowed", blurb: "The one place the wire is a conversation: the harness stops and asks, and nothing moves until an answer is written back. Recorded against a sandbox whose settings escalate the shell.", prompt: "Run the shell command `echo approved-and-ran` using the Bash tool, then tell me its output. (Answered: allow)", source: approvalAllow },
+  { provider: "claude", transport: "stream", id: "approval-deny", label: "Approval — refused", blurb: "The same ask, answered no. The refusal text becomes the tool's error, and the turn still completes — a declined tool is not a failed run.", prompt: "The same prompt, answered: deny.", source: approvalDeny },
+  { provider: "claude", transport: "stream", id: "compaction", label: "Context compaction", blurb: "The window fills and history is summarised away — twice. The transcript keeps everything; only the model forgets. Forced by reading a generated corpus on Haiku with a 100k window.", prompt: "Read fifteen generated files in full, one at a time, answering with only each filename.", source: compaction },
+  { provider: "claude", transport: "stream", id: "resume", label: "Resume + model swap", blurb: "Two processes, one session id: a second init, and a model change derived from it.", prompt: "Remember the number 47. Create marker.txt containing it. Then, resumed on Haiku: what number did I ask you to remember?", source: `${resumeOne}\n${resumeTwo}` },
+  { provider: "claude", transport: "acp", id: "claude-acp", label: "Tools over ACP", blurb: "Claude Code through Zed's adapter. The same agent on a different protocol: it asks for permission over the wire without the stdio flag its own stream needs, and `session/new` advertises the models it can switch to.", prompt: "Create notes.txt with two lines, then run 'wc -l notes.txt'.", source: acpClaudeTools },
+
   // ---------- Codex ----------
-  { provider: "codex", id: "codex-printed", label: "Plain text", blurb: "One committed message. Codex streams nothing in this mode, which is why live preview has to be optional rather than assumed.", prompt: "Reply with exactly: hello world. Do not run any commands.", source: codexPrinted },
-  { provider: "codex", id: "codex-tools", label: "Tools", blurb: "A file write and a shell command, each an item that opens and settles — the item id is the call id.", prompt: "Create notes.txt with three lines of text, read it back, then run 'wc -l notes.txt'.", source: codexTools },
-  { provider: "codex", id: "codex-plan", label: "Plan", blurb: "The plan republished whole as steps complete, with no step ids — position in the list is the identity.", prompt: "Plan and then do three steps: create a.txt, create b.txt, then run 'ls *.txt'. Track your progress.", source: codexPlan },
-  { provider: "codex", id: "codex-patch", label: "File changes", blurb: "Structured edits: which files changed and how. Claude Code reports the same work only as opaque tool calls.", prompt: "Create greet.py with a function that prints hello, then modify it to take a name argument.", source: codexPatch },
-  { provider: "codex", id: "codex-delegate", label: "Spawned agent", blurb: "A spawned agent writes nothing to this stream; its transcript lives under the receiver thread id.", prompt: "Use a subagent to print three greetings, then summarize.", source: codexDelegate },
-  { provider: "codex", id: "codex-failing", label: "Failed command", blurb: "A non-zero exit code, so failure is a fact the wire states rather than something inferred from prose.", prompt: "Run 'cat /nonexistent/definitely-missing-file' and tell me what happened.", source: codexFailing },
-  { provider: "codex", id: "codex-websearch", label: "Web search", blurb: "A search item, which opens and settles like any other call.", prompt: "Search the web for the current version of the TypeScript compiler.", source: codexWebsearch },
-  { provider: "codex", id: "codex-resume", label: "Resume", blurb: "Two processes, one thread id — a resume is no more visible here than it is on Claude.", prompt: "Remember the number 47… then, resumed: what number did I ask you to remember?", source: `${codexResumeOne}\n${codexResumeTwo}` },
+  { provider: "codex", transport: "exec", id: "codex-printed", label: "Plain text", blurb: "One committed message. Codex streams nothing in this mode, which is why live preview has to be optional rather than assumed.", prompt: "Reply with exactly: hello world. Do not run any commands.", source: codexPrinted },
+  { provider: "codex", transport: "exec", id: "codex-tools", label: "Tools", blurb: "A file write and a shell command, each an item that opens and settles — the item id is the call id.", prompt: "Create notes.txt with three lines of text, read it back, then run 'wc -l notes.txt'.", source: codexTools },
+  { provider: "codex", transport: "exec", id: "codex-plan", label: "Plan", blurb: "The plan republished whole as steps complete, with no step ids — position in the list is the identity.", prompt: "Plan and then do three steps: create a.txt, create b.txt, then run 'ls *.txt'. Track your progress.", source: codexPlan },
+  { provider: "codex", transport: "exec", id: "codex-patch", label: "File changes", blurb: "Structured edits: which files changed and how. Claude Code reports the same work only as opaque tool calls.", prompt: "Create greet.py with a function that prints hello, then modify it to take a name argument.", source: codexPatch },
+  { provider: "codex", transport: "exec", id: "codex-delegate", label: "Spawned agent", blurb: "A spawned agent writes nothing to this stream; its transcript lives under the receiver thread id.", prompt: "Use a subagent to print three greetings, then summarize.", source: codexDelegate },
+  { provider: "codex", transport: "exec", id: "codex-failing", label: "Failed command", blurb: "A non-zero exit code, so failure is a fact the wire states rather than something inferred from prose.", prompt: "Run 'cat /nonexistent/definitely-missing-file' and tell me what happened.", source: codexFailing },
+  { provider: "codex", transport: "exec", id: "codex-websearch", label: "Web search", blurb: "A search item, which opens and settles like any other call.", prompt: "Search the web for the current version of the TypeScript compiler.", source: codexWebsearch },
+  { provider: "codex", transport: "exec", id: "codex-resume", label: "Resume", blurb: "Two processes, one thread id — a resume is no more visible here than it is on Claude.", prompt: "Remember the number 47… then, resumed: what number did I ask you to remember?", source: `${codexResumeOne}\n${codexResumeTwo}` },
+
+  { provider: "codex", transport: "app-server", id: "codex-appserver", label: "Tools", blurb: "The other Codex protocol. It carries the prompt in the client's own request and streams the answer as agentMessage deltas — neither of which `exec --json` does.", prompt: "Create notes.txt with two lines, then run 'wc -l notes.txt'.", source: codexAppServerTools },
+  { provider: "codex", transport: "acp", id: "codex-acp", label: "Tools over ACP", blurb: "Codex through the ACP adapter, read by the same reader as Claude's and opencode's. Streams where exec does not, and reports its sandbox modes — read-only, auto, full-access.", prompt: "Create notes.txt with two lines, then run 'wc -l notes.txt'.", source: acpCodexTools },
+
+  // ---------- opencode ----------
+  { provider: "opencode", transport: "run", id: "oc-printed", label: "Plain text", blurb: "Three lines for a whole turn. No init, no deltas, no terminator of its own — a step opens, a part carries the answer, a step finishes.", prompt: "Reply with exactly: hello world. Do not use any tools.", source: opencodePrinted },
+  { provider: "opencode", transport: "run", id: "oc-tools", label: "Tools", blurb: "Each call arrives settled: one line carrying the input it ran with and the result it produced, so a row opens and closes together.", prompt: "Create notes.txt with three lines, read it back, then run 'wc -l notes.txt'.", source: opencodeTools },
+  { provider: "opencode", transport: "run", id: "oc-todos", label: "Plan", blurb: "The plan is a tool call — todowrite republishes the whole list, and the turn is six steps deep because a tool loop finishes a step per call.", prompt: "Use your todo list to plan and do three steps: create a.txt, create b.txt, then run 'ls *.txt'.", source: opencodeTodos },
+  { provider: "opencode", transport: "run", id: "oc-subagent", label: "Subagent", blurb: "The one thing opencode does better than both others: the delegation names the child's own session id, and `opencode export` reads it.", prompt: "Use a subagent to find out what files are in this directory, then tell me what it found.", source: opencodeSubagent },
+  { provider: "opencode", transport: "run", id: "oc-failing", label: "Failed command", blurb: "The trap in this wire: the call settles as completed because the tool worked, and the failure is only in metadata.exit.", prompt: "Run 'cat ./definitely-missing-file.txt' and tell me what happened.", source: opencodeFailing },
+  { provider: "opencode", transport: "run", id: "oc-rejected", label: "Refused call", blurb: "Unattended, a permission rule auto-rejects — and then the run just ends. No closing message, no terminator: a turn that stops rather than finishes.", prompt: "Create a file at /etc/opencode-probe.txt, then tell me whether it worked.", source: opencodeRejected },
+  { provider: "opencode", transport: "run", id: "oc-websearch", label: "Web search", blurb: "opencode's web search is an MCP tool that calls out to a third-party search service, so the result arrives as a search payload rather than as prose.", prompt: "Search the web for the current version of the TypeScript compiler and tell me in one line.", source: opencodeWebsearch },
+  { provider: "opencode", transport: "run", id: "oc-overflow", label: "Context overrun", blurb: "28 steps reading a generated corpus until the context passed 232k against a 200k window. opencode never compacted — the run ended on an upstream error instead, which is the one thing Claude's compaction exists to avoid.", prompt: "Read every one of 32 generated files in full, one at a time, replying with only the filename.", source: opencodeOverflow },
+  { provider: "opencode", transport: "run", id: "oc-resume", label: "Resume + model swap", blurb: "Two processes, one session id, and a different model on the second — which the wire never mentions, because it names a model only inside a delegation.", prompt: "Remember the number 47… then, resumed on another model: what number did I ask you to remember?", source: `${opencodeResumeOne}\n${opencodeResumeTwo}` },
+
+  { provider: "opencode", transport: "serve", id: "oc-sse-printed", label: "Streamed answer", blurb: "The server's bus, where opencode does stream: 254 token deltas for one paragraph, each joinable to the part that supersedes it. Its `/event` endpoint is server-wide, so this capture carries a second session too.", prompt: "Write one paragraph of four sentences about the tide. Do not use tools.", source: opencodeSsePrinted },
+  { provider: "opencode", transport: "serve", id: "oc-sse-tools", label: "Streamed + refused", blurb: "The same bus with a tool call: arguments stream as partial JSON, the session names its model, and a permission ask is held open and answered rather than auto-rejected.", prompt: "Create sse-notes.txt with two lines, then run 'wc -l sse-notes.txt'.", source: opencodeSseTools },
+  { provider: "opencode", transport: "acp", id: "oc-acp-printed", label: "Plain text", blurb: "The Agent Client Protocol over stdio: a conversation, not a stream. Nine frames, and the client's own request is what carries the prompt. The one-way stream never echoes it; the bus repeats it back as a part.", prompt: "Reply with exactly: hello world. Do not use any tools.", source: opencodeAcpPrinted },
+  { provider: "opencode", transport: "acp", id: "oc-acp-tools", label: "Tools", blurb: "Thoughts and prose stream as separate chunk kinds, and a call opens before it settles, the way the bus also republishes a running one. The kind is the protocol's, not a guess from a tool's name.", prompt: "Create acp-notes.txt with two lines, then run 'wc -l acp-notes.txt'.", source: opencodeAcpTools },
+  { provider: "opencode", transport: "serve", id: "oc-sse-plan", label: "Plan", blurb: "The same todo list as the one-way stream, arriving as settled parts between the token deltas.", prompt: "Use your todo list to plan and do three steps: create a.txt, create b.txt, then run 'ls *.txt'.", source: opencodeSsePlan },
+  { provider: "opencode", transport: "serve", id: "oc-sse-subagent", label: "Subagent", blurb: "A delegation on the bus — and because `/event` is server-wide, the child's own session publishes here too rather than being hidden behind the call.", prompt: "Use a subagent to find out what files are in this directory, then tell me what it found.", source: opencodeSseSubagent },
+  { provider: "opencode", transport: "serve", id: "oc-sse-websearch", label: "Web search", blurb: "A search tool call, with its arguments streaming in as partial JSON before the results settle.", prompt: "Search the web for the current version of the TypeScript compiler.", source: opencodeSseWebsearch },
+  { provider: "opencode", transport: "acp", id: "oc-acp-plan", label: "Plan", blurb: "ACP has a plan update of its own, but opencode does not use it: the todo list arrives as a `todowrite` tool call, and its list rides on the call's input while it is still running.", prompt: "Use your todo list to plan and do three steps: create a.txt, create b.txt, then run 'ls *.txt'.", source: opencodeAcpPlan },
+  { provider: "opencode", transport: "acp", id: "oc-acp-subagent", label: "Subagent", blurb: "A delegation, which ACP labels with the protocol's own `think` kind. The child session id is named only inside the result text — the one place this wire puts it.", prompt: "Use a subagent to find out what files are in this directory, then tell me what it found.", source: opencodeAcpSubagent },
+  { provider: "opencode", transport: "acp", id: "oc-acp-websearch", label: "Web search", blurb: "A search call, renamed by the agent as it goes: it opens as `websearch` and settles under the query it ran.", prompt: "Search the web for the current version of the TypeScript compiler.", source: opencodeAcpWebsearch },
+  { provider: "opencode", transport: "acp", id: "oc-acp-permission", label: "Approval", blurb: "The agent asks the client for permission and blocks until answered, listing the options it will accept. Answered allow here, so the write went through.", prompt: "Create a file at /tmp/acp-outside-probe.txt, then tell me whether it worked. (Answered: allow once)", source: opencodeAcpPermission },
 ]
 
 const LINES = new Map(CAPTURES.map((capture) => [capture.id, capture.source.split("\n").filter((line) => line.trim().length > 0)]))
@@ -282,34 +348,62 @@ interface LiveState {
  * and a reader comparing the two should be able to see that without opening
  * the raw pane.
  */
-function ProviderSupport({ provider, transport }: { provider: Provider; transport: Transport }) {
-  const features = [
-    // What the wire carries, whichever transport is used…
-    ["streams tokens", provider.supports.streaming],
-    ["structured file edits", provider.supports.fileEdits],
-    ["workflow board", provider.supports.workflowBoard],
-    ["transcripts on disk", provider.supports.transcriptsOnDisk],
-    // …and what this transport in particular can do.
+function ProviderSupport({ provider, transport }: { provider: Provider; transport: TransportDescriptor }) {
+  // Read from the transport descriptor rather than listed here: adding a
+  // provider adds a row in the library, and this row follows without an edit.
+  const features: readonly (readonly [string, Supported])[] = [
+    ["streams tokens", transport.supports.streaming],
+    ["names the model", transport.supports.namesModel],
+    ["structured file edits", transport.supports.fileEdits],
     ["session capabilities", transport.supports.capabilities],
     ["approvals", transport.supports.approvals],
     ["steering", transport.supports.steering],
-  ] as const
+    ["shared bus, filter by session", transport.supports.sharedBus],
+    // Still the provider's own, since neither is a property of the wire.
+    ["workflow board", provider.supports.workflowBoard],
+    ["transcripts on disk", provider.supports.transcriptsOnDisk],
+  ]
 
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="provider-support">
       <code className="text-muted-foreground">{transport.command}</code>
       {features.map(([label, supported]) => (
-        <Badge key={label} variant={supported ? "secondary" : "outline"} className={supported ? "" : "opacity-60"}>
-          {supported ? label : `no ${label}`}
+        <Badge key={label} variant={supported === true ? "secondary" : "outline"} className={supported === true ? "" : "opacity-60"}>
+          {/* Three states, because "nobody has captured this" is not the same
+              answer as "it cannot". */}
+          {supported === true ? label : supported === false ? `no ${label}` : `${label}: unrecorded`}
         </Badge>
       ))}
     </div>
   )
 }
 
+/** Whether a capture's transport publishes more than one session on one stream. */
+function sharedBusCapture(captureId: string): boolean {
+  const capture = CAPTURES.find((entry) => entry.id === captureId)
+  if (capture === undefined) return false
+  return transportOf(capture.provider, capture.transport ?? "")?.supports.sharedBus === true
+}
+
+/** What a fold looks like before its first event, on a bus whose session is not yet known. */
+const EMPTY_TRANSCRIPT: Transcript = new TranscriptBuilder().snapshot()
+
 /** Which provider a capture came from. */
 function providerOf(captureId: string): ProviderId {
   return CAPTURES.find((entry) => entry.id === captureId)?.provider ?? "claude"
+}
+
+/**
+ * The mapper a capture has to be read with.
+ *
+ * Taken from the capture rather than from whatever the toggle is showing: a
+ * recording belongs to the wire it came from, and reading opencode's bus with
+ * its one-way mapper would decode every frame as unknown.
+ */
+function mapperFor(captureId: string): { push(line: string): readonly AgentEvent[] } {
+  const capture = CAPTURES.find((entry) => entry.id === captureId)
+  const provider = PROVIDERS[capture?.provider ?? "claude"]
+  return provider.createMapper(capture?.transport ?? provider.transports[0]!.id)
 }
 
 function useLiveTranscript(captureId: string, count: number, live: boolean): LiveState {
@@ -317,7 +411,7 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
     captureId: string
     count: number
     mapper: { push(line: string): readonly AgentEvent[] }
-    builder: TranscriptBuilder
+    builder: TranscriptBuilder | null
     buffers: Map<string, string>
     events: AgentEvent[]
     produced: number[]
@@ -329,8 +423,10 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
     current = {
       captureId,
       count: 0,
-      mapper: PROVIDERS[providerOf(captureId)].createMapper(),
-      builder: new TranscriptBuilder(),
+      mapper: mapperFor(captureId),
+      // On a bus the builder cannot be made until a session is known, because
+      // a transcript is one conversation and the stream carries several.
+      builder: sharedBusCapture(captureId) ? null : new TranscriptBuilder(),
       buffers: new Map(),
       events: [],
       produced: [],
@@ -349,7 +445,13 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
     const mapped = current.mapper.push(line)
     current.produced.push(mapped.length)
     current.events.push(...mapped)
-    current.builder.push(mapped)
+    // The first session seen is the one being watched; the rest of the bus —
+    // a subagent's own session, another window's work — is filtered out rather
+    // than folded into this conversation.
+    if (current.builder === null && mapped[0] !== undefined) {
+      current.builder = new TranscriptBuilder({ sessionId: mapped[0].sessionId })
+    }
+    current.builder?.push(mapped)
     applyDeltas(mapped, current.buffers)
   }
   current.count = target
@@ -357,7 +459,7 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
   return {
     events: current.events,
     produced: current.produced,
-    transcript: current.builder.snapshot({ live }),
+    transcript: current.builder?.snapshot({ live }) ?? EMPTY_TRANSCRIPT,
     previews: current.buffers,
   }
 }
@@ -382,6 +484,17 @@ const OpenTranscript = React.createContext<(ref: claude.TranscriptRef) => void>(
 const DISK_TRANSCRIPTS: Readonly<Record<string, string>> = {
   a37fefefbc61e13e3: diskSubagent,
   a35ea63276cd501aa: diskWorkflowAgent,
+}
+
+/**
+ * opencode's exported sessions, by the child session id its own stream names.
+ *
+ * Where Claude's have to be located on disk from a path contract, opencode
+ * hands the id over on the spawning call — so a host runs one command and gets
+ * the conversation. The story ships the answer that command returned.
+ */
+const OPENCODE_EXPORTS: Readonly<Record<string, string>> = {
+  ses_fb47fb139ffeWc3UUbQebXLJ1h: opencodeExportSubagent,
 }
 
 const TOOL_ICONS: Partial<Record<ToolKind, React.ReactNode>> = {
@@ -782,6 +895,17 @@ function compactionSummary(transcript: Transcript, seq: number): string | null {
   return null
 }
 
+/**
+ * A turn's cost, at the precision it actually has.
+ *
+ * Two cents rounds to "$0.02", but a run on a free model costs exactly nothing
+ * and must say so rather than being rounded into looking like a rounding error.
+ */
+function formatCost(usd: number): string {
+  if (usd === 0) return "free"
+  return usd < 0.01 ? `$${usd.toFixed(4)}` : `$${usd.toFixed(2)}`
+}
+
 /** A field a provider left unset, so the surface can omit it rather than print a placeholder. */
 function known(value: string | null | undefined): string | null {
   return value === undefined || value === null || value === "" || value === "unknown" ? null : value
@@ -859,6 +983,12 @@ function TranscriptView({
         {transcript.usage === null ? null : (
           <span className="text-muted-foreground text-xs">
             {transcript.usage.totalTokens?.toLocaleString() ?? "—"} tokens
+            {/* Only where a provider priced the turn. Claude and opencode both
+                do; Codex reports counts and no cost, and a "$0.00" invented for
+                it would read as free rather than as unreported. */}
+            {transcript.usage.totalCostUsd === undefined || transcript.usage.totalCostUsd === null
+              ? null
+              : ` · ${formatCost(transcript.usage.totalCostUsd)}`}
           </span>
         )}
       </div>
@@ -876,13 +1006,19 @@ function TranscriptView({
       <MessageScroller className="min-h-0 flex-1">
         <MessageScrollerViewport className="px-1">
           <MessageScrollerContent aria-label="Agent transcript">
-            <Message from="user">
-              <MessageAvatar fallback="You" alt="You" />
-              <MessageContent>
-                <MessageHeader>host-supplied — headless never echoes the prompt</MessageHeader>
-                <MessageBubble variant="muted">{prompt}</MessageBubble>
-              </MessageContent>
-            </Message>
+            {/* Only where the wire does not carry it. Most of these streams
+                never echo the prompt, so the host is the only thing that knows
+                what it asked — but ACP sends it in the client's own request,
+                and printing both would show the question twice. */}
+            {transcript.events.some((event) => event.payload.type === "user_message") ? null : (
+              <Message from="user">
+                <MessageAvatar fallback="You" alt="You" />
+                <MessageContent>
+                  <MessageHeader>host-supplied — headless never echoes the prompt</MessageHeader>
+                  <MessageBubble variant="muted">{prompt}</MessageBubble>
+                </MessageContent>
+              </Message>
+            )}
             {transcript.turns.map((turn) => (
               <div key={turn.key} className="flex flex-col gap-3 py-2">
                 {turn.prompt === null || turn.prompt.payload.type !== "user_message" || turn.prompt.payload.synthetic ? null : (
@@ -1130,10 +1266,32 @@ function useAnchoredToggle(open: boolean) {
  */
 const AUTO_COLLAPSE_ROWS = 4
 
-/** The pointer to a run's own transcript, built from the session's own `init`. */
+/**
+ * The pointer to a run's own transcript.
+ *
+ * Two providers answer this differently and both answers are real: Claude's is
+ * derived from a path contract against the session's `init`, and opencode's is
+ * the child session id it printed on the spawning call. A run neither can
+ * address stays null, which is what keeps "open this subagent" from being an
+ * offer the surface cannot honour.
+ */
 function useRunRef(run: DelegatedRun): claude.TranscriptRef | null {
   const { location, runIds } = React.useContext(TranscriptLocation)
-  if (location === null || run.kind === "workflow") return null
+  if (run.kind === "workflow") return null
+  if (run.transcriptId !== null) {
+    return {
+      kind: "subagent",
+      label: run.label ?? run.description ?? "subagent",
+      key: run.transcriptId,
+      callId: run.callId,
+      // Not a path: the command that fetches it. Nothing has to be looked up
+      // first, which is exactly the difference from Claude's refs.
+      path: opencode.opencodeExportCommand(run.transcriptId),
+      resolved: true,
+      blockedBy: null,
+    }
+  }
+  if (location === null) return null
   return claude.collectTranscriptRefs(location, [run], runIds).find((ref) => ref.kind === "subagent") ?? null
 }
 
@@ -1265,7 +1423,7 @@ function InspectorView({
   count: number
   events: readonly AgentEvent[]
   produced: readonly number[]
-  transport: Transport
+  transport: TransportDescriptor
   opened: claude.TranscriptRef | null
   onCloseTranscript: () => void
 }) {
@@ -1294,6 +1452,16 @@ function InspectorView({
     () =>
       transport.supports.capabilities && provider.id === "codex"
         ? codex.codexCapabilities(codexAppServerCapabilities as unknown as Record<string, JsonValue>)
+        : null,
+    [provider.id, transport.supports.capabilities],
+  )
+  // opencode answers on a third channel again: not the stream, not a server,
+  // but its own CLI listings. Captured from `opencode models` and
+  // `opencode agent list`, which is all a host has to build a picker from.
+  const opencodeCaps = React.useMemo(
+    () =>
+      transport.supports.capabilities && provider.id === "opencode"
+        ? opencode.opencodeCapabilities({ models: opencodeCliModels, agents: opencodeCliAgents })
         : null,
     [provider.id, transport.supports.capabilities],
   )
@@ -1332,7 +1500,7 @@ function InspectorView({
           aria-label="Session capabilities"
         >
           {/* One pane, two sources: whichever the provider filled. */}
-          <CapabilitiesView capabilities={capabilities ?? codexCaps} />
+          <CapabilitiesView capabilities={capabilities ?? codexCaps ?? opencodeCaps} />
         </div>
       ) : shownPane === "raw" ? (
         <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -1360,9 +1528,7 @@ function InspectorView({
           </ul>
           <p className="text-muted-foreground text-xs">
             {`→ n is how many events the line produced. ${produced.filter((entry) => entry === 0).length} of ${produced.length} produce none: `}
-            {provider.id === "claude"
-              ? "message_start is the mapper's join key, message_stop and message_delta repeat what result carries, signature_delta signs a thinking block, and a steady-state rate limit has nothing to act on."
-              : "turn.started is a bare marker, and an item that is reported whole on completion says nothing when it opens."}
+            {provider.silentLinesNote}
           </p>
           <div className="border-border min-h-0 flex-1 overflow-auto rounded-xl border p-3">
             {decoded === null ? null : <JsonTree value={decoded} collapsible defaultExpandedDepth={2} />}
@@ -1402,8 +1568,14 @@ function InspectorView({
  * a lesser surface than the main thread is a choice, not a constraint.
  */
 function OpenedTranscript({ ref_, onClose }: { ref_: claude.TranscriptRef; onClose: () => void }) {
+  // An exported opencode session is read by opencode's own reader, and a
+  // Claude transcript on disk by Claude's. The view below is the same either
+  // way: both arrive as the same events.
+  const exported = OPENCODE_EXPORTS[ref_.key]
+  const parsedExport = exported === undefined ? null : opencode.parseOpencodeExport(exported)
   const source = ref_.path === null ? null : DISK_TRANSCRIPTS[ref_.key]
-  const events = source === undefined || source === null ? null : mapClaudeStream(source)
+  const events =
+    parsedExport !== null ? parsedExport.events : source === undefined || source === null ? null : mapClaudeStream(source)
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3" data-testid="opened-transcript">
@@ -1416,6 +1588,15 @@ function OpenedTranscript({ ref_, onClose }: { ref_: claude.TranscriptRef; onClo
         </Button>
       </div>
       <code className="text-muted-foreground truncate text-xs">{ref_.path}</code>
+      {parsedExport === null ? null : (
+        <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
+          {/* What the parent's stream could not say about its own delegation:
+              which model ran it, and what it cost. */}
+          {known(parsedExport.info.model) === null ? null : <Badge variant="outline">{parsedExport.info.model}</Badge>}
+          {parsedExport.info.totalTokens === null ? null : <span>{parsedExport.info.totalTokens.toLocaleString()} tokens</span>}
+          {parsedExport.info.totalCostUsd === null ? null : <span>{formatCost(parsedExport.info.totalCostUsd)}</span>}
+        </div>
+      )}
 
       {events === null ? (
         <p className="text-muted-foreground text-xs">
@@ -1473,9 +1654,28 @@ function OpenedTranscript({ ref_, onClose }: { ref_: claude.TranscriptRef; onClo
 function Explorer({ initialCapture = "tools", autoplay = false }: { initialCapture?: string; autoplay?: boolean }) {
   const [captureId, setCaptureId] = React.useState(initialCapture)
   const provider = PROVIDERS[providerOf(captureId)]
-  const captures = CAPTURES.filter((entry) => entry.provider === provider.id)
   const [transportId, setTransportId] = React.useState(provider.transports[0]!.id)
   const transport = provider.transports.find((entry) => entry.id === transportId) ?? provider.transports[0]!
+  // A capture recorded from one transport is only offered on that transport:
+  // opencode's token deltas exist on its server bus and nowhere else, so
+  // listing them under the one-way stream would promise a stream that has none.
+  const captures = CAPTURES.filter(
+    (entry) => entry.provider === provider.id && (entry.transport === undefined || entry.transport === transport.id),
+  )
+
+  // Switching transport lands on a capture that transport actually has. A
+  // recording belongs to the wire it came from, so keeping the old selection
+  // would show one transport's bytes while the panel claimed the other's.
+  const switchTransport = (next: string) => {
+    if (next === transport.id) return
+    setTransportId(next)
+    const available = CAPTURES.filter(
+      (entry) => entry.provider === provider.id && (entry.transport === undefined || entry.transport === next),
+    )
+    if (!available.some((entry) => entry.id === captureId) && available[0] !== undefined) {
+      setCaptureId(available[0].id)
+    }
+  }
 
   // Switching provider lands on that provider's first capture, so the two
   // sides are compared on the same scenario rather than on whatever the old
@@ -1582,7 +1782,7 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
       </div>
       <p className="text-muted-foreground text-xs">{capture?.blurb}</p>
       <div className="flex flex-wrap items-center gap-2">
-        <SegmentedControl aria-label="Transport" value={transport.id} onValueChange={setTransportId} className="shrink-0">
+        <SegmentedControl aria-label="Transport" value={transport.id} onValueChange={switchTransport} className="shrink-0">
           {provider.transports.map((entry) => (
             <SegmentedControlOption key={entry.id} value={entry.id}>
               {entry.label}
@@ -1702,89 +1902,190 @@ export const Delegation: Story = {
 const STRUCTURE = `classDiagram
     direction LR
 
-    class WireEvent {
-        <<claude/wire.ts>>
-        +system
-        +stream_event
-        +assistant / user
-        +result
-        +control_request
-        parseWireLine(line) WireParseResult
+    class ClaudeStream {
+        <<claude/stream/wire.ts>>
+        +ClaudeWireType
+        +CLAUDE_STREAM_PROVENANCE 2.1.251
+        parseWireLine(line)
+    }
+    class CodexExec {
+        <<codex/exec/wire.ts>>
+        +CodexWireType
+        +CODEX_EXEC_PROVENANCE 0.144.1
+        parseCodexLine(line)
+    }
+    class CodexAppServer {
+        <<codex/app-server/wire.ts>>
+        +CodexAppServerNotification
+        +schema published by the CLI
+        parseCodexAppServerLine(frame)
+    }
+    class OpencodeRun {
+        <<opencode/run/wire.ts>>
+        +OpencodeRunType
+        +OPENCODE_RUN_PROVENANCE 1.18.25
+        parseOpencodeLine(line)
+    }
+    class OpencodeServer {
+        <<opencode/server/wire.ts>>
+        +OpencodeServerEventType
+        +API 1.0.0
+        parseOpencodeSseLine(frame)
+    }
+    class Acp {
+        <<acp/ — one protocol, three agents>>
+        +AcpMethod
+        +AcpUpdate
+        +ACP_PROVENANCE protocol 1
+        parseAcpLine(frame)
     }
 
-    class ClaudeStreamMapper {
-        <<claude/mapper.ts>>
-        -currentMessageId
-        -committedBlocks Map
-        -pathByCall Map
-        -planSteps
+    class OpencodeParts {
+        <<opencode/parts.ts>>
+        the payload run and serve both carry
+        +OpencodePartType
+        +OpencodeToolName
+        toolEvents(sink, part) AgentEvent[]
+    }
+    class EventSink {
+        <<emitter.ts — shared>>
         -seq
+        -openedSessions
+        -partIndex
+        +build(payload) AgentEvent
+        +blockOf(part) BlockRef
+    }
+
+    class Mappers {
+        <<one per wire — the only stateful layer>>
+        ClaudeStreamMapper
+        CodexStreamMapper
+        CodexAppServerMapper
+        OpencodeRunMapper
+        OpencodeServerMapper
+        AcpMapper
         +push(line) AgentEvent[]
+    }
+    class MappingTables {
+        <<data, not code — one per wire>>
+        CLAUDE_EVENT_MAPPING
+        CODEX_EVENT_MAPPING
+        CODEX_APP_SERVER_MAPPING
+        OPENCODE_RUN_MAPPING
+        OPENCODE_SERVER_MAPPING
+        ACP_MAPPING
     }
 
     class AgentEvent {
-        <<events.ts — shared>>
+        <<events.ts — the shared contract>>
         +id
         +sessionId
         +seq
+        +ts
         +agentPath string[]
         +payload AgentEventPayload
         +raw
     }
-
     class AgentEventPayload {
-        <<27 variants — shared>>
+        <<28 variants>>
         +assistant_text
-        +tool_call_started
         +delta
-        +task_progress
-        +workflow_progress
+        +tool_call_started
+        +tool_call_completed
         +plan_updated
+        +task_started
+        +permission_requested
+        +context_compacted
         +unknown
+    }
+
+    class TransportDescriptor {
+        <<transports.ts — 9 transports>>
+        +id
+        +provenance WireProvenance
+        +supports TransportSupport
+    }
+    class TransportSupport {
+        <<true | false | null>>
+        +streaming
+        +approvals
+        +namesModel
+        +sharedBus
+        +sessionControl
+        +contextWindow
     }
 
     class TranscriptBuilder {
         <<builder.ts — shared>>
-        -closedTurns
-        -runs Map
         +push(events)
         +snapshot(live) Transcript
     }
-
     class Transcript {
         +turns Turn[]
         +runs DelegatedRun[]
-        +resultByCallId Map
         +plan PlanStep[]
-        +pendingAsks
+    }
+    class Stores {
+        <<a delegated run's own transcript>>
+        claude/store.ts — derived from a path
+        opencode/store.ts — named by the wire
+    }
+    class Capabilities {
+        <<what a picker needs, answered off-stream>>
+        claude/stream — from init
+        codex/app-server — from JSON-RPC replies
+        opencode — from CLI listings
     }
 
-    class SessionStore {
-        <<claude/store.ts>>
-        +subagentTranscriptPath()
-        +workflowAgentTranscriptPath()
-        +collectTranscriptRefs() TranscriptRef[]
-    }
-
-    class CodexMapper {
-        <<codex/mapper.ts>>
-        +push(line) AgentEvent[]
-    }
-
-    class AcpMapper {
-        <<acp/ — not built>>
-        +push(notification) AgentEvent[]
-    }
-
-    WireEvent --> ClaudeStreamMapper : decoded, no state
-    ClaudeStreamMapper --> AgentEvent : emits
+    ClaudeStream --> Mappers
+    CodexExec --> Mappers
+    CodexAppServer --> Mappers
+    OpencodeRun --> Mappers
+    OpencodeServer --> Mappers
+    Acp --> Mappers
+    OpencodeRun ..> OpencodeParts : same payload
+    OpencodeServer ..> OpencodeParts : same payload
+    EventSink <.. Mappers : numbering and sessions
+    MappingTables ..> Mappers : declares what each may emit
+    Mappers --> AgentEvent : emits
     AgentEvent *-- AgentEventPayload
     AgentEvent --> TranscriptBuilder : appended
     TranscriptBuilder --> Transcript : snapshot per frame
-    SessionStore ..> AgentEvent : keys read off task_started
-    SessionStore ..> ClaudeStreamMapper : disk transcripts reuse it
-    CodexMapper --> AgentEvent : same contract
-    AcpMapper ..> AgentEvent : same contract
+    TransportDescriptor *-- TransportSupport
+    TransportDescriptor ..> Mappers : which one to read with
+    Stores ..> AgentEvent : same events from a saved session
+    Capabilities ..> TransportDescriptor
+`
+
+/**
+ * The exchange only an interactive transport has.
+ *
+ * Three of the six wires are one-way: bytes arrive and a surface renders
+ * them. ACP is a conversation, and drawing it beside the one-way flow is the
+ * clearest way to show why "does this agent support approvals" is a question
+ * about the transport rather than the agent.
+ */
+const DUPLEX = `sequenceDiagram
+    autonumber
+    participant UI as Surface
+    participant Map as AcpMapper
+    participant Agent as Claude Code, Codex or opencode
+
+    UI->>Agent: session/prompt carrying the prompt text
+    Note over Map: the client's own request is mapped —<br/>ACP is the one wire where what was<br/>asked is on the wire at all
+    Agent--)Map: session/update agent_thought_chunk
+    Map--)UI: delta, streamed reasoning
+    Agent--)Map: session/update tool_call, status pending
+    Map--)UI: tool_call_started, kind from the protocol
+
+    Agent->>UI: session/request_permission
+    Note over Agent,UI: the tool is blocked until answered,<br/>and the options offered are the agent's
+    UI->>Agent: outcome selected, allow_once
+    Agent--)Map: tool_call_update, status completed
+    Map--)UI: tool_call_completed plus file_edits
+
+    Agent->>UI: session/prompt reply — stopReason and usage
+    Map--)UI: turn_completed
 `
 
 /**
@@ -1875,9 +2176,83 @@ export const Providers: Story = {
   },
 }
 
+/**
+ * The capability table, rendered from the library rather than described.
+ *
+ * The point of moving this into `transports.ts` was that a surface should read
+ * what a wire can do instead of knowing it; a story that hardcoded the same
+ * grid would be the drift this exists to prevent.
+ */
+function TransportMatrix() {
+  const features = [
+    ["streams tokens", "streaming"],
+    ["names the model", "namesModel"],
+    ["session capabilities", "capabilities"],
+    ["approvals", "approvals"],
+    ["steering", "steering"],
+    ["structured file edits", "fileEdits"],
+    ["shared bus (filter by session)", "sharedBus"],
+    ["client opens sessions", "sessionControl"],
+    ["context window size", "contextWindow"],
+  ] as const
+
+  const columns = AGENT_TRANSPORTS.flatMap((provider) =>
+    provider.transports.map((transport) => ({ provider, transport })),
+  )
+
+  return (
+    // Scrollable on its own, so it needs to be reachable from the keyboard:
+    // a region a mouse can pan and a keyboard cannot is unusable without one.
+    <div
+      className="border-border overflow-x-auto rounded-xl border"
+      tabIndex={0}
+      role="region"
+      aria-label="What each transport was observed to report"
+    >
+      <table className="w-full border-collapse text-left nessa-text-2">
+        <thead>
+          <tr className="border-border border-b">
+            <th className="text-muted-foreground p-2 font-medium">Transport</th>
+            {columns.map(({ provider, transport }) => (
+              <th key={`${provider.id}/${transport.id}`} className="p-2 font-medium whitespace-nowrap">
+                <span className="text-muted-foreground">{provider.label}</span> {transport.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="border-border border-b">
+            <td className="text-muted-foreground p-2">read from build</td>
+            {columns.map(({ provider, transport }) => (
+              <td key={`${provider.id}/${transport.id}`} className="text-muted-foreground p-2 whitespace-nowrap">
+                {transport.provenance.version}
+              </td>
+            ))}
+          </tr>
+          {features.map(([label, key]) => (
+            <tr key={key} className="border-border border-b last:border-0">
+              <td className="text-muted-foreground p-2">{label}</td>
+              {columns.map(({ provider, transport }) => {
+                const value = transport.supports[key]
+                return (
+                  <td key={`${provider.id}/${transport.id}`} className="p-2">
+                    {/* A dash is deliberately not a no: it says nobody has
+                        captured this transport for this yet. */}
+                    {value === true ? "yes" : value === false ? <span className="text-muted-foreground">no</span> : "—"}
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export const Architecture: Story = {
   parameters: storyDocumentation(
-    "How the parser is put together, and where a second harness plugs in. The class diagram shows which type each layer owns: the wire layer is stateless and disposable, the mapper holds the only state, and everything to the right of AgentEvent is harness-agnostic — so Codex or an ACP agent is a new wire type and a new mapper, and no component changes. The sequence shows one line's journey, including the two rules that are easy to get wrong: a delta is a preview the committed event supersedes, and the fold is appended to rather than recomputed.",
+    "How the parser is put together, now that three agents and six wires have been read. Each transport owns its own envelope types, its own mapping table and its own mapper — they are separate protocols with separate versions, and opencode alone speaks three. Only what is genuinely identical is shared: opencode's `run` and `serve` carry the same message parts, so those are read once. Everything to the right of AgentEvent is agent-agnostic, which is what makes a fourth provider a new column here and no change to any component. The three diagrams are the structure, one line's journey on a one-way wire, and the exchange only an interactive one has.",
   ),
   args: {},
   render: () => (
@@ -1885,8 +2260,11 @@ export const Architecture: Story = {
       <section className="flex flex-col gap-2">
         <h3 className="text-sm font-medium">Layers, and what each one owns</h3>
         <p className="text-muted-foreground text-sm">
-          One direction of dependency. A harness that speaks a different wire supplies the two boxes on the left; the contract and
-          everything past it is shared.
+          One direction of dependency, and one box per wire — six wires carrying nine transports across three agents. A transport supplies its own
+          envelope types, its own mapping table and its own mapper; everything from AgentEvent rightwards is shared and does not
+          move. Only two things are shared further left, and both because they are genuinely the same: opencode&rsquo;s one-way
+          stream and its server bus carry identical message parts, and ACP is one protocol that Claude Code, Codex and opencode
+          all speak.
         </p>
         <MermaidDiagram chart={STRUCTURE} className="w-full" />
       </section>
@@ -1897,6 +2275,27 @@ export const Architecture: Story = {
           Including the lines that produce no event at all, which is most of what makes the counts in the raw pane not match.
         </p>
         <MermaidDiagram chart={FLOW} className="w-full" />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h3 className="text-sm font-medium">And the exchange only an interactive transport has</h3>
+        <p className="text-muted-foreground text-sm">
+          Three of the six wires are one-way; the other three are conversations. ACP is the same conversation whichever agent is
+          behind it —
+          Claude Code, Codex and opencode all speak it, so one reader serves all three. The agent asks the client for permission
+          and blocks until answered, which is why &ldquo;does this agent support approvals&rdquo; is a question about the
+          transport rather than the agent.
+        </p>
+        <MermaidDiagram chart={DUPLEX} className="w-full" />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h3 className="text-sm font-medium">What each transport was observed to report</h3>
+        <p className="text-muted-foreground text-sm">
+          Read from the library&rsquo;s own table rather than restated here, so this cannot drift from what the parsers know. A
+          dash means nobody has captured that transport for it yet — which is not the same answer as no.
+        </p>
+        <TransportMatrix />
       </section>
     </div>
   ),

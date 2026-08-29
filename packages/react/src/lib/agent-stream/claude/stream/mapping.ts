@@ -1,7 +1,7 @@
 /** @responsibility States, as data, which Claude Code line kind becomes which normalized event. */
 
-import { asRecord, asString } from "../json"
-import { AgentEventType, PlanStepStatus, TaskKind } from "../events"
+import { asRecord, asString } from "../../json"
+import { AgentEventType, PlanStepStatus, TaskKind } from "../../events"
 import {
   ClaudeTaskType,
   ClaudeContentBlockType,
@@ -174,6 +174,10 @@ export const CLAUDE_EVENT_MAPPING: Readonly<Record<ClaudeWireKind, ClaudeMapping
   [`${ClaudeWireType.System}/${ClaudeSystemSubtype.PermissionDenied}`]: {
     emits: [AgentEventType.PermissionDenied],
     note: "a call refused without being asked about",
+  },
+  [ClaudeWireType.Attachment]: {
+    emits: [AgentEventType.Unknown],
+    note: "the CLI's own bookkeeping in a saved transcript — a deferred tool list, not a turn; carried as unknown so the raw line survives",
   },
   [ClaudeWireType.RateLimit]: {
     emits: [AgentEventType.RateLimited],

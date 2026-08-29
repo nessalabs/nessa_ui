@@ -1,6 +1,6 @@
 /** @responsibility Turns Claude Code `stream-json` lines into normalized agent events, holding the little state that requires. */
 
-import { pathKey } from "../events"
+import { pathKey } from "../../events"
 import type {
   AgentEvent,
   AgentEventPayload,
@@ -14,10 +14,10 @@ import type {
   Usage,
   WorkflowAgentProgress,
   WorkflowPhaseProgress,
-} from "../events"
+} from "../../events"
 import { claudePlanStatus, claudeTaskKind } from "./mapping"
-import { asArray, asNumber, asObject, asOneOf, asRecord, asString, asStrings } from "../json"
-import { toolKind, toolTitle } from "./tools"
+import { asArray, asNumber, asObject, asOneOf, asRecord, asString, asStrings } from "../../json"
+import { toolKind, toolTitle } from "../tools"
 import type {
   JsonValue,
   WireLine,
@@ -401,6 +401,10 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
             label: asString(line.subagent_type) ?? asString(line.workflow_name),
             description: asString(line.description) ?? "",
             prompt: asString(line.prompt),
+            // Claude names no transcript for a delegated run. A subagent's
+            // sits on disk under a path derived from the session, which
+            // `claude/store` works out; a workflow agent's is watchable only.
+            transcriptId: null,
           },
           sessionId,
           path,
@@ -934,6 +938,8 @@ function readWorkflowProgress(value: JsonValue | undefined): readonly WorkflowPh
 
   const phases = new Map<number, { index: number; title: string; agents: WorkflowAgentProgress[] }>()
   const orphans: WorkflowAgentProgress[] = []
+  /** How many agents have been read, so an unindexed one still has an identity. */
+  let seen = 0
 
   for (const item of value) {
     const entry = asRecord(item)
@@ -948,7 +954,10 @@ function readWorkflowProgress(value: JsonValue | undefined): readonly WorkflowPh
     if (asString(entry.type) !== "workflow_agent") continue
 
     const agent: WorkflowAgentProgress = {
-      index: asNumber(entry.index) ?? 0,
+      // Position in the board when the wire gives no index of its own: a
+      // queued agent has none, and defaulting every one of them to zero made
+      // several agents share an identity, so a view keyed on it drew one.
+      index: asNumber(entry.index) ?? seen++,
       label: asString(entry.label) ?? "agent",
       phaseIndex: asNumber(entry.phaseIndex) ?? 0,
       phaseTitle: asString(entry.phaseTitle) ?? "",

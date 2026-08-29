@@ -47,7 +47,7 @@ lib/agent-stream/
     mapper.ts      CodexStreamMapper                        ← provider
 ```
 
-Two providers now exist, which is what turns the layering from a claim into a
+Three providers now exist, which is what turns the layering from a claim into a
 measurement. Adding Codex cost **one** addition to the shared contract —
 `file_edits`, for a capability Claude Code does not have — and nothing else
 moved: the fold, the grouping, the delta machinery and every component are
@@ -197,26 +197,34 @@ a flat id is expensive, and Codex's equivalent field is already called
 counter per session, shared by mapped lines and anything the app synthesizes,
 seeded from the persisted log on resume — it is also the reconnect cursor.
 
-## 4. Wire traps, each observed
+## 4. Wire traps
 
-- **`"iterations": null`** — an explicit null, not an absent key. A reader that
+Four of these are demonstrated by a checked-in fixture and four are not; the
+unbacked ones are marked **(not in a fixture)** and were seen while building
+against a live CLI rather than recorded. Treat a marked one as a caution, not
+as evidence — and if you can capture it, do, because that is the difference
+this document is built on.
+
+- **`"iterations": null`** *(not in a fixture — every capture has an array)* — an explicit null, not an absent key. A reader that
   only handles absence fails the whole line, and since those lines are the
   replies to built-in commands, the commands appear to do nothing.
-- **`stop_reason` is null** on the `result` that closes a compaction. Requiring
-  it kills the turn terminator, and the session then sits on "in progress"
-  forever.
+- **`stop_reason` can be null** on a `result` *(not in a fixture — the
+  compaction capture's `result` says `end_turn`)*. Requiring it kills the turn
+  terminator, and the session then sits on "in progress" forever.
 - **`user` lines are two unrelated things** — the human's prompt (a bare string)
   and the CLI's own feedback (a block array). Discriminate by JSON type.
 - **`isReplay` / `isSynthetic`** separate the CLI's bookkeeping from real
   conversation. Neither implies the other.
-- **`<tool_use_error>` wrapping** on failed tool results is wire framing;
+- **`<tool_use_error>` wrapping** on failed tool results is wire framing *(not
+  in a fixture — `failing.jsonl` carries plain text with `is_error`)*;
   `is_error` already carries the fact. Strip only an exact whole-string wrap — a
   result that merely *mentions* the tag (a grep hit) must survive intact.
-- **Interrupts** arrive as prose (`[Request interrupted by user…`). Matching
+- **Interrupts** arrive as prose (`[Request interrupted by user…`) *(not in a
+  fixture — headless cannot produce one)*. Matching
   prose is acceptable *here only* because `result.terminal_reason` carries the
   truth: a reworded notice costs one stray row, never a missed turn end.
 - **Images arrive twice** — as an API image block and on the `tool_use_result`
-  sidecar. Read one, archive to disk, carry a path. A session of screenshots is
+  sidecar *(not in a fixture — no capture sent an image)*. Read one, archive to disk, carry a path. A session of screenshots is
   otherwise megabytes of base64 in the log.
 - **A turn's `result` can arrive while background tasks are open.** "Idle" is
   `result` **and** an empty `background_tasks_changed`.
@@ -486,7 +494,231 @@ copies — copying a session's events per frame is the cost the class exists to
 avoid — so a consumer memoizes on `transcript.revision`, which changes when the
 content does. Anything still being written to (a run's own events) *is* copied.
 
-## 10. Capturing your own fixtures
+## 10. opencode, and the version every one of these is true of
+
+opencode is the third provider, and it has **three** wires of its own, not one.
+All three are captured, and they disagree enough that treating them as one
+would misdescribe every session read through the wrong one.
+
+### How the two are laid out in code
+
+They are separate protocols, so they are separate modules, and only what is
+genuinely shared sits between them:
+
+```
+opencode/
+  parts.ts       the payload run and serve BOTH carry — the part shapes, the
+                 tool vocabulary, and the emitter that turns a part into events
+  mapping.ts     the shape every table is written in
+  run/           `run --format json`: envelope DTOs, its table, its mapper
+  server/        `serve` SSE bus: envelope DTOs, its table, its mapper
+  acp/           `acp` JSON-RPC: envelope DTOs, its table, its mapper
+  store.ts       an exported session, read through the run mapper
+  capabilities.ts  what the CLI's own listings answer
+```
+
+`run` and `serve` genuinely share a payload — the server wraps the identical
+`part` object in `message.part.updated` — and reading it twice would be two sets
+of rules to disagree about one conversation. Their envelopes share nothing:
+different names, different framing, different versions, different capabilities.
+
+ACP shares neither. It is a different protocol with its own object model, so it
+sits beside them rather than inside either, and it needed a weaker line decoder:
+the shared one insists on a `type` field, which every stream wire has and no
+JSON-RPC frame does.
+
+### What a transport can do is data
+
+`transports.ts` states, per transport, whether it streams, names the model,
+advertises capabilities, takes approvals, accepts steering, reports structured
+edits, and whether its stream carries more than one session. A surface reads
+that instead of knowing it, so a fourth provider is a new row rather than an
+edit to every badge and empty state.
+
+Each answer is **three-valued**. `false` is a fact — the relevant scenario was
+captured and the wire said nothing. `null` means nobody has captured that
+transport for it, and must not be drawn as a no. Codex's app-server is the
+clearest case: a short session proved it streams, and in the same capture set
+no approval policy was ever exercised, no command ran and no file changed — so
+those three stay `null` while `streaming` is now `true`.
+
+The same rule demotes claims this document used to make from documentation
+rather than evidence. **Steering is `null` on every transport**: each
+interactive one has a method for it, one of them advertises it in its
+handshake, and no capture exercises a single mid-turn message.
+
+### `opencode run --format json`
+
+Three lines for a whole turn. A step opens, parts carry the answer, a step
+finishes — and there is **no init line at all**: no model, no working
+directory, no tool list, nothing. `SessionInfo` is therefore almost entirely
+null here, which is what those nullable fields were for.
+
+Four things this wire will mislead you about:
+
+| What it looks like | What it is |
+| --- | --- |
+| Several `step_finish` lines | A tool loop finishes a step per call. Only a `stop` reason ends the turn. |
+| A tool call `completed` | The *call* worked. A shell command that exited non-zero is still `completed`, with the failure only in `metadata.exit`. |
+| A tool call `error` | The call never ran — it threw, or a permission rule refused it. |
+| A turn with no ending | Unattended, opencode auto-rejects anything its rules ask about and the run then **stops**: no closing message, no terminator, exit 0. |
+
+The two tool-status rows are the ones worth checking rather than believing, so
+they were checked against opencode's own source. Its shell tool returns
+normally whatever the command did — `return { title, metadata: { output, exit:
+code, truncated }, output }` — and never throws on a non-zero exit, so the call
+settles as `completed`. The `error` state is set by `failToolCall`, which runs
+when the tool threw, was refused, or was aborted. Reading failure from the
+status alone would call every failed build a success.
+
+The shell tool is also a live example of why a wire is pinned to a build: it is
+implemented as `shell.ts` but deliberately exposes the id `bash`, with its own
+source noting the rename is planned for opencode 2.0. Both names are in the
+vocabulary, mapped to the same kind.
+
+Its delegations are the best of the three: the spawning call names the child's
+own session id, and `opencode export <id>` returns that conversation with its
+prompt, its tool calls, its tokens and its cost. Claude's subagent transcripts
+have to be located on disk from a path contract; Codex names threads it never
+lets you read. Only opencode hands the id over and answers to it — which is why
+`task_started` now carries `transcriptId`, null for the other two.
+
+### `opencode serve` — the bus, where it does stream
+
+The one-way stream carries no partials at all. The headless server does: its
+`GET /event` endpoint is an SSE stream, and one paragraph of prose arrived as
+**254 `message.part.delta` frames**. The same bus also names the model, reports
+the working directory and the build, and — unlike the unattended stream — holds
+a permission ask open and publishes the answer.
+
+Two things to design around. The endpoint is **server-wide**, not one session's:
+a capture taken while two sessions ran carries both, so every event has to be
+stamped with the session that produced it or a background run's work is filed
+under the conversation someone is reading. And a session is announced by
+`session.created` *without* a model — the `session.updated` that follows
+immediately is the first line that describes it, which is why the mapper opens
+a session on the update rather than on the creation.
+
+### `opencode acp` — a conversation, not a stream
+
+The third wire, and not another door onto the second: `opencode acp` speaks the
+Agent Client Protocol over stdio. Frames travel **both ways**, and the one a
+surface most has to handle comes *from* the agent — `session/request_permission`
+blocks the tool until the client answers, offering the options it will accept
+(`allow_once`, `allow_always`, `reject_once`). Answer it and the call proceeds;
+this is the only opencode transport where an unattended run is not simply
+refused.
+
+It is also the best-described of the four wires in this document:
+
+- **It states its own version, and names the agent behind it.** `initialize`
+  replies with `agentInfo: { name, version }` and a negotiated
+  `protocolVersion`. Two other wires stamp a build too — Claude's `system/init`
+  carries `claude_code_version`, and opencode's bus puts `info.version` on
+  `session.created` — but ACP is the only one that also says *which agent* is
+  answering, which is what a single reader serving three of them needs.
+- **It normalizes tool kinds itself** — `read`, `edit`, `execute`, `fetch` — so
+  a call's kind is the protocol's word rather than a guess from a tool's name.
+- **A call opens before it settles.** `tool_call` then `tool_call_update`. The
+  server's bus republishes a running state too; the one-way stream is the only
+  opencode wire that publishes calls already settled.
+- **Prose and reasoning stream as separate kinds**, so nothing has to work out
+  which block a chunk belongs to.
+- **It reports the context window's size**, not just how much was used.
+- **It publishes the slash commands** on the stream, and the model list in
+  `session/new`'s reply.
+
+What it does not do is multiplex: one connection is one conversation, where the
+server's `/event` is a bus carrying every session at once.
+
+| | `run --format json` | `serve` (SSE bus) | `acp` (JSON-RPC) |
+| --- | --- | --- | --- |
+| Streams tokens | no | yes | yes |
+| Names the model | no | yes | yes |
+| Approvals | auto-rejected, run ends | asked and answered | asked, and it blocks |
+| Prompt on the wire | no | yes | **yes, in the request** |
+| Session scope | one | every session on the server | one per connection |
+| Client opens/resumes sessions | no | — | yes |
+| Context window size | no | no | yes |
+| States its own version | no | no | **yes** |
+
+### What opencode does *not* do: compact
+
+Claude compacts and says so; Codex compacts and says nothing. opencode appears
+to do neither. Reading a generated corpus on the one-way stream pushed the
+context to **232k against the model's own 200k window** — the size ACP reports —
+across 28 steps, with no boundary of any kind on the wire, and the run ended on
+an upstream 504 rather than on a summary. The `model_auto_compact_token_limit`
+config exists but changed nothing on 1.18.25, whether passed with `-c` or
+written into a project config.
+
+So the honest reading is: **not observed**, and a surface built on opencode
+should not assume a long session will be rescued. The capture is checked in as
+`overflow.jsonl` because a turn that grows until the provider gives up is a
+shape a consumer has to handle.
+
+It also caught a parser bug worth naming: an `error` line nests its message at
+`error.data.message`, itself a JSON string from whatever upstream refused.
+Reading `error` as a string — which it never is — reported every failure as the
+word "error".
+
+Capabilities come from a fourth place for the first two: `opencode models` and
+`opencode agent list` print them, and neither of those wires does. ACP answers
+for itself.
+
+### ACP: one protocol, three agents
+
+This started as an opencode module and moved out, because it turned out not to
+be an opencode thing at all. Claude Code and Codex both speak ACP through Zed's
+adapters — `@zed-industries/claude-code-acp` and
+`@agentclientprotocol/codex-acp` — and the *same reader* maps all three
+captures without a change. That is the strongest evidence in this repository
+that the contract is real rather than aspirational.
+
+It also moves capability off the agent and onto the transport in a way that is
+easy to state: Claude Code asks for permission over ACP without the stdio flag
+its own stream needs, and Codex streams tokens over ACP where `exec --json`
+sends none. Neither is a property of the agent.
+
+Two practical notes. The Claude adapter refuses to start inside another Claude
+Code session unless `CLAUDECODE` is unset. And an agent may extend the protocol
+under `_meta` — Codex sends a `session_info_update` doing exactly that — so a
+reader has to tolerate an extension rather than treat it as an unknown frame.
+
+### Which version each of these is true of
+
+None of these shapes is a published contract, and two of the three CLIs put no
+version anywhere on the stream. Each provider therefore records the build its
+description was read from, next to the command that produces it:
+
+| Provider | Transport | Build | Command |
+| --- | --- | --- | --- |
+| Claude Code | stream-json | 2.1.251 | `claude -p --output-format stream-json …` |
+| Claude Code | acp | adapter 0.16.2 | `npx @zed-industries/claude-code-acp` |
+| codex-cli | exec | 0.144.1 | `codex exec --json` |
+| codex-cli | app-server | 0.144.1 | `codex app-server` |
+| codex-cli | acp | adapter 1.7.0 | `npx @agentclientprotocol/codex-acp` |
+| opencode | run | 1.18.25 | `opencode run --format json` |
+| opencode | serve | 1.18.25, **API 1.0.0** | `opencode serve → GET /event` |
+| opencode | acp | 1.18.25, **protocol 1** | `opencode acp` |
+
+Nine transports over six wires, because two of them are the same wire twice:
+Claude's duplex mode is its own stream with stdin open, and ACP is one protocol
+shared by three agents. The modules follow that exactly — `claude/stream/`,
+`codex/exec/`, `codex/app-server/`, `opencode/run/`, `opencode/server/`, and
+`acp/` beside them rather than inside any one agent.
+
+Per *transport*, not per provider, because a provider can speak more than one
+protocol and they version independently — opencode's server declares its own
+`info.version` at `GET /doc`, which is on 1.0.0 while the CLI carrying it is on
+1.18.x. Every transport's descriptor carries its provenance, so a consumer can
+compare what it is reading against what was modelled. **When a capture is retaken against a newer build, update the
+version and the date in the same commit as the fixtures.** If nothing changed,
+that is itself worth recording. Claude Code is the only one that stamps its own
+version on the wire (`system/init`), so it is the only one where the two can be
+compared automatically.
+
+## 11. Capturing your own fixtures
 
 ```bash
 claude -p --output-format stream-json --include-partial-messages --verbose \
@@ -499,9 +731,9 @@ plan, a subagent, a workflow, a web search, and a resume with a different model.
 Those eight are what the checked-in fixtures cover, and each one broke something
 in the parser that the others did not.
 
-Every shape on this wire is now captured. Compaction was the last, and it is
-the one that cannot be produced by asking for it — the window has to actually
-fill.
+Every shape this document describes for Claude's stream is now captured.
+Compaction came last of them, and it is the one that cannot be produced by
+asking: the window has to actually fill.
 
 ### Forcing a compaction
 
@@ -532,9 +764,9 @@ field and count around them. The corpus is reproducible from the script above.
 | Field | Meaning |
 | --- | --- |
 | `trigger` | `auto` when the window filled, `manual` when asked for |
-| `pre_tokens` / `post_tokens` | 71.5k down to 10k on the first boundary here |
+| `pre_tokens` / `post_tokens` | 71.1k down to 9.3k on the first boundary here |
 | `cumulative_dropped_tokens` | across the **session**, not the boundary — it keeps climbing |
-| `duration_ms` | 36s and 41s here: compaction is a slow model call of its own |
+| `duration_ms` | 17.5s and 22.3s here: compaction is a slow model call of its own |
 | `preserved_messages` | the uuids that survived, reachable through `raw` |
 
 Two consequences. Compaction removes history from the *model*, not from the
@@ -547,7 +779,9 @@ Codex has the same mechanism — `model_auto_compact_token_limit`, and
 `PreCompact` / `PostCompact` hooks — but **`codex exec --json` publishes
 nothing about it**. Forced with a 15k limit, the on-disk rollout records
 `{"type":"context_compacted"}` and a `replacement_history` entry while the JSON
-stream shows only a normal turn.
+stream shows only a normal turn. *That run is not checked in: the rollout is a
+third location, outside both the stream and this repository, so this paragraph
+is a report rather than something a fixture proves.*
 
 The consequence is visible in the transcript rather than announced: after
 compacting, the agent read one file of ten, answered with that filename, and
@@ -555,7 +789,9 @@ ended the turn — the rest of the instruction had been summarised away. A
 consumer on `exec` sees an agent that simply stopped early, with no way to know
 why.
 
-The app-server transport does better. Its schema declares a `ContextCompaction`
+The app-server transport does better, though only on paper here: none of this
+is in a checked-in capture, and the app-server fixture is a short session that
+never compacts. Its schema declares a `ContextCompaction`
 thread item, plus a `thread/compact/start` request so a client can compact on
 demand — something Claude's stream offers no way to ask for. The item carries
 `{id, type}` and nothing else: no token counts, no duration. So on Codex the

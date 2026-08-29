@@ -19,6 +19,7 @@ export {
   type MapperOptions,
   type PlanStep,
   type SessionInfo,
+  type WireProvenance,
   type ToolKind,
   type ToolResult,
   type TurnStatus,
@@ -49,6 +50,7 @@ export {
   asString,
   asStrings,
   parseJsonLine,
+  parseJsonObjectLine,
   parseJsonLines,
   shortenPath,
   type JsonLineResult,
@@ -76,6 +78,18 @@ export {
   type WorkItem,
 } from "./transcript"
 
+export { type MappingEntry, type WireKind } from "./mapping"
+export { EventSink } from "./emitter"
+export {
+  AGENT_TRANSPORTS,
+  transportOf,
+  transportsOf,
+  type ProviderDescriptor,
+  type Supported,
+  type TransportDescriptor,
+  type TransportSupport,
+} from "./transports"
+
 // ---------- providers ----------
 /**
  * Namespaced, not flattened.
@@ -86,10 +100,19 @@ export {
  * make adding `codex/` a breaking change to this module's public API: exactly
  * the "nothing else moves" claim the layering exists to keep.
  */
+export * as acp from "./acp"
 export * as claude from "./claude"
 export * as codex from "./codex"
+export * as opencode from "./opencode"
 
 // The two entry points are also exported flat, because reaching for a parser by
 // name is the common case and `claude.ClaudeStreamMapper` stutters.
-export { ClaudeStreamMapper, mapClaudeStream } from "./claude/mapper"
-export { CodexStreamMapper, mapCodexStream } from "./codex/mapper"
+export { ClaudeStreamMapper, mapClaudeStream } from "./claude"
+export { CodexAppServerMapper, CodexStreamMapper, mapCodexAppServerStream, mapCodexStream } from "./codex"
+export { AcpMapper, mapAcpStream } from "./acp"
+export {
+  OpencodeRunMapper,
+  OpencodeServerMapper,
+  mapOpencodeServerStream,
+  mapOpencodeStream,
+} from "./opencode"

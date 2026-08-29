@@ -96,7 +96,14 @@ export interface WorkflowAgentProgress {
   /** The harness's handle, absent until the agent actually starts. */
   readonly agentId: string | null
   readonly model: string | null
-  /** `start` covers both queued and running; `done` is terminal. */
+  /**
+   * The wire's own word, passed through.
+   *
+   * Observed: `start` (queued or running), `progress`, and `done`, which is
+   * terminal. Passed through rather than normalized because the vocabulary is
+   * the harness's and it has already grown once — a consumer should treat any
+   * unrecognised value as "not finished" rather than as unknown.
+   */
   readonly state: string
   readonly queuedAt: number | null
   readonly startedAt: number | null
@@ -178,6 +185,30 @@ export interface Usage {
    */
   readonly reasoningTokens: number | null
   readonly totalCostUsd?: number
+}
+
+/**
+ * Which build of a CLI a provider's wire description was read from.
+ *
+ * These shapes are not a published contract — all three CLIs change their
+ * output between releases, and two of the three do so without a version field
+ * anywhere on the stream. A mapper is therefore only true of the build it was
+ * captured from, and saying which one is the difference between a parser a
+ * maintainer can re-verify and one that quietly rots.
+ *
+ * When a capture is retaken against a newer build, update `version` and
+ * `capturedOn` in the same commit as the fixtures. If nothing changed, that is
+ * itself the finding worth recording.
+ */
+export interface WireProvenance {
+  /** The CLI as it names itself. */
+  readonly cli: string
+  /** The exact build the checked-in fixtures were recorded from. */
+  readonly version: string
+  /** The command that produces this wire, so the capture can be repeated. */
+  readonly command: string
+  /** ISO date of the capture, in UTC. */
+  readonly capturedOn: string
 }
 
 /** What one `system/init` said the session was configured with. */
@@ -310,6 +341,16 @@ export type AgentEventPayload =
       readonly label: string | null
       readonly description: string
       readonly prompt: string | null
+      /**
+       * The delegated run's own transcript, where the provider names one.
+       *
+       * opencode puts the child session id on the call itself, and
+       * `opencode export <id>` reads it — so its delegated work is readable
+       * without deriving anything. Claude's subagent transcripts have to be
+       * located on disk instead (see `claude/store`), and Codex names threads
+       * it never lets you read, so both send null here.
+       */
+      readonly transcriptId: string | null
     }
   | {
       readonly type: "task_progress"

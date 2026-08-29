@@ -1,0 +1,7 @@
+build (primary)
+compaction (primary)
+explore (subagent)
+general (subagent)
+plan (primary)
+summary (primary)
+title (primary)

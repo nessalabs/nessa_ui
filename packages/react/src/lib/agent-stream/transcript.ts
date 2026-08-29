@@ -59,6 +59,14 @@ export interface DelegatedRun {
   readonly kind: "agent" | "workflow" | "bash" | "other"
   readonly label: string | null
   readonly description: string | null
+  /**
+   * The run's own transcript, where the provider named one.
+   *
+   * Only opencode does: it puts the child session id on the spawning call, and
+   * `opencode export <id>` reads it. Null everywhere else, which is what tells
+   * a surface whether "open this subagent" is an offer it can honour.
+   */
+  readonly transcriptId: string | null
   /** Latest progress line, rewritten per event, so it drives a live status row. */
   readonly status: string | null
   readonly lastTool: string | null
@@ -282,9 +290,17 @@ export function groupTools(work: readonly AgentEvent[]): readonly WorkItem[] {
  */
 export function buildTranscript(
   source: readonly AgentEvent[],
-  options: { readonly live?: boolean; readonly liveTaskIds?: ReadonlySet<string> } = {},
+  options: {
+    readonly live?: boolean
+    readonly liveTaskIds?: ReadonlySet<string>
+    /**
+     * Fold only this session. Required on a transport whose stream is a bus —
+     * see [`TranscriptBuilder`] — and unnecessary everywhere else.
+     */
+    readonly sessionId?: string
+  } = {},
 ): Transcript {
-  const builder = new TranscriptBuilder()
+  const builder = new TranscriptBuilder({ sessionId: options.sessionId })
   builder.push(inSeqOrder(source))
   return builder.snapshot(options)
 }

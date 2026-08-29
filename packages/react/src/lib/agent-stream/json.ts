@@ -75,6 +75,32 @@ export function parseJsonLine(text: string): JsonLineResult {
   return { ok: true, line: decoded as JsonLineSuccess["line"] }
 }
 
+/**
+ * The same, for a wire that does not tag its lines with a `type`.
+ *
+ * Three of the four wires here are streams of type-tagged events, and their
+ * mappers rely on `parseJsonLine` having checked that. JSON-RPC is not one of
+ * those: a frame is identified by `method`, `id` and `result`, so requiring a
+ * `type` would reject every valid frame. The object check is the whole of what
+ * can honestly be promised about one.
+ */
+export function parseJsonObjectLine(text: string): JsonLineResult {
+  const trimmed = text.trim()
+  if (trimmed.length === 0) return { ok: false, line: text, reason: "empty line" }
+
+  let decoded: unknown
+  try {
+    decoded = JSON.parse(trimmed)
+  } catch (error) {
+    return { ok: false, line: text, reason: error instanceof Error ? error.message : "invalid JSON" }
+  }
+
+  if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)) {
+    return { ok: false, line: text, reason: "line is not a JSON object" }
+  }
+  return { ok: true, line: decoded as JsonLineSuccess["line"] }
+}
+
 /** Decodes a whole capture, keeping failures in place. */
 export function parseJsonLines(text: string): readonly JsonLineResult[] {
   return text

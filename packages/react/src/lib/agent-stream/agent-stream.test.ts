@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url"
 import test from "node:test"
 
 import { AgentEventType, isEvent, type AgentEvent } from "./events"
-import { sessionCapabilities } from "./claude/capabilities"
+import { sessionCapabilities } from "./claude/stream/capabilities"
+import { CLAUDE_EVENT_MAPPING, claudeMappingFor, claudeWireKind } from "./claude/stream/mapping"
 import {
   collectTranscriptRefs,
   parseSubagentMeta,
@@ -17,9 +18,9 @@ import {
   workflowAgentTranscriptPath,
 } from "./claude/store"
 import { TranscriptBuilder } from "./builder"
-import { ClaudeStreamMapper, mapClaudeStream } from "./claude/mapper"
+import { ClaudeStreamMapper, mapClaudeStream } from "./claude/stream/mapper"
 import { applyDeltas, buildTranscript, isCompacting, isToolGroup, previewOf } from "./transcript"
-import { ClaudeSystemSubtype, ClaudeWireType, parseWireLines } from "./claude/wire"
+import { CLAUDE_STREAM_PROVENANCE, ClaudeSystemSubtype, ClaudeWireType, parseWireLines } from "./claude/stream/wire"
 import { asRecord } from "./json"
 
 const FIXTURES = fileURLToPath(new URL("../../../../../apps/storybook/stories/fixtures/agent-stream/", import.meta.url))
@@ -39,6 +40,9 @@ const NAMES = [
   "resume_turn1",
   "resume_turn2",
   "workflow_phases",
+  "approval_allow",
+  "approval_deny",
+  "compaction",
   "disk_subagent_a37fefefbc61e13e3",
   "disk_workflow_agent_a35ea63276cd501aa",
 ] as const
@@ -583,10 +587,7 @@ test("a replayed tail is absorbed once; a genuinely earlier event is refused", (
  * about — `turn_started` sat in the union unemitted until this test existed.
  */
 const UNCAPTURED: ReadonlyMap<string, string> = new Map([
-  ["context_compacted", "needs a session long enough to auto-compact, or a /compact"],
   ["error", "needs an interrupted turn, which headless cannot produce"],
-  ["permission_requested", "needs --permission-prompt-tool stdio"],
-  ["permission_decided", "needs --permission-prompt-tool stdio"],
   ["permission_denied", "needs a sandbox path refusal or a mode that cannot ask"],
   ["rate_limited", "only emitted when a limit is actually reached"],
   ["model_changed", "derived across two captures; covered by the resume test"],
@@ -1254,4 +1255,149 @@ test("a surface can tell that compaction is in flight, not just that it happened
   // finished transcript never renders a marker that will not resolve.
   assert.equal(isCompacting([]), false)
   assert.equal(isCompacting(events), false)
+})
+
+/**
+ * The test `claude/stream/mapping.ts` says exists.
+ *
+ * Its header promised "the test suite walks every fixture line and asserts the
+ * mapper emitted exactly what this table promises" — and nothing did. The
+ * table was decorative for the oldest wire in the library, which is how a line
+ * kind reached it undeclared.
+ */
+test("every Claude line kind the captures contain is declared, and emits what the table promises", () => {
+  for (const name of NAMES) {
+    const mapper = new ClaudeStreamMapper()
+    for (const result of parseWireLines(capture(name))) {
+      if (!result.ok) continue
+      const kind = claudeWireKind(result.line)
+      const entry = claudeMappingFor(kind)
+      assert.notEqual(entry, null, `${name}: ${kind} is not in CLAUDE_EVENT_MAPPING`)
+      const declared = new Set<string>(entry!.emits)
+      for (const event of mapper.map(result.line)) {
+        assert.ok(declared.has(event.payload.type), `${name}: ${kind} emitted an undeclared ${event.payload.type}`)
+      }
+    }
+  }
+})
+
+/**
+ * A table may only promise what something has seen.
+ *
+ * The conformance checks above are one-directional: they prove the mapper
+ * never exceeds its table, not that a declared row is real. A row no capture
+ * exercises is a claim about a wire nobody has read, so each one has to be
+ * acknowledged here — which is what stops a table growing fiction.
+ */
+const CLAUDE_UNEXERCISED: ReadonlyMap<string, string> = new Map([
+  ["system/permission_denied", "needs a sandbox path refusal, or a mode that cannot ask"],
+])
+
+test("every Claude row the captures never reach is acknowledged as unexercised", () => {
+  const seen = new Set<string>()
+  for (const name of NAMES) {
+    for (const result of parseWireLines(capture(name))) {
+      if (result.ok) seen.add(claudeWireKind(result.line))
+    }
+  }
+  const declared = Object.keys(CLAUDE_EVENT_MAPPING)
+  const unexercised = declared.filter((kind) => !seen.has(kind))
+  assert.deepEqual(
+    unexercised.filter((kind) => !CLAUDE_UNEXERCISED.has(kind)).sort(),
+    [],
+    "a table row no fixture exercises must be listed in CLAUDE_UNEXERCISED, with a capture or a reason",
+  )
+  for (const kind of CLAUDE_UNEXERCISED.keys()) {
+    // The ledger may not outlive the gap it records…
+    assert.ok(!seen.has(kind), `${kind} is listed as unexercised but a fixture reaches it`)
+    // …nor name a row that does not exist, which is how a ledger becomes
+    // decoration that passes whatever the table says.
+    assert.ok(declared.includes(kind), `${kind} is listed as unexercised but is not a row in the table`)
+  }
+})
+
+test("the recorded build is the newest the fixtures actually came from", () => {
+  // This wire stamps its own version, so the constant can be checked rather
+  // than trusted. The fixtures span two builds; the provenance must name the
+  // newest of them, and every capture must be one this build has seen.
+  const versions = new Set<string>()
+  for (const name of NAMES) {
+    for (const result of parseWireLines(capture(name))) {
+      if (!result.ok) continue
+      const line = result.line as { type?: string; subtype?: string; claude_code_version?: unknown }
+      if (line.type === "system" && line.subtype === "init" && typeof line.claude_code_version === "string") {
+        versions.add(line.claude_code_version)
+      }
+    }
+  }
+  assert.ok(versions.size > 0)
+  assert.ok(versions.has(CLAUDE_STREAM_PROVENANCE.version), "the provenance names a build no fixture came from")
+  const newest = [...versions].sort((left, right) =>
+    left.localeCompare(right, undefined, { numeric: true }),
+  )[versions.size - 1]
+  assert.equal(CLAUDE_STREAM_PROVENANCE.version, newest)
+})
+
+test("an id from the wire cannot address a file outside the session", () => {
+  // These ids are built into paths a host then reads, and they come from a
+  // process this library does not control. A session id containing `..` used
+  // to produce a path that escaped the projects directory — and claimed to be
+  // resolved.
+  assert.equal(sessionLocationOf("/projects", { cwd: "/workspace", sessionId: "../../../../tmp/owned" }), null)
+  assert.equal(sessionLocationOf("/projects", { cwd: "/workspace", sessionId: "a/b" }), null)
+
+  const location = sessionLocationOf("/projects", { cwd: "/workspace", sessionId: "ses_1" })!
+  const [, unsafe] = collectTranscriptRefs(location, [
+    { kind: "agent", taskId: "../../x", callId: "c1", label: "a", phases: [] },
+  ])
+  assert.equal(unsafe!.resolved, false)
+  assert.equal(unsafe!.path, null)
+})
+
+test("only a delegated agent is offered a transcript", () => {
+  // A background shell has no subagent transcript at that path. Offering one
+  // as resolved sent a host to open a file that was never written.
+  const location = sessionLocationOf("/projects", { cwd: "/workspace", sessionId: "ses_1" })!
+  const kinds = (kind: string) =>
+    collectTranscriptRefs(location, [{ kind, taskId: "t1", callId: "c1", label: "l", phases: [] }]).map(
+      (ref) => ref.kind,
+    )
+  assert.deepEqual(kinds("bash"), ["session"])
+  assert.deepEqual(kinds("agent"), ["session", "subagent"])
+})
+
+test("two workflow agents with no index of their own are still two agents", () => {
+  // A queued agent has no index yet. Defaulting every one to zero gave them a
+  // shared identity, so a board keyed on it drew one agent where there were two.
+  const line = JSON.stringify({
+    type: "system",
+    subtype: "task_progress",
+    task_id: "w",
+    tool_use_id: "c",
+    workflow_progress: [
+      { type: "workflow_phase", index: 1, title: "P" },
+      { type: "workflow_agent", label: "a", phaseIndex: 1 },
+      { type: "workflow_agent", label: "b", phaseIndex: 1 },
+    ],
+  })
+  const board = mapClaudeStream(line).flatMap((event) =>
+    event.payload.type === "workflow_progress" ? [event.payload.phases] : [],
+  )[0]!
+  const agents = board.flatMap((phase) => phase.agents)
+  assert.equal(agents.length, 2)
+  assert.equal(new Set(agents.map((agent) => agent.index)).size, 2)
+})
+
+test("a workflow agent's state is the wire's own word, and there are three of them", () => {
+  // The contract used to document two. The captures carry `start`, `progress`
+  // and `done`, and a consumer that only knew two treated a working agent as
+  // unknown.
+  const states = new Set<string>()
+  for (const name of NAMES) {
+    for (const event of mapClaudeStream(capture(name))) {
+      if (event.payload.type !== "workflow_progress") continue
+      for (const phase of event.payload.phases) for (const agent of phase.agents) states.add(agent.state)
+    }
+  }
+  assert.deepEqual([...states].sort(), ["done", "progress", "start"])
 })

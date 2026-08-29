@@ -6,9 +6,9 @@ import type {
   CapabilityModel,
   CapabilityPluginSource,
   CapabilitySkill,
-} from "../capabilities"
-import { asArray, asNumber, asRecord, asString } from "../json"
-import type { JsonValue } from "../json"
+} from "../../capabilities"
+import { asArray, asNumber, asRecord, asString } from "../../json"
+import type { JsonValue } from "../../json"
 
 /**
  * Codex reports capabilities on a different channel from its stream.
@@ -39,9 +39,10 @@ export type CodexCapabilityMethod = (typeof CODEX_CAPABILITY_METHODS)[number]
 /**
  * Reads the app-server's replies, keyed by the method that produced each.
  *
- * A missing method reads as an empty list rather than an error: a host may ask
- * for only what a surface needs, and a picker with no plugins is a picker, not
- * a failure.
+ * A method the host never asked about reads as `null`, not as an empty list:
+ * the shared contract reserves null for "this provider cannot report it", and
+ * an empty array tells a picker the installation *has* none. A reply that came
+ * back empty really is empty, and stays `[]`.
  */
 export function codexCapabilities(replies: Readonly<Record<string, JsonValue>>): AgentCapabilities {
   const models: CapabilityModel[] = []
@@ -104,10 +105,12 @@ export function codexCapabilities(replies: Readonly<Record<string, JsonValue>>):
     model: null,
     cwd: null,
     permissionMode: null,
-    models,
-    skills,
-    hooks,
-    pluginSources,
+    // A method the host never asked about is unreported, which is not the same
+    // as answered-with-nothing.
+    models: "model/list" in replies ? models : null,
+    skills: "skills/list" in replies ? skills : null,
+    hooks: "hooks/list" in replies ? hooks : null,
+    pluginSources: "plugin/list" in replies ? pluginSources : null,
     // Null rather than empty: Codex has these concepts, this reply does not
     // carry them, and a picker should omit the section rather than show it bare.
     commands: null,

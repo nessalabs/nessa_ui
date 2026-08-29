@@ -5,9 +5,9 @@ import type {
   CapabilityCommand,
   CapabilityServer,
   CapabilityTool,
-} from "../capabilities"
-import type { AgentEvent, SessionInfo } from "../events"
-import { toolKind } from "./tools"
+} from "../../capabilities"
+import type { AgentEvent, SessionInfo } from "../../events"
+import { toolKind } from "../tools"
 
 /**
  * The prefix an MCP tool carries, normalized for comparison against a server's

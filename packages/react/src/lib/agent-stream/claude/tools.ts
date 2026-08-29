@@ -2,7 +2,7 @@
 
 import type { ToolKind } from "../events"
 import { asRecord, asString, shortenPath } from "../json"
-import type { JsonValue } from "./wire"
+import type { JsonValue } from "./stream/wire"
 
 const KINDS: ReadonlyArray<readonly [ToolKind, ReadonlySet<string>]> = [
   ["shell", new Set(["Bash", "BashOutput", "KillShell", "shell", "local_shell_call"])],
