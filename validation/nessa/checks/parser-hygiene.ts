@@ -4,16 +4,17 @@ import { defineCheck } from "../../framework/define-check.ts"
 import { checkMetadata } from "../check-metadata.ts"
 
 /**
- * The two files allowed to narrow raw JSON by hand.
+ * The files allowed to narrow raw JSON by hand.
  *
- * `json.ts` is where the narrowing lives on purpose; `wire.ts` sits upstream of
- * it, deciding whether a decoded line is an object at all, and cannot use a
- * reader that already assumes one.
+ * `json.ts` is where the narrowing lives on purpose. Each provider's `wire.ts`
+ * sits upstream of it, deciding whether a decoded line is an object at all, and
+ * cannot use a reader that already assumes one — so the exemption is stated as
+ * a rule about that boundary rather than a list of paths a second provider
+ * would have to be added to.
  */
-const NARROWING_OWNERS = new Set([
-  "packages/react/src/lib/agent-stream/json.ts",
-  "packages/react/src/lib/agent-stream/claude/wire.ts",
-])
+function ownsNarrowing(filePath: string): boolean {
+  return filePath === "packages/react/src/lib/agent-stream/json.ts" || /\/agent-stream\/[^/]+\/wire\.ts$/.test(filePath)
+}
 
 const NARROWED_PRIMITIVES = new Set(["string", "number", "boolean", "object"])
 
@@ -143,7 +144,7 @@ export const parserHygieneCheck = defineCheck({
 
       // A test asserting a runtime shape is doing so on purpose — that is the
       // assertion, not a narrowing shortcut.
-      if (NARROWING_OWNERS.has(filePath) || filePath.endsWith(".test.ts")) continue
+      if (ownsNarrowing(filePath) || filePath.endsWith(".test.ts")) continue
       for (const comparison of handRolledNarrowing(ast)) {
         findings.push(
           context.fail(

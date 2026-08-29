@@ -31,6 +31,64 @@ export type JsonValue =
  * so a caller uses `??` to state its fallback rather than branching.
  */
 
+/** What a line that could not be decoded at all becomes. */
+export interface JsonLineFailure {
+  readonly ok: false
+  readonly line: string
+  readonly reason: string
+}
+
+export interface JsonLineSuccess {
+  readonly ok: true
+  /** An object with a string `type` — the most any decoder can claim before reading further. */
+  readonly line: { readonly type: string; readonly [key: string]: JsonValue | undefined }
+}
+
+export type JsonLineResult = JsonLineSuccess | JsonLineFailure
+
+/**
+ * Decodes one line of a newline-delimited JSON stream.
+ *
+ * Shared by every provider because every provider's wire is this: a stream is
+ * read for as long as a process runs, and one malformed line — a truncated
+ * write, a stray log — must not end the transcript, so failure is returned
+ * rather than thrown. Blank lines fail with an explicit reason so a caller
+ * filters them knowingly rather than by accident.
+ */
+export function parseJsonLine(text: string): JsonLineResult {
+  const trimmed = text.trim()
+  if (trimmed.length === 0) return { ok: false, line: text, reason: "empty line" }
+
+  let decoded: unknown
+  try {
+    decoded = JSON.parse(trimmed)
+  } catch (error) {
+    return { ok: false, line: text, reason: error instanceof Error ? error.message : "invalid JSON" }
+  }
+
+  if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)) {
+    return { ok: false, line: text, reason: "line is not a JSON object" }
+  }
+  if (typeof (decoded as { type?: unknown }).type !== "string") {
+    return { ok: false, line: text, reason: "line has no `type`" }
+  }
+  return { ok: true, line: decoded as JsonLineSuccess["line"] }
+}
+
+/** Decodes a whole capture, keeping failures in place. */
+export function parseJsonLines(text: string): readonly JsonLineResult[] {
+  return text
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map(parseJsonLine)
+}
+
+/** Trims a path to its last two segments, which is what identifies a file in a narrow row. */
+export function shortenPath(path: string): string {
+  const parts = path.split("/").filter(Boolean)
+  return parts.length <= 2 ? path : `…/${parts.slice(-2).join("/")}`
+}
+
 /** The value as a string, or null. */
 export function asString(value: JsonValue | undefined): string | null {
   return typeof value === "string" ? value : null

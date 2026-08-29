@@ -1,5 +1,6 @@
 /** @responsibility Describes Claude Code's `stream-json` wire shapes and decodes one line into them without interpreting it. */
 
+import { parseJsonLine } from "../json"
 import type { JsonValue } from "../json"
 
 /** Re-exported so one import gives a consumer this wire's whole vocabulary. */
@@ -221,13 +222,131 @@ export interface WireTaskUsage {
   readonly duration_ms?: number
 }
 
+/** What one `system/init` advertises: the whole session, as the CLI sees it. */
+export interface WireInitEvent {
+  readonly type: "system"
+  readonly subtype: "init"
+  readonly session_id: string
+  readonly cwd: string
+  readonly model: string
+  readonly tools: readonly string[]
+  readonly slash_commands?: readonly string[]
+  readonly terminal_slash_commands?: readonly string[]
+  readonly skills?: readonly string[]
+  readonly agents?: readonly string[]
+  readonly mcp_servers?: readonly { readonly name: string; readonly status: string }[]
+  readonly plugins?: readonly { readonly name: string; readonly version?: string; readonly source?: string }[]
+  readonly permissionMode?: string
+  readonly output_style?: string
+  readonly claude_code_version?: string
+}
+
+/** A delegated run beginning: a subagent, a workflow, or a backgrounded shell. */
+export interface WireTaskStartedEvent {
+  readonly type: "system"
+  readonly subtype: "task_started"
+  readonly task_id: string
+  readonly tool_use_id: string
+  readonly task_type: string
+  readonly description?: string
+  readonly subagent_type?: string
+  readonly workflow_name?: string
+  readonly prompt?: string
+}
+
+/**
+ * A delegated run's live status.
+ *
+ * `workflow_progress` rides only some of these, and is the only window into a
+ * workflow's agents — they write nothing else to the stream.
+ */
+export interface WireTaskProgressEvent {
+  readonly type: "system"
+  readonly subtype: "task_progress"
+  readonly task_id: string
+  readonly tool_use_id: string
+  readonly description?: string
+  readonly last_tool_name?: string
+  readonly usage?: { readonly total_tokens?: number; readonly tool_uses?: number; readonly duration_ms?: number }
+  readonly workflow_progress?: readonly JsonValue[]
+}
+
+/** A delegated run finishing, with where its output was written. */
+export interface WireTaskNotificationEvent {
+  readonly type: "system"
+  readonly subtype: "task_notification"
+  readonly task_id: string
+  readonly tool_use_id?: string
+  readonly status?: string
+  readonly summary?: string
+  readonly output_file?: string
+}
+
+/** The seam a compaction left, and what it cost. */
+export interface WireCompactBoundaryEvent {
+  readonly type: "system"
+  readonly subtype: "compact_boundary"
+  readonly compact_metadata?: {
+    readonly trigger?: string
+    readonly pre_tokens?: number
+    readonly post_tokens?: number
+  }
+}
+
+/** A call refused without ever being asked about. */
+export interface WirePermissionDeniedEvent {
+  readonly type: "system"
+  readonly subtype: "permission_denied"
+  readonly tool_name: string
+  readonly tool_use_id: string
+  readonly message?: string
+}
+
+/** A hook running. `hook_response` adds the outcome. */
+export interface WireHookEvent {
+  readonly type: "system"
+  readonly subtype: "hook_started" | "hook_response"
+  readonly hook_name?: string
+  readonly hook_event?: string
+  readonly outcome?: string
+  readonly exit_code?: number
+}
+
+/** A system line this build does not model. Open on purpose: the CLI adds subtypes. */
+export interface WireUnknownSystemEvent {
+  readonly type: "system"
+  readonly subtype: string
+  readonly [key: string]: JsonValue | undefined
+}
+
+/** Everything the `system` channel can carry. */
+export type WireSystemEvent =
+  | WireInitEvent
+  | WireTaskStartedEvent
+  | WireTaskProgressEvent
+  | WireTaskNotificationEvent
+  | WireCompactBoundaryEvent
+  | WirePermissionDeniedEvent
+  | WireHookEvent
+  | WireUnknownSystemEvent
+
+/** Any decoded line, before anything past `type` has been checked. */
+export interface WireLine {
+  readonly type: string
+  readonly [key: string]: JsonValue | undefined
+}
+
 /**
  * One decoded line. Every arm keeps the fields this library reads and tolerates
  * the rest: the CLI adds keys and whole subtypes between releases, and a parser
  * that fails a line over an unknown field loses content it could have shown.
+ *
+ * These shapes describe the wire; they do not police it. A declared type is a
+ * claim about bytes, not a check on them, so the mapper reads every field
+ * through the shared readers rather than trusting the declaration.
  */
 export type WireEvent =
-  | { readonly type: "system"; readonly subtype: string; readonly [key: string]: JsonValue | undefined }
+  | WireSystemEvent
   | {
       readonly type: "stream_event"
       readonly event: WireStreamFrame
@@ -294,7 +413,14 @@ export interface WireParseFailure {
 
 export interface WireParseSuccess {
   readonly ok: true
-  readonly event: WireEvent
+  /**
+   * What the parser actually verified: an object with a string `type`.
+   *
+   * Not one of the arms above. Returning the union would claim fields nothing
+   * checked; the arms describe the wire, and a consumer narrows to one after
+   * checking, the way this package's own mapper does.
+   */
+  readonly line: WireLine
 }
 
 export type WireParseResult = WireParseSuccess | WireParseFailure
@@ -307,34 +433,19 @@ export type WireParseResult = WireParseSuccess | WireParseFailure
  * not end the transcript. Blank lines are a failure with an explicit reason so
  * a caller can filter them knowingly instead of by accident.
  */
+/**
+ * Decodes one line of Claude Code's stream.
+ *
+ * The decoding itself is shared — every provider's wire is newline-delimited
+ * JSON, and one copy per provider is one place per provider for a bug in it to
+ * live. What stays here is the naming and the return type.
+ */
 export function parseWireLine(line: string): WireParseResult {
-  const trimmed = line.trim()
-  if (trimmed.length === 0) return { ok: false, line, reason: "empty line" }
-
-  let decoded: unknown
-  try {
-    decoded = JSON.parse(trimmed)
-  } catch (error) {
-    return {
-      ok: false,
-      line,
-      reason: error instanceof Error ? error.message : "invalid JSON",
-    }
-  }
-
-  if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)) {
-    return { ok: false, line, reason: "line is not a JSON object" }
-  }
-
-  const event = decoded as { type?: unknown }
-  if (typeof event.type !== "string") {
-    return { ok: false, line, reason: "line has no `type`" }
-  }
-
-  return { ok: true, event: decoded as WireEvent }
+  const result = parseJsonLine(line)
+  return result.ok ? { ok: true, line: result.line as WireLine } : result
 }
 
-/** Splits a whole capture into lines and decodes each one, keeping failures in place. */
+/** Decodes a whole capture, keeping failures in place. */
 export function parseWireLines(text: string): readonly WireParseResult[] {
   return text
     .split("\n")

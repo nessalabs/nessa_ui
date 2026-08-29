@@ -5,7 +5,9 @@ import {
   Badge,
   Button,
   ClaudeStreamMapper,
+  CodexStreamMapper,
   claude,
+  codex,
   mapClaudeStream,
   JsonTree,
   Message,
@@ -18,6 +20,14 @@ import {
   MessageScrollerButton,
   MessageScrollerContent,
   MessageScrollerViewport,
+  FileDiffCard,
+  FileDiffCardHeader,
+  FileDiffCardHeading,
+  FileDiffCardIcon,
+  FileDiffCardTitle,
+  FileDiffList,
+  FileDiffListItem,
+  FileDiffPath,
   MermaidDiagram,
   RandomAvatar,
   SegmentedControl,
@@ -28,16 +38,23 @@ import {
   ToolCallContent,
   ToolCallTabs,
   ToolCallTrigger,
+  TranscriptDivider,
   applyDeltas,
+  isCompacting,
+  unreportedCapabilities,
   TranscriptBuilder,
   isToolGroup,
   previewOf,
   type AgentEvent,
+  type AgentEventPayload,
   type DelegatedRun,
   type PlanStep,
   type DeltaBuffers,
+  type FileEdit,
   type ToolKind,
   type WorkflowAgentProgress,
+  type AgentCapabilities,
+  type JsonValue,
   type Transcript,
   type WorkItem,
 } from "@nessa-ui/react"
@@ -57,6 +74,9 @@ import { storyDocumentation } from "./story-documentation"
 // directory. Everything below is parsed from these bytes — nothing in this file
 // is authored transcript data.
 import failing from "./fixtures/agent-stream/failing.jsonl?raw"
+import approvalAllow from "./fixtures/agent-stream/approval_allow.jsonl?raw"
+import compaction from "./fixtures/agent-stream/compaction.jsonl?raw"
+import approvalDeny from "./fixtures/agent-stream/approval_deny.jsonl?raw"
 import printed from "./fixtures/agent-stream/printed.jsonl?raw"
 import resumeOne from "./fixtures/agent-stream/resume_turn1.jsonl?raw"
 import resumeTwo from "./fixtures/agent-stream/resume_turn2.jsonl?raw"
@@ -66,13 +86,129 @@ import tools from "./fixtures/agent-stream/tools.jsonl?raw"
 import websearch from "./fixtures/agent-stream/websearch.jsonl?raw"
 import workflow from "./fixtures/agent-stream/workflow.jsonl?raw"
 import workflowPhases from "./fixtures/agent-stream/workflow_phases.jsonl?raw"
+// The same scenario matrix recorded from `codex exec --json`.
+import codexDelegate from "./fixtures/agent-stream/codex/delegate.jsonl?raw"
+import codexFailing from "./fixtures/agent-stream/codex/failing.jsonl?raw"
+import codexPatch from "./fixtures/agent-stream/codex/patch.jsonl?raw"
+import codexPlan from "./fixtures/agent-stream/codex/plan.jsonl?raw"
+import codexPrinted from "./fixtures/agent-stream/codex/printed.jsonl?raw"
+import codexResumeOne from "./fixtures/agent-stream/codex/resume_turn1.jsonl?raw"
+import codexResumeTwo from "./fixtures/agent-stream/codex/resume_turn2.jsonl?raw"
+import codexTools from "./fixtures/agent-stream/codex/tools.jsonl?raw"
+import codexWebsearch from "./fixtures/agent-stream/codex/websearch.jsonl?raw"
+// What the interactive app-server answers that the one-way stream never sends.
+import codexAppServerCapabilities from "./fixtures/agent-stream/codex/appserver_capabilities.json"
 // The transcripts the *stream* refuses to carry, read back from the files
 // Claude Code writes under ~/.claude/projects. Keyed by the ids the stream does
 // give: a subagent by its `task_id`, a workflow agent by its `agentId`.
 import diskSubagent from "./fixtures/agent-stream/disk_subagent_a37fefefbc61e13e3.jsonl?raw"
 import diskWorkflowAgent from "./fixtures/agent-stream/disk_workflow_agent_a35ea63276cd501aa.jsonl?raw"
 
+type ProviderId = "claude" | "codex"
+
+/**
+ * What a provider is, and what it supports.
+ *
+ * The panes read `supports` rather than checking the id: a surface that a
+ * provider cannot fill should be absent, not empty, and asking "does this
+ * provider report capabilities" is a question a third provider answers for
+ * itself without this file learning its name.
+ */
+interface Transport {
+  readonly id: string
+  readonly label: string
+  readonly command: string
+  readonly interactive: boolean
+  readonly supports: {
+    readonly capabilities: boolean
+    readonly approvals: boolean
+    readonly steering: boolean
+  }
+  readonly note: string
+}
+
+interface Provider {
+  readonly id: ProviderId
+  readonly label: string
+  readonly command: string
+  /** The provider's own mapper, behind the shared interface. */
+  readonly createMapper: () => { push(line: string): readonly AgentEvent[] }
+  /**
+   * How you reach this agent. A provider can speak more than one, and they do
+   * not carry the same things — Codex's one-way stream and its interactive
+   * app-server differ enough that a reader comparing them should see which is
+   * which rather than a single blurred answer.
+   */
+  readonly transports: readonly Transport[]
+  readonly supports: {
+    /** Token-level previews. Claude streams; Codex, in this mode, does not. */
+    readonly streaming: boolean
+    /** A session advertisement worth building composer pickers from. */
+    readonly capabilities: boolean
+    /** Structured file edits rather than opaque file tool calls. */
+    readonly fileEdits: boolean
+    /** A phase-and-agent board for a fan-out. */
+    readonly workflowBoard: boolean
+    /** Delegated transcripts addressable on disk from ids the wire gave. */
+    readonly transcriptsOnDisk: boolean
+  }
+}
+
+const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
+  claude: {
+    id: "claude",
+    label: "Claude Code",
+    command: "claude -p --output-format stream-json --include-partial-messages",
+    transports: [
+      {
+        id: "stream",
+        label: "stream-json",
+        command: "claude -p --output-format stream-json",
+        interactive: false,
+        supports: { capabilities: true, approvals: false, steering: false },
+        note: "One-way. The opening line advertises the whole session, so pickers can be built from the stream alone.",
+      },
+      {
+        id: "pipe",
+        label: "stream-json, both ways",
+        command: "claude -p --input-format stream-json --output-format stream-json",
+        interactive: true,
+        supports: { capabilities: true, approvals: true, steering: true },
+        note: "The same stream with stdin open: prompts and steering go in, control requests answer approvals and change model or permission mode mid-turn.",
+      },
+    ],
+    createMapper: () => new ClaudeStreamMapper(),
+    supports: { streaming: true, capabilities: true, fileEdits: false, workflowBoard: true, transcriptsOnDisk: true },
+  },
+  codex: {
+    id: "codex",
+    label: "Codex",
+    command: "codex exec --json",
+    transports: [
+      {
+        id: "exec",
+        label: "exec --json",
+        command: "codex exec --json",
+        interactive: false,
+        supports: { capabilities: false, approvals: false, steering: false },
+        note: "One-way. The opening line carries a thread id and nothing else, so nothing here can populate a picker.",
+      },
+      {
+        id: "app-server",
+        label: "app-server",
+        command: "codex app-server",
+        interactive: true,
+        supports: { capabilities: true, approvals: true, steering: true },
+        note: "Interactive JSON-RPC. Answers model, skill, plugin and hook lists on request, asks for approval before running untrusted commands, and takes steer and interrupt mid-turn.",
+      },
+    ],
+    createMapper: () => new CodexStreamMapper(),
+    supports: { streaming: false, capabilities: false, fileEdits: true, workflowBoard: false, transcriptsOnDisk: true },
+  },
+}
+
 interface Capture {
+  readonly provider: ProviderId
   readonly id: string
   readonly label: string
   readonly blurb: string
@@ -87,15 +223,27 @@ interface Capture {
 }
 
 const CAPTURES: readonly Capture[] = [
-  { id: "printed", label: "Plain text", blurb: "One streamed message and nothing else — the delta path with no tools in the way.", prompt: "Print exactly: hello world. Do not use any tools.", source: printed },
-  { id: "tools", label: "Tools", blurb: "Write, read and a shell command: three calls, three results, one reasoning block.", prompt: "Create a file notes.txt containing three lines of text, then read it back, then run 'wc -l notes.txt'. Keep it brief.", source: tools },
-  { id: "todos", label: "Plan", blurb: "The incremental plan tools — TaskCreate and TaskUpdate — folded into one checklist.", prompt: "Use your todo list to plan and then do these three steps: create a.txt with 'a', create b.txt with 'b', then run 'ls *.txt'. Track each step in your todos.", source: todos },
-  { id: "subagent", label: "Subagent", blurb: "An Explore subagent, its own events filed under the call that spawned it.", prompt: "Use the Explore subagent to find out what files are in this directory, then tell me what it found in one line.", source: subagent },
-  { id: "workflow", label: "Workflow", blurb: "Three parallel agents behind one Workflow call: no inner transcripts, but a full phase-and-agent board with state, cost and results.", prompt: "Use a workflow to run three agents in parallel, each printing a different greeting (hello, hola, bonjour), then summarize what they returned. Keep it tiny.", source: workflow },
-  { id: "phases", label: "Multi-phase workflow", blurb: "Three phases, four agents. Every phase is declared up front, so the ones not reached yet render as pending rather than appearing late.", prompt: "Use a workflow with THREE phases: 'Greet' runs two agents in parallel (hello, hola); 'Translate' runs one (bonjour); 'Summarize' lists all three.", source: workflowPhases },
-  { id: "failing", label: "Failed tool", blurb: "A command that exits non-zero, with the wire's error framing stripped off.", prompt: "Run the command 'cat /nonexistent/definitely-missing-file' and then tell me what happened in one sentence.", source: failing },
-  { id: "websearch", label: "Web search", blurb: "Server-side tools, whose results arrive as structured blocks rather than text.", prompt: "Search the web for the current version of the TypeScript compiler and tell me in one line.", source: websearch },
-  { id: "resume", label: "Resume + model swap", blurb: "Two processes, one session id: a second init, and a model change derived from it.", prompt: "Remember the number 47. Create marker.txt containing it. Then, resumed on Haiku: what number did I ask you to remember?", source: `${resumeOne}\n${resumeTwo}` },
+  { provider: "claude", id: "printed", label: "Plain text", blurb: "One streamed message and nothing else — the delta path with no tools in the way.", prompt: "Print exactly: hello world. Do not use any tools.", source: printed },
+  { provider: "claude", id: "tools", label: "Tools", blurb: "Write, read and a shell command: three calls, three results, one reasoning block.", prompt: "Create a file notes.txt containing three lines of text, then read it back, then run 'wc -l notes.txt'. Keep it brief.", source: tools },
+  { provider: "claude", id: "todos", label: "Plan", blurb: "The incremental plan tools — TaskCreate and TaskUpdate — folded into one checklist.", prompt: "Use your todo list to plan and then do these three steps: create a.txt with 'a', create b.txt with 'b', then run 'ls *.txt'. Track each step in your todos.", source: todos },
+  { provider: "claude", id: "subagent", label: "Subagent", blurb: "An Explore subagent, its own events filed under the call that spawned it.", prompt: "Use the Explore subagent to find out what files are in this directory, then tell me what it found in one line.", source: subagent },
+  { provider: "claude", id: "workflow", label: "Workflow", blurb: "Three parallel agents behind one Workflow call: no inner transcripts, but a full phase-and-agent board with state, cost and results.", prompt: "Use a workflow to run three agents in parallel, each printing a different greeting (hello, hola, bonjour), then summarize what they returned. Keep it tiny.", source: workflow },
+  { provider: "claude", id: "phases", label: "Multi-phase workflow", blurb: "Three phases, four agents. Every phase is declared up front, so the ones not reached yet render as pending rather than appearing late.", prompt: "Use a workflow with THREE phases: 'Greet' runs two agents in parallel (hello, hola); 'Translate' runs one (bonjour); 'Summarize' lists all three.", source: workflowPhases },
+  { provider: "claude", id: "failing", label: "Failed tool", blurb: "A command that exits non-zero, with the wire's error framing stripped off.", prompt: "Run the command 'cat /nonexistent/definitely-missing-file' and then tell me what happened in one sentence.", source: failing },
+  { provider: "claude", id: "websearch", label: "Web search", blurb: "Server-side tools, whose results arrive as structured blocks rather than text.", prompt: "Search the web for the current version of the TypeScript compiler and tell me in one line.", source: websearch },
+  { provider: "claude", id: "approval-allow", label: "Approval — allowed", blurb: "The one place the wire is a conversation: the harness stops and asks, and nothing moves until an answer is written back. Recorded against a sandbox whose settings escalate the shell.", prompt: "Run the shell command `echo approved-and-ran` using the Bash tool, then tell me its output. (Answered: allow)", source: approvalAllow },
+  { provider: "claude", id: "approval-deny", label: "Approval — refused", blurb: "The same ask, answered no. The refusal text becomes the tool's error, and the turn still completes — a declined tool is not a failed run.", prompt: "The same prompt, answered: deny.", source: approvalDeny },
+  { provider: "claude", id: "compaction", label: "Context compaction", blurb: "The window fills and history is summarised away — twice. The transcript keeps everything; only the model forgets. Forced by reading a generated corpus on Haiku with a 100k window.", prompt: "Read fifteen generated files in full, one at a time, answering with only each filename.", source: compaction },
+  { provider: "claude", id: "resume", label: "Resume + model swap", blurb: "Two processes, one session id: a second init, and a model change derived from it.", prompt: "Remember the number 47. Create marker.txt containing it. Then, resumed on Haiku: what number did I ask you to remember?", source: `${resumeOne}\n${resumeTwo}` },
+  // ---------- Codex ----------
+  { provider: "codex", id: "codex-printed", label: "Plain text", blurb: "One committed message. Codex streams nothing in this mode, which is why live preview has to be optional rather than assumed.", prompt: "Reply with exactly: hello world. Do not run any commands.", source: codexPrinted },
+  { provider: "codex", id: "codex-tools", label: "Tools", blurb: "A file write and a shell command, each an item that opens and settles — the item id is the call id.", prompt: "Create notes.txt with three lines of text, read it back, then run 'wc -l notes.txt'.", source: codexTools },
+  { provider: "codex", id: "codex-plan", label: "Plan", blurb: "The plan republished whole as steps complete, with no step ids — position in the list is the identity.", prompt: "Plan and then do three steps: create a.txt, create b.txt, then run 'ls *.txt'. Track your progress.", source: codexPlan },
+  { provider: "codex", id: "codex-patch", label: "File changes", blurb: "Structured edits: which files changed and how. Claude Code reports the same work only as opaque tool calls.", prompt: "Create greet.py with a function that prints hello, then modify it to take a name argument.", source: codexPatch },
+  { provider: "codex", id: "codex-delegate", label: "Spawned agent", blurb: "A spawned agent writes nothing to this stream; its transcript lives under the receiver thread id.", prompt: "Use a subagent to print three greetings, then summarize.", source: codexDelegate },
+  { provider: "codex", id: "codex-failing", label: "Failed command", blurb: "A non-zero exit code, so failure is a fact the wire states rather than something inferred from prose.", prompt: "Run 'cat /nonexistent/definitely-missing-file' and tell me what happened.", source: codexFailing },
+  { provider: "codex", id: "codex-websearch", label: "Web search", blurb: "A search item, which opens and settles like any other call.", prompt: "Search the web for the current version of the TypeScript compiler.", source: codexWebsearch },
+  { provider: "codex", id: "codex-resume", label: "Resume", blurb: "Two processes, one thread id — a resume is no more visible here than it is on Claude.", prompt: "Remember the number 47… then, resumed: what number did I ask you to remember?", source: `${codexResumeOne}\n${codexResumeTwo}` },
 ]
 
 const LINES = new Map(CAPTURES.map((capture) => [capture.id, capture.source.split("\n").filter((line) => line.trim().length > 0)]))
@@ -126,11 +274,49 @@ interface LiveState {
  * rebuilds, because that is the one case where the accumulated state describes
  * something that is no longer true.
  */
+/**
+ * What this provider can and cannot report.
+ *
+ * Shown rather than hidden because the differences are the interesting part:
+ * a surface missing for Codex is missing because the wire does not carry it,
+ * and a reader comparing the two should be able to see that without opening
+ * the raw pane.
+ */
+function ProviderSupport({ provider, transport }: { provider: Provider; transport: Transport }) {
+  const features = [
+    // What the wire carries, whichever transport is used…
+    ["streams tokens", provider.supports.streaming],
+    ["structured file edits", provider.supports.fileEdits],
+    ["workflow board", provider.supports.workflowBoard],
+    ["transcripts on disk", provider.supports.transcriptsOnDisk],
+    // …and what this transport in particular can do.
+    ["session capabilities", transport.supports.capabilities],
+    ["approvals", transport.supports.approvals],
+    ["steering", transport.supports.steering],
+  ] as const
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="provider-support">
+      <code className="text-muted-foreground">{transport.command}</code>
+      {features.map(([label, supported]) => (
+        <Badge key={label} variant={supported ? "secondary" : "outline"} className={supported ? "" : "opacity-60"}>
+          {supported ? label : `no ${label}`}
+        </Badge>
+      ))}
+    </div>
+  )
+}
+
+/** Which provider a capture came from. */
+function providerOf(captureId: string): ProviderId {
+  return CAPTURES.find((entry) => entry.id === captureId)?.provider ?? "claude"
+}
+
 function useLiveTranscript(captureId: string, count: number, live: boolean): LiveState {
   const state = React.useRef<{
     captureId: string
     count: number
-    mapper: ClaudeStreamMapper
+    mapper: { push(line: string): readonly AgentEvent[] }
     builder: TranscriptBuilder
     buffers: Map<string, string>
     events: AgentEvent[]
@@ -143,7 +329,7 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
     current = {
       captureId,
       count: 0,
-      mapper: new ClaudeStreamMapper(),
+      mapper: PROVIDERS[providerOf(captureId)].createMapper(),
       builder: new TranscriptBuilder(),
       buffers: new Map(),
       events: [],
@@ -152,14 +338,21 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
     state.current = current
   }
 
-  for (let index = current.count; index < count; index += 1) {
-    const mapped = current.mapper.push(lines[index]!)
+  // Clamped to the capture that is actually loaded. `count` is state and the
+  // capture can change under it — switching provider mid-playback leaves the
+  // previous capture's line count in place for a render, and reading past the
+  // end of the new one hands the mapper an undefined line.
+  const target = Math.min(count, lines.length)
+  for (let index = current.count; index < target; index += 1) {
+    const line = lines[index]
+    if (line === undefined) break
+    const mapped = current.mapper.push(line)
     current.produced.push(mapped.length)
     current.events.push(...mapped)
     current.builder.push(mapped)
     applyDeltas(mapped, current.buffers)
   }
-  current.count = count
+  current.count = target
 
   return {
     events: current.events,
@@ -169,22 +362,6 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
   }
 }
 
-/**
- * On-disk transcripts, by the id the stream reports.
- *
- * A host reaches these through the path contract in `store.ts`; the story ships
- * two of them as fixtures so the expanded views are real rather than mocked.
- */
-const DISK_TRANSCRIPTS: Readonly<Record<string, string>> = {
-  a37fefefbc61e13e3: diskSubagent,
-  a35ea63276cd501aa: diskWorkflowAgent,
-}
-
-function diskTranscript(id: string | null): readonly AgentEvent[] | null {
-  if (id === null) return null
-  const source = DISK_TRANSCRIPTS[id]
-  return source === undefined ? null : mapClaudeStream(source)
-}
 
 /**
  * How a row asks the panel to open a transcript.
@@ -195,6 +372,17 @@ function diskTranscript(id: string | null): readonly AgentEvent[] | null {
  * knows a path, the shell owns the surface.
  */
 const OpenTranscript = React.createContext<(ref: claude.TranscriptRef) => void>(() => {})
+
+/**
+ * On-disk transcripts, by the id the stream reports.
+ *
+ * A host reaches these through the path contract in `store.ts`; the story ships
+ * two of them as fixtures so the opened views are real rather than mocked.
+ */
+const DISK_TRANSCRIPTS: Readonly<Record<string, string>> = {
+  a37fefefbc61e13e3: diskSubagent,
+  a35ea63276cd501aa: diskWorkflowAgent,
+}
 
 const TOOL_ICONS: Partial<Record<ToolKind, React.ReactNode>> = {
   shell: <BashIcon />,
@@ -513,6 +701,11 @@ function WorkRow({ item, transcript, previews }: { item: WorkItem; transcript: T
     )
   }
   if (payload.type === "user_message") {
+    // The harness writes its own messages into the user's lane — after a
+    // compaction it injects the summary as "This session is being continued…".
+    // Drawing it as the user's words puts something in their mouth, and it is
+    // machinery the divider above it already accounts for.
+    if (payload.synthetic) return null
     return (
       <Message from="user">
         <MessageContent>
@@ -521,13 +714,132 @@ function WorkRow({ item, transcript, previews }: { item: WorkItem; transcript: T
       </Message>
     )
   }
+  // Edits are not drawn where they happen. A turn touches the same files
+  // repeatedly and interleaves them with the calls that made them, so inline
+  // rows read as noise between the steps; the turn's changed files are one
+  // summary at the end, which is the question a reader actually has.
+  if (payload.type === "file_edits") return null
   if (payload.type === "error") {
     return <p className="text-destructive text-xs">{payload.message}</p>
+  }
+  // A compaction is not a step the agent took — it happened *to* the
+  // conversation — so it marks the transcript with a rule rather than taking a
+  // card's weight beside the work it sits between.
+  if (payload.type === "context_compacted") {
+    const summary = compactionSummary(transcript, item.seq)
+    return (
+      <TranscriptDivider
+        meta={compactionDetail(payload)}
+        data-testid="compaction-boundary"
+        detail={
+          summary === null ? null : (
+            <div className="max-h-64 overflow-auto rounded-lg border border-border bg-muted/40 p-3 whitespace-pre-wrap">
+              {summary}
+            </div>
+          )
+        }
+      >
+        {payload.trigger === "manual" ? "Context compacted on request" : "Context compacted"}
+      </TranscriptDivider>
+    )
   }
   return null
 }
 
-function TranscriptView({ transcript, previews, prompt }: { transcript: Transcript; previews: DeltaBuffers; prompt: string }) {
+/** Rounds a token count the way a reader reads it, not the way it is billed. */
+function tokens(value: number | null): string | null {
+  if (value === null) return null
+  return value >= 1000 ? `${Math.round(value / 100) / 10}k` : String(value)
+}
+
+/**
+ * What the boundary is worth saying out loud: how much smaller the window got,
+ * and how long the agent was busy doing it. The cumulative figure is left to
+ * the raw pane — it is a session total, and this row is about one moment.
+ */
+function compactionDetail(payload: Extract<AgentEventPayload, { type: "context_compacted" }>): string | null {
+  const before = tokens(payload.preTokens)
+  const after = tokens(payload.postTokens)
+  const seconds = payload.durationMs === null ? null : `${Math.round(payload.durationMs / 1000)}s`
+  const size = before !== null && after !== null ? `${before} → ${after} tokens` : null
+  return [size, seconds].filter((part) => part !== null).join(" · ") || null
+}
+
+/**
+ * The summary the agent carries forward in place of the history it dropped.
+ *
+ * The harness writes it into the user's lane as a synthetic message right
+ * after the boundary. It is worth keeping — it is the only record of what
+ * survived the drop — but not worth putting in the user's voice, so it hides
+ * behind the marker rather than being drawn as something they said.
+ */
+function compactionSummary(transcript: Transcript, seq: number): string | null {
+  for (const event of transcript.events) {
+    if (event.seq <= seq) continue
+    if (event.payload.type !== "user_message") continue
+    return event.payload.synthetic ? event.payload.text : null
+  }
+  return null
+}
+
+/** A field a provider left unset, so the surface can omit it rather than print a placeholder. */
+function known(value: string | null | undefined): string | null {
+  return value === undefined || value === null || value === "" || value === "unknown" ? null : value
+}
+
+/**
+ * Every file a turn touched, once.
+ *
+ * A turn can edit the same path several times; the reader wants the set of
+ * files that changed, not a replay of each write, so the last change to a path
+ * wins and the order follows first touch.
+ */
+function turnFileEdits(work: readonly WorkItem[]): readonly FileEdit[] {
+  const byPath = new Map<string, FileEdit>()
+  for (const item of work) {
+    if (isToolGroup(item) || item.payload.type !== "file_edits") continue
+    for (const edit of item.payload.edits) byPath.set(edit.path, edit)
+  }
+  return [...byPath.values()]
+}
+
+function TurnFileEdits({ edits }: { edits: readonly FileEdit[] }) {
+  if (edits.length === 0) return null
+  return (
+    <FileDiffCard defaultExpanded itemCount={edits.length} data-testid="file-edits">
+      <FileDiffCardHeader>
+        <FileDiffCardIcon>
+          <EditIcon />
+        </FileDiffCardIcon>
+        <FileDiffCardHeading>
+          <FileDiffCardTitle>{`Changed ${edits.length} file${edits.length === 1 ? "" : "s"}`}</FileDiffCardTitle>
+        </FileDiffCardHeading>
+      </FileDiffCardHeader>
+      <FileDiffList aria-label="Changed files">
+        {edits.map((edit) => (
+          <FileDiffListItem key={edit.path}>
+            <FileDiffPath path={edit.path} />
+            <Badge variant="outline" className="ml-auto">
+              {edit.change}
+            </Badge>
+          </FileDiffListItem>
+        ))}
+      </FileDiffList>
+    </FileDiffCard>
+  )
+}
+
+function TranscriptView({
+  transcript,
+  previews,
+  prompt,
+  provider,
+}: {
+  transcript: Transcript
+  previews: DeltaBuffers
+  prompt: string
+  provider: Provider
+}) {
   const session = transcript.session
   // A model change is the one session-level shift the stream actually proves;
   // "resumed" is not on the wire at all, so nothing here claims it.
@@ -536,8 +848,12 @@ function TranscriptView({ transcript, previews, prompt }: { transcript: Transcri
   return (
     <div className="flex h-full flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge>{session?.model ?? "no session yet"}</Badge>
-        {session === null ? null : <Badge variant="secondary">{session.permissionMode}</Badge>}
+        {/* Codex's thread line names no model or sandbox, so those badges are
+            absent rather than reading "unknown" — the provider did not say. */}
+        <Badge>{session === null ? "no session yet" : known(session.model) ?? provider.label}</Badge>
+        {known(session?.permissionMode) === null ? null : (
+          <Badge variant="secondary">{session!.permissionMode}</Badge>
+        )}
         {transcript.sessions.length > 1 ? <Badge variant="outline">{transcript.sessions.length} inits</Badge> : null}
         {modelSwap === null ? null : <Badge variant="outline">{`model → ${modelSwap}`}</Badge>}
         {transcript.usage === null ? null : (
@@ -549,8 +865,8 @@ function TranscriptView({ transcript, previews, prompt }: { transcript: Transcri
 
       {transcript.plan.length === 0 ? null : (
         <TaskList aria-label="Agent plan" className="border-border rounded-xl border p-3">
-          {transcript.plan.map((step) => (
-            <TaskListItem key={step.id ?? step.content} status={planStatus(step)}>
+          {transcript.plan.map((step, index) => (
+            <TaskListItem key={step.id ?? `step:${index}`} status={planStatus(step)}>
               {step.content}
             </TaskListItem>
           ))}
@@ -569,7 +885,7 @@ function TranscriptView({ transcript, previews, prompt }: { transcript: Transcri
             </Message>
             {transcript.turns.map((turn) => (
               <div key={turn.key} className="flex flex-col gap-3 py-2">
-                {turn.prompt === null || turn.prompt.payload.type !== "user_message" ? null : (
+                {turn.prompt === null || turn.prompt.payload.type !== "user_message" || turn.prompt.payload.synthetic ? null : (
                   <Message from="user">
                     <MessageAvatar fallback="You" alt="You" />
                     <MessageContent>
@@ -593,8 +909,19 @@ function TranscriptView({ transcript, previews, prompt }: { transcript: Transcri
                     </MessageContent>
                   </Message>
                 )}
+                {/* Last in the turn: what changed on disk is the turn's
+                    outcome, not a step within it. */}
+                <TurnFileEdits edits={turnFileEdits(turn.work)} />
               </div>
             ))}
+            {/* Bottom of the transcript, because it is happening now: the
+                summary call can run for the better part of a minute, and a
+                view that shows nothing for that long reads as hung. */}
+            {isCompacting(transcript.events) ? (
+              <TranscriptDivider pending data-testid="compacting">
+                Compacting…
+              </TranscriptDivider>
+            ) : null}
           </MessageScrollerContent>
         </MessageScrollerViewport>
         <MessageScrollerButton />
@@ -604,55 +931,132 @@ function TranscriptView({ transcript, previews, prompt }: { transcript: Transcri
 }
 
 /** The raw side: the bytes as they arrived, and the events they became, selectable against each other. */
-function CapabilitiesView({ capabilities }: { capabilities: claude.SessionCapabilities | null }) {
-  if (capabilities === null) return <p className="text-muted-foreground text-xs">No init line yet.</p>
-  const bySource = (source: string) => capabilities.commands.filter((command) => command.source === source)
+/**
+ * One capabilities pane for every provider.
+ *
+ * The shape is shared and every section is nullable, so a provider that cannot
+ * report something leaves it null and the section is absent — no per-provider
+ * branch here, and no empty list pretending to be an answer. Where the answers
+ * come from stays each provider's business: Claude advertises itself on its
+ * event stream, Codex answers a separate interactive channel.
+ */
+function CapabilitiesView({ capabilities }: { capabilities: AgentCapabilities | null }) {
+  if (capabilities === null) return <p className="text-muted-foreground text-xs">Nothing advertised yet.</p>
+  const unreported = unreportedCapabilities(capabilities)
+  const commands = capabilities.commands
+
   return (
     <div className="flex flex-col gap-3 text-xs">
-      <Section title={`Slash commands (${capabilities.commands.length})`}>
-        {(["skill", "plugin", "session", "terminal"] as const).map((source) =>
-          bySource(source).length === 0 ? null : (
-            <div key={source} className="mb-2">
-              <p className="text-muted-foreground mb-1 uppercase">{source}</p>
-              <div className="flex flex-wrap gap-1">
-                {bySource(source).map((command) => (
-                  <Badge key={command.name} variant="secondary">{`/${command.name}`}</Badge>
-                ))}
+      {capabilities.models === null ? null : (
+        <Section title={`Models (${capabilities.models.length})`}>
+          <ul className="space-y-1">
+            {capabilities.models.map((model) => (
+              <li key={model.id} className="flex items-center gap-2">
+                <Badge variant={model.isDefault ? "default" : "outline"}>{model.label}</Badge>
+                <span className="text-muted-foreground min-w-0 truncate">{model.description}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {commands === null ? null : (
+        <Section title={`Slash commands (${commands.length})`}>
+          {(["skill", "plugin", "session", "terminal"] as const).map((source) => {
+            const group = commands.filter((command) => command.source === source)
+            if (group.length === 0) return null
+            return (
+              <div key={source} className="mb-2">
+                <p className="text-muted-foreground mb-1 uppercase">{source}</p>
+                <div className="flex flex-wrap gap-1">
+                  {group.map((command) => (
+                    <Badge key={command.name} variant="secondary">{`/${command.name}`}</Badge>
+                  ))}
+                </div>
               </div>
-            </div>
-          ),
-        )}
-      </Section>
-      <Section title={`MCP servers (${capabilities.mcpServers.length})`}>
-        <ul className="space-y-1">
-          {capabilities.mcpServers.map((server) => (
-            <li key={server.name} className="flex items-center gap-2">
-              <Badge variant={server.connected ? "default" : "outline"}>{server.status}</Badge>
-              <span>{server.name}</span>
-              <span className="text-muted-foreground ml-auto">{server.tools.length} tools</span>
-            </li>
-          ))}
-        </ul>
-      </Section>
-      <Section title={`Subagents (${capabilities.agents.length})`}>
-        <div className="flex flex-wrap gap-1">
-          {capabilities.agents.map((agent) => (
-            <Badge key={agent} variant="outline">{agent}</Badge>
-          ))}
-        </div>
-      </Section>
-      <Section title={`Tools (${capabilities.tools.length})`}>
-        <p className="text-muted-foreground mb-1">
-          {capabilities.tools.filter((tool) => tool.deferred).length} arrived in a later init — deferred tools loading on demand.
+            )
+          })}
+        </Section>
+      )}
+
+      {capabilities.skills === null ? null : (
+        <Section title={`Skills (${capabilities.skills.length})`}>
+          <div className="flex flex-wrap gap-1">
+            {capabilities.skills.map((skill) => (
+              <Badge key={skill.name} variant="secondary">{`/${skill.name}`}</Badge>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {capabilities.mcpServers === null ? null : (
+        <Section title={`MCP servers (${capabilities.mcpServers.length})`}>
+          <ul className="space-y-1">
+            {capabilities.mcpServers.map((server) => (
+              <li key={server.name} className="flex items-center gap-2">
+                <Badge variant={server.connected ? "default" : "outline"}>{server.status}</Badge>
+                <span>{server.name}</span>
+                <span className="text-muted-foreground ml-auto">{`${server.tools.length} tools`}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {capabilities.agents === null ? null : (
+        <Section title={`Subagents (${capabilities.agents.length})`}>
+          <div className="flex flex-wrap gap-1">
+            {capabilities.agents.map((agent) => (
+              <Badge key={agent} variant="outline">{agent}</Badge>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {capabilities.tools === null ? null : (
+        <Section title={`Tools (${capabilities.tools.length})`}>
+          <p className="text-muted-foreground mb-1">
+            {`${capabilities.tools.filter((tool) => tool.deferred).length} arrived in a later advertisement — deferred tools loading on demand.`}
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {capabilities.tools.slice(0, 40).map((tool) => (
+              <Badge key={tool.name} variant={tool.deferred ? "secondary" : "outline"}>
+                {tool.name}
+              </Badge>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {capabilities.pluginSources === null ? null : (
+        <Section title={`Plugin sources (${capabilities.pluginSources.length})`}>
+          <ul className="space-y-1">
+            {capabilities.pluginSources.map((source) => (
+              <li key={source.name} className="flex items-center gap-2">
+                <span>{source.name}</span>
+                {/* The catalogue's real size, not the sample the reply carried. */}
+                <span className="text-muted-foreground ml-auto">{`${source.count.toLocaleString()} plugins`}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {capabilities.hooks === null ? null : (
+        <Section title={`Hooks (${capabilities.hooks.length})`}>
+          <div className="flex flex-wrap gap-1">
+            {capabilities.hooks.map((hook, index) => (
+              <Badge key={`${hook.event}-${index}`} variant="outline">{hook.event ?? "hook"}</Badge>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {unreported.length === 0 ? null : (
+        <p className="text-muted-foreground">
+          {`Not reported here: ${unreported.join(", ")} — absent because this transport does not carry it, not because there is none.`}
         </p>
-        <div className="flex flex-wrap gap-1">
-          {capabilities.tools.slice(0, 40).map((tool) => (
-            <Badge key={tool.name} variant={tool.deferred ? "secondary" : "outline"}>
-              {tool.name}
-            </Badge>
-          ))}
-        </div>
-      </Section>
+      )}
     </div>
   )
 }
@@ -782,11 +1186,13 @@ function AgentRow({
 
   if (!openable) {
     return (
-      <div
-        className="flex items-baseline gap-2 rounded-lg px-1 py-1 text-sm"
-        title={transcript?.blockedBy ?? undefined}
-      >
+      <div className="flex items-baseline gap-2 rounded-lg px-1 py-1 text-sm">
         {body}
+        {/* Visible, not a tooltip: a reason only a mouse can reach is a reason
+            a keyboard or screen-reader user never learns. */}
+        {transcript?.blockedBy === undefined || transcript.blockedBy === null ? null : (
+          <span className="text-muted-foreground min-w-0 shrink truncate text-xs">{transcript.blockedBy}</span>
+        )}
       </div>
     )
   }
@@ -836,6 +1242,7 @@ function agentState(agent: WorkflowAgentProgress): string {
   return agent.agentId === null ? "queued" : "running"
 }
 
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="border-border rounded-xl border p-3">
@@ -847,6 +1254,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function InspectorView({
   captureId,
+  transport,
   count,
   events,
   produced,
@@ -857,16 +1265,46 @@ function InspectorView({
   count: number
   events: readonly AgentEvent[]
   produced: readonly number[]
+  transport: Transport
   opened: claude.TranscriptRef | null
   onCloseTranscript: () => void
 }) {
+  // Per pane, and reset with the capture: raw lines and events are
+  // deliberately not one-to-one, so one shared index highlights row 12 of a
+  // list the detail below is not showing.
   const [pane, setPane] = React.useState<"raw" | "events" | "capabilities">("raw")
-  const capabilities = React.useMemo(() => claude.sessionCapabilities(events), [events])
-  const [selected, setSelected] = React.useState(0)
+  const [selectedByPane, setSelectedByPane] = React.useState<{ raw: number; events: number }>({ raw: 0, events: 0 })
+  React.useEffect(() => setSelectedByPane({ raw: 0, events: 0 }), [captureId])
+  const provider = PROVIDERS[providerOf(captureId)]
+  // Only Claude advertises its commands, skills and servers; asking Codex's
+  // events for them would answer null, and a pane that is always empty is
+  // worse than a pane that is absent.
+  // Claude advertises itself on the stream; Codex answers a different channel,
+  // so its capabilities come from a captured app-server reply rather than from
+  // the events. Same pane, two sources, and neither invents the other's.
+  // Keyed on the event count, not on `events`: the live reader appends to one
+  // array and hands the same object back, so a memo on its identity is computed
+  // once — against whatever the log held on the first render. After a Replay
+  // that was zero events, and the pane then read "nothing advertised" for good.
+  const capabilities = React.useMemo(
+    () => (transport.supports.capabilities && provider.id === "claude" ? claude.sessionCapabilities(events) : null),
+    [events, events.length, provider.id, transport.supports.capabilities],
+  )
+  const codexCaps = React.useMemo(
+    () =>
+      transport.supports.capabilities && provider.id === "codex"
+        ? codex.codexCapabilities(codexAppServerCapabilities as unknown as Record<string, JsonValue>)
+        : null,
+    [provider.id, transport.supports.capabilities],
+  )
+  const selected = pane === "events" ? selectedByPane.events : selectedByPane.raw
+  const setSelected = (index: number) =>
+    setSelectedByPane((current) => ({ ...current, [pane === "events" ? "events" : "raw"]: index }))
   const lines = (LINES.get(captureId) ?? []).slice(0, count)
   const line = lines[Math.min(selected, Math.max(lines.length - 1, 0))]
   const decoded = line === undefined ? null : (JSON.parse(line) as unknown)
   const selectedEvent = events[Math.min(selected, Math.max(events.length - 1, 0))]
+  const shownPane = pane === "capabilities" && !transport.supports.capabilities ? "raw" : pane
 
   // An opened transcript takes the panel over: it is a different conversation,
   // not another view of this one.
@@ -874,17 +1312,29 @@ function InspectorView({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      <SegmentedControl aria-label="Inspector pane" value={pane} onValueChange={(value) => setPane(value as "raw" | "events" | "capabilities")}>
+      <SegmentedControl aria-label="Inspector pane" value={shownPane} onValueChange={(value) => setPane(value as "raw" | "events" | "capabilities")}>
         <SegmentedControlOption value="raw">Raw wire ({lines.length})</SegmentedControlOption>
         <SegmentedControlOption value="events">Events ({events.length})</SegmentedControlOption>
-        <SegmentedControlOption value="capabilities">Capabilities</SegmentedControlOption>
+        {transport.supports.capabilities ? (
+          <SegmentedControlOption value="capabilities">Capabilities</SegmentedControlOption>
+        ) : null}
       </SegmentedControl>
 
-      {pane === "capabilities" ? (
-        <div className="min-h-0 flex-1 overflow-auto">
-          <CapabilitiesView capabilities={capabilities} />
+      {shownPane === "capabilities" ? (
+        // A scrolling region holding only chips has nothing focusable inside
+        // it, so a keyboard user cannot reach the scroll. Naming it and making
+        // it a tab stop is the treatment MessageScrollerViewport gives its own
+        // viewport.
+        <div
+          className="focus-visible:outline-ring min-h-0 flex-1 overflow-auto outline-none focus-visible:outline-2 focus-visible:outline-offset-2"
+          tabIndex={0}
+          role="region"
+          aria-label="Session capabilities"
+        >
+          {/* One pane, two sources: whichever the provider filled. */}
+          <CapabilitiesView capabilities={capabilities ?? codexCaps} />
         </div>
-      ) : pane === "raw" ? (
+      ) : shownPane === "raw" ? (
         <div className="flex min-h-0 flex-1 flex-col gap-2">
           <ul className="border-border h-40 shrink-0 overflow-auto rounded-xl border p-1 font-mono text-xs" data-testid="raw-lines">
             {lines.map((entry, index) => {
@@ -895,6 +1345,7 @@ function InspectorView({
                   <button
                     type="button"
                     onClick={() => setSelected(index)}
+                    aria-current={index === selected}
                     className={`w-full truncate rounded px-2 py-0.5 text-left ${index === selected ? "bg-accent text-accent-foreground" : "hover:bg-muted"}`}
                   >
                     <span className="text-muted-foreground">{String(index).padStart(3, "0")}</span> {parsed.type}
@@ -908,7 +1359,10 @@ function InspectorView({
             })}
           </ul>
           <p className="text-muted-foreground text-xs">
-            {`→ n is how many events the line produced. ${produced.filter((entry) => entry === 0).length} of ${produced.length} produce none: message_start is the mapper's join key, message_stop and message_delta repeat what result carries, signature_delta signs a thinking block, and a steady-state rate limit has nothing to act on.`}
+            {`→ n is how many events the line produced. ${produced.filter((entry) => entry === 0).length} of ${produced.length} produce none: `}
+            {provider.id === "claude"
+              ? "message_start is the mapper's join key, message_stop and message_delta repeat what result carries, signature_delta signs a thinking block, and a steady-state rate limit has nothing to act on."
+              : "turn.started is a bare marker, and an item that is reported whole on completion says nothing when it opens."}
           </p>
           <div className="border-border min-h-0 flex-1 overflow-auto rounded-xl border p-3">
             {decoded === null ? null : <JsonTree value={decoded} collapsible defaultExpandedDepth={2} />}
@@ -922,6 +1376,7 @@ function InspectorView({
                 <button
                   type="button"
                   onClick={() => setSelected(index)}
+                  aria-current={index === selected}
                   className={`w-full truncate rounded px-2 py-0.5 text-left ${index === selected ? "bg-accent text-accent-foreground" : "hover:bg-muted"}`}
                 >
                   <span className="text-muted-foreground">{String(event.seq).padStart(3, "0")}</span> {event.payload.type}
@@ -1017,6 +1472,24 @@ function OpenedTranscript({ ref_, onClose }: { ref_: claude.TranscriptRef; onClo
 
 function Explorer({ initialCapture = "tools", autoplay = false }: { initialCapture?: string; autoplay?: boolean }) {
   const [captureId, setCaptureId] = React.useState(initialCapture)
+  const provider = PROVIDERS[providerOf(captureId)]
+  const captures = CAPTURES.filter((entry) => entry.provider === provider.id)
+  const [transportId, setTransportId] = React.useState(provider.transports[0]!.id)
+  const transport = provider.transports.find((entry) => entry.id === transportId) ?? provider.transports[0]!
+
+  // Switching provider lands on that provider's first capture, so the two
+  // sides are compared on the same scenario rather than on whatever the old
+  // selection happened to be.
+  const switchProvider = (next: string) => {
+    // The control fires on the selected option too, so without this a click on
+    // the provider already showing throws away the capture and transport.
+    if (next === provider.id) return
+    const first = CAPTURES.find((entry) => entry.provider === next)
+    if (first !== undefined) setCaptureId(first.id)
+    // A transport belongs to its provider, so the selection cannot survive the
+    // switch — land on the new provider's first one.
+    setTransportId(PROVIDERS[next as ProviderId].transports[0]!.id)
+  }
   const lines = LINES.get(captureId) ?? []
   const [count, setCount] = React.useState(autoplay ? 0 : lines.length)
   const [playing, setPlaying] = React.useState(autoplay)
@@ -1049,9 +1522,13 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
   React.useEffect(() => setOpened(null), [captureId])
 
   const session = transcript.session
+  // Claude's store only: the path is built from a Claude session's cwd and its
+  // own on-disk layout. Handing it a Codex thread produced a confident
+  // `~/.claude/projects/...` path for a transcript that is not there, in a
+  // format this parser could not read anyway.
   const location = React.useMemo(
-    () => (session === null ? null : claude.sessionLocationOf("~/.claude/projects", session)),
-    [session],
+    () => (session === null || provider.id !== "claude" ? null : claude.sessionLocationOf("~/.claude/projects", session)),
+    [session, provider.id],
   )
   // A host reads these off the workflow records on disk; the story supplies the
   // one it has so the workflow pointers resolve instead of staying blocked.
@@ -1063,16 +1540,32 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
   return (
     <TranscriptLocation.Provider value={{ location, runIds }}>
     <OpenTranscript.Provider value={setOpened}>
-    <div className="border-border bg-background flex h-[42rem] w-full flex-col gap-3 rounded-3xl border p-4">
+    {/*
+      Height is fixed only where the two panes sit side by side. Below that
+      breakpoint they stack, and pinning the shell to one screen would give each
+      pane half of it — so the shell grows and the page scrolls instead.
+    */}
+    <div className="border-border bg-background flex w-full flex-col gap-3 rounded-3xl border p-3 sm:p-4 lg:h-[42rem]">
       <div className="flex flex-wrap items-center gap-2">
-        <SegmentedControl aria-label="Capture" value={captureId} onValueChange={setCaptureId}>
-          {CAPTURES.map((entry) => (
+        <SegmentedControl aria-label="Provider" value={provider.id} onValueChange={switchProvider} className="shrink-0">
+          {Object.values(PROVIDERS).map((entry) => (
             <SegmentedControlOption key={entry.id} value={entry.id}>
               {entry.label}
             </SegmentedControlOption>
           ))}
         </SegmentedControl>
-        <div className="ml-auto flex items-center gap-2">
+        {/* Nine captures do not fit a phone. The row scrolls itself; the
+            negative margin keeps the scroll edge off the control's focus ring. */}
+        <div className="-mx-1 min-w-0 max-w-full overflow-x-auto px-1">
+          <SegmentedControl aria-label="Capture" value={captureId} onValueChange={setCaptureId} className="w-max">
+          {captures.map((entry) => (
+            <SegmentedControlOption key={entry.id} value={entry.id}>
+              {entry.label}
+            </SegmentedControlOption>
+          ))}
+          </SegmentedControl>
+        </div>
+        <div className="flex items-center gap-2 sm:ml-auto">
           <Button size="sm" variant="outline" onClick={() => { setCount(0); setPlaying(true) }}>
             Replay
           </Button>
@@ -1088,14 +1581,34 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
         </div>
       </div>
       <p className="text-muted-foreground text-xs">{capture?.blurb}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <SegmentedControl aria-label="Transport" value={transport.id} onValueChange={setTransportId} className="shrink-0">
+          {provider.transports.map((entry) => (
+            <SegmentedControlOption key={entry.id} value={entry.id}>
+              {entry.label}
+            </SegmentedControlOption>
+          ))}
+        </SegmentedControl>
+        <ProviderSupport provider={provider} transport={transport} />
+      </div>
+      <p className="text-muted-foreground text-xs">
+        {transport.note}
+        {transport.interactive ? " These captures were recorded from the one-way mode; this row describes what the interactive one adds." : ""}
+      </p>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="border-border min-h-0 overflow-hidden rounded-2xl border p-3">
-          <TranscriptView transcript={transcript} previews={previews} prompt={capture?.prompt ?? ""} />
+        <div className="border-border flex min-h-[26rem] flex-col overflow-hidden rounded-2xl border p-3 lg:min-h-0">
+          <TranscriptView
+            transcript={transcript}
+            previews={previews}
+            prompt={capture?.prompt ?? ""}
+            provider={provider}
+          />
         </div>
-        <div className="border-border min-h-0 rounded-2xl border p-3">
+        <div className="border-border flex min-h-[26rem] flex-col rounded-2xl border p-3 lg:min-h-0">
           <InspectorView
             captureId={captureId}
+            transport={transport}
             count={count}
             events={events}
             produced={produced}
@@ -1119,7 +1632,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "The agent stream parser, driven by real `claude -p --output-format stream-json` captures. Left is the transcript drawn from parsed events with Message, ToolCall, TaskList and MessageMarkdown; right is the same bytes unparsed — every wire line and every event it became, selectable against each other through JsonTree. The player feeds lines one at a time so the delta path, the shimmer on an unfinished call and the plan filling in all happen the way they do against a live process.",
+          "The agent stream parser, driven by real captures from two agents — `claude -p --output-format stream-json` and `codex exec --json`. Left is the transcript drawn from parsed events with Message, ToolCall, TaskList and MessageMarkdown; right is the same bytes unparsed — every wire line and every event it became, selectable against each other through JsonTree. The player feeds lines one at a time so the delta path, the shimmer on an unfinished call and the plan filling in all happen the way they do against a live process.",
       },
     },
   },
@@ -1254,7 +1767,7 @@ const STRUCTURE = `classDiagram
     }
 
     class CodexMapper {
-        <<codex/ — not built>>
+        <<codex/mapper.ts>>
         +push(line) AgentEvent[]
     }
 
@@ -1270,7 +1783,7 @@ const STRUCTURE = `classDiagram
     TranscriptBuilder --> Transcript : snapshot per frame
     SessionStore ..> AgentEvent : keys read off task_started
     SessionStore ..> ClaudeStreamMapper : disk transcripts reuse it
-    CodexMapper ..> AgentEvent : same contract
+    CodexMapper --> AgentEvent : same contract
     AcpMapper ..> AgentEvent : same contract
 `
 
@@ -1321,6 +1834,46 @@ const FLOW = `sequenceDiagram
     Note over Build: the turn closes and is assembled<br/>once, never recomputed
     Build->>UI: snapshot
 `
+
+export const Providers: Story = {
+  parameters: storyDocumentation(
+    "The same views over a different agent. Switching provider swaps only the wire module and the mapper — the transcript, the tool rows, the plan and the raw inspector are the shared layer, unchanged. What differs is what each wire can say: the strip under the captures names it, and a surface a provider cannot fill is absent rather than empty. Codex reports structured file changes, which Claude Code does not; Claude advertises its commands, skills and MCP servers, which Codex does not.",
+  ),
+  args: { initialCapture: "codex-patch" },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+
+    // Codex reports which files changed and how, so the changed-file surface
+    // is present…
+    await waitFor(async () => {
+      await expect(canvas.getByTestId("file-edits")).toBeInTheDocument()
+    })
+    // …and the capabilities pane, which needs a session advertisement Codex
+    // does not send, is absent rather than empty.
+    await expect(canvas.queryByRole("button", { name: "Capabilities" })).toBeNull()
+
+    // Switching provider lands on that provider's own captures and restores
+    // the surfaces its wire supports.
+    await userEvent.click(canvas.getByRole("button", { name: "Claude Code" }))
+    await waitFor(async () => {
+      await expect(canvas.getByRole("button", { name: "Capabilities" })).toBeInTheDocument()
+    })
+    await expect(canvas.queryByTestId("file-edits")).toBeNull()
+    await expect(canvas.getByTestId("provider-support")).toHaveTextContent("streams tokens")
+
+    // Codex's second transport answers what its stream cannot: switching to the
+    // app-server restores the capabilities pane the one-way stream has no data
+    // for, and the support strip flips with it.
+    await userEvent.click(canvas.getByRole("button", { name: "Codex" }))
+    await waitFor(async () => {
+      await expect(canvas.getByRole("button", { name: "app-server" })).toBeInTheDocument()
+    })
+    await expect(canvas.queryByRole("button", { name: "Capabilities" })).toBeNull()
+    await userEvent.click(canvas.getByRole("button", { name: "app-server" }))
+    await userEvent.click(await canvas.findByRole("button", { name: "Capabilities" }))
+    await expect(canvas.getByText(/Models \(\d+\)/)).toBeInTheDocument()
+  },
+}
 
 export const Architecture: Story = {
   parameters: storyDocumentation(

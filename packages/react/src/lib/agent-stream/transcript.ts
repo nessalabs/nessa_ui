@@ -12,6 +12,7 @@ import type {
 } from "./events"
 import { TranscriptBuilder } from "./builder"
 import { pathKey } from "./events"
+import type { AgentEventType } from "./events"
 
 /** A run of consecutive same-tool calls, collapsed behind one row. */
 export interface ToolGroup {
@@ -140,11 +141,12 @@ export const GROUP_MIN = 2
  * has to be kept in step — a rule nothing enforces and everything eventually
  * breaks.
  *
- * `plan_updated` is deliberately absent: the plan draws in its own surface, not
- * as a row in the work list, so counting it would both overstate a collapse and
- * split a run of plan-tool calls down the middle.
+ * `plan_updated` and `file_edits` are deliberately absent: both draw in their
+ * own surface rather than as a row in the work list — the plan in its panel, the
+ * changed files as one summary at the end of the turn — so counting either
+ * would both overstate a collapse and split a run of calls down the middle.
  */
-export const RENDERS: ReadonlySet<string> = new Set([
+export const RENDERS: ReadonlySet<AgentEventType> = new Set<AgentEventType>([
   "user_message",
   "assistant_text",
   "reasoning",
@@ -333,4 +335,26 @@ export function previewOf(buffers: DeltaBuffers, block: BlockRef | null): string
 /** A stable React key for a run. */
 export function runKey(run: DelegatedRun): string {
   return `run:${pathKey(run.path)}`
+}
+
+/**
+ * Whether the agent is compacting its context *right now*.
+ *
+ * The boundary event only lands once the summary has been written, which took
+ * 17 to 41 seconds across the captures — far too long for a surface to sit
+ * looking idle. The status line says `compacting` as the work starts, so this
+ * is read from the stream rather than guessed at, and any later status (or the
+ * boundary itself) retires it.
+ *
+ * Derived here rather than in each consumer: "is it busy" is a question about
+ * the stream, and two surfaces answering it differently would disagree about
+ * the same session.
+ */
+export function isCompacting(events: readonly AgentEvent[]): boolean {
+  let compacting = false
+  for (const event of events) {
+    if (event.payload.type === "context_compacted") compacting = false
+    else if (event.payload.type === "status_changed") compacting = event.payload.status === "compacting"
+  }
+  return compacting
 }

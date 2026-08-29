@@ -12,16 +12,7 @@ export {
   type ClaudeWireKind,
 } from "./mapping"
 export { ClaudeStreamMapper, mapClaudeStream } from "./mapper"
-export {
-  groupTools as groupCapabilityTools,
-  mcpServerOf,
-  sessionCapabilities,
-  type CommandEntry,
-  type CommandSource,
-  type McpServerEntry,
-  type SessionCapabilities,
-  type ToolEntry,
-} from "./capabilities"
+export { groupTools as groupCapabilityTools, mcpServerOf, sessionCapabilities } from "./capabilities"
 export {
   collectTranscriptRefs,
   parseSubagentMeta,

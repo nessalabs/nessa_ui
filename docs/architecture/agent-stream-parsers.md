@@ -41,8 +41,18 @@ lib/agent-stream/
     tools.ts       Claude's tool names → ToolKind           ← provider
     capabilities.ts  Claude's init → pickers                ← provider
     store.ts       Claude Code's on-disk layout             ← provider
-  codex/           ← a second harness is a folder, nothing else moves
+  codex/
+    wire.ts        Codex's line shapes + vocabularies       ← provider
+    mapping.ts     Codex's kinds → contract kinds, as data  ← provider
+    mapper.ts      CodexStreamMapper                        ← provider
 ```
+
+Two providers now exist, which is what turns the layering from a claim into a
+measurement. Adding Codex cost **one** addition to the shared contract —
+`file_edits`, for a capability Claude Code does not have — and nothing else
+moved: the fold, the grouping, the delta machinery and every component are
+reused untouched, and a test asserts the shared fold accepts Codex events with
+no provider knowledge at all.
 
 The Storybook story is a demo, not a shipped component.
 
@@ -137,8 +147,9 @@ Four kinds of line arrive interleaved on one stdout:
    `terminal_reason`, `permission_denials` and a per-model usage breakdown.
 
 Plus `rate_limit_event`, and — only when the child was spawned with
-`--permission-prompt-tool stdio` — `control_request`, the one inbound line that
-**blocks the agent until answered**.
+`--permission-prompt-tool stdio` — `control_request`, the one line that
+**blocks the agent until answered** on stdin. It is the sole duplex exchange on
+an otherwise one-way wire.
 
 ### The stream is not one event per line, and must not be
 
@@ -339,6 +350,13 @@ runs in a browser as readily as in a host process. Reading the files is the
 host's job (Node, Tauri, Electron); parsing what comes back is `mapClaudeStream`,
 same as always.
 
+Codex has the same disk story with a different shape: a spawned agent writes
+nothing to the parent stream and is addressed by a *receiver thread id*, whose
+rollout file uses a third vocabulary — `{type: response_item | event_msg |
+session_meta, payload}` — that neither the live stream nor Claude's disk
+transcripts share. "The same parser reads what comes back" is a Claude
+property, not a general one.
+
 **This changes what a UI can promise.** The stream alone supports "watch a
 subagent, read its report". With the store, both a subagent and a workflow agent
 can be opened and read in full — the fan-out stops being a black box.
@@ -481,7 +499,105 @@ plan, a subagent, a workflow, a web search, and a resume with a different model.
 Those eight are what the checked-in fixtures cover, and each one broke something
 in the parser that the others did not.
 
-Two shapes remain uncaptured and are therefore unimplemented rather than
-guessed: `control_request` permission prompts (they need
-`--permission-prompt-tool stdio`) and `compact_boundary`. Capture before
-modelling.
+Every shape on this wire is now captured. Compaction was the last, and it is
+the one that cannot be produced by asking for it — the window has to actually
+fill.
+
+### Forcing a compaction
+
+A deterministic corpus (`generate-corpus.mjs`, seeded, from the system word
+list) is read file by file until the window overflows. Nothing is authored:
+
+```bash
+node generate-corpus.mjs ./corpus 15 24        # 15 files of ~24KB
+claude -p "Read each file in full, one at a time. Reply with only the filename." \
+  --output-format stream-json --include-partial-messages --verbose \
+  --model haiku --autocompact 100000 --allowed-tools Read
+```
+
+`--autocompact` sets the window and accepts nothing below 100k, so a capture of
+a real compaction is inherently large. Growth must also be *gradual*: a first
+attempt read the repo's own largest source files, jumped tens of thousands of
+tokens per read, and hit `"Prompt is too long"` without ever compacting. The
+smaller the individual read, the more reliably the threshold is met rather than
+overshot.
+
+Its own tool results are 765KB of dictionary words, so the fixture elides the
+generated bodies — in both places the CLI repeats them, the `tool_result`
+content and the `tool_use_result.file.content` sidecar — and keeps every line,
+field and count around them. The corpus is reproducible from the script above.
+
+### What a boundary says
+
+| Field | Meaning |
+| --- | --- |
+| `trigger` | `auto` when the window filled, `manual` when asked for |
+| `pre_tokens` / `post_tokens` | 71.5k down to 10k on the first boundary here |
+| `cumulative_dropped_tokens` | across the **session**, not the boundary — it keeps climbing |
+| `duration_ms` | 36s and 41s here: compaction is a slow model call of its own |
+| `preserved_messages` | the uuids that survived, reachable through `raw` |
+
+Two consequences. Compaction removes history from the *model*, not from the
+transcript — a consumer that trimmed its own view to match would delete what
+the user is still reading. And it is not a failure: the run completes normally.
+
+### Codex compacts too, and does not tell you
+
+Codex has the same mechanism — `model_auto_compact_token_limit`, and
+`PreCompact` / `PostCompact` hooks — but **`codex exec --json` publishes
+nothing about it**. Forced with a 15k limit, the on-disk rollout records
+`{"type":"context_compacted"}` and a `replacement_history` entry while the JSON
+stream shows only a normal turn.
+
+The consequence is visible in the transcript rather than announced: after
+compacting, the agent read one file of ten, answered with that filename, and
+ended the turn — the rest of the instruction had been summarised away. A
+consumer on `exec` sees an agent that simply stopped early, with no way to know
+why.
+
+The app-server transport does better. Its schema declares a `ContextCompaction`
+thread item, plus a `thread/compact/start` request so a client can compact on
+demand — something Claude's stream offers no way to ask for. The item carries
+`{id, type}` and nothing else: no token counts, no duration. So on Codex the
+fact is available on one transport and absent on the other, and even where
+present it is a marker rather than a measurement.
+
+| | Claude (`stream-json`) | Codex (`exec --json`) | Codex (app-server) |
+| --- | --- | --- | --- |
+| Compaction announced | yes | **no** | yes |
+| Token counts | yes | — | no |
+| Client can trigger it | — | — | `thread/compact/start` |
+
+Approvals were the last of these, and are now captured twice — once answered
+allow, once answered deny. Getting them to happen at all took an explicit rule
+in the sandbox's own settings:
+
+```json
+{ "permissions": { "ask": ["Bash(*)", "WebFetch(*)"], "defaultMode": "default" } }
+```
+
+Without an `ask` rule nothing escalates, which is why earlier attempts recorded
+nothing no matter which permission mode was used. The capture immediately
+corrected two things that had been written from the documented shape:
+
+- The ask names its reason `decision_reason_type` (`"rule"` here), not
+  `decision_reason`. Reading the documented name alone returned null.
+- The reply's `behavior` — `allow` or `deny` — was not being read at all, so a
+  decision recorded only that it had happened. A consumer cannot draw a
+  refusal it cannot see.
+
+What the exchange looks like, and what a consumer needs from it:
+
+| Fact | Where it lands |
+| --- | --- |
+| The ask, with the exact input to be approved | `permission_requested` |
+| Why the harness escalated | `reason` — `"rule"` |
+| The answer, and its direction | `permission_decided.decision` |
+| The refusal's stated reason | becomes the tool result's error text, verbatim |
+| Refusals over the whole turn | `turn_completed.permissionDenials` |
+
+Two consequences worth designing for. A declined tool is **not** a failed turn:
+the result still reports success, and the agent explains itself in prose. And
+neither control frame carries a timestamp, so ordering an approval against the
+surrounding stream rests on `seq` alone — which is the reason `seq` and not `ts`
+is the ordering key.

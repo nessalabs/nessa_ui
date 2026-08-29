@@ -1,7 +1,7 @@
 /** @responsibility Classifies harness tool names and summarizes one call's arguments for a transcript row. */
 
 import type { ToolKind } from "../events"
-import { asRecord, asString } from "../json"
+import { asRecord, asString, shortenPath } from "../json"
 import type { JsonValue } from "./wire"
 
 const KINDS: ReadonlyArray<readonly [ToolKind, ReadonlySet<string>]> = [
@@ -34,11 +34,7 @@ function field(input: JsonValue, key: string): string | null {
   return asString(asRecord(input)[key])
 }
 
-/** Trims a path to its last two segments, which is what identifies a file in a narrow row. */
-export function shortenPath(path: string): string {
-  const parts = path.split("/").filter(Boolean)
-  return parts.length <= 2 ? path : `…/${parts.slice(-2).join("/")}`
-}
+export { shortenPath } from "../json"
 
 /**
  * One line naming what a call does, from its own arguments.

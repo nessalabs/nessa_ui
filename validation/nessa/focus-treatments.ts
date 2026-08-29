@@ -24,6 +24,8 @@ const composerFocusComponents = Object.freeze([
   { component: "searchable-listbox", count: 1 },
   { component: "sectioned-listbox", count: 1 },
   { component: "tool-call", count: 3 },
+  // The label is the only target; the rules either side are decoration.
+  { component: "transcript-divider", count: 1 },
 ] as const)
 
 type FocusComponent =
