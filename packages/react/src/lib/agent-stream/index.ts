@@ -50,6 +50,7 @@ export {
   asString,
   asStrings,
   parseJsonLine,
+  parseJsonObjectLine,
   parseJsonLines,
   shortenPath,
   type JsonLineResult,
@@ -105,4 +106,11 @@ export * as opencode from "./opencode"
 // name is the common case and `claude.ClaudeStreamMapper` stutters.
 export { ClaudeStreamMapper, mapClaudeStream } from "./claude/mapper"
 export { CodexStreamMapper, mapCodexStream } from "./codex/mapper"
-export { OpencodeRunMapper, OpencodeServerMapper, mapOpencodeServerStream, mapOpencodeStream } from "./opencode"
+export {
+  OpencodeAcpMapper,
+  OpencodeRunMapper,
+  OpencodeServerMapper,
+  mapOpencodeAcpStream,
+  mapOpencodeServerStream,
+  mapOpencodeStream,
+} from "./opencode"

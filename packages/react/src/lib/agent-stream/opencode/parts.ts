@@ -79,6 +79,8 @@ export const OpencodeToolName = Object.freeze({
   Grep: "grep",
   List: "list",
   WebFetch: "webfetch",
+  /** Search, which opencode serves through an external MCP endpoint. */
+  WebSearch: "websearch",
   TodoWrite: "todowrite",
   TodoRead: "todoread",
   /** Delegation. Its metadata names the child session, which is readable on its own. */
@@ -448,6 +450,7 @@ export const OPENCODE_TOOL_KIND: Readonly<Partial<Record<OpencodeToolName, ToolK
   [OpencodeToolName.Grep]: "search",
   [OpencodeToolName.List]: "search",
   [OpencodeToolName.WebFetch]: "web",
+  [OpencodeToolName.WebSearch]: "web",
   [OpencodeToolName.TodoWrite]: "plan",
   [OpencodeToolName.TodoRead]: "plan",
   [OpencodeToolName.Task]: "subagent",

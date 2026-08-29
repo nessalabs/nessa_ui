@@ -28,6 +28,10 @@ export interface TransportSupport {
   readonly fileEdits: Supported
   /** Carries more than one session, so a reader must filter by session id. */
   readonly multiSession: Supported
+  /** Lets a client open, list, resume or fork a session rather than only starting one. */
+  readonly sessionControl: Supported
+  /** Reports the context window's size, not just how much of it was used. */
+  readonly contextWindow: Supported
 }
 
 /**
@@ -87,6 +91,13 @@ const OPENCODE_SERVE: WireProvenance = Object.freeze({
   capturedOn: "2026-08-29",
 })
 
+const OPENCODE_ACP: WireProvenance = Object.freeze({
+  cli: "opencode",
+  version: "1.18.25",
+  command: "opencode acp",
+  capturedOn: "2026-08-29",
+})
+
 /**
  * Every transport this library has read, and what each was observed to carry.
  *
@@ -113,6 +124,8 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
           namesModel: true,
           fileEdits: false,
           multiSession: false,
+          sessionControl: false,
+          contextWindow: false,
         }),
         note: "One-way. The opening line advertises the whole session, so pickers can be built from the stream alone.",
       }),
@@ -130,6 +143,8 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
           namesModel: true,
           fileEdits: false,
           multiSession: false,
+          sessionControl: false,
+          contextWindow: false,
         }),
         note: "The same stream with stdin open: prompts and steering go in, and control requests answer approvals.",
       }),
@@ -153,6 +168,8 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
           namesModel: false,
           fileEdits: true,
           multiSession: false,
+          sessionControl: false,
+          contextWindow: false,
         }),
         note: "One-way. The opening line carries a thread id and nothing else, so nothing here can populate a picker.",
       }),
@@ -173,6 +190,8 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
           namesModel: true,
           fileEdits: true,
           multiSession: null,
+          sessionControl: true,
+          contextWindow: null,
         }),
         note: "Interactive JSON-RPC. Answers model, skill, plugin and hook lists on request, and asks before running untrusted commands.",
       }),
@@ -196,6 +215,8 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
           namesModel: false,
           fileEdits: true,
           multiSession: false,
+          sessionControl: false,
+          contextWindow: false,
         }),
         note: "One-way, and it opens with nothing at all — no init line, no model, no working directory. Unattended, anything its permission rules ask about is auto-rejected and the run simply ends.",
       }),
@@ -213,8 +234,33 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
           namesModel: true,
           fileEdits: true,
           multiSession: true,
+          sessionControl: true,
+          contextWindow: false,
         }),
-        note: "The headless server and the ACP server share one bus, and it is where opencode streams. `/event` is server-wide, so a reader has to filter by session.",
+        note: "The headless server's own bus, and the first place opencode streams. `/event` is server-wide, so a reader has to filter by session.",
+      }),
+      Object.freeze({
+        id: "acp",
+        label: "acp",
+        command: "opencode acp",
+        interactive: true,
+        provenance: OPENCODE_ACP,
+        supports: Object.freeze({
+          streaming: true,
+          capabilities: true,
+          approvals: true,
+          steering: true,
+          namesModel: true,
+          // ACP names the files a call touched as `locations`, which is a
+          // stronger claim than a path read off a tool's input.
+          fileEdits: true,
+          // One connection, one conversation: sessions are opened explicitly
+          // rather than multiplexed onto a shared bus.
+          multiSession: false,
+          sessionControl: true,
+          contextWindow: true,
+        }),
+        note: "A different protocol from the server's bus, not another door onto it: JSON-RPC over stdio, where the agent asks the client for permission and blocks until answered. It states its own version, negotiates capabilities, and reports the context window's size.",
       }),
     ]),
   }),

@@ -3,7 +3,7 @@
 import type { AgentEvent, AgentStreamMapper, MapperOptions, SessionInfo } from "../../events"
 import { asNumber, asRecord, asString } from "../../json"
 import type { JsonValue } from "../../json"
-import { OpencodeEmitter, OpencodeFinishReason, OpencodePartType, usageOf } from "../parts"
+import { OpencodeEmitter, OpencodeFinishReason, OpencodePartType, planOf, usageOf } from "../parts"
 import type { OpencodeRawLine } from "../run/wire"
 import { OpencodeDeltaField, OpencodeServerEventType, parseOpencodeSseLine } from "./wire"
 
@@ -114,6 +114,12 @@ export class OpencodeServerMapper implements AgentStreamMapper {
         return []
       }
 
+      case OpencodeServerEventType.TodoUpdated: {
+        const steps = planOf(properties)
+        if (steps.length === 0) return []
+        return [this.emit.build({ type: "plan_updated", steps }, raw, stamp)]
+      }
+
       case OpencodeServerEventType.MessagePartUpdated:
         return this.part(asRecord(properties.part), raw, stamp)
 
@@ -163,6 +169,8 @@ export class OpencodeServerMapper implements AgentStreamMapper {
       case OpencodeServerEventType.ServerConnected:
       case OpencodeServerEventType.ServerHeartbeat:
       case OpencodeServerEventType.SessionDiff:
+      case OpencodeServerEventType.FileEdited:
+      case OpencodeServerEventType.FileWatcherUpdated:
       case OpencodeServerEventType.PluginAdded:
       case OpencodeServerEventType.CatalogUpdated:
       case OpencodeServerEventType.ReferenceUpdated:

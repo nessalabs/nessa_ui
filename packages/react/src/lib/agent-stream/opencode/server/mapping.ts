@@ -50,6 +50,18 @@ export const OPENCODE_SERVER_MAPPING: Readonly<Record<string, OpencodeMappingEnt
     emits: [AgentEventType.Delta],
     note: "the token stream: one chunk of a part's text, reasoning or arguments, superseded by the settled part",
   },
+  [OpencodeServerEventType.TodoUpdated]: {
+    emits: [AgentEventType.PlanUpdated],
+    note: "the plan republished whole, as its own event rather than as a tool call — the one place this bus reports something the one-way stream only implies",
+  },
+  [OpencodeServerEventType.FileEdited]: {
+    emits: [],
+    note: "a file changed; the call that changed it already published the path, and reporting it twice would double every edit",
+  },
+  [OpencodeServerEventType.FileWatcherUpdated]: {
+    emits: [],
+    note: "the watcher noticing a change from outside the session, which is the editor's business rather than the transcript's",
+  },
   [OpencodeServerEventType.PermissionAsked]: {
     emits: [AgentEventType.PermissionRequested],
     note: "the ask the one-way stream never makes — held open here rather than auto-rejected",

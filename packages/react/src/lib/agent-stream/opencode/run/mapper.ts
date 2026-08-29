@@ -94,11 +94,15 @@ export class OpencodeRunMapper implements AgentStreamMapper {
         return [...opened, this.emit.build({ type: "reasoning", text: text ?? "", block: null }, raw, ts)]
       }
 
-      case OpencodeRunType.Error:
-        return [
-          ...opened,
-          this.emit.build({ type: "error", message: asString(part.error) ?? asString(line.error) ?? "error" }, raw, ts),
-        ]
+      case OpencodeRunType.Error: {
+        // The failure is nested: `error.data.message`, itself a JSON string
+        // from whatever upstream refused. Reading `error` as a string — which
+        // it never is — reported every failure as the word "error".
+        const error = asRecord(line.error)
+        const message =
+          asString(asRecord(error.data).message) ?? asString(error.name) ?? asString(part.error) ?? "error"
+        return [...opened, this.emit.build({ type: "error", message }, raw, ts)]
+      }
 
       case OpencodeRunType.ToolUse:
         return [...opened, ...this.emit.tool(part, raw, ts)]

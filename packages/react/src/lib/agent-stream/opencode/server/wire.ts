@@ -40,6 +40,11 @@ export const OpencodeServerEventType = Object.freeze({
   SessionStatus: "session.status",
   SessionIdle: "session.idle",
   SessionDiff: "session.diff",
+  /** The todo list, republished whole — the bus's own plan event. */
+  TodoUpdated: "todo.updated",
+  /** A file the agent changed, and the watcher noticing one that changed under it. */
+  FileEdited: "file.edited",
+  FileWatcherUpdated: "file.watcher.updated",
   MessageUpdated: "message.updated",
   MessagePartUpdated: "message.part.updated",
   /** One token, or one chunk of a tool's arguments. The only streaming opencode does. */

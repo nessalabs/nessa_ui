@@ -47,6 +47,21 @@ export {
 export { OPENCODE_SERVER_MAPPING } from "./server/mapping"
 export { OpencodeServerMapper, mapOpencodeServerStream } from "./server/mapper"
 
+// ---------- `opencode acp` ----------
+export {
+  OPENCODE_ACP_PROVENANCE,
+  OpencodeAcpMethod,
+  OpencodeAcpPermissionKind,
+  OpencodeAcpToolKind,
+  OpencodeAcpToolStatus,
+  OpencodeAcpUpdate,
+  parseOpencodeAcp,
+  parseOpencodeAcpLine,
+  type OpencodeAcpFrame,
+} from "./acp/wire"
+export { OPENCODE_ACP_MAPPING, OPENCODE_ACP_TOOL_KIND, opencodeAcpMappingFor, opencodeAcpToolKind } from "./acp/mapping"
+export { OpencodeAcpMapper, mapOpencodeAcpStream } from "./acp/mapper"
+
 // ---------- capabilities and stored sessions ----------
 export {
   OPENCODE_CAPABILITY_COMMANDS,

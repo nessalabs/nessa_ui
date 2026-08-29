@@ -6,6 +6,7 @@ import {
   Button,
   ClaudeStreamMapper,
   CodexStreamMapper,
+  OpencodeAcpMapper,
   OpencodeRunMapper,
   OpencodeServerMapper,
   claude,
@@ -114,6 +115,17 @@ import codexWebsearch from "./fixtures/agent-stream/codex/websearch.jsonl?raw"
 import codexAppServerCapabilities from "./fixtures/agent-stream/codex/appserver_capabilities.json"
 import opencodeCliAgents from "./fixtures/agent-stream/opencode/cli_agents.txt?raw"
 import opencodeExportSubagent from "./fixtures/agent-stream/opencode/export_subagent.json?raw"
+import opencodeAcpPermission from "./fixtures/agent-stream/opencode/acp_permission.jsonl?raw"
+import opencodeAcpPlan from "./fixtures/agent-stream/opencode/acp_plan.jsonl?raw"
+import opencodeAcpSubagent from "./fixtures/agent-stream/opencode/acp_subagent.jsonl?raw"
+import opencodeAcpWebsearch from "./fixtures/agent-stream/opencode/acp_websearch.jsonl?raw"
+import opencodeSsePlan from "./fixtures/agent-stream/opencode/sse_plan.jsonl?raw"
+import opencodeSseSubagent from "./fixtures/agent-stream/opencode/sse_subagent.jsonl?raw"
+import opencodeSseWebsearch from "./fixtures/agent-stream/opencode/sse_websearch.jsonl?raw"
+import opencodeOverflow from "./fixtures/agent-stream/opencode/overflow.jsonl?raw"
+import opencodeWebsearch from "./fixtures/agent-stream/opencode/websearch.jsonl?raw"
+import opencodeAcpPrinted from "./fixtures/agent-stream/opencode/acp_printed.jsonl?raw"
+import opencodeAcpTools from "./fixtures/agent-stream/opencode/acp_tools.jsonl?raw"
 import opencodeSsePrinted from "./fixtures/agent-stream/opencode/sse_printed.jsonl?raw"
 import opencodeSseTools from "./fixtures/agent-stream/opencode/sse_tools.jsonl?raw"
 import opencodeCliModels from "./fixtures/agent-stream/opencode/cli_models.txt?raw"
@@ -199,7 +211,11 @@ const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
     createMapper: (transportId: string) =>
       // Two wires, two mappers: the bus is a different protocol, not the same
       // one with more on it.
-      transportId === "serve" ? new OpencodeServerMapper() : new OpencodeRunMapper(),
+      transportId === "serve"
+        ? new OpencodeServerMapper()
+        : transportId === "acp"
+          ? new OpencodeAcpMapper()
+          : new OpencodeRunMapper(),
     silentLinesNote:
       "a step opening says only that a model call began, and the steps that finish mid-turn are the tool loop rather than the end of the answer — only the one that stops for its own sake closes the turn.",
     // Its delegated runs are the readable ones: the child session id is on the
@@ -262,10 +278,21 @@ const CAPTURES: readonly Capture[] = [
   { provider: "opencode", transport: "run", id: "oc-subagent", label: "Subagent", blurb: "The one thing opencode does better than both others: the delegation names the child's own session id, and `opencode export` reads it.", prompt: "Use a subagent to find out what files are in this directory, then tell me what it found.", source: opencodeSubagent },
   { provider: "opencode", transport: "run", id: "oc-failing", label: "Failed command", blurb: "The trap in this wire: the call settles as completed because the tool worked, and the failure is only in metadata.exit.", prompt: "Run 'cat ./definitely-missing-file.txt' and tell me what happened.", source: opencodeFailing },
   { provider: "opencode", transport: "run", id: "oc-rejected", label: "Refused call", blurb: "Unattended, a permission rule auto-rejects — and then the run just ends. No closing message, no terminator: a turn that stops rather than finishes.", prompt: "Create a file at /etc/opencode-probe.txt, then tell me whether it worked.", source: opencodeRejected },
+  { provider: "opencode", transport: "run", id: "oc-websearch", label: "Web search", blurb: "opencode's web search is an MCP tool that calls out to a third-party search service, so the result arrives as a search payload rather than as prose.", prompt: "Search the web for the current version of the TypeScript compiler and tell me in one line.", source: opencodeWebsearch },
+  { provider: "opencode", transport: "run", id: "oc-overflow", label: "Context overrun", blurb: "28 steps reading a generated corpus until the context passed 232k against a 200k window. opencode never compacted — the run ended on an upstream error instead, which is the one thing Claude's compaction exists to avoid.", prompt: "Read every one of 32 generated files in full, one at a time, replying with only the filename.", source: opencodeOverflow },
   { provider: "opencode", transport: "run", id: "oc-resume", label: "Resume + model swap", blurb: "Two processes, one session id, and a different model on the second — which the wire never mentions, because it names a model only inside a delegation.", prompt: "Remember the number 47… then, resumed on another model: what number did I ask you to remember?", source: `${opencodeResumeOne}\n${opencodeResumeTwo}` },
 
   { provider: "opencode", transport: "serve", id: "oc-sse-printed", label: "Streamed answer", blurb: "The server's bus, where opencode does stream: 254 token deltas for one paragraph, each joinable to the part that supersedes it. Its `/event` endpoint is server-wide, so this capture carries a second session too.", prompt: "Write one paragraph of four sentences about the tide. Do not use tools.", source: opencodeSsePrinted },
   { provider: "opencode", transport: "serve", id: "oc-sse-tools", label: "Streamed + refused", blurb: "The same bus with a tool call: arguments stream as partial JSON, the session names its model, and a permission ask is held open and answered rather than auto-rejected.", prompt: "Create sse-notes.txt with two lines, then run 'wc -l sse-notes.txt'.", source: opencodeSseTools },
+  { provider: "opencode", transport: "acp", id: "oc-acp-printed", label: "Plain text", blurb: "The Agent Client Protocol over stdio: a conversation, not a stream. Nine frames, and the client's own request is what carries the prompt — the only opencode wire where what was asked is on the wire.", prompt: "Reply with exactly: hello world. Do not use any tools.", source: opencodeAcpPrinted },
+  { provider: "opencode", transport: "acp", id: "oc-acp-tools", label: "Tools", blurb: "Thoughts and prose stream as separate chunk kinds, and a call opens before it settles — the one transport that shows a tool actually running. The kind is the protocol's, not a guess from a tool's name.", prompt: "Create acp-notes.txt with two lines, then run 'wc -l acp-notes.txt'.", source: opencodeAcpTools },
+  { provider: "opencode", transport: "serve", id: "oc-sse-plan", label: "Plan", blurb: "The same todo list as the one-way stream, arriving as settled parts between the token deltas.", prompt: "Use your todo list to plan and do three steps: create a.txt, create b.txt, then run 'ls *.txt'.", source: opencodeSsePlan },
+  { provider: "opencode", transport: "serve", id: "oc-sse-subagent", label: "Subagent", blurb: "A delegation on the bus — and because `/event` is server-wide, the child's own session publishes here too rather than being hidden behind the call.", prompt: "Use a subagent to find out what files are in this directory, then tell me what it found.", source: opencodeSseSubagent },
+  { provider: "opencode", transport: "serve", id: "oc-sse-websearch", label: "Web search", blurb: "A search tool call, with its arguments streaming in as partial JSON before the results settle.", prompt: "Search the web for the current version of the TypeScript compiler.", source: opencodeSseWebsearch },
+  { provider: "opencode", transport: "acp", id: "oc-acp-plan", label: "Plan", blurb: "ACP has a plan update of its own, but opencode does not use it: the todo list arrives as a `todowrite` tool call, and its list rides on the call's input while it is still running.", prompt: "Use your todo list to plan and do three steps: create a.txt, create b.txt, then run 'ls *.txt'.", source: opencodeAcpPlan },
+  { provider: "opencode", transport: "acp", id: "oc-acp-subagent", label: "Subagent", blurb: "A delegation, which ACP labels with the protocol's own `think` kind. The child session id is named only inside the result text — the one place this wire puts it.", prompt: "Use a subagent to find out what files are in this directory, then tell me what it found.", source: opencodeAcpSubagent },
+  { provider: "opencode", transport: "acp", id: "oc-acp-websearch", label: "Web search", blurb: "A search call, renamed by the agent as it goes: it opens as `websearch` and settles under the query it ran.", prompt: "Search the web for the current version of the TypeScript compiler.", source: opencodeAcpWebsearch },
+  { provider: "opencode", transport: "acp", id: "oc-acp-permission", label: "Approval", blurb: "The agent asks the client for permission and blocks until answered, listing the options it will accept. Answered allow here, so the write went through.", prompt: "Create a file at /tmp/acp-outside-probe.txt, then tell me whether it worked. (Answered: allow once)", source: opencodeAcpPermission },
 ]
 
 const LINES = new Map(CAPTURES.map((capture) => [capture.id, capture.source.split("\n").filter((line) => line.trim().length > 0)]))
@@ -944,13 +971,19 @@ function TranscriptView({
       <MessageScroller className="min-h-0 flex-1">
         <MessageScrollerViewport className="px-1">
           <MessageScrollerContent aria-label="Agent transcript">
-            <Message from="user">
-              <MessageAvatar fallback="You" alt="You" />
-              <MessageContent>
-                <MessageHeader>host-supplied — headless never echoes the prompt</MessageHeader>
-                <MessageBubble variant="muted">{prompt}</MessageBubble>
-              </MessageContent>
-            </Message>
+            {/* Only where the wire does not carry it. Most of these streams
+                never echo the prompt, so the host is the only thing that knows
+                what it asked — but ACP sends it in the client's own request,
+                and printing both would show the question twice. */}
+            {transcript.events.some((event) => event.payload.type === "user_message") ? null : (
+              <Message from="user">
+                <MessageAvatar fallback="You" alt="You" />
+                <MessageContent>
+                  <MessageHeader>host-supplied — headless never echoes the prompt</MessageHeader>
+                  <MessageBubble variant="muted">{prompt}</MessageBubble>
+                </MessageContent>
+              </Message>
+            )}
             {transcript.turns.map((turn) => (
               <div key={turn.key} className="flex flex-col gap-3 py-2">
                 {turn.prompt === null || turn.prompt.payload.type !== "user_message" || turn.prompt.payload.synthetic ? null : (

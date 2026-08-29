@@ -488,8 +488,9 @@ content does. Anything still being written to (a run's own events) *is* copied.
 
 ## 10. opencode, and the version every one of these is true of
 
-opencode is the third provider, and the first with two wires of its own worth
-reading. Both are captured.
+opencode is the third provider, and it has **three** wires of its own, not one.
+All three are captured, and they disagree enough that treating them as one
+would misdescribe every session read through the wrong one.
 
 ### How the two are laid out in code
 
@@ -498,20 +499,25 @@ genuinely shared sits between them:
 
 ```
 opencode/
-  parts.ts       the payload BOTH wires carry — the part shapes, the tool
-                 vocabulary, and the emitter that turns a part into events
-  mapping.ts     the shape both tables are written in
+  parts.ts       the payload run and serve BOTH carry — the part shapes, the
+                 tool vocabulary, and the emitter that turns a part into events
+  mapping.ts     the shape every table is written in
   run/           `run --format json`: envelope DTOs, its table, its mapper
-  server/        `serve` SSE: envelope DTOs, its table, its mapper
+  server/        `serve` SSE bus: envelope DTOs, its table, its mapper
+  acp/           `acp` JSON-RPC: envelope DTOs, its table, its mapper
   store.ts       an exported session, read through the run mapper
   capabilities.ts  what the CLI's own listings answer
 ```
 
-The payload really is shared — the server wraps the identical `part` object in
-`message.part.updated` — and reading it twice would be two sets of rules to
-disagree about one conversation. The envelopes share nothing: different names,
-different framing, different versions, different capabilities. A mapper that
-handled both would be the place those differences quietly blur.
+`run` and `serve` genuinely share a payload — the server wraps the identical
+`part` object in `message.part.updated` — and reading it twice would be two sets
+of rules to disagree about one conversation. Their envelopes share nothing:
+different names, different framing, different versions, different capabilities.
+
+ACP shares neither. It is a different protocol with its own object model, so it
+sits beside them rather than inside either, and it needed a weaker line decoder:
+the shared one insists on a `type` field, which every stream wire has and no
+JSON-RPC frame does.
 
 ### What a transport can do is data
 
@@ -579,15 +585,69 @@ under the conversation someone is reading. And a session is announced by
 immediately is the first line that describes it, which is why the mapper opens
 a session on the update rather than on the creation.
 
-| | `run --format json` | `serve` / `acp` |
-| --- | --- | --- |
-| Streams tokens | no | **yes** |
-| Names the model | no | yes |
-| Approvals | auto-rejected, run ends | asked and answered |
-| Session scope | one | every session on the server |
+### `opencode acp` — a conversation, not a stream
 
-Capabilities come from neither: `opencode models` and `opencode agent list`
-print them, and nothing on either wire does.
+The third wire, and not another door onto the second: `opencode acp` speaks the
+Agent Client Protocol over stdio. Frames travel **both ways**, and the one a
+surface most has to handle comes *from* the agent — `session/request_permission`
+blocks the tool until the client answers, offering the options it will accept
+(`allow_once`, `allow_always`, `reject_once`). Answer it and the call proceeds;
+this is the only opencode transport where an unattended run is not simply
+refused.
+
+It is also the best-described of the four wires in this document:
+
+- **It states its own version.** `initialize` replies with
+  `agentInfo: { name, version }` and a negotiated `protocolVersion`, so a
+  consumer can check the process it is talking to instead of being told out of
+  band. Every other wire needs a constant.
+- **It normalizes tool kinds itself** — `read`, `edit`, `execute`, `fetch` — so
+  a call's kind is the protocol's word rather than a guess from a tool's name.
+- **A call opens before it settles.** `tool_call` then `tool_call_update`, with
+  an `in_progress` state neither other transport publishes.
+- **Prose and reasoning stream as separate kinds**, so nothing has to work out
+  which block a chunk belongs to.
+- **It reports the context window's size**, not just how much was used.
+- **It publishes the slash commands** on the stream, and the model list in
+  `session/new`'s reply.
+
+What it does not do is multiplex: one connection is one conversation, where the
+server's `/event` is a bus carrying every session at once.
+
+| | `run --format json` | `serve` (SSE bus) | `acp` (JSON-RPC) |
+| --- | --- | --- | --- |
+| Streams tokens | no | yes | yes |
+| Names the model | no | yes | yes |
+| Approvals | auto-rejected, run ends | asked and answered | asked, and it blocks |
+| Prompt on the wire | no | yes | **yes, in the request** |
+| Session scope | one | every session on the server | one per connection |
+| Client opens/resumes sessions | no | — | yes |
+| Context window size | no | no | yes |
+| States its own version | no | no | **yes** |
+
+### What opencode does *not* do: compact
+
+Claude compacts and says so; Codex compacts and says nothing. opencode appears
+to do neither. Reading a generated corpus on the one-way stream pushed the
+context to **232k against the model's own 200k window** — the size ACP reports —
+across 28 steps, with no boundary of any kind on the wire, and the run ended on
+an upstream 504 rather than on a summary. The `model_auto_compact_token_limit`
+config exists but changed nothing on 1.18.25, whether passed with `-c` or
+written into a project config.
+
+So the honest reading is: **not observed**, and a surface built on opencode
+should not assume a long session will be rescued. The capture is checked in as
+`overflow.jsonl` because a turn that grows until the provider gives up is a
+shape a consumer has to handle.
+
+It also caught a parser bug worth naming: an `error` line nests its message at
+`error.data.message`, itself a JSON string from whatever upstream refused.
+Reading `error` as a string — which it never is — reported every failure as the
+word "error".
+
+Capabilities come from a fourth place for the first two: `opencode models` and
+`opencode agent list` print them, and neither of those wires does. ACP answers
+for itself.
 
 ### Which version each of these is true of
 
@@ -601,6 +661,7 @@ description was read from, next to the command that produces it:
 | codex-cli | exec | 0.144.1 | `codex exec --json` |
 | opencode | run | 1.18.25 | `opencode run --format json` |
 | opencode | serve | 1.18.25, **API 1.0.0** | `opencode serve → GET /event` |
+| opencode | acp | 1.18.25, **protocol 1** | `opencode acp` |
 
 Per *transport*, not per provider, because a provider can speak more than one
 protocol and they version independently — opencode's server declares its own

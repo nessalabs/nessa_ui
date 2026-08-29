@@ -15,6 +15,10 @@ import { OPENCODE_RUN_PROVENANCE, OpencodeRunType, parseOpencodeLines } from "./
 import { OPENCODE_SERVER_MAPPING } from "./opencode/server/mapping"
 import { OpencodeServerMapper, mapOpencodeServerStream } from "./opencode/server/mapper"
 import { OPENCODE_SERVER_PROVENANCE, parseOpencodeSse, parseOpencodeSseLine } from "./opencode/server/wire"
+import { OPENCODE_ACP_MAPPING, opencodeAcpMappingFor } from "./opencode/acp/mapping"
+import { OpencodeAcpMapper, mapOpencodeAcpStream } from "./opencode/acp/mapper"
+import { OPENCODE_ACP_PROVENANCE, parseOpencodeAcp } from "./opencode/acp/wire"
+import { asRecord } from "./json"
 import { AGENT_TRANSPORTS, transportOf } from "./transports"
 import { opencodeExportCommand, parseOpencodeExport } from "./opencode/store"
 import { applyDeltas, buildTranscript, isToolGroup, previewOf } from "./transcript"
@@ -34,9 +38,15 @@ const NAMES = [
   "failing",
   "subagent",
   "rejected",
+  "websearch",
+  "overflow",
   "resume_turn1",
   "resume_turn2",
 ] as const
+
+/** Every capture of the server's bus, and of ACP, so the sweeps cover all three wires. */
+const SSE_NAMES = ["sse_printed", "sse_tools", "sse_plan", "sse_subagent", "sse_websearch"] as const
+const ACP_NAMES = ["acp_printed", "acp_tools", "acp_permission", "acp_plan", "acp_subagent", "acp_websearch"] as const
 
 test("every captured line decodes", () => {
   for (const name of NAMES) {
@@ -48,6 +58,9 @@ test("every captured line decodes", () => {
 
 test("no capture maps to an unreadable event", () => {
   for (const name of NAMES) {
+    // `overflow` is a capture *of* a failure — the agent really did get a 504 —
+    // so an error event there is the recording, not a parser giving up.
+    if (name === "overflow") continue
     const bad = mapOpencodeStream(capture(name)).filter((event) => event.payload.type === AgentEventType.Error)
     assert.deepEqual(
       bad.map((event) => (event.payload.type === "error" ? event.payload.message : "")),
@@ -390,7 +403,7 @@ function mapSse(name: string) {
 }
 
 test("the server's stream decodes, and every kind of it is in the table", () => {
-  for (const name of ["sse_printed", "sse_tools"]) {
+  for (const name of SSE_NAMES) {
     const results = parseOpencodeSse(sse(name))
     assert.ok(results.length > 0, name)
     for (const result of results) {
@@ -620,4 +633,243 @@ test("the shell tool is named for what the wire calls it, and for what it will b
   assert.equal(OpencodeToolName.Shell, "shell")
   assert.equal(opencodeToolKind("bash"), "shell")
   assert.equal(opencodeToolKind("shell"), "shell")
+})
+
+/**
+ * The third transport.
+ *
+ * `opencode acp` is not another door onto the server's bus — it is the Agent
+ * Client Protocol over stdio, a conversation rather than a stream. These
+ * captures are real sessions driven by a client that answered what the agent
+ * asked back.
+ */
+function acp(name: string): string {
+  return readFileSync(`${FIXTURES}${name}.jsonl`, "utf8")
+}
+
+test("every ACP frame decodes, although none of them carries a `type`", () => {
+  for (const name of ACP_NAMES) {
+    const results = parseOpencodeAcp(acp(name))
+    assert.ok(results.length > 0, name)
+    // The shared line decoder insists on a `type`, which every stream wire has
+    // and no JSON-RPC frame does. Using it here would reject the whole capture.
+    for (const result of results) assert.equal(result.ok, true, `${name}: ${result.ok ? "" : result.reason}`)
+  }
+})
+
+test("ACP frames travel both ways, and the client's own are part of the record", () => {
+  const events = mapOpencodeAcpStream(acp("acp_tools"))
+  // The prompt is on the wire here — carried in the client's request — where
+  // neither other opencode transport echoes it at all.
+  const prompts = events.filter((event) => event.payload.type === "user_message")
+  assert.equal(prompts.length, 1)
+  assert.match((prompts[0]!.payload as { text: string }).text, /acp-notes\.txt/)
+
+  // And the turn ends on the *reply* to that request, not on a broadcast.
+  const finished = events.flatMap((event) => (event.payload.type === "turn_completed" ? [event.payload] : []))
+  assert.equal(finished.length, 1)
+  assert.equal(finished[0]!.stopReason, "end_turn")
+  assert.ok((finished[0]!.usage?.totalTokens ?? 0) > 0)
+})
+
+test("ACP streams both prose and reasoning, and keeps them apart", () => {
+  const events = mapOpencodeAcpStream(acp("acp_tools"))
+  const deltas = events.filter((event) => event.payload.type === "delta")
+  assert.ok(deltas.length > 20, "the answer really did arrive a chunk at a time")
+
+  // The protocol separates a thought from a message, so nothing has to guess
+  // which block a chunk belongs to — they land on different blocks.
+  const blocks = new Set(
+    deltas.map((event) => {
+      const payload = event.payload as { block: { messageId: string; index: number } }
+      return `${payload.block.messageId}:${payload.block.index}`
+    }),
+  )
+  assert.ok(blocks.size >= 2)
+
+  // Folded, the chunks assemble into the answer — ACP publishes no committed
+  // message, so this fold is the only place the text exists whole.
+  const buffers = applyDeltas(events)
+  const assembled = [...blocks].map((key) => {
+    const [messageId, index] = key.split(":")
+    return previewOf(buffers, { messageId: messageId!, index: Number(index) }) ?? ""
+  })
+  assert.ok(assembled.some((text) => text.length > 10))
+})
+
+test("a tool call opens before it settles, which only this transport shows", () => {
+  const events = mapOpencodeAcpStream(acp("acp_tools"))
+  const started = events.flatMap((event) => (event.payload.type === "tool_call_started" ? [event.payload] : []))
+  const completed = events.flatMap((event) => (event.payload.type === "tool_call_completed" ? [event.payload] : []))
+  assert.equal(started.length, 2)
+  assert.equal(completed.length, 2)
+
+  // The kind comes from the protocol, not from a tool's name: ACP normalizes it
+  // so a client renders the call the same way whichever agent it is talking to.
+  assert.deepEqual(
+    started.map((payload) => payload.kind),
+    ["file_edit", "shell"],
+  )
+  // An `in_progress` update is not a result. Settling on it would close a row
+  // that is still running.
+  assert.ok(completed.every((payload) => payload.result.isError === false))
+})
+
+test("the agent asks the client for permission, and lists the answers it will accept", () => {
+  const events = mapOpencodeAcpStream(acp("acp_permission"))
+  const asks = events.flatMap((event) => (event.payload.type === "permission_requested" ? [event.payload] : []))
+  assert.equal(asks.length, 1)
+  const ask = asks[0]!
+  assert.ok(ask.callId.startsWith("call_"))
+  // The options are the agent's, not a surface's invention — offering wording
+  // it never listed would send back an option it cannot honour.
+  assert.match(ask.description ?? "", /Allow once/)
+  assert.match(ask.description ?? "", /Reject/)
+  // And the ask names every path the call would touch.
+  const call = asRecord(ask.input as never)
+  assert.ok(Array.isArray(call.locations))
+})
+
+test("ACP is a separate transport from the server bus, and says so", () => {
+  // The mistake this corrects: these were modelled as one row. They are
+  // different protocols — one is an SSE broadcast, the other a JSON-RPC
+  // conversation — and only one of them multiplexes sessions.
+  const serve = transportOf("opencode", "serve")!
+  const acpTransport = transportOf("opencode", "acp")!
+  assert.notEqual(serve.command, acpTransport.command)
+  assert.equal(serve.supports.multiSession, true)
+  assert.equal(acpTransport.supports.multiSession, false)
+  // Both stream and both take approvals; only ACP lets a client drive sessions
+  // and reports how big the context window is.
+  assert.equal(acpTransport.supports.sessionControl, true)
+  assert.equal(acpTransport.supports.contextWindow, true)
+  assert.equal(serve.supports.contextWindow, false)
+
+  // ACP is the only wire of the four that states its own version, which it
+  // sends in the `initialize` reply rather than leaving to a constant.
+  assert.equal(OPENCODE_ACP_PROVENANCE.protocolVersion, 1)
+  assert.ok(acp("acp_printed").includes('"agentInfo"'))
+  assert.ok(acp("acp_printed").includes(`"version":"${OPENCODE_ACP_PROVENANCE.version}"`))
+})
+
+test("every ACP frame kind the captures contain is declared in its own table", () => {
+  for (const name of ACP_NAMES) {
+    for (const result of parseOpencodeAcp(acp(name))) {
+      if (!result.ok) continue
+      const frame = result.line as { method?: string; params?: { update?: { sessionUpdate?: string } } }
+      if (frame.method === undefined) continue
+      const update = frame.params?.update?.sessionUpdate
+      const kind = update === undefined ? frame.method : `${frame.method}/${update}`
+      assert.notEqual(opencodeAcpMappingFor(kind), null, `${name}: ${kind} is not in OPENCODE_ACP_MAPPING`)
+    }
+  }
+})
+
+test("no capture of any transport maps to an unreadable event", () => {
+  // The sweep that matters most once there are three wires: a frame nobody
+  // decided about must not reach a surface as an error.
+  for (const name of SSE_NAMES) {
+    const bad = mapOpencodeServerStream(sse(name)).filter((event) => event.payload.type === "error")
+    assert.deepEqual(bad.map((event) => (event.payload.type === "error" ? event.payload.message : "")), [], name)
+  }
+  for (const name of ACP_NAMES) {
+    const bad = mapOpencodeAcpStream(acp(name)).filter((event) => event.payload.type === "error")
+    assert.deepEqual(bad.map((event) => (event.payload.type === "error" ? event.payload.message : "")), [], name)
+  }
+})
+
+test("the same scenario is readable on every transport that has it", () => {
+  // The point of capturing all three: a consumer writes one renderer, and the
+  // same work shows up whichever wire carried it.
+  for (const [label, events] of [
+    ["run", mapOpencodeStream(capture("todos"))],
+    ["serve", mapOpencodeServerStream(sse("sse_plan"))],
+    ["acp", mapOpencodeAcpStream(acp("acp_plan"))],
+  ] as const) {
+    const plans = events.flatMap((event) => (event.payload.type === "plan_updated" ? [event.payload.steps] : []))
+    assert.ok(plans.length > 0, `${label} produced no plan`)
+    const last = plans[plans.length - 1]!
+    assert.ok(last.length >= 3, label)
+    assert.ok(last.every((step) => step.content.length > 0), label)
+  }
+
+  for (const [label, events] of [
+    ["run", mapOpencodeStream(capture("subagent"))],
+    ["serve", mapOpencodeServerStream(sse("sse_subagent"))],
+    ["acp", mapOpencodeAcpStream(acp("acp_subagent"))],
+  ] as const) {
+    const tasks = events.filter((event) => event.payload.type === "task_started")
+    assert.ok(tasks.length > 0, `${label} produced no delegation`)
+  }
+})
+
+test("opencode's plan is a tool call on ACP, not the protocol's plan update", () => {
+  // ACP defines a `plan` update and opencode never sends one: the todo list
+  // arrives as a `todowrite` call, with the list on the call's *input* while it
+  // is still running. Waiting for a result would drop every update.
+  const frames = parseOpencodeAcp(acp("acp_plan"))
+  const kinds = new Set(
+    frames.flatMap((result) =>
+      result.ok ? [((result.line as { params?: { update?: { sessionUpdate?: string } } }).params?.update?.sessionUpdate ?? "")] : [],
+    ),
+  )
+  assert.ok(!kinds.has("plan"), "opencode does not use ACP's own plan update")
+
+  const events = mapOpencodeAcpStream(acp("acp_plan"))
+  const plans = events.flatMap((event) => (event.payload.type === "plan_updated" ? [event.payload.steps] : []))
+  assert.ok(plans.length > 1, "the list is republished as steps complete")
+  assert.ok(plans[plans.length - 1]!.every((step) => step.status === "completed"))
+})
+
+test("a call's kind prefers opencode's tool name over ACP's coarser one", () => {
+  // ACP's vocabulary is deliberately small — `task` arrives as `think`,
+  // `todowrite` and `websearch` both as `other` — which is right for a client
+  // that knows nothing about the agent behind it. Here we do know.
+  const delegation = mapOpencodeAcpStream(acp("acp_subagent")).find(
+    (event) => event.payload.type === "tool_call_started",
+  )!
+  assert.equal((delegation.payload as { kind: string; name: string }).name, "task")
+  assert.equal((delegation.payload as { kind: string }).kind, "subagent")
+
+  const search = mapOpencodeAcpStream(acp("acp_websearch")).find(
+    (event) => event.payload.type === "tool_call_started",
+  )!
+  assert.equal((search.payload as { kind: string }).kind, "web")
+})
+
+test("web search reaches the transcript on all three wires", () => {
+  // opencode's web search is an MCP tool that calls a third-party service, so
+  // the result is a search payload rather than prose — on every transport.
+  for (const [label, events] of [
+    ["run", mapOpencodeStream(capture("websearch"))],
+    ["serve", mapOpencodeServerStream(sse("sse_websearch"))],
+    ["acp", mapOpencodeAcpStream(acp("acp_websearch"))],
+  ] as const) {
+    const calls = events.flatMap((event) => (event.payload.type === "tool_call_started" ? [event.payload] : []))
+    assert.ok(calls.length > 0, `${label} ran no search`)
+    const results = events.flatMap((event) =>
+      event.payload.type === "tool_call_completed" ? [event.payload.result] : [],
+    )
+    assert.ok(results.some((result) => result.text.length > 0), `${label} returned nothing`)
+  }
+})
+
+test("opencode does not compact: it runs out of window and fails", () => {
+  const events = mapOpencodeStream(capture("overflow"))
+  const usage = events.flatMap((event) =>
+    event.payload.type === "turn_completed" ? [event.payload.usage?.totalTokens ?? 0] : [],
+  )
+  const steps = events.filter((event) => event.payload.type === "tool_call_started")
+  assert.ok(steps.length > 20, "the capture really is a long run")
+
+  // The context grew past the model's own 200k window — ACP reports that size —
+  // and nothing on the wire marked a boundary. Claude compacts here; Codex
+  // compacts silently; opencode kept growing until the provider gave up.
+  const errors = events.flatMap((event) => (event.payload.type === "error" ? [event.payload.message] : []))
+  assert.equal(errors.length, 1)
+  assert.match(errors[0]!, /Upstream idle timeout|504/)
+  // Read as a string, `error` is an object and every failure reported the word
+  // "error"; the message is nested two levels down.
+  assert.notEqual(errors[0], "error")
+  assert.ok(usage.every((total) => total !== null))
 })
