@@ -361,7 +361,7 @@ export const Streaming: Story = {
     series: SESSION,
   },
   parameters: storyDocumentation(
-    "A quote arriving bar by bar, which is how an agent drives this panel: it holds the series it has fetched, appends each new print, and lets the panel redraw. The headline price, the change, and the market colour all follow the last bar. The play test waits for the series to grow and proves the cursor's own reachable range grew with it.",
+    "A quote arriving bar by bar, which is how an agent drives this panel: it holds the series it has fetched, appends each new print, and lets the panel redraw. The headline price, the change, and the market colour all follow the last bar, and a window drawn on the chart survives the prints that land under it — the bars it names are still the same bars. The play test zooms into a window, waits for more prints, proves the window did not move, then clears it onto a series that has grown.",
   ),
   render: () => (
     <div className="w-full max-w-2xl">
@@ -373,6 +373,36 @@ export const Streaming: Story = {
     const cursor = canvas.getByRole("slider")
     const startingBars = Number(cursor.getAttribute("aria-valuemax"))
     await expect(startingBars).toBe(39)
+
+    // A window drawn on a live feed has to survive the prints that arrive
+    // under it: the bars it names are still the same bars.
+    const bounds = cursor.getBoundingClientRect()
+    const at = (ratio: number) => ({
+      pointerId: 1,
+      pointerType: "mouse",
+      clientX: bounds.left + bounds.width * ratio,
+      clientY: bounds.top + bounds.height / 2,
+    })
+    await fireEvent.pointerDown(cursor, at(0.2))
+    await fireEvent.pointerMove(cursor, at(0.6))
+    await fireEvent.pointerUp(cursor, at(0.6))
+    await waitFor(async () => {
+      await expect(
+        Number(cursor.getAttribute("aria-valuemin")),
+      ).toBeGreaterThan(0)
+    })
+    const zoomedMin = cursor.getAttribute("aria-valuemin")
+    const zoomedMax = cursor.getAttribute("aria-valuemax")
+
+    // Long enough for two more prints to land under the open window.
+    await new Promise((resolve) => {
+      setTimeout(resolve, 1600)
+    })
+    await expect(cursor).toHaveAttribute("aria-valuemin", zoomedMin as string)
+    await expect(cursor).toHaveAttribute("aria-valuemax", zoomedMax as string)
+
+    // Clearing it returns to the full series, which by now has grown.
+    await userEvent.click(canvas.getByRole("button", { name: "Clear selection" }))
     await waitFor(
       async () => {
         await expect(
@@ -402,7 +432,9 @@ export const Website: Story = {
   render: (args) => (
     <div className="min-h-dvh w-full bg-background p-6 font-sans text-foreground @container md:p-10">
       <header className="mx-auto mb-6 flex w-full max-w-6xl items-baseline justify-between gap-4">
-        <h1 className="m-0 nessa-text-7 font-semibold">Markets</h1>
+        {/* A heading, not the page's own `h1`: this canvas is embedded in a
+            docs page that already owns that level. */}
+        <h2 className="m-0 nessa-text-7 font-semibold">Markets</h2>
         <p className="m-0 nessa-text-3 text-muted-foreground">
           Prices delayed by up to 15 minutes
         </p>

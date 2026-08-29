@@ -357,7 +357,7 @@ function PriceChart({
   // A draft is in the plotted window's own coordinates, so it cannot outlive
   // that window: a keyboard band drawn before a re-zoom would otherwise
   // commit against bars it never covered.
-  const draftFrameRef = React.useRef<number | null>(null)
+  const draftFrameRef = React.useRef<string | null>(null)
 
   // Everything below plots the visible window, not the whole series, so a
   // zoom needs no second code path: the offset maps a visible bar back to
@@ -369,6 +369,9 @@ function PriceChart({
   // this instead, or it defeats its own memo.
   const zoomed = windowEnd >= 0
   offsetRef.current = offset
+  // Identifies the plotted window. A draft is in this window's coordinates,
+  // so it cannot outlive either of its ends moving.
+  const frameKey = `${offset}:${windowEnd}`
   // Keyed on the window's own bounds: `selection` is normalised fresh on every
   // render, so an object dependency would defeat this memo (and the geometry
   // and candle memos below it) for the whole time a zoom is active.
@@ -461,6 +464,9 @@ function PriceChart({
     pointerId: number
     /** Visible bar the press landed on — the anchor a window grows from. */
     anchorIndex: number
+    /** That bar's own timestamp, so the anchor can be recognised if the
+     * series shifts underneath it. */
+    anchorTime: number | undefined
     originX: number
     /** Whether the press has travelled far enough to become a window. */
     drawing: boolean
@@ -517,6 +523,7 @@ function PriceChart({
     dragRef.current = null
     setDragging(false)
     release(session.target, session.pointerId)
+    keyboardAnchorRef.current = null
     draftFrameRef.current = null
     setDraft(null)
     setScrubIndex(null)
@@ -551,6 +558,7 @@ function PriceChart({
     dragRef.current = {
       pointerId: event.pointerId,
       anchorIndex: index,
+      anchorTime: visible[index]?.time,
       originX: event.clientX,
       drawing: false,
       target: event.currentTarget,
@@ -581,7 +589,14 @@ function PriceChart({
     // same bar — but a re-zoom or a shorter series re-bases every index, so
     // the drag is abandoned rather than committed against coordinates it
     // never saw.
-    if (session.offset !== offset || visible.length < session.count) {
+    const anchorBar = visible[session.anchorIndex]
+    if (
+      session.offset !== offset ||
+      visible.length < session.count ||
+      // Bars loaded in behind the drag shift every index without changing
+      // the offset, so the anchor is checked by identity, not position.
+      (anchorBar && session.anchorTime !== anchorBar.time)
+    ) {
       abandonDrag(session)
       return
     }
@@ -589,7 +604,7 @@ function PriceChart({
     session.drawing = true
     const next = { start: session.anchorIndex, end: index }
     session.draft = next
-    draftFrameRef.current = offset
+    draftFrameRef.current = frameKey
     setDraft(next)
   }
 
@@ -613,6 +628,7 @@ function PriceChart({
       dragRef.current = null
       setDragging(false)
       release(session.target, pointerId)
+      keyboardAnchorRef.current = null
       if (session.offset !== offsetRef.current) {
         draftFrameRef.current = null
         setDraft(null)
@@ -722,7 +738,7 @@ function PriceChart({
     if (canSelect && event.shiftKey) {
       const anchor = keyboardAnchorRef.current ?? current
       keyboardAnchorRef.current = anchor
-      draftFrameRef.current = offset
+      draftFrameRef.current = frameKey
       setDraft({ start: anchor, end: next })
       return
     }
@@ -775,12 +791,12 @@ function PriceChart({
   const announcedWindowRef = React.useRef<string | null | undefined>(undefined)
   // A draft only means something in the window it was drawn in.
   React.useEffect(() => {
-    if (draftFrameRef.current === null || draftFrameRef.current === offset) {
+    if (draftFrameRef.current === null || draftFrameRef.current === frameKey) {
       return
     }
     setDraft(null)
     draftFrameRef.current = null
-  }, [offset])
+  }, [frameKey])
 
   React.useEffect(() => {
     const key = zoomed ? `${offset}:${windowEnd}` : null
