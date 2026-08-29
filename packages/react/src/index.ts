@@ -827,12 +827,6 @@ export {
   type DialogContentProps,
 } from "./components/dialog"
 export {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "./components/tabs"
-export {
   Select,
   SelectContent,
   SelectGroup,

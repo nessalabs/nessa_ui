@@ -55,7 +55,7 @@ function AccordionTrigger({
         className={cn(
           // Trigger rows stack flush between the item hairlines, so the
           // outline draws inset to stay off the rules and neighboring rows.
-          "flex flex-1 items-center justify-between gap-4 py-3 text-left font-sans text-sm font-medium text-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:underline hover:underline-offset-4 focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none [&[data-state=open]>svg]:rotate-180",
+          "flex flex-1 items-center justify-between gap-4 py-3 text-left font-sans nessa-text-4 font-medium text-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:underline hover:underline-offset-4 focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none [&[data-state=open]>svg]:rotate-180",
           className,
         )}
         {...props}
@@ -84,7 +84,7 @@ function AccordionContent({
   return (
     <AccordionPrimitive.Content
       data-slot="accordion-content"
-      className="overflow-hidden font-sans text-sm text-foreground data-[state=closed]:animate-nessa-accordion-up data-[state=open]:animate-nessa-accordion-down"
+      className="overflow-hidden font-sans nessa-text-4 text-foreground data-[state=closed]:animate-nessa-accordion-up data-[state=open]:animate-nessa-accordion-down"
       {...props}
     >
       <div className={cn("pb-3", className)}>{children}</div>

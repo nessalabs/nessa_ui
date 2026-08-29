@@ -78,7 +78,7 @@ function TooltipContent({
         collisionPadding={collisionPadding}
         className={cn(
           popoverSurfaceVariants({ elevation: "md", radius: "lg" }),
-          "z-50 max-w-72 origin-(--radix-tooltip-content-transform-origin) text-balance px-2.5 py-1 text-xs data-[state=closed]:animate-out data-[state=delayed-open]:animate-in data-[state=instant-open]:animate-in data-[state=closed]:fade-out-0 data-[state=delayed-open]:fade-in-0 data-[state=instant-open]:fade-in-0",
+          "z-50 max-w-72 origin-(--radix-tooltip-content-transform-origin) text-balance px-2.5 py-1 nessa-text-2 data-[state=closed]:animate-out data-[state=delayed-open]:animate-in data-[state=instant-open]:animate-in data-[state=closed]:fade-out-0 data-[state=delayed-open]:fade-in-0 data-[state=instant-open]:fade-in-0",
           className,
         )}
         {...props}
