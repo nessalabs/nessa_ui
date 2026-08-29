@@ -385,6 +385,13 @@ function slashItemForLabel(label: string): SlashItem | undefined {
     .find((item) => item.label === label)
 }
 
+/** Finds the catalog entry a lifted passage came from. */
+function slashItemForId(id: string): SlashItem | undefined {
+  return slashSections
+    .flatMap((section) => section.items)
+    .find((item) => item.id === id)
+}
+
 /** The pill's slash sections: a Commands section ahead of the shared skills and plugins. */
 function pillSlashSections(query: string) {
   return [
@@ -514,6 +521,8 @@ interface PendingQuote {
   text: string
   /** The note attached to it from the selection tooltip, if any. */
   comment?: string
+  /** The slash item whose document the passage came from. */
+  sourceId?: string
 }
 
 interface DemoMessage {
@@ -746,6 +755,9 @@ function DemoBubble({
   onReplyCommit,
   onMenuOpenChange,
   onChipOpen,
+  onQuotePress,
+  onQuoteSourceOpen,
+  onQuotesOpen,
   menuBoundary,
 }: {
   message: DemoMessage
@@ -765,6 +777,12 @@ function DemoBubble({
   onMenuOpenChange?: (open: boolean) => void
   /** Opens a chip's file from a chip inside this bubble; true asks for a new tab. */
   onChipOpen?: (label: string, newTab: boolean) => void
+  /** Focuses the thread this message replies into (its quote chip's tap). */
+  onQuotePress?: () => void
+  /** Opens the document a lifted passage came from. */
+  onQuoteSourceOpen?: (sourceId: string) => void
+  /** Opens the read-only list of this message's annotations. */
+  onQuotesOpen?: (quotes: PendingQuote[]) => void
   /** Flips the tapback menu above the press point at this element's edges. */
   menuBoundary?: Element | null
 }) {
@@ -808,15 +826,50 @@ function DemoBubble({
               {attachments.map((attachment) => tile(attachment, "size-28", false))}
             </ChatAttachmentStack>
           ) : null}
-      {message.replyTo ? <ChatMessageQuote>{message.replyTo}</ChatMessageQuote> : null}
-      {message.quotes?.map((quote, index) => (
-        <span key={index} className="flex max-w-full flex-col items-inherit gap-0.5">
-          <ChatMessageQuote>{quote.text}</ChatMessageQuote>
-          {quote.comment ? (
-            <ChatBubble className="mb-1">{quote.comment}</ChatBubble>
-          ) : null}
-        </span>
-      ))}
+      {message.replyTo ? (
+        <ChatMessageQuote
+          role={onQuotePress ? "button" : undefined}
+          tabIndex={onQuotePress ? 0 : undefined}
+          title={onQuotePress ? "Show this thread" : undefined}
+          onClick={onQuotePress}
+          onKeyDown={
+            onQuotePress
+              ? (event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return
+                  event.preventDefault()
+                  onQuotePress()
+                }
+              : undefined
+          }
+          className={onQuotePress ? "cursor-pointer hover:bg-accent" : undefined}
+        >
+          {message.replyTo}
+        </ChatMessageQuote>
+      ) : null}
+      {message.quotes && message.quotes.length > 0 ? (
+        // The annotations travel as one compact pill — the chat stays
+        // clean, and tapping it opens the same list view they were
+        // reviewed in before sending.
+        <ChatMessageQuote
+          role="button"
+          tabIndex={0}
+          title="Show the annotations"
+          onClick={(event) => {
+            event.stopPropagation()
+            onQuotesOpen?.(message.quotes!)
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" && event.key !== " ") return
+            event.preventDefault()
+            onQuotesOpen?.(message.quotes!)
+          }}
+          className="cursor-pointer hover:bg-accent"
+        >
+          {message.quotes.length === 1
+            ? "1 annotation"
+            : `${message.quotes.length} annotations`}
+        </ChatMessageQuote>
+      ) : null}
       {message.text ? (
         /* Right-click / long-press raises the ContextMenu with the tapback
            row and a Reply action. Opening it never frosts the transcript —
@@ -1003,6 +1056,7 @@ const seededAnnotations: PendingQuote[] = [
   {
     text: "Gather the relevant context from the current chat.",
     comment: "This should spell out how much history counts as relevant.",
+    sourceId: "skill-creator",
   },
   { text: "Apply the checklist this skill carries." },
   {
@@ -1034,32 +1088,56 @@ const seededAnnotations: PendingQuote[] = [
 function QuoteRow({
   quote,
   onRemove,
+  onOpenSource,
 }: {
   quote: PendingQuote
-  onRemove: () => void
+  /** Omitted in the read-only view of a sent message's annotations. */
+  onRemove?: () => void
+  /** Opens the document this passage was lifted from. */
+  onOpenSource?: () => void
 }) {
   return (
     <div className="flex items-start gap-2">
       <ChatMessage tone="received" className="max-w-full flex-1">
         {quote.comment ? (
           // A commented annotation reads as a reply: the lifted passage as
-          // the quote chip, the comment as the bubble beneath it.
+          // the quote chip — tap it to revisit the document it came from —
+          // and the comment as the bubble beneath it.
           <>
-            <ChatMessageQuote>{quote.text}</ChatMessageQuote>
+            <ChatMessageQuote
+              role={onOpenSource ? "button" : undefined}
+              tabIndex={onOpenSource ? 0 : undefined}
+              title={onOpenSource ? "Open the source document" : undefined}
+              onClick={onOpenSource}
+              onKeyDown={
+                onOpenSource
+                  ? (event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return
+                      event.preventDefault()
+                      onOpenSource()
+                    }
+                  : undefined
+              }
+              className={onOpenSource ? "cursor-pointer hover:bg-accent" : undefined}
+            >
+              {quote.text}
+            </ChatMessageQuote>
             <ChatBubble>{quote.comment}</ChatBubble>
           </>
         ) : (
           <ChatBubble>{quote.text}</ChatBubble>
         )}
       </ChatMessage>
-      <button
-        type="button"
-        aria-label="Discard quoted selection"
-        onClick={onRemove}
-        className="mt-1.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3"
-      >
-        <X aria-hidden="true" />
-      </button>
+      {onRemove ? (
+        <button
+          type="button"
+          aria-label="Discard quoted selection"
+          onClick={onRemove}
+          className="mt-1.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3"
+        >
+          <X aria-hidden="true" />
+        </button>
+      ) : null}
     </div>
   )
 }
@@ -1111,6 +1189,10 @@ function PlaygroundExample({
   // The full-list view of pending quotes, rendered live so removals and
   // expands reflect immediately.
   const [quotesOpen, setQuotesOpen] = React.useState(false)
+  // A sent message's annotations opened read-only from its pill.
+  const [viewedQuotes, setViewedQuotes] = React.useState<
+    PendingQuote[] | null
+  >(null)
   // Chips open their file directly: plain press previews in the current
   // tab, a modified press (Cmd/Ctrl) parks the file as its own tab.
   const openChipFromLabel = (label: string, newTab: boolean) => {
@@ -1317,10 +1399,19 @@ function PlaygroundExample({
   // itself, everything it transitively replies to, and every reply chained
   // onto it — and the rest of the transcript recedes, matching iMessage's
   // "just this thread" view.
+  // Tapping a reply's quote chip focuses that thread without composing.
+  const [focusedThreadId, setFocusedThreadId] = React.useState<number | null>(
+    null,
+  )
   const threadIds = React.useMemo(() => {
-    if (!replyTarget) return null
+    const focusTarget =
+      replyTarget ??
+      (focusedThreadId !== null
+        ? messages.find((entry) => entry.id === focusedThreadId)
+        : undefined)
+    if (!focusTarget) return null
     const ids = new Set<number>()
-    let ancestor: DemoMessage | undefined = replyTarget
+    let ancestor: DemoMessage | undefined = focusTarget
     while (ancestor && !ids.has(ancestor.id)) {
       ids.add(ancestor.id)
       const parentId: number | undefined = ancestor.replyToId
@@ -1341,19 +1432,20 @@ function PlaygroundExample({
       }
     }
     return ids
-  }, [messages, replyTarget])
+  }, [messages, replyTarget, focusedThreadId])
 
-  // Escape leaves the reply view from anywhere, not just the input.
+  // Escape leaves the reply view — or a focused thread — from anywhere.
   React.useEffect(() => {
-    if (!replyTarget) return
+    if (!replyTarget && focusedThreadId === null) return
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return
       event.preventDefault()
       setReplyTarget(null)
+      setFocusedThreadId(null)
     }
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [replyTarget])
+  }, [replyTarget, focusedThreadId])
 
   return (
     <div
@@ -1432,6 +1524,8 @@ function PlaygroundExample({
           setOverlay(null)
           setModelCardOpen(false)
           setQuotesOpen(false)
+          setViewedQuotes(null)
+          setFocusedThreadId(null)
         }}
         onClose={(id) => {
           if (id === generatingTabId) {
@@ -1491,11 +1585,17 @@ function PlaygroundExample({
           // Comment additionally hands focus to the composer (jumping back
           // to the conversation from a file tab, which has no composer).
           onAttach={(text) =>
-            setQuotes((current) => [...current, { text }])
+            setQuotes((current) => [
+              ...current,
+              { text, sourceId: activeFileItem.id },
+            ])
           }
           // A comment attaches too — nothing sends until the user sends.
           onComment={(text, comment) =>
-            setQuotes((current) => [...current, { text, comment }])
+            setQuotes((current) => [
+              ...current,
+              { text, comment, sourceId: activeFileItem.id },
+            ])
           }
         />
       ) : (
@@ -1538,6 +1638,19 @@ function PlaygroundExample({
             }
             menuBoundary={frameElement}
             onChipOpen={openChipFromLabel}
+            onQuotePress={
+              entry.replyToId !== undefined
+                ? () =>
+                    setFocusedThreadId((current) =>
+                      current === entry.replyToId ? null : entry.replyToId!,
+                    )
+                : undefined
+            }
+            onQuoteSourceOpen={(sourceId) => {
+              const item = slashItemForId(sourceId)
+              if (item) openChipPreview(item, false)
+            }}
+            onQuotesOpen={setViewedQuotes}
             onReact={(emoji) => {
               updateMessages(activeTabId, (current) =>
                 current.map((message) =>
@@ -1579,26 +1692,45 @@ function PlaygroundExample({
           {overlay.body}
         </ChatAttachmentViewer>
       ) : null}
-      {quotesOpen ? (
-        // The pending selections read as messages over the transcript; the
-        // way back is spelled out where the summary line used to be.
+      {quotesOpen || viewedQuotes ? (
+        // The annotations read as messages over the transcript — pending
+        // ones removable, a sent message's read-only — and the way back is
+        // spelled out where the summary line used to be.
         <div className="absolute inset-0 z-10 flex flex-col bg-background">
           <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto py-2 text-left [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {quotes.map((entry, at) => (
+            {(viewedQuotes ?? quotes).map((entry, at) => (
               <QuoteRow
                 key={at}
                 quote={entry}
-                onRemove={() => {
-                  const next = quotes.filter((_, index2) => index2 !== at)
-                  setQuotes(next)
-                  if (next.length === 0) setQuotesOpen(false)
-                }}
+                onRemove={
+                  viewedQuotes
+                    ? undefined
+                    : () => {
+                        const next = quotes.filter(
+                          (_, index2) => index2 !== at,
+                        )
+                        setQuotes(next)
+                        if (next.length === 0) setQuotesOpen(false)
+                      }
+                }
+                onOpenSource={
+                  entry.sourceId && slashItemForId(entry.sourceId)
+                    ? () => {
+                        setQuotesOpen(false)
+                        setViewedQuotes(null)
+                        openChipPreview(slashItemForId(entry.sourceId!)!, false)
+                      }
+                    : undefined
+                }
               />
             ))}
           </div>
           <button
             type="button"
-            onClick={() => setQuotesOpen(false)}
+            onClick={() => {
+              setQuotesOpen(false)
+              setViewedQuotes(null)
+            }}
             className="mx-auto shrink-0 cursor-pointer rounded-full border-0 bg-transparent px-3 py-1.5 font-sans nessa-text-2 font-medium text-(--nessa-chat-accent) outline-none hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
             Back to chat
@@ -1617,7 +1749,7 @@ function PlaygroundExample({
           onClose={() => setModelCardOpen(false)}
         />
       ) : null}
-      {quotes.length > 0 && !quotesOpen && !overlay ? (
+      {quotes.length > 0 && !quotesOpen && !viewedQuotes && !overlay ? (
         // One quote pill stands for the whole set — it, or "+ N other",
         // opens the full list over the transcript.
         <div className="flex max-w-full items-center gap-1.5 self-start">
@@ -2556,6 +2688,19 @@ export const Annotations: Story = {
     await expect(
       canvas.getByRole("button", { name: "+ 6 others" }),
     ).toBeInTheDocument()
+    // The a11y pass that follows reads computed colors, so the finite
+    // animations must settle first; the busy subagent avatars animate
+    // forever by design, so only finite animations count here.
+    await waitFor(() => {
+      const running = canvasElement
+        .getAnimations({ subtree: true })
+        .filter(
+          (animation) =>
+            animation.playState === "running" &&
+            animation.effect?.getTiming().iterations !== Infinity,
+        )
+      expect(running).toHaveLength(0)
+    }, { timeout: 4000 })
   },
 }
 
