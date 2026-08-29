@@ -815,3 +815,39 @@ export {
   statusDotVariants,
   type StatusDotProps,
 } from "./components/status-dot"
+export {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  type DialogContentProps,
+} from "./components/dialog"
+export {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "./components/tabs"
+export {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+  type SelectContentProps,
+} from "./components/select"
+export {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+  type TooltipContentProps,
+} from "./components/tooltip"
+export { ScrollArea, ScrollBar } from "./components/scroll-area"

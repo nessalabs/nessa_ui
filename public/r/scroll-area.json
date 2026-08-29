@@ -1,0 +1,22 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "scroll-area",
+  "title": "Scroll area",
+  "description": "A scroll container with subtle token-colored overlay scrollbars in both orientations, keeping dense panes like log output geometrically stable across platforms.",
+  "dependencies": [
+    "radix-ui"
+  ],
+  "registryDependencies": [
+    "nessalabs/nessa_ui/nessa-base",
+    "nessalabs/nessa_ui/utils"
+  ],
+  "files": [
+    {
+      "path": "packages/react/src/components/scroll-area.tsx",
+      "content": "\"use client\"\n\nimport * as React from \"react\"\nimport { ScrollArea as ScrollAreaPrimitive } from \"radix-ui\"\n\nimport { cn } from \"@/lib/utils\"\n\n/**\n * A scroll container with Nessa-styled overlay scrollbars: a hairline\n * token-colored thumb that appears while scrolling or hovering instead of\n * the host platform's gutter, so dense panes like log output keep their\n * geometry across platforms. Size it like any block — the single child\n * scrolls inside. The viewport itself is keyboard-focusable so off-screen\n * content stays reachable without a pointer, drawing its focus outline\n * inset because the root clips its rounded corners. Vertical by default;\n * add a `ScrollBar orientation=\"horizontal\"` child alongside the content\n * for sideways overflow.\n */\nfunction ScrollArea({\n  className,\n  children,\n  ...props\n}: React.ComponentProps<typeof ScrollAreaPrimitive.Root>) {\n  return (\n    <ScrollAreaPrimitive.Root\n      data-slot=\"scroll-area\"\n      className={cn(\"relative overflow-hidden\", className)}\n      {...props}\n    >\n      <ScrollAreaPrimitive.Viewport\n        data-slot=\"scroll-area-viewport\"\n        tabIndex={0}\n        className=\"size-full rounded-[inherit] outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring\"\n      >\n        {children}\n      </ScrollAreaPrimitive.Viewport>\n      <ScrollBar />\n      <ScrollAreaPrimitive.Corner />\n    </ScrollAreaPrimitive.Root>\n  )\n}\n\n/**\n * One scrollbar inside a `ScrollArea`. The vertical bar is built in; render\n * this with `orientation=\"horizontal\"` next to the content when the pane\n * also scrolls sideways.\n */\nfunction ScrollBar({\n  className,\n  orientation = \"vertical\",\n  ...props\n}: React.ComponentProps<typeof ScrollAreaPrimitive.Scrollbar>) {\n  return (\n    <ScrollAreaPrimitive.Scrollbar\n      data-slot=\"scroll-area-scrollbar\"\n      orientation={orientation}\n      className={cn(\n        \"flex touch-none select-none p-px\",\n        orientation === \"vertical\" && \"h-full w-2 border-l border-l-transparent\",\n        orientation === \"horizontal\" &&\n          \"h-2 flex-col border-t border-t-transparent\",\n        className,\n      )}\n      {...props}\n    >\n      <ScrollAreaPrimitive.Thumb\n        data-slot=\"scroll-area-thumb\"\n        className=\"relative flex-1 rounded-full bg-border transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-muted-foreground/50 motion-reduce:transition-none\"\n      />\n    </ScrollAreaPrimitive.Scrollbar>\n  )\n}\n\nexport { ScrollArea, ScrollBar }\n",
+      "type": "registry:ui",
+      "target": "components/ui/scroll-area.tsx"
+    }
+  ],
+  "type": "registry:ui"
+}

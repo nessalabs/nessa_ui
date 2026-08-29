@@ -46,9 +46,12 @@ type FocusComponent =
   | "selection-tooltip"
   | "tool-approval"
   | "checkbox"
+  | "dialog"
   | "dropdown-menu"
   | "pagination"
   | "page-outline"
+  | "scroll-area"
+  | "select"
   | "table/table"
   | "table/table-toolbar"
   | "split-view/split-view-separator"
@@ -357,6 +360,39 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
+  // The corner close button is the dialog's only self-styled control; the
+  // footer actions are ordinary Buttons with their own treatment.
+  {
+    component: "dialog",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The trigger and the option row each carry the standard outline; like
+  // the menu items, the option draws inset on the clipping content surface.
+  {
+    component: "select",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 2,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The viewport is a focusable scroll region, like the table's scroll
+  // container, so keyboard users can reach off-screen content.
+  {
+    component: "scroll-area",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
   {
     component: "pagination",
     layer: "outline",
@@ -495,6 +531,20 @@ export const focusGeometryClasses = Object.freeze([
   // outset outline would land on (or past) the padding edge.
   { component: "dropdown-menu", className: "focus-visible:outline-2", count: 4 },
   { component: "dropdown-menu", className: "focus-visible:-outline-offset-2", count: 4 },
+  // The dialog close button floats in the padded content corner and keeps
+  // the standard outset offset.
+  { component: "dialog", className: "focus-visible:outline-2", count: 1 },
+  { component: "dialog", className: "focus-visible:outline-offset-2", count: 1 },
+  // The trigger is a free-standing field and keeps the outset offset; the
+  // option rows draw inset like menu items because the content surface
+  // clips its overflow.
+  { component: "select", className: "focus-visible:outline-2", count: 2 },
+  { component: "select", className: "focus-visible:outline-offset-2", count: 1 },
+  { component: "select", className: "focus-visible:-outline-offset-2", count: 1 },
+  // The viewport draws inset because the root clips its rounded corners,
+  // like the other clipping scroll surfaces.
+  { component: "scroll-area", className: "focus-visible:outline-2", count: 1 },
+  { component: "scroll-area", className: "focus-visible:-outline-offset-2", count: 1 },
   // Page buttons routinely sit inside a clipping table shell, so their lone
   // outline draws inset.
   { component: "pagination", className: "focus-visible:outline-2", count: 1 },
