@@ -355,3 +355,24 @@ test("the answer's meaning comes from the option's kind, not its id", () => {
   assert.equal(decided.length, 1)
   assert.equal(decided[0]!.decision, "deny")
 })
+
+test("absent usage stays absent, and reasoning cost survives the protocol", () => {
+  // Claude's adapter closes a turn with `{stopReason}` and no usage at all.
+  // Building an all-null Usage there made "nothing was reported" look like
+  // "reported, all unknown" — and only on this wire, so a consumer checking
+  // `usage !== null` drew an empty panel for ACP sessions alone.
+  const claude = mapAcpStream(acp("acp/claude_tools")).flatMap((event) =>
+    event.payload.type === "turn_completed" ? [event.payload.usage] : [],
+  )
+  assert.deepEqual(claude, [null])
+
+  // Codex's reports it, and calls reasoning `thoughtTokens` — a name that has
+  // to be read or the cost shows on `exec` and vanishes here.
+  const codex = mapAcpStream(acp("acp/codex_tools")).flatMap((event) =>
+    event.payload.type === "turn_completed" ? [event.payload.usage] : [],
+  )
+  assert.equal(codex.length, 1)
+  assert.notEqual(codex[0], null)
+  assert.equal(codex[0]!.totalTokens, 22790)
+  assert.equal(codex[0]!.reasoningTokens, 0)
+})

@@ -1337,3 +1337,67 @@ test("the recorded build is the newest the fixtures actually came from", () => {
   )[versions.size - 1]
   assert.equal(CLAUDE_STREAM_PROVENANCE.version, newest)
 })
+
+test("an id from the wire cannot address a file outside the session", () => {
+  // These ids are built into paths a host then reads, and they come from a
+  // process this library does not control. A session id containing `..` used
+  // to produce a path that escaped the projects directory — and claimed to be
+  // resolved.
+  assert.equal(sessionLocationOf("/projects", { cwd: "/workspace", sessionId: "../../../../tmp/owned" }), null)
+  assert.equal(sessionLocationOf("/projects", { cwd: "/workspace", sessionId: "a/b" }), null)
+
+  const location = sessionLocationOf("/projects", { cwd: "/workspace", sessionId: "ses_1" })!
+  const [, unsafe] = collectTranscriptRefs(location, [
+    { kind: "agent", taskId: "../../x", callId: "c1", label: "a", phases: [] },
+  ])
+  assert.equal(unsafe!.resolved, false)
+  assert.equal(unsafe!.path, null)
+})
+
+test("only a delegated agent is offered a transcript", () => {
+  // A background shell has no subagent transcript at that path. Offering one
+  // as resolved sent a host to open a file that was never written.
+  const location = sessionLocationOf("/projects", { cwd: "/workspace", sessionId: "ses_1" })!
+  const kinds = (kind: string) =>
+    collectTranscriptRefs(location, [{ kind, taskId: "t1", callId: "c1", label: "l", phases: [] }]).map(
+      (ref) => ref.kind,
+    )
+  assert.deepEqual(kinds("bash"), ["session"])
+  assert.deepEqual(kinds("agent"), ["session", "subagent"])
+})
+
+test("two workflow agents with no index of their own are still two agents", () => {
+  // A queued agent has no index yet. Defaulting every one to zero gave them a
+  // shared identity, so a board keyed on it drew one agent where there were two.
+  const line = JSON.stringify({
+    type: "system",
+    subtype: "task_progress",
+    task_id: "w",
+    tool_use_id: "c",
+    workflow_progress: [
+      { type: "workflow_phase", index: 1, title: "P" },
+      { type: "workflow_agent", label: "a", phaseIndex: 1 },
+      { type: "workflow_agent", label: "b", phaseIndex: 1 },
+    ],
+  })
+  const board = mapClaudeStream(line).flatMap((event) =>
+    event.payload.type === "workflow_progress" ? [event.payload.phases] : [],
+  )[0]!
+  const agents = board.flatMap((phase) => phase.agents)
+  assert.equal(agents.length, 2)
+  assert.equal(new Set(agents.map((agent) => agent.index)).size, 2)
+})
+
+test("a workflow agent's state is the wire's own word, and there are three of them", () => {
+  // The contract used to document two. The captures carry `start`, `progress`
+  // and `done`, and a consumer that only knew two treated a working agent as
+  // unknown.
+  const states = new Set<string>()
+  for (const name of NAMES) {
+    for (const event of mapClaudeStream(capture(name))) {
+      if (event.payload.type !== "workflow_progress") continue
+      for (const phase of event.payload.phases) for (const agent of phase.agents) states.add(agent.state)
+    }
+  }
+  assert.deepEqual([...states].sort(), ["done", "progress", "start"])
+})

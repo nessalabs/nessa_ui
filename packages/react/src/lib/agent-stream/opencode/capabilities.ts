@@ -32,8 +32,15 @@ export interface OpencodeCapabilityListings {
   readonly agents?: string
 }
 
-/** `name (primary)` / `name (subagent)`, ignoring the JSON permission blocks between them. */
-const AGENT_LINE = /^([A-Za-z0-9_-]+)\s+\((primary|subagent)\)\s*$/
+/**
+ * `name (primary)` / `name (subagent)`, ignoring the JSON permission blocks
+ * between them.
+ *
+ * The name accepts dots and colons because a plugin's agents are namespaced —
+ * a stricter pattern silently dropped exactly the agents a picker most needs
+ * to offer, with nothing to say they had been discarded.
+ */
+const AGENT_LINE = /^([A-Za-z0-9_.:-]+)\s+\((primary|subagent)\)\s*$/
 
 /**
  * Reads the CLI's listings.

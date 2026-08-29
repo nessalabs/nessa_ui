@@ -712,7 +712,9 @@ test("opencode does not compact: it runs out of window and fails", () => {
   // Read as a string, `error` is an object and every failure reported the word
   // "error"; the message is nested two levels down.
   assert.notEqual(errors[0], "error")
-  assert.ok(usage.every((total) => total !== null))
+  // The run never completed a turn — all 28 steps end on `tool-calls` — so
+  // there is no usage to check here, and saying so is the assertion.
+  assert.deepEqual(usage, [])
 })
 
 /**
@@ -745,6 +747,11 @@ test("every opencode run row the captures never reach is acknowledged as unexerc
   )
   for (const kind of RUN_UNEXERCISED.keys()) {
     assert.ok(declared.includes(kind), `${kind} is listed as unexercised but is not a row in the table`)
+    // The `tool_use` row is reached by fallback rather than as an exact key,
+    // so it is the one entry a capture legitimately never names.
+    if (kind !== "tool_use") {
+      assert.ok(!seen.has(kind), `${kind} is listed as unexercised but a fixture reaches it`)
+    }
   }
 })
 
@@ -768,6 +775,7 @@ test("every opencode server row the captures never reach is acknowledged as unex
   )
   for (const kind of SERVER_UNEXERCISED.keys()) {
     assert.ok(declared.includes(kind), `${kind} is listed as unexercised but is not a row in the table`)
+    assert.ok(!seen.has(kind), `${kind} is listed as unexercised but a fixture reaches it`)
   }
 })
 

@@ -20,6 +20,8 @@ export class CodexAppServerMapper implements AgentStreamMapper {
   private readonly emit: EventSink
   /** Item kinds by id, so a completion that omits the kind keeps the one it opened with. */
   private readonly items = new Map<string, string>()
+  /** Threads described by a reply, for when the notification arrives first. */
+  private readonly described = new Map<string, Record<string, JsonValue>>()
 
   constructor(options: MapperOptions = {}) {
     this.emit = new EventSink(options.startSeq ?? 0)
@@ -38,7 +40,8 @@ export class CodexAppServerMapper implements AgentStreamMapper {
     const raw = event as JsonValue
     const frame = asRecord(raw)
     const method = asString(frame.method)
-    if (method === null) return []
+    // A response, which is where `thread/start` describes the thread it made.
+    if (method === null) return this.response(asRecord(frame.result), raw)
     const params = asRecord(frame.params)
 
     const threadId = asString(params.threadId)
@@ -59,7 +62,7 @@ export class CodexAppServerMapper implements AgentStreamMapper {
       }
 
       case CodexAppServerNotification.ThreadStarted:
-        return this.open(asString(params.threadId) ?? asString(asRecord(params.thread).id), raw)
+        return this.open(asRecord(params.thread), asString(params.threadId), raw)
 
       case CodexAppServerNotification.ThreadStatusChanged:
         return [
@@ -288,17 +291,39 @@ export class CodexAppServerMapper implements AgentStreamMapper {
     return [this.emit.build({ type: "plan_updated", steps }, raw, null)]
   }
 
-  private open(threadId: string | null, raw: JsonValue): readonly AgentEvent[] {
+  /**
+   * A `thread/start` reply, which describes the thread the notification only
+   * named. Reading responses is what lets the session say its model and its
+   * working directory instead of reporting null for both.
+   */
+  private response(result: Record<string, JsonValue>, raw: JsonValue): readonly AgentEvent[] {
+    const thread = asRecord(result.thread)
+    const id = asString(thread.id)
+    if (id === null) return []
+    // The model sits *beside* the thread in this reply rather than inside it,
+    // so the description is the two merged.
+    const described = { ...thread, ...(result.model === undefined ? {} : { model: result.model }) }
+    this.described.set(id, described)
+    return this.open(described, id, raw)
+  }
+
+  private open(
+    thread: Record<string, JsonValue>,
+    threadId: string | null,
+    raw: JsonValue,
+  ): readonly AgentEvent[] {
+    const described = threadId === null ? {} : (this.described.get(threadId) ?? {})
+    const info = Object.keys(thread).length > 0 ? thread : described
     if (threadId === null || this.emit.openedSessions.has(threadId)) return []
     this.emit.openedSessions.add(threadId)
     this.emit.primary ??= threadId
     this.emit.current = threadId
-    // The notification names the thread and nothing else; the model and the
-    // rest are answered by the capability requests, not by the stream.
     const session: SessionInfo = {
       sessionId: threadId,
-      model: null,
-      cwd: null,
+      // The thread's own description, from whichever frame carried it: the
+      // notification names it, and the `thread/start` reply describes it.
+      model: asString(info.model),
+      cwd: asString(info.cwd),
       tools: [],
       slashCommands: [],
       terminalSlashCommands: [],
@@ -306,8 +331,8 @@ export class CodexAppServerMapper implements AgentStreamMapper {
       skills: [],
       plugins: [],
       mcpServers: [],
-      permissionMode: null,
-      version: null,
+      permissionMode: asString(info.approvalPolicy),
+      version: asString(info.cliVersion),
       outputStyle: null,
       initIndex: this.emit.openedSessions.size - 1,
     }

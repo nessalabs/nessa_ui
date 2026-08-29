@@ -2,7 +2,7 @@
 
 import type { AgentEvent, AgentStreamMapper, FileEdit, MapperOptions, PlanStep, SessionInfo } from "../events"
 import { PlanStepStatus } from "../events"
-import { asArray, asNumber, asRecord, asString } from "../json"
+import { asArray, asNumber, asObject, asRecord, asString } from "../json"
 import type { JsonValue } from "../json"
 import { EventSink } from "../emitter"
 import { TaskKind } from "../events"
@@ -368,6 +368,7 @@ export class AcpMapper implements AgentStreamMapper {
 
     if (id === null || !this.prompts.has(id)) return []
     this.prompts.delete(id)
+    const reported = asObject(result.usage)
     const usage = asRecord(result.usage)
     const stop = asString(result.stopReason)
     return [
@@ -380,14 +381,23 @@ export class AcpMapper implements AgentStreamMapper {
           stopReason: stop,
           terminalReason: null,
           finalText: null,
-          usage: {
-            totalTokens: asNumber(usage.totalTokens),
-            inputTokens: asNumber(usage.inputTokens),
-            outputTokens: asNumber(usage.outputTokens),
-            reasoningTokens: null,
-            cacheReadTokens: asNumber(usage.cachedReadTokens),
-            cacheCreationTokens: null,
-          },
+          // Absent means absent. Building an all-null Usage made "nothing was
+          // reported" indistinguishable from "reported, and every counter is
+          // unknown" — and only on this wire, so a consumer checking
+          // `usage !== null` drew an empty panel for ACP sessions alone.
+          usage:
+            reported === null
+              ? null
+              : {
+                  totalTokens: asNumber(usage.totalTokens),
+                  inputTokens: asNumber(usage.inputTokens),
+                  outputTokens: asNumber(usage.outputTokens),
+                  // Codex's adapter calls it `thoughtTokens`; without reading
+                  // it, reasoning cost showed on `exec` and vanished here.
+                  reasoningTokens: asNumber(usage.thoughtTokens) ?? asNumber(usage.reasoningTokens),
+                  cacheReadTokens: asNumber(usage.cachedReadTokens),
+                  cacheCreationTokens: null,
+                },
           durationMs: null,
           numTurns: null,
           permissionDenials: [],

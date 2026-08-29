@@ -30,6 +30,19 @@ export function projectSlug(cwd: string): string {
   return cwd.replace(/[^a-zA-Z0-9]/g, "-")
 }
 
+/**
+ * Whether an id from the wire can be used as one path segment.
+ *
+ * These ids are built into paths a host then reads, and they arrive from a
+ * process this library does not control — so `..` or a slash in a session or
+ * task id would address a file outside the session's own directory. Anything
+ * that is not a plain segment is refused rather than escaped, because a
+ * transcript that needs escaping is not a transcript this contract can name.
+ */
+export function isAddressableId(id: string): boolean {
+  return id.length > 0 && !id.includes("/") && !id.includes("\\") && id !== "." && id !== ".."
+}
+
 /** The folder holding every session for this working directory. */
 export function projectDir(location: SessionLocation): string {
   return `${location.projectsDir}/${projectSlug(location.cwd)}`
@@ -193,6 +206,9 @@ export function sessionLocationOf(
   // never reported one cannot be addressed on disk. Null says that plainly
   // rather than building a path rooted at an empty string.
   if (session.cwd === null || session.cwd === "") return null
+  // An id that is not a plain path segment cannot name a folder, and building
+  // one anyway would hand a host a path outside the projects directory.
+  if (!isAddressableId(session.sessionId)) return null
   return { projectsDir, cwd: session.cwd, sessionId: session.sessionId }
 }
 
@@ -210,6 +226,17 @@ export function subagentTranscriptRef(
       path: null,
       resolved: false,
       blockedBy: "no task id yet — the run has not reported task_started",
+    }
+  }
+  if (!isAddressableId(run.taskId)) {
+    return {
+      kind: "subagent",
+      label: run.label ?? "Subagent",
+      key: run.callId,
+      callId: run.callId,
+      path: null,
+      resolved: false,
+      blockedBy: "the task id is not a path segment, so it cannot name a file",
     }
   }
   return {
@@ -312,6 +339,10 @@ export function collectTranscriptRefs(
       }
       continue
     }
+    // Only an agent has a transcript at this path. A background shell or a
+    // run of another kind has none, and offering one as `resolved` sends a
+    // host to open a file that was never written.
+    if (run.kind !== "agent") continue
     refs.push(subagentTranscriptRef(location, run))
   }
 

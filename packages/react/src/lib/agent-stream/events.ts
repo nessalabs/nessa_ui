@@ -96,7 +96,14 @@ export interface WorkflowAgentProgress {
   /** The harness's handle, absent until the agent actually starts. */
   readonly agentId: string | null
   readonly model: string | null
-  /** `start` covers both queued and running; `done` is terminal. */
+  /**
+   * The wire's own word, passed through.
+   *
+   * Observed: `start` (queued or running), `progress`, and `done`, which is
+   * terminal. Passed through rather than normalized because the vocabulary is
+   * the harness's and it has already grown once — a consumer should treat any
+   * unrecognised value as "not finished" rather than as unknown.
+   */
   readonly state: string
   readonly queuedAt: number | null
   readonly startedAt: number | null

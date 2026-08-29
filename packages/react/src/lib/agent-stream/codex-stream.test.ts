@@ -13,6 +13,7 @@ import { CodexStreamMapper, mapCodexStream } from "./codex/exec/mapper"
 import { CODEX_APP_SERVER_MAPPING, codexAppServerKind, codexAppServerMappingFor } from "./codex/app-server/mapping"
 import { mapCodexAppServerStream } from "./codex/app-server/mapper"
 import { CODEX_APP_SERVER_PROVENANCE, parseCodexAppServer } from "./codex/app-server/wire"
+import type { JsonValue } from "./json"
 import { transportOf } from "./transports"
 import { CODEX_EXEC_PROVENANCE, CodexItemType, CodexWireType, parseCodexLines } from "./codex/exec/wire"
 import { applyDeltas, buildTranscript, isToolGroup, previewOf } from "./transcript"
@@ -208,11 +209,15 @@ test("the app-server answers what the exec stream cannot", () => {
   assert.equal(CODEX_CAPABILITY_METHODS.includes("model/list"), true)
 })
 
-test("a host that asks for only some capabilities gets the rest empty, not an error", () => {
-  const partial = codexCapabilities({ "model/list": { data: [{ id: "gpt-5", displayName: "GPT-5" }] } } as never)
+test("a host that asks for only some capabilities gets the rest as unreported", () => {
+  const partial = codexCapabilities({
+    "model/list": { data: [{ id: "gpt-5", displayName: "GPT-5" }] },
+  } as Record<string, JsonValue>)
   assert.equal(partial.models!.length, 1)
-  assert.deepEqual(partial.skills, [])
-  assert.deepEqual(partial.pluginSources, [])
+  // Null, not empty. This test used to pin the opposite, which is how a picker
+  // came to render "no skills" for a host that had simply not asked.
+  assert.equal(partial.skills, null)
+  assert.equal(partial.pluginSources, null)
 })
 
 test("one spawned agent is one run, and its result is the run's result", () => {
@@ -425,4 +430,27 @@ test("the app-server capture reaches the rows it should, and the rest are schema
     schemaOnly.length <= declared.length - 8,
     "at least eight rows should be backed by a capture rather than by the schema alone",
   )
+})
+
+test("the app-server session says what its own reply says", () => {
+  // The `thread/started` notification names the thread; the `thread/start`
+  // reply describes it, with the model beside the thread rather than inside
+  // it. Reading only the notification reported null for all three.
+  const session = mapCodexAppServerStream(readFileSync(`${FIXTURES}appserver_tools.jsonl`, "utf8")).flatMap(
+    (event) => (event.payload.type === "session_started" ? [event.payload.session] : []),
+  )
+  assert.equal(session.length, 1)
+  assert.equal(session[0]!.model, "gpt-5.6-luna")
+  assert.equal(session[0]!.version, "0.144.1")
+  assert.ok((session[0]!.cwd ?? "").length > 0)
+})
+
+test("a capability nobody asked about is unreported, not empty", () => {
+  // The shared contract reserves null for "this provider cannot report it".
+  // Returning `[]` for a method the host never called told a picker the
+  // installation has no models.
+  assert.equal(codexCapabilities({}).models, null)
+  assert.equal(codexCapabilities({}).skills, null)
+  // A reply that really came back empty stays empty.
+  assert.deepEqual(codexCapabilities({ "model/list": { data: [] } }).models, [])
 })
