@@ -14,6 +14,9 @@ import {
   ChatComposerAttachmentIcon,
   FilePreviewJson,
   FilePreviewMarkdown,
+  SelectionTooltip,
+  SelectionTooltipAction,
+  SelectionTooltipLabel,
   ChatComposerEditor,
   ChatComposerTrigger,
   type ChatComposerContentPart,
@@ -53,6 +56,7 @@ import {
 } from "@nessa-ui/react"
 import { Braces, ChevronLeft, ChevronRight, FileText, Folder, Image as ImageIcon, Paperclip, Plus, SlidersHorizontal, Sparkles, Puzzle, Square, X } from "lucide-react"
 
+import { ChatAddIcon } from "./icons/nucleo"
 import { storyDocumentation } from "./story-documentation"
 import {
   filterSlashSections,
@@ -215,74 +219,81 @@ function chipFileMock(item: SlashItem): {
 }
 
 /**
- * The read view a chip opens: what the skill or plugin contains, shown as a
- * closable in-chat card above the pill, like the /model card.
+ * A previewed file on the chat surface: the bare renderer, plus a selection
+ * tooltip — select any passage and add it to the chat to talk to the agent
+ * about it.
  */
-function ChipCard({
+function DocumentSurface({
   item,
-  onClose,
-  onPreview,
+  onAddToChat,
 }: {
   item: SlashItem
-  onClose: () => void
-  /** Receives true when the press asked for a new tab (Cmd/Ctrl-click). */
-  onPreview: (newTab: boolean) => void
+  onAddToChat: (text: string) => void
 }) {
-  const ref = React.useRef<HTMLDivElement>(null)
-  React.useEffect(() => {
-    const node = ref.current
-    if (!node) return
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
-    const animation = node.animate(
-      [
-        { opacity: 0, translate: "0 10px", scale: "0.95" },
-        { opacity: 1, translate: "0 0", scale: "1" },
-      ],
-      { duration: 200, easing: "cubic-bezier(0.2, 0.9, 0.3, 1.1)" },
-    )
-    return () => animation.cancel()
-  }, [])
+  const file = chipFileMock(item)
+  const previewFile = {
+    src: `data:${file.mimeType};charset=utf-8,${encodeURIComponent(file.content)}`,
+    name: file.name,
+    mimeType: file.mimeType,
+  }
+  const containerRef = React.useRef<HTMLDivElement>(null)
+  const [selection, setSelection] = React.useState<{
+    text: string
+    left: number
+    top: number
+  } | null>(null)
+  const captureSelection = () => {
+    const container = containerRef.current
+    const live = container?.ownerDocument.getSelection()
+    if (!container || !live || live.isCollapsed) {
+      setSelection(null)
+      return
+    }
+    const text = live.toString().trim()
+    if (!text || !container.contains(live.anchorNode)) {
+      setSelection(null)
+      return
+    }
+    const rect = live.getRangeAt(0).getBoundingClientRect()
+    const host = container.getBoundingClientRect()
+    setSelection({
+      text,
+      left: rect.left - host.left + rect.width / 2,
+      top: rect.top - host.top + container.scrollTop,
+    })
+  }
   return (
-    <Card
-      ref={ref}
-      data-slot="pill-composer-demo-chip-card"
-      className="relative origin-bottom gap-2 rounded-3xl px-4 py-3.5 shadow-none"
+    <div
+      ref={containerRef}
+      className="relative min-h-0 flex-1 overflow-y-auto text-left [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      onMouseUp={captureSelection}
+      onKeyUp={captureSelection}
     >
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        aria-label={`Close ${item.label} details`}
-        title="Close"
-        onClick={onClose}
-        className="absolute right-2.5 top-2.5 z-10 size-7 rounded-full text-muted-foreground"
-      >
-        <X aria-hidden="true" />
-      </Button>
-      <span className="flex items-center gap-2 pr-8 font-sans">
-        <span
-          aria-hidden="true"
-          className="flex size-4 shrink-0 items-center justify-center text-(--nessa-chat-accent) [&_svg]:size-4"
+      {item.kind === "plugin" ? (
+        <FilePreviewJson file={previewFile} kind="json" />
+      ) : (
+        <FilePreviewMarkdown file={previewFile} kind="markdown" />
+      )}
+      {selection ? (
+        <SelectionTooltip
+          className="absolute z-10 -translate-x-1/2 -translate-y-full"
+          style={{ left: selection.left, top: Math.max(selection.top - 8, 0) }}
         >
-          {item.icon}
-        </span>
-        <span className="nessa-text-4 font-semibold">{item.label}</span>
-        <span className="nessa-text-1 uppercase tracking-wide text-muted-foreground">
-          {item.kind}
-        </span>
-      </span>
-      <p className="m-0 font-sans nessa-text-2 leading-5 text-muted-foreground">
-        {item.description}
-      </p>
-      <button
-        type="button"
-        onClick={(event) => onPreview(event.metaKey || event.ctrlKey)}
-        title="Click to preview here; Cmd-click for a new tab"
-        className="self-start rounded-full border-0 bg-transparent p-0 font-sans nessa-text-2 font-medium text-(--nessa-chat-accent) outline-none hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-      >
-        Preview {chipFileMock(item).name}
-      </button>
-    </Card>
+          <SelectionTooltipAction
+            aria-label="Add to chat"
+            tooltip="Add to chat"
+            onClick={() => {
+              onAddToChat(selection.text)
+              containerRef.current?.ownerDocument.getSelection()?.removeAllRanges()
+              setSelection(null)
+            }}
+          >
+            <ChatAddIcon aria-hidden="true" />
+            <SelectionTooltipLabel>Add to chat</SelectionTooltipLabel>
+          </SelectionTooltipAction>
+        </SelectionTooltip>
+      ) : null}
+    </div>
   )
 }
 
@@ -449,7 +460,8 @@ function BubbleParts({
   onChipPress,
 }: {
   parts: ChatComposerContentPart[]
-  onChipPress?: (label: string) => void
+  /** Receives the chip label and whether the press asked for a new tab. */
+  onChipPress?: (label: string, newTab: boolean) => void
 }) {
   return (
     <>
@@ -460,11 +472,15 @@ function BubbleParts({
             data-slot="bubble-chip"
             role={onChipPress ? "button" : undefined}
             tabIndex={onChipPress ? 0 : undefined}
+            title={slashItemForLabel(part.chip.label)?.description}
             onClick={
               onChipPress
                 ? (event) => {
                     event.stopPropagation()
-                    onChipPress(part.chip.label)
+                    onChipPress(
+                      part.chip.label,
+                      event.metaKey || event.ctrlKey,
+                    )
                   }
                 : undefined
             }
@@ -474,7 +490,10 @@ function BubbleParts({
                     if (event.key !== "Enter" && event.key !== " ") return
                     event.preventDefault()
                     event.stopPropagation()
-                    onChipPress(part.chip.label)
+                    onChipPress(
+                      part.chip.label,
+                      event.metaKey || event.ctrlKey,
+                    )
                   }
                 : undefined
             }
@@ -654,8 +673,8 @@ function DemoBubble({
   onReplyCommit?: () => void
   /** Reports the tapback menu opening and closing. */
   onMenuOpenChange?: (open: boolean) => void
-  /** Opens a chip's read view from a chip inside this bubble. */
-  onChipOpen?: (label: string) => void
+  /** Opens a chip's file from a chip inside this bubble; true asks for a new tab. */
+  onChipOpen?: (label: string, newTab: boolean) => void
   /** Flips the tapback menu above the press point at this element's edges. */
   menuBoundary?: Element | null
 }) {
@@ -919,13 +938,15 @@ function PlaygroundExample({
   const generating = generatingTabId !== null && generatingTabId === activeTabId
   const [model, setModel] = React.useState<ModelPickerValue>(defaultModel)
   const [modelCardOpen, setModelCardOpen] = React.useState(false)
-  // The chip read view: what the pressed skill or plugin contains.
-  const [chipCardItem, setChipCardItem] = React.useState<SlashItem | null>(null)
-  const openChipCard = (label: string) => {
+  // A passage lifted out of a previewed document, quoted on the next send.
+  const [quoteText, setQuoteText] = React.useState<string | null>(null)
+  // Chips open their file directly: plain press previews in the current
+  // tab, a modified press (Cmd/Ctrl) parks the file as its own tab.
+  const openChipFromLabel = (label: string, newTab: boolean) => {
     const item = slashItemForLabel(label)
     if (!item) return
     setModelCardOpen(false)
-    setChipCardItem(item)
+    openChipPreview(item, newTab)
   }
   const [replyTarget, setReplyTarget] = React.useState<DemoMessage | null>(null)
   const [attachments, setAttachments] = React.useState<DemoAttachment[]>([])
@@ -967,7 +988,6 @@ function PlaygroundExample({
     null,
   )
   const openChipPreview = (item: SlashItem, newTab: boolean) => {
-    setChipCardItem(null)
     if (!newTab) {
       setInlinePreview(item)
       return
@@ -1079,8 +1099,8 @@ function PlaygroundExample({
     setMenuTargetId(null)
     setOverlay(null)
     setModelCardOpen(false)
-    setChipCardItem(null)
     setInlinePreview(null)
+    setQuoteText(null)
   }
 
   const addAttachment = (kind: DemoAttachmentKind) => {
@@ -1235,7 +1255,6 @@ function PlaygroundExample({
           setMenuTargetId(null)
           setOverlay(null)
           setModelCardOpen(false)
-          setChipCardItem(null)
         }}
         onClose={(id) => {
           if (id === generatingTabId) {
@@ -1286,23 +1305,18 @@ function PlaygroundExample({
         className="relative flex min-h-0 flex-1 flex-col"
       >
       {activeFileItem ? (
-        // A file tab replaces the transcript with the bare file content —
-        // no viewer chrome; the tab itself is the navigation.
-        <div className="min-h-0 flex-1 overflow-y-auto text-left [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {(() => {
-            const file = chipFileMock(activeFileItem)
-            const previewFile = {
-              src: `data:${file.mimeType};charset=utf-8,${encodeURIComponent(file.content)}`,
-              name: file.name,
-              mimeType: file.mimeType,
-            }
-            return activeFileItem.kind === "plugin" ? (
-              <FilePreviewJson file={previewFile} kind="json" />
-            ) : (
-              <FilePreviewMarkdown file={previewFile} kind="markdown" />
-            )
-          })()}
-        </div>
+        // A file replaces the transcript only — the tab strip stays, and in
+        // the current tab the composer stays too, so a selected passage can
+        // be added to the chat and discussed in place.
+        <DocumentSurface
+          item={activeFileItem}
+          onAddToChat={(text) => {
+            setQuoteText(text)
+            setInlinePreview(null)
+            if (fileTabs[activeTabId]) setActiveTabId(auditTabId)
+            inputRef.current?.focus()
+          }}
+        />
       ) : (
       <div
         ref={logRef}
@@ -1342,7 +1356,7 @@ function PlaygroundExample({
               setMenuTargetId(open ? entry.id : null)
             }
             menuBoundary={frameElement}
-            onChipOpen={openChipCard}
+            onChipOpen={openChipFromLabel}
             onReact={(emoji) => {
               updateMessages(activeTabId, (current) =>
                 current.map((message) =>
@@ -1385,13 +1399,6 @@ function PlaygroundExample({
         </ChatAttachmentViewer>
       ) : null}
       </div>
-      {chipCardItem ? (
-        <ChipCard
-          item={chipCardItem}
-          onClose={() => setChipCardItem(null)}
-          onPreview={(newTab) => openChipPreview(chipCardItem, newTab)}
-        />
-      ) : null}
       {modelCardOpen ? (
         <ModelCard
           value={model}
@@ -1403,7 +1410,23 @@ function PlaygroundExample({
           onClose={() => setModelCardOpen(false)}
         />
       ) : null}
-      {activeFileItem ? null : (
+      {quoteText ? (
+        // The lifted passage waits above the pill until it is sent or
+        // dismissed; the next message quotes it, iMessage reply style.
+        <div className="flex items-start gap-2 self-start">
+          <ChatMessageQuote className="m-0">{quoteText}</ChatMessageQuote>
+          <button
+            type="button"
+            aria-label="Discard quoted selection"
+            title="Discard quoted selection"
+            onClick={() => setQuoteText(null)}
+            className="mt-1 inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3"
+          >
+            <X aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
+      {fileTabs[activeTabId] ? null : (
       <PillComposer
         generating={generating}
         onSubmit={(event) => {
@@ -1426,7 +1449,7 @@ function PlaygroundExample({
               role: "user",
               text,
               parts: hasChips ? content?.parts : undefined,
-              replyTo: replyTarget?.text,
+              replyTo: quoteText ?? replyTarget?.text,
               replyToId: replyTarget?.id,
               attachments: attachments.length > 0 ? attachments : undefined,
             },
@@ -1435,7 +1458,7 @@ function PlaygroundExample({
           setMessage("")
           setAttachments([])
           setReplyTarget(null)
-          setChipCardItem(null)
+          setQuoteText(null)
           setGeneratingTabId(activeTabId)
           startReply(activeTabId, replyDelay)
         }}
@@ -1499,7 +1522,7 @@ function PlaygroundExample({
           <ChatComposerEditor
             ref={inputRef}
             onContentChange={(content) => setMessage(content.text)}
-            onChipPress={(chip) => openChipCard(chip.label)}
+            onChipPress={(chip) => openChipFromLabel(chip.label, false)}
             placeholder={
               replyTarget
                 ? "Reply"
