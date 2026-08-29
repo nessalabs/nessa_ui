@@ -169,11 +169,60 @@ const modelCommand: SlashItem = {
   icon: <SlidersHorizontal aria-hidden="true" />,
 }
 
+/** The mocked file behind a chip: skills carry a SKILL.md, plugins a manifest. */
+function chipFileMock(item: SlashItem): { name: string; body: string } {
+  const slug = item.label.toLowerCase().replace(/\s+/g, "-")
+  if (item.kind === "plugin") {
+    return {
+      name: `${slug}/manifest.json`,
+      body: [
+        "```json",
+        JSON.stringify(
+          {
+            name: slug,
+            kind: "plugin",
+            description: item.description,
+            permissions: ["read", "search"],
+            entry: "index.ts",
+          },
+          null,
+          2,
+        ),
+        "```",
+      ].join("\n"),
+    }
+  }
+  return {
+    name: `${slug}/SKILL.md`,
+    body: [
+      `# ${item.label}`,
+      "",
+      item.description + ".",
+      "",
+      "## When to use",
+      `Invoke with \`/${slug}\` from any conversation.`,
+      "",
+      "## Steps",
+      "1. Gather the relevant context from the current chat.",
+      "2. Apply the checklist this skill carries.",
+      "3. Report the result back into the thread.",
+    ].join("\n"),
+  }
+}
+
 /**
  * The read view a chip opens: what the skill or plugin contains, shown as a
  * closable in-chat card above the pill, like the /model card.
  */
-function ChipCard({ item, onClose }: { item: SlashItem; onClose: () => void }) {
+function ChipCard({
+  item,
+  onClose,
+  onPreview,
+}: {
+  item: SlashItem
+  onClose: () => void
+  onPreview: () => void
+}) {
   const ref = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => {
     const node = ref.current
@@ -220,6 +269,13 @@ function ChipCard({ item, onClose }: { item: SlashItem; onClose: () => void }) {
       <p className="m-0 font-sans nessa-text-2 leading-5 text-muted-foreground">
         {item.description}
       </p>
+      <button
+        type="button"
+        onClick={onPreview}
+        className="self-start rounded-full border-0 bg-transparent p-0 font-sans nessa-text-2 font-medium text-(--nessa-chat-accent) outline-none hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        Preview {chipFileMock(item).name.split("/")[1]}
+      </button>
     </Card>
   )
 }
@@ -872,8 +928,44 @@ function PlaygroundExample({
   const [holdToRecord, setHoldToRecord] = React.useState(true)
   const [micMenuOpen, setMicMenuOpen] = React.useState(false)
   const holdingToRecord = React.useRef(false)
-  const [viewerAttachments, setViewerAttachments] =
-    React.useState<DemoAttachment[] | null>(null)
+  // One overlay surface over the chat for anything full-screen — the
+  // attachment grid, a file preview, whatever comes next. Whoever opens it
+  // supplies the summary line and the content.
+  const [overlay, setOverlay] = React.useState<{
+    summary: string
+    body: React.ReactNode
+  } | null>(null)
+  const openAttachmentsOverlay = (attachments: DemoAttachment[]) =>
+    setOverlay({
+      summary: attachmentSummary(attachments),
+      body: attachments.map((attachment) => (
+        <ChatAttachmentTile
+          key={attachment.id}
+          label={attachment.label}
+          imageSrc={attachment.src}
+          icon={
+            attachment.kind === "photo" ? undefined : (
+              <AttachmentKindIcon kind={attachment.kind} />
+            )
+          }
+          className="size-28"
+        />
+      )),
+    })
+  const openChipPreview = (item: SlashItem) => {
+    const file = chipFileMock(item)
+    setChipCardItem(null)
+    setOverlay({
+      summary: file.name,
+      body: (
+        <div className="max-w-full self-start rounded-2xl bg-accent px-4 py-3 text-left">
+          <MessageMarkdown className="nessa-text-2 leading-5">
+            {file.body}
+          </MessageMarkdown>
+        </div>
+      ),
+    })
+  }
   const [menuTargetId, setMenuTargetId] = React.useState<number | null>(null)
   const attachmentCounters = React.useRef<Record<DemoAttachmentKind, number>>({ photo: 0, file: 0, folder: 0, skill: 0, plugin: 0 })
   const inputRef = React.useRef<ChatComposerEditorHandle>(null)
@@ -966,7 +1058,7 @@ function PlaygroundExample({
     setActiveTabId(tabId)
     setReplyTarget(null)
     setMenuTargetId(null)
-    setViewerAttachments(null)
+    setOverlay(null)
     setModelCardOpen(false)
     setChipCardItem(null)
   }
@@ -1108,7 +1200,7 @@ function PlaygroundExample({
           setActiveTabId(target)
           setReplyTarget(null)
           setMenuTargetId(null)
-          setViewerAttachments(null)
+          setOverlay(null)
           setModelCardOpen(false)
           setChipCardItem(null)
         }}
@@ -1141,7 +1233,7 @@ function PlaygroundExample({
           setActiveTabId(id)
           setReplyTarget(null)
           setMenuTargetId(null)
-          setViewerAttachments(null)
+          setOverlay(null)
           setModelCardOpen(false)
           inputRef.current?.focus()
         }}
@@ -1175,7 +1267,7 @@ function PlaygroundExample({
           <DemoBubble
             message={entry}
             delivered={entry.id === lastUserId}
-            onOpenAttachments={setViewerAttachments}
+            onOpenAttachments={openAttachmentsOverlay}
             dimmed={
               threadIds !== null
                 ? !threadIds.has(entry.id)
@@ -1226,28 +1318,20 @@ function PlaygroundExample({
         ) : null}
       </div>
       </div>
-      {viewerAttachments ? (
+      {overlay ? (
         <ChatAttachmentViewer
-          summary={attachmentSummary(viewerAttachments)}
-          onClose={() => setViewerAttachments(null)}
+          summary={overlay.summary}
+          onClose={() => setOverlay(null)}
         >
-          {viewerAttachments.map((attachment) => (
-            <ChatAttachmentTile
-              key={attachment.id}
-              label={attachment.label}
-              imageSrc={attachment.src}
-              icon={
-                attachment.kind === "photo" ? undefined : (
-                  <AttachmentKindIcon kind={attachment.kind} />
-                )
-              }
-              className="size-28"
-            />
-          ))}
+          {overlay.body}
         </ChatAttachmentViewer>
       ) : null}
       {chipCardItem ? (
-        <ChipCard item={chipCardItem} onClose={() => setChipCardItem(null)} />
+        <ChipCard
+          item={chipCardItem}
+          onClose={() => setChipCardItem(null)}
+          onPreview={() => openChipPreview(chipCardItem)}
+        />
       ) : null}
       {modelCardOpen ? (
         <ModelCard
@@ -1307,7 +1391,7 @@ function PlaygroundExample({
                     <AttachmentKindIcon kind={attachment.kind} />
                   )
                 }
-                onOpen={() => setViewerAttachments([attachment])}
+                onOpen={() => openAttachmentsOverlay([attachment])}
               />
               <button
                 type="button"
