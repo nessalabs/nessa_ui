@@ -11,7 +11,11 @@ import {
   ChatComposerAction,
   ChatComposerAttachments,
   ChatComposerInput,
+  ChatComposerAttachmentIcon,
+  ChatComposerEditor,
   ChatComposerTrigger,
+  type ChatComposerContentPart,
+  type ChatComposerEditorHandle,
   ChatMessage,
   ChatMessageQuote,
   ChatMessageReceipt,
@@ -50,6 +54,7 @@ import { ChevronLeft, ChevronRight, Folder, Image as ImageIcon, Paperclip, Plus,
 import { storyDocumentation } from "./story-documentation"
 import {
   filterSlashSections,
+  slashSections,
   matchesQuery,
   renderSlashItem,
   type SlashItem,
@@ -162,6 +167,68 @@ const modelCommand: SlashItem = {
   label: "/model",
   description: "Choose a model",
   icon: <SlidersHorizontal aria-hidden="true" />,
+}
+
+/**
+ * The read view a chip opens: what the skill or plugin contains, shown as a
+ * closable in-chat card above the pill, like the /model card.
+ */
+function ChipCard({ item, onClose }: { item: SlashItem; onClose: () => void }) {
+  const ref = React.useRef<HTMLDivElement>(null)
+  React.useEffect(() => {
+    const node = ref.current
+    if (!node) return
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
+    const animation = node.animate(
+      [
+        { opacity: 0, translate: "0 10px", scale: "0.95" },
+        { opacity: 1, translate: "0 0", scale: "1" },
+      ],
+      { duration: 200, easing: "cubic-bezier(0.2, 0.9, 0.3, 1.1)" },
+    )
+    return () => animation.cancel()
+  }, [])
+  return (
+    <Card
+      ref={ref}
+      data-slot="pill-composer-demo-chip-card"
+      className="relative origin-bottom gap-2 rounded-3xl px-4 py-3.5 shadow-none"
+    >
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-label={`Close ${item.label} details`}
+        title="Close"
+        onClick={onClose}
+        className="absolute right-2.5 top-2.5 z-10 size-7 rounded-full text-muted-foreground"
+      >
+        <X aria-hidden="true" />
+      </Button>
+      <span className="flex items-center gap-2 pr-8 font-sans">
+        <span
+          aria-hidden="true"
+          className="flex size-4 shrink-0 items-center justify-center text-(--nessa-chat-accent) [&_svg]:size-4"
+        >
+          {item.icon}
+        </span>
+        <span className="nessa-text-4 font-semibold">{item.label}</span>
+        <span className="nessa-text-1 uppercase tracking-wide text-muted-foreground">
+          {item.kind}
+        </span>
+      </span>
+      <p className="m-0 font-sans nessa-text-2 leading-5 text-muted-foreground">
+        {item.description}
+      </p>
+    </Card>
+  )
+}
+
+/** Finds the catalog entry behind an inserted chip, for the read view. */
+function slashItemForLabel(label: string): SlashItem | undefined {
+  return slashSections
+    .flatMap((section) => section.items)
+    .find((item) => item.label === label)
 }
 
 /** The pill's slash sections: a Commands section ahead of the shared skills and plugins. */
@@ -304,6 +371,69 @@ interface DemoMessage {
   streaming?: boolean
   /** Subagent ids this assistant turn spawned, rendered as drill-in chips. */
   spawned?: string[]
+  /**
+   * The editor's content parts when the message carried inline chips, so the
+   * bubble re-renders each chip the way the composer showed it.
+   */
+  parts?: ChatComposerContentPart[]
+}
+
+/**
+ * Renders editor content parts inside a bubble: chips keep their icon on the
+ * text baseline and press open the same read view as in the composer.
+ */
+function BubbleParts({
+  parts,
+  onChipPress,
+}: {
+  parts: ChatComposerContentPart[]
+  onChipPress?: (label: string) => void
+}) {
+  return (
+    <>
+      {parts.map((part, index) =>
+        part.type === "chip" ? (
+          <span
+            key={index}
+            data-slot="bubble-chip"
+            role={onChipPress ? "button" : undefined}
+            tabIndex={onChipPress ? 0 : undefined}
+            onClick={
+              onChipPress
+                ? (event) => {
+                    event.stopPropagation()
+                    onChipPress(part.chip.label)
+                  }
+                : undefined
+            }
+            onKeyDown={
+              onChipPress
+                ? (event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return
+                    event.preventDefault()
+                    event.stopPropagation()
+                    onChipPress(part.chip.label)
+                  }
+                : undefined
+            }
+            className={cn(
+              "whitespace-nowrap font-medium underline-offset-2",
+              onChipPress && "cursor-pointer hover:underline",
+            )}
+          >
+            <ChatComposerAttachmentIcon
+              kind={part.chip.kind}
+              icon={slashItemForLabel(part.chip.label)?.icon}
+              className="mr-1 align-[-0.125em]"
+            />
+            {part.chip.label}
+          </span>
+        ) : (
+          <React.Fragment key={index}>{part.text}</React.Fragment>
+        ),
+      )}
+    </>
+  )
 }
 
 interface DemoSubagent {
@@ -444,6 +574,7 @@ function DemoBubble({
   onReact,
   onReplyCommit,
   onMenuOpenChange,
+  onChipOpen,
   menuBoundary,
 }: {
   message: DemoMessage
@@ -461,6 +592,8 @@ function DemoBubble({
   onReplyCommit?: () => void
   /** Reports the tapback menu opening and closing. */
   onMenuOpenChange?: (open: boolean) => void
+  /** Opens a chip's read view from a chip inside this bubble. */
+  onChipOpen?: (label: string) => void
   /** Flips the tapback menu above the press point at this element's edges. */
   menuBoundary?: Element | null
 }) {
@@ -527,6 +660,8 @@ function DemoBubble({
                 >
                   {message.text}
                 </MessageMarkdown>
+              ) : message.parts ? (
+                <BubbleParts parts={message.parts} onChipPress={onChipOpen} />
               ) : (
                 message.text
               )}
@@ -722,6 +857,14 @@ function PlaygroundExample({
   const generating = generatingTabId !== null && generatingTabId === activeTabId
   const [model, setModel] = React.useState<ModelPickerValue>(defaultModel)
   const [modelCardOpen, setModelCardOpen] = React.useState(false)
+  // The chip read view: what the pressed skill or plugin contains.
+  const [chipCardItem, setChipCardItem] = React.useState<SlashItem | null>(null)
+  const openChipCard = (label: string) => {
+    const item = slashItemForLabel(label)
+    if (!item) return
+    setModelCardOpen(false)
+    setChipCardItem(item)
+  }
   const [replyTarget, setReplyTarget] = React.useState<DemoMessage | null>(null)
   const [attachments, setAttachments] = React.useState<DemoAttachment[]>([])
   const [listening, setListening] = React.useState(false)
@@ -733,7 +876,7 @@ function PlaygroundExample({
     React.useState<DemoAttachment[] | null>(null)
   const [menuTargetId, setMenuTargetId] = React.useState<number | null>(null)
   const attachmentCounters = React.useRef<Record<DemoAttachmentKind, number>>({ photo: 0, file: 0, folder: 0, skill: 0, plugin: 0 })
-  const inputRef = React.useRef<HTMLTextAreaElement>(null)
+  const inputRef = React.useRef<ChatComposerEditorHandle>(null)
   const logRef = React.useRef<HTMLDivElement>(null)
   const [frameElement, setFrameElement] = React.useState<HTMLDivElement | null>(
     null,
@@ -825,6 +968,7 @@ function PlaygroundExample({
     setMenuTargetId(null)
     setViewerAttachments(null)
     setModelCardOpen(false)
+    setChipCardItem(null)
   }
 
   const addAttachment = (kind: DemoAttachmentKind) => {
@@ -858,7 +1002,9 @@ function PlaygroundExample({
         inputRef.current?.focus()
         return
       }
-      setMessage((current) => (current ? `${current} ${word}` : word))
+      // The transcription streams into the real editor at the caret; the
+      // editor reports the text back through onContentChange.
+      inputRef.current?.insertText(word)
     }, 280)
     return () => clearInterval(interval)
   }, [listening])
@@ -964,6 +1110,7 @@ function PlaygroundExample({
           setMenuTargetId(null)
           setViewerAttachments(null)
           setModelCardOpen(false)
+          setChipCardItem(null)
         }}
         onClose={(id) => {
           if (id === generatingTabId) {
@@ -984,7 +1131,9 @@ function PlaygroundExample({
           })
         }}
         onNew={() => {
-          const id = `chat-${nextId.current++}`
+          // nextId starts at 1, and "chat-1" already exists — offset new
+          // tab ids so the first + click can never mint a duplicate key.
+          const id = `chat-${1 + nextId.current++}`
           setTabs((current) => [
             ...current,
             { id, title: "New chat", closeable: true },
@@ -1043,6 +1192,7 @@ function PlaygroundExample({
               setMenuTargetId(open ? entry.id : null)
             }
             menuBoundary={frameElement}
+            onChipOpen={openChipCard}
             onReact={(emoji) => {
               updateMessages(activeTabId, (current) =>
                 current.map((message) =>
@@ -1096,6 +1246,9 @@ function PlaygroundExample({
           ))}
         </ChatAttachmentViewer>
       ) : null}
+      {chipCardItem ? (
+        <ChipCard item={chipCardItem} onClose={() => setChipCardItem(null)} />
+      ) : null}
       {modelCardOpen ? (
         <ModelCard
           value={model}
@@ -1111,23 +1264,30 @@ function PlaygroundExample({
         generating={generating}
         onSubmit={(event) => {
           event.preventDefault()
-          const text = message.trim()
+          const content = inputRef.current?.getContent()
+          const text = (content?.text ?? message).trim()
           if ((!text && attachments.length === 0) || generatingTabId !== null)
             return
+          // Chips travel with the message: the bubble re-renders them with
+          // their icons instead of flattening to plain text.
+          const hasChips = content?.parts.some((part) => part.type === "chip")
           updateMessages(activeTabId, (current) => [
             ...current,
             {
               id: nextId.current++,
               role: "user",
               text,
+              parts: hasChips ? content?.parts : undefined,
               replyTo: replyTarget?.text,
               replyToId: replyTarget?.id,
               attachments: attachments.length > 0 ? attachments : undefined,
             },
           ])
+          inputRef.current?.clear()
           setMessage("")
           setAttachments([])
           setReplyTarget(null)
+          setChipCardItem(null)
           setGeneratingTabId(activeTabId)
           startReply(activeTabId, replyDelay)
         }}
@@ -1184,10 +1344,14 @@ function PlaygroundExample({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <ChatComposerInput
+          {/* The rich editor in place of the plain textarea: skills and
+              plugins land as inline chips on the text baseline, exactly as
+              in the ChatComposerEditor catalog story; only files, photos,
+              and folders use the tile row above. */}
+          <ChatComposerEditor
             ref={inputRef}
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
+            onContentChange={(content) => setMessage(content.text)}
+            onChipPress={(chip) => openChipCard(chip.label)}
             placeholder={
               replyTarget
                 ? "Reply"
@@ -1303,10 +1467,16 @@ function PlaygroundExample({
                   setModelCardOpen(true)
                   return
                 }
-                setAttachments((current) => [
-                  ...current,
-                  { id: nextId.current++, kind: item.kind, label: item.label },
-                ])
+                // Skills and plugins are inline chips on the text baseline,
+                // like the main composer; only files, photos, and folders
+                // use the tile row above the input.
+                inputRef.current?.insertChip({
+                  id: `chip-${nextId.current++}`,
+                  kind: item.kind,
+                  label: item.label,
+                  icon: item.icon,
+                  className: "font-medium text-(--nessa-chat-accent)",
+                })
               }}
               listLabel="Commands, skills, and plugins"
               emptyMessage="No matching commands"
@@ -1690,7 +1860,7 @@ export const Playground: Story = {
     await expect(
       canvas.getByText("Ship the release notes"),
     ).toBeInTheDocument()
-    await expect(input).toHaveValue("")
+    await waitFor(() => expect(input.textContent ?? "").toBe(""))
     const composer = canvasElement.querySelector<HTMLElement>(
       '[data-slot="pill-composer"]',
     )!
@@ -1741,9 +1911,9 @@ export const Playground: Story = {
       ),
     })
     // Opening the tapback menu alone must not frost the transcript.
-    await expect(input).toHaveAttribute("placeholder", "Ask me anything")
+    await expect(input).toHaveAttribute("data-placeholder", "Ask me anything")
     await userEvent.click(await body.findByRole("menuitem", { name: "Reply" }))
-    await expect(input).toHaveAttribute("placeholder", "Reply")
+    await expect(input).toHaveAttribute("data-placeholder", "Reply")
     const firstMessage = canvasElement.querySelector<HTMLElement>(
       '[data-slot="chat-message"]',
     )!
@@ -1751,7 +1921,7 @@ export const Playground: Story = {
       expect(getComputedStyle(firstMessage).filter).toContain("blur")
     })
     await userEvent.keyboard("{Escape}")
-    await expect(input).toHaveAttribute("placeholder", "Ask me anything")
+    await expect(input).toHaveAttribute("data-placeholder", "Ask me anything")
     await waitFor(() => {
       expect(getComputedStyle(firstMessage).filter).toBe("none")
     })
@@ -1762,7 +1932,7 @@ export const Playground: Story = {
       ),
     })
     await userEvent.click(await body.findByRole("menuitem", { name: "Reply" }))
-    await expect(input).toHaveAttribute("placeholder", "Reply")
+    await expect(input).toHaveAttribute("data-placeholder", "Reply")
     await waitFor(() => {
       expect(input).toHaveFocus()
     })
@@ -1770,7 +1940,7 @@ export const Playground: Story = {
     await expect(
       canvas.getByLabelText("Reply to: thanks"),
     ).toBeInTheDocument()
-    await expect(input).toHaveAttribute("placeholder", "Ask me anything")
+    await expect(input).toHaveAttribute("data-placeholder", "Ask me anything")
     await waitFor(() => {
       expect(getComputedStyle(firstMessage).filter).toBe("none")
     })
@@ -1796,7 +1966,7 @@ export const Playground: Story = {
     })
     await userEvent.type(input, "/mod")
     await userEvent.click(await body.findByRole("option", { name: /model/ }))
-    await expect(input).toHaveValue("")
+    await waitFor(() => expect(input.textContent ?? "").toBe(""))
     const modelList = canvas.getByRole("listbox", { name: "Models" })
     await userEvent.click(
       within(modelList).getByRole("option", { name: /Sonnet 5/ }),
@@ -1838,7 +2008,7 @@ export const Playground: Story = {
       canvas.queryByRole("button", { name: "Stop listening" }),
     ).not.toBeInTheDocument()
     await waitFor(() => {
-      expect((input as HTMLTextAreaElement).value).toContain("Draft")
+      expect(input.textContent ?? "").toContain("Draft")
     })
     canvasElement.ownerDocument.defaultView!.dispatchEvent(
       new PointerEvent("pointerup", { bubbles: true, button: 0, pointerId: 1 }),
@@ -1874,9 +2044,9 @@ export const Playground: Story = {
       '[data-slot="chat-reaction"]',
     )!
     await expect(reactionBadge).toHaveTextContent("❤️")
-    await expect(input).toHaveAttribute("placeholder", "Ask me anything")
+    await expect(input).toHaveAttribute("data-placeholder", "Ask me anything")
     await userEvent.type(input, " tomorrow")
-    await expect((input as HTMLTextAreaElement).value).toMatch(/ tomorrow$/)
+    await expect(input.textContent ?? "").toMatch(/ tomorrow$/)
     await waitForSettledAnimations(canvasElement)
   },
 }
@@ -1911,7 +2081,7 @@ export const Subagents: Story = {
     ).toBeInTheDocument()
     await expect(
       canvas.getByRole("textbox", { name: "Message" }),
-    ).toHaveAttribute("placeholder", "Message Reviewer…")
+    ).toHaveAttribute("data-placeholder", "Message Reviewer…")
     // The provenance caption names the task; the way back is the tab
     // itself — re-selecting the subagent tab you are inside (the hover
     // back glyph's action) returns to the spawning conversation.
@@ -2030,7 +2200,7 @@ export const Voice: Story = {
       expect(voice).toHaveAttribute("aria-pressed", "true")
     })
     await waitFor(() => {
-      expect((input as HTMLTextAreaElement).value).toContain("Draft")
+      expect(input.textContent ?? "").toContain("Draft")
     })
     canvasElement.ownerDocument.defaultView!.dispatchEvent(
       new PointerEvent("pointerup", { bubbles: true, button: 0, pointerId: 1 }),
@@ -2077,7 +2247,7 @@ export const ModelCommand: Story = {
     const input = canvas.getByRole("textbox", { name: "Message" })
     await userEvent.type(input, "/mod")
     await userEvent.click(await body.findByRole("option", { name: /model/ }))
-    await expect(input).toHaveValue("")
+    await waitFor(() => expect(input.textContent ?? "").toBe(""))
     const search = canvas.getByRole("textbox", { name: "Search models" })
     await userEvent.type(search, "kimi")
     await userEvent.click(canvas.getByRole("option", { name: /Kimi K3/ }))
