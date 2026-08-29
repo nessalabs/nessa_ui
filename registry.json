@@ -1891,6 +1891,7 @@
       "title": "Price chart",
       "description": "A brokerage-style price plot: one hairline stroke in the market's colour with an optional tone wash, a dotted reference rule, a price scale over faint gridlines and a time scale that re-label themselves when a drag zooms into a window, a candle view over the same geometry, a pulsing marker for a streaming quote, and a cursor that scrubs by pointer, finger, or arrow key.",
       "dependencies": [
+        "class-variance-authority",
         "lucide-react"
       ],
       "registryDependencies": [

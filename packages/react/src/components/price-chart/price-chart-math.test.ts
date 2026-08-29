@@ -101,11 +101,34 @@ test("the line path breaks at a bar with no price", () => {
     priceChartLinePath(line, geometry),
     "M0.00,100.00L50.00,0.00L100.00,50.00",
   )
+  // Each stranded observation repeats its own point so a round cap draws it
+  // as a dot; a lone move command would render nothing at all.
   const gapped = [line[0] as PriceChartBar, { time: 1 }, line[2] as PriceChartBar]
   assert.equal(
     priceChartLinePath(gapped, priceChartGeometry({ width: 100, height: 100, series: gapped, inset: 0 })),
-    "M0.00,100.00M100.00,0.00",
+    "M0.00,100.00L0.00,100.00M100.00,0.00L100.00,0.00",
   )
+})
+
+test("the area closes every run to the floor, never across a gap", () => {
+  const gapped: PriceChartBar[] = [
+    { time: 0, value: 10 },
+    { time: 1, value: 12 },
+    { time: 2 },
+    { time: 3, value: 18 },
+    { time: 4, value: 20 },
+  ]
+  const geometry = priceChartGeometry({
+    width: 100,
+    height: 100,
+    series: gapped,
+    inset: 0,
+  })
+  const area = priceChartAreaPath(gapped, geometry)
+  // Two closed subpaths, one per run — not one shape spanning the gap.
+  assert.equal(area.split("Z").length - 1, 2)
+  assert.ok(area.includes("M0.00,100.00L25.00,80.00L25.00,100.00L0.00,100.00Z"))
+  assert.ok(area.includes("M75.00,20.00L100.00,0.00L100.00,100.00L75.00,100.00Z"))
 })
 
 test("a single bar draws a flat line across the box", () => {
@@ -161,6 +184,16 @@ test("the cursor resolves the nearest bar in each view's own spacing", () => {
   assert.equal(priceChartIndexAt(10, candleGeometry, "candle"), 0)
   assert.equal(priceChartIndexAt(80, candleGeometry, "candle"), 1)
   assert.equal(priceChartIndexAt(10, geometryFor([]), "line"), -1)
+  // An unmeasured plot resolves no bar at all, so a press that lands before
+  // the first measurement cannot silently anchor on the first one.
+  assert.equal(
+    priceChartIndexAt(
+      10,
+      priceChartGeometry({ width: 0, height: 0, series: line }),
+      "line",
+    ),
+    -1,
+  )
 })
 
 test("tone compares against the reference and stays neutral when flat", () => {

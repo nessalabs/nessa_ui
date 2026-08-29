@@ -38,6 +38,41 @@ what per-theme steps remove.
 
 `N` runs 1..8: blue, orange, aqua, sand, rose, moss, violet, sky.
 
+## The direction axis is not part of the ramp
+
+Not every chart colours by category. A price series carries a **direction** —
+up or down against a reference — which is one semantic pair, not two slots
+drawn from a list. Assigning it ramp slots would say the wrong thing twice:
+that the two readings are unrelated categories, and that a different chart
+using slots 1 and 2 means the same thing by them.
+
+That pair has its own tokens:
+
+| Token | Role |
+| --- | --- |
+| `--nessa-market-gain` | a price above its reference |
+| `--nessa-market-loss` | a price below it |
+
+`PriceChart` takes them through `priceChartToneVariants`, the same
+export-the-mapping move `pieChartPalette` and `radarChartPalette` make, so a
+panel showing the same reading beside the chart (`StockQuote`'s headline
+change) matches it without naming a token twice.
+
+Both are text-contrast tokens rather than fill steps: they paint a hairline
+stroke, a change line, and candle bodies, all read as foreground. They are
+therefore on the `A11Y-001` matrix against `--card`, `--background`, and
+`--popover` — every surface they are actually painted on — rather than on the
+categorical separation gates, which govern *telling slots apart* and have
+nothing to say about a two-value semantic pair.
+
+Direction is never carried by colour alone: `StockQuote`'s change line ships
+an arrow glyph and an off-screen "Up"/"Down", and a host embedding a bare
+`PriceChart` owes the same relief the ramp's contrast rule asks for.
+
+A future chart with its own semantic axis (pass/fail, over/under budget)
+should follow this shape — a named pair of tokens and an exported mapping —
+rather than borrowing ramp slots.
+
 ## Slot order is the safety mechanism
 
 A slot is assigned by **input order** and always means the same entity. A

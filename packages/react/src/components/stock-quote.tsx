@@ -15,9 +15,9 @@ import {
   priceChartBarValue,
   priceChartHasCandles,
   priceChartTone,
+  priceChartToneVariants,
   type PriceChartBar,
   type PriceChartSelectionContext,
-  type PriceChartTone,
   type PriceChartView,
 } from "./price-chart"
 import { SegmentedControl, SegmentedControlOption } from "./segmented-control"
@@ -109,11 +109,7 @@ export const stockQuoteDefaultLabels: StockQuoteLabels = Object.freeze({
   selected: "Selected",
 })
 
-const toneTextClass: Record<PriceChartTone, string> = {
-  gain: "text-(--nessa-market-gain)",
-  loss: "text-(--nessa-market-loss)",
-  neutral: "text-muted-foreground",
-}
+
 
 export interface StockQuoteProps
   extends Omit<React.ComponentProps<"section">, "onChange"> {
@@ -121,7 +117,12 @@ export interface StockQuoteProps
   symbol: string
   /** The issuer's display name. */
   name?: string
-  /** The latest price, shown large until the chart is scrubbed. */
+  /**
+   * The latest price, shown large until the chart is scrubbed or zoomed.
+   * It is the quote's own number rather than a reading off `series`, so a
+   * host with a faster price feed than bar feed can keep the two apart; pass
+   * the newest bar's price when they are the same thing.
+   */
   price: number
   /**
    * The reference the headline change is measured from, and the chart's
@@ -177,12 +178,24 @@ export interface StockQuoteProps
    */
   status?: StockQuoteStatus
   /**
-   * Whether dragging across the chart selects a window. While one is
-   * selected the headline reports that window instead of the session.
+   * Whether dragging across the chart selects a window to zoom into. While
+   * one is open the headline reports that window instead of the session, and
+   * `onSelectionChange` carries it to the host.
    */
   selectable?: boolean
   /** Figures shown in the strip under the chart. */
   stats?: readonly StockQuoteStat[]
+  /**
+   * Fires when a window is zoomed into on the chart or cleared, with the
+   * bars at each end and the move across them — the hook for loading that
+   * span at a finer resolution.
+   */
+  onSelectionChange?: (selection: PriceChartSelectionContext | null) => void
+  /**
+   * Fires as the cursor moves across bars, with the index into the active
+   * window's series and `null` when the cursor leaves.
+   */
+  onScrubChange?: (index: number | null) => void
   /** Overrides for the strings the component itself produces. */
   labels?: Partial<StockQuoteLabels>
   /** Actions for the header's trailing edge, such as a trade button. */
@@ -201,6 +214,11 @@ export interface StockQuoteProps
  * `onRangeChange` by loading that window. It fills the box its host gives it
  * and reflows from a phone-width card to a full-width desk layout on its own
  * container's width, so the same element serves both.
+ *
+ * The chart inside is configured for this panel — scales on, wash on, prices
+ * and times formatted from `currency` and `locale` — and its two readings
+ * reach the host through `onScrubChange` and `onSelectionChange`. A surface
+ * that needs different chart settings should compose `PriceChart` directly.
  */
 function StockQuote({
   symbol,
@@ -221,6 +239,8 @@ function StockQuote({
   extendedHours,
   status,
   selectable = true,
+  onSelectionChange,
+  onScrubChange,
   stats,
   labels: labelsProp,
   className,
@@ -237,11 +257,14 @@ function StockQuote({
   const seriesByRange = Array.isArray(seriesProp)
     ? null
     : (seriesProp as Readonly<Record<string, readonly PriceChartBar[]>>)
-  const ranges: readonly StockQuoteRange[] =
-    rangesProp ??
-    (seriesByRange
-      ? Object.keys(seriesByRange).map((id) => ({ id, label: id }))
-      : stockQuoteDefaultRanges)
+  const ranges: readonly StockQuoteRange[] = React.useMemo(
+    () =>
+      rangesProp ??
+      (seriesByRange
+        ? Object.keys(seriesByRange).map((id) => ({ id, label: id }))
+        : stockQuoteDefaultRanges),
+    [rangesProp, seriesByRange],
+  )
 
   const [uncontrolledView, setUncontrolledView] =
     React.useState<PriceChartView>(defaultView)
@@ -263,12 +286,18 @@ function StockQuote({
   )
 
   const changeRange = (next: string) => {
-    // A window drawn on one range means nothing on another.
-    setSelection(null)
-    setScrubIndex(null)
     if (rangeProp === undefined) setUncontrolledRange(next)
     onRangeChange?.(next)
   }
+
+  // A window and a cursor are indices into one window's bars; they mean
+  // nothing once a different window is on screen. Dropping them here covers
+  // the controlled host that changes `range` itself, which the control's own
+  // handler never sees.
+  React.useEffect(() => {
+    setSelection(null)
+    setScrubIndex(null)
+  }, [range])
 
   const currencyFormatter = React.useMemo(
     () =>
@@ -362,14 +391,19 @@ function StockQuote({
   // the window — scrubbing inside a zoom has to keep reading out prices —
   // while the window still rules what the change is measured from. All of it
   // is derived here so the headline, its colour, and the chart agree.
-  const selectionValue = selection
-    ? priceChartBarValue(selection.endBar)
+  // Read back through the current series rather than the bars the callback
+  // captured: a streaming host appends to `series` while a window is open,
+  // and a stale snapshot would let the headline disagree with the plot.
+  const selectionWindow =
+    selection && selection.end < series.length ? selection : null
+  const selectionValue = selectionWindow
+    ? priceChartBarValue(series[selectionWindow.end] as PriceChartBar)
     : null
-  const selectionOpen = selection
-    ? priceChartBarValue(selection.startBar)
+  const selectionOpen = selectionWindow
+    ? priceChartBarValue(series[selectionWindow.start] as PriceChartBar)
     : null
   const shownPrice = scrubbedValue ?? selectionValue ?? price
-  const reference = selection
+  const reference = selectionWindow
     ? (selectionOpen ?? shownPrice)
     : (baseline ?? price)
   const changeAmount = shownPrice - reference
@@ -379,7 +413,7 @@ function StockQuote({
   // change line only has to say which reading this is.
   const changeContext = scrubbedBar
     ? formatTime(scrubbedBar.time)
-    : selection
+    : selectionWindow
       ? labels.selected
       : labels.change
 
@@ -417,6 +451,7 @@ function StockQuote({
               <span
                 data-slot="stock-quote-status"
                 data-status={status}
+                role="status"
                 className="sr-only"
               >
                 {statusLabel}
@@ -446,7 +481,7 @@ function StockQuote({
             data-slot="stock-quote-change"
             className={cn(
               "m-0 flex flex-wrap items-center gap-x-1.5 nessa-text-4 font-medium tabular-nums transition-colors duration-(--nessa-motion-duration-fast)",
-              toneTextClass[tone],
+              priceChartToneVariants({ tone }),
             )}
           >
             {/* The slot is always occupied: a mark that appears and
@@ -473,7 +508,7 @@ function StockQuote({
               data-slot="stock-quote-extended-change"
               className={cn(
                 "m-0 flex flex-wrap items-center gap-x-1.5 nessa-text-3 tabular-nums",
-                toneTextClass[extendedTone],
+                priceChartToneVariants({ tone: extendedTone }),
               )}
             >
               <span>{formatPrice(extendedHours.price)}</span>
@@ -501,16 +536,26 @@ function StockQuote({
           series={series}
           view={view}
           baseline={baseline}
-          tone={tone}
+          // The chart states what the series did; the headline states what the
+          // cursor is reading. Forcing the chart's colour from the cursor
+          // would repaint the whole plot red every time a hover crossed
+          // below the open on a day that closed up.
+          tone={selection || scrubbedBar ? undefined : tone}
           live={status === "live"}
           fill
           scrubIndex={scrubIndex}
-          onScrubChange={setScrubIndex}
+          onScrubChange={(index) => {
+            setScrubIndex(index)
+            onScrubChange?.(index)
+          }}
           selectable={selectable}
           selection={
             selection ? { start: selection.start, end: selection.end } : null
           }
-          onSelectionChange={setSelection}
+          onSelectionChange={(next) => {
+            setSelection(next)
+            onSelectionChange?.(next)
+          }}
           formatValue={formatPrice}
           formatTime={formatTime}
           formatAxisTime={formatAxisTime}
@@ -526,13 +571,20 @@ function StockQuote({
             aria-label={labels.ranges}
             value={range}
             onValueChange={changeRange}
-            className="min-w-0 flex-wrap border-transparent p-0"
+            variant="bare"
+            className="min-w-0 flex-wrap"
           >
             {ranges.map((entry) => (
               <SegmentedControlOption
                 key={entry.id}
                 value={entry.id}
-                aria-label={entry.description}
+                // The spoken name has to start with the label a person can
+                // see, or voice control cannot match "1D" to this button.
+                aria-label={
+                  entry.description
+                    ? `${entry.label}, ${entry.description}`
+                    : undefined
+                }
                 className="px-2.5 tabular-nums"
               >
                 {entry.label}

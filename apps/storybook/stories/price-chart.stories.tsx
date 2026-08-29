@@ -184,12 +184,12 @@ export const Sparklines: Story = {
   render: () => (
     <ul className="m-0 grid max-w-md list-none gap-1 p-0">
       {[
-        { symbol: "HOOD", last: "$132.19", series: INTRADAY },
-        { symbol: "COIN", last: "$118.02", series: DECLINE },
+        { symbol: "HOOD", last: "$132.19", change: "+7.4%", series: INTRADAY },
+        { symbol: "COIN", last: "$118.02", change: "−5.1%", series: DECLINE },
       ].map((row) => (
         <li
           key={row.symbol}
-          className="grid grid-cols-[4rem_1fr_5rem] items-center gap-3 rounded-lg border border-border px-3 py-2"
+          className="grid grid-cols-[4rem_1fr_6rem] items-center gap-3 rounded-lg border border-border px-3 py-2"
         >
           <span className="nessa-text-4 font-semibold">{row.symbol}</span>
           <PriceChart
@@ -199,8 +199,13 @@ export const Sparklines: Story = {
             aria-label={`${row.symbol} price history`}
             className="h-10 min-h-0"
           />
-          <span className="text-right nessa-text-4 tabular-nums">
-            {row.last}
+          <span className="grid justify-items-end nessa-text-4 tabular-nums">
+            <span>{row.last}</span>
+            {/* The sign carries direction without colour, which is the
+                relief a bare plot owes when it has no header to read. */}
+            <span className="nessa-text-2 text-muted-foreground">
+              {row.change}
+            </span>
           </span>
         </li>
       ))}
@@ -243,6 +248,12 @@ export const ZoomToSelection: Story = {
     })
 
     await expect(cursor).toHaveAttribute("aria-valuemin", "0")
+    // The plot has to be measured before a press can resolve to a bar.
+    await waitFor(async () => {
+      await expect(
+        canvasElement.querySelector('[data-slot="price-chart"] svg'),
+      ).toBeInTheDocument()
+    })
 
     await fireEvent.pointerDown(cursor, at(0.3))
     await fireEvent.pointerMove(cursor, at(0.65))
@@ -304,7 +315,8 @@ export const ZoomToSelection: Story = {
     await expect(zoomedMax).toBeLessThan(INTRADAY.length - 1)
     await expect(zoomedMax - zoomedMin).toBeGreaterThan(1)
 
-    // Clearing restores the full series.
+    // Clearing restores the full series and hands focus back to the cursor,
+    // rather than dropping it on the body when the control unmounts itself.
     await userEvent.click(canvas.getByRole("button", { name: "Clear selection" }))
     await waitFor(async () => {
       await expect(cursor).toHaveAttribute("aria-valuemin", "0")
@@ -313,5 +325,67 @@ export const ZoomToSelection: Story = {
       "aria-valuemax",
       String(INTRADAY.length - 1),
     )
+    await expect(cursor).toHaveFocus()
+
+    // The same window by keyboard: Shift+Arrow draws it, Enter commits it,
+    // Escape puts the whole series back.
+    await fireEvent.keyDown(cursor, { key: "Home" })
+    for (let step = 0; step < 6; step += 1) {
+      await fireEvent.keyDown(cursor, { key: "ArrowRight", shiftKey: true })
+    }
+    await waitFor(async () => {
+      await expect(
+        canvasElement.querySelector(
+          '[data-slot="price-chart-selection-summary"]',
+        ),
+      ).toBeInTheDocument()
+    })
+    await fireEvent.keyDown(cursor, { key: "Enter" })
+    await waitFor(async () => {
+      await expect(cursor).toHaveAttribute("aria-valuemax", "6")
+    })
+    // Shift+End extends a window in progress rather than discarding it.
+    await fireEvent.keyDown(cursor, { key: "Escape" })
+    await waitFor(async () => {
+      await expect(cursor).toHaveAttribute(
+        "aria-valuemax",
+        String(INTRADAY.length - 1),
+      )
+    })
+    await fireEvent.keyDown(cursor, { key: "Home" })
+    await fireEvent.keyDown(cursor, { key: "ArrowRight", shiftKey: true })
+    await fireEvent.keyDown(cursor, { key: "End", shiftKey: true })
+    await fireEvent.keyDown(cursor, { key: "Enter" })
+    await waitFor(async () => {
+      await expect(cursor).toHaveAttribute("aria-valuemin", "0")
+      await expect(cursor).toHaveAttribute(
+        "aria-valuemax",
+        String(INTRADAY.length - 1),
+      )
+    })
+  },
+}
+
+export const NoData: Story = {
+  parameters: storyDocumentation(
+    "An empty series still occupies its box and says so, rather than collapsing or drawing an axis for prices that do not exist. The cursor stays present but disabled, so a keyboard user who reaches it hears the same thing the plot shows.",
+  ),
+  args: { series: [] },
+  render: (args) => (
+    <div className="h-48 w-full max-w-3xl">
+      <PriceChart {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByText("No price data")).toBeInTheDocument()
+    const cursor = canvas.getByRole("slider")
+    await expect(cursor).toHaveAttribute("aria-disabled", "true")
+    await expect(cursor).toHaveAttribute("aria-valuetext", "No price data")
+    // No scale is printed for an empty plot.
+    await expect(
+      canvasElement.querySelector('[data-slot="price-chart-value-axis"]')
+        ?.textContent,
+    ).toBe("")
   },
 }

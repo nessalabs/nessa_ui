@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { cva } from "class-variance-authority"
 import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -36,10 +37,24 @@ export interface PriceChartLabels {
   chart: string
   /** Shown and announced in place of the plot when the series is empty. */
   empty: string
-  /** Names the scrub cursor for assistive technology. */
+  /**
+   * Names the scrub cursor for assistive technology when the host passes no
+   * `aria-label`. A host that does pass one names the cursor with it, since
+   * the cursor is the chart's only focusable surface.
+   */
   cursor: string
   /** Names the control that returns a zoomed chart to the full series. */
   clearSelection: string
+  /**
+   * Describes the window gesture on the cursor, so a person who cannot see
+   * the plot still learns the chart can be zoomed. Rendered off-screen and
+   * referenced by the cursor's `aria-describedby`.
+   */
+  selectionHint: string
+  /** Announces a committed window. Receives the formatted span. */
+  zoomed: (span: string) => string
+  /** Announces a return to the full series. */
+  cleared: string
 }
 
 /** The out-of-the-box English strings. */
@@ -48,13 +63,30 @@ export const priceChartDefaultLabels: PriceChartLabels = Object.freeze({
   empty: "No price data",
   cursor: "Price cursor",
   clearSelection: "Clear selection",
+  selectionHint:
+    "Drag across the chart, or hold Shift and press the arrow keys and then Enter, to zoom into a window. Escape returns to the full series.",
+  zoomed: (span: string) => `Zoomed to ${span}`,
+  cleared: "Showing the full series",
 })
 
-const toneTextClass: Record<PriceChartTone, string> = {
-  gain: "text-(--nessa-market-gain)",
-  loss: "text-(--nessa-market-loss)",
-  neutral: "text-muted-foreground",
-}
+/**
+ * The market colour for a direction, as a text class so anything inside it —
+ * SVG paint through `currentColor`, a change line, a legend swatch — takes it
+ * without naming the token again. Exported because a host or a sibling panel
+ * showing the same reading has to be able to match the chart exactly.
+ */
+export const priceChartToneVariants = cva("", {
+  variants: {
+    tone: {
+      gain: "text-(--nessa-market-gain)",
+      loss: "text-(--nessa-market-loss)",
+      neutral: "text-muted-foreground",
+    },
+  },
+  defaultVariants: { tone: "neutral" },
+})
+
+const toneTextClass = (tone: PriceChartTone) => priceChartToneVariants({ tone })
 
 /**
  * A selected window with everything a host needs to act on it: the bars at
@@ -71,9 +103,53 @@ export interface PriceChartSelectionContext extends PriceChartSelection {
   changePercent: number
 }
 
+/**
+ * The measured content box of an element, or `null` before the first
+ * measurement. Deliberately identical to the hooks RadarChart and PieChart
+ * carry, so a chart's plot never paints at a stale size and the three can be
+ * lifted into one shared module without behaviour drift.
+ */
+function useMeasuredBox(ref: React.RefObject<HTMLElement | null>) {
+  const [box, setBox] = React.useState<{ width: number; height: number } | null>(
+    null,
+  )
+  React.useLayoutEffect(() => {
+    const element = ref.current
+    if (!element) return
+    // Measured once before subscribing, unlike the observer-only copies in
+    // RadarChart and PieChart: this plot resolves pointer positions against
+    // its own width, so a press landing between first paint and the
+    // observer's first callback would resolve every position to bar zero.
+    const initial = element.getBoundingClientRect()
+    setBox((previous) =>
+      previous ??
+      { width: Math.round(initial.width), height: Math.round(initial.height) },
+    )
+    if (typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[entries.length - 1]!.contentRect
+      const width = Math.round(rect.width)
+      const height = Math.round(rect.height)
+      setBox((previous) =>
+        previous && previous.width === width && previous.height === height
+          ? previous
+          : { width, height },
+      )
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [ref])
+  return box
+}
+
 export interface PriceChartProps
   extends Omit<React.ComponentProps<"div">, "onChange"> {
-  /** The observations to plot, oldest first. */
+  /**
+   * The observations to plot, oldest first. A bar carrying no price is a gap
+   * — the line breaks around it rather than drawing through it — and the
+   * candle view skips any bar without a full open/high/low/close set, so a
+   * partial stream renders what it has instead of failing.
+   */
   series: readonly PriceChartBar[]
   /**
    * Whether to draw a continuous price line or one candle per bar. A candle
@@ -93,9 +169,16 @@ export interface PriceChartProps
    * baseline (or the first price), red below.
    */
   tone?: PriceChartTone
-  /** Fades a tone-colored wash from the line down to the bottom edge. */
+  /**
+   * Fades a tone-colored wash from the line down to the bottom edge. Off by
+   * default, and inert in the candle view, which has no line to fill under.
+   */
   fill?: boolean
-  /** Marks the newest bar with a pulsing dot for a streaming quote. */
+  /**
+   * Marks the newest bar of the series with a pulsing dot for a streaming
+   * quote. Off by default, and hidden while a zoom is showing a window that
+   * does not reach the newest bar.
+   */
   live?: boolean
   /** Controlled index of the scrubbed bar; `null` clears the cursor. */
   scrubIndex?: number | null
@@ -107,15 +190,17 @@ export interface PriceChartProps
    */
   onScrubChange?: (index: number | null) => void
   /**
-   * Turns off pointer and keyboard scrubbing. The plot then exposes itself
-   * as a single labelled image instead of a cursor.
+   * Whether the plot carries a cursor at all. Defaults to `true`; passing
+   * `false` drops the interactive overlay and exposes the plot as a single
+   * labelled image, which also disables `selectable` — the window gesture
+   * lives on that same overlay.
    */
   scrubbable?: boolean
   /**
-   * Whether dragging across the plot selects a window to zoom into. The
-   * drag draws a shaded band with a running summary; releasing it re-plots
-   * the chart on that window alone, and the clear control or Escape returns
-   * to the full series.
+   * Whether dragging across the plot selects a window to zoom into.
+   * Defaults to `true`. The drag draws a shaded band with a running summary;
+   * releasing it re-plots the chart on that window alone, and the clear
+   * control or Escape returns to the full series. Requires `scrubbable`.
    */
   selectable?: boolean
   /**
@@ -135,8 +220,8 @@ export interface PriceChartProps
   formatPercent?: (percent: number) => string
   /**
    * Whether to print the price scale down the right edge and the time scale
-   * along the bottom. Both re-read the plotted window, so zooming re-labels
-   * them. Turn them off for sparkline-sized charts.
+   * along the bottom. On by default; both re-read the plotted window, so
+   * zooming re-labels them. Turn them off for sparkline-sized charts.
    */
   axes?: boolean
   /**
@@ -156,6 +241,11 @@ export interface PriceChartProps
   formatTime?: (time: number) => string
   /** Overrides for the strings the chart itself produces. */
   labels?: Partial<PriceChartLabels>
+  /**
+   * Rendered under the plot and its scales — the slot for a legend or a
+   * caption that should sit inside the chart's own box.
+   */
+  children?: React.ReactNode
 }
 
 const defaultFormatValue = (value: number) => value.toFixed(2)
@@ -213,32 +303,17 @@ function PriceChart({
     [labelsProp],
   )
   const plotRef = React.useRef<HTMLDivElement>(null)
+  const cursorRef = React.useRef<HTMLDivElement>(null)
+  // Read through refs inside the commit callback: the announcement wording
+  // and the formatter are presentation, and neither should re-create the
+  // commit — or the window listener that calls it — on every render.
+  const labelsRef = React.useRef(labels)
+  labelsRef.current = labels
+  const formatTimeRef = React.useRef(formatTime)
+  formatTimeRef.current = formatTime
   const gradientId = React.useId()
-  const [box, setBox] = React.useState({ width: 0, height: 0 })
-
-  // The host owns the box; the plot only reads it. Sub-pixel churn is
-  // ignored so a scrollbar appearing next to the chart cannot oscillate the
-  // measurement.
-  React.useEffect(() => {
-    const element = plotRef.current
-    if (!element || typeof ResizeObserver === "undefined") return
-    const measure = () => {
-      const next = {
-        width: element.clientWidth,
-        height: element.clientHeight,
-      }
-      setBox((previous) =>
-        Math.abs(previous.width - next.width) > 1 ||
-        Math.abs(previous.height - next.height) > 1
-          ? next
-          : previous,
-      )
-    }
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [])
+  const hintId = React.useId()
+  const box = useMeasuredBox(plotRef) ?? { width: 0, height: 0 }
 
   const [uncontrolledSelection, setUncontrolledSelection] =
     React.useState<PriceChartSelection | null>(defaultSelection)
@@ -255,12 +330,17 @@ function PriceChart({
   // zoom needs no second code path: the offset maps a visible bar back to
   // the index the host knows it by.
   const offset = selection?.start ?? 0
+  const windowEnd = selection?.end ?? -1
+  // Keyed on the window's own bounds: `selection` is normalised fresh on every
+  // render, so an object dependency would defeat this memo (and the geometry
+  // and candle memos below it) for the whole time a zoom is active.
   const visible = React.useMemo(
-    () =>
-      selection ? series.slice(selection.start, selection.end + 1) : series,
-    [series, selection],
+    () => (windowEnd >= 0 ? series.slice(offset, windowEnd + 1) : series),
+    [series, offset, windowEnd],
   )
 
+  // The window gesture rides the cursor overlay, so it cannot outlive it.
+  const canSelect = selectable && scrubbable
   const resolvedView =
     view === "candle" && !priceChartHasCandles(visible) ? "line" : view
   const geometry = React.useMemo(
@@ -316,6 +396,15 @@ function PriceChart({
     (next: PriceChartSelection | null) => {
       const normalized = priceChartNormalizeSelection(next, series.length)
       if (selectionProp === undefined) setUncontrolledSelection(normalized)
+      const startBar = normalized ? series[normalized.start] : undefined
+      const endBar = normalized ? series[normalized.end] : undefined
+      setAnnouncement(
+        normalized && startBar && endBar
+          ? labelsRef.current.zoomed(
+              `${formatTimeRef.current(startBar.time)} – ${formatTimeRef.current(endBar.time)}`,
+            )
+          : labelsRef.current.cleared,
+      )
       if (!onSelectionChange) return
       if (!normalized) {
         onSelectionChange(null)
@@ -345,6 +434,17 @@ function PriceChart({
     drawing: boolean
     /** The element holding pointer capture, so it can be released. */
     target: HTMLElement
+    /**
+     * The window the drag has reached, mirrored off state: `pointermove` is a
+     * continuous-priority update and `pointerup` a discrete one, so a fast
+     * drag can release before React has committed the last move. Reading the
+     * draft from state there would commit a window short of where the person
+     * let go, or none at all.
+     */
+    draft: PriceChartSelection | null
+    /** The zoom in force when the press began, so a host that changes the
+     * window mid-gesture cannot re-base the commit on a different offset. */
+    offset: number
   } | null>(null)
   // Mirrors the session for the window listener that ends it. A release
   // outside the plot has to finish the drag too, or the band it drew stays
@@ -396,6 +496,9 @@ function PriceChart({
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 && event.pointerType === "mouse") return
+    // One gesture at a time: a second finger landing during a pinch must not
+    // take over the session the first one owns.
+    if (dragRef.current) return
     const index = scrubToClientX(event.clientX)
     if (index < 0) return
     dragRef.current = {
@@ -404,6 +507,8 @@ function PriceChart({
       originX: event.clientX,
       drawing: false,
       target: event.currentTarget,
+      draft: null,
+      offset,
     }
     setDragging(true)
     capture(event.currentTarget, event.pointerId)
@@ -416,7 +521,7 @@ function PriceChart({
     if (!session && event.pointerType !== "mouse") return
     if (session && session.pointerId !== event.pointerId) return
     const index = scrubToClientX(event.clientX)
-    if (!session || !selectable || index < 0) return
+    if (!session || !canSelect || index < 0) return
     if (
       !session.drawing &&
       Math.abs(event.clientX - session.originX) < SELECTION_THRESHOLD
@@ -424,27 +529,35 @@ function PriceChart({
       return
     }
     session.drawing = true
-    setDraft({ start: session.anchorIndex, end: index })
+    const next = { start: session.anchorIndex, end: index }
+    session.draft = next
+    setDraft(next)
   }
 
   const endDrag = React.useCallback(
-    (pointerId: number, pointerType: string) => {
+    (pointerId: number, pointerType: string, overPlot: boolean) => {
       const session = dragRef.current
       if (!session || session.pointerId !== pointerId) return
       dragRef.current = null
       setDragging(false)
       release(session.target, pointerId)
-      const drawn = priceChartNormalizeSelection(draft, visible.length)
+      const drawn = priceChartNormalizeSelection(session.draft, visible.length)
       setDraft(null)
       if (session.drawing && drawn && drawn.end > drawn.start) {
         keyboardAnchorRef.current = null
         setScrubIndex(null)
-        commitSelection({ start: offset + drawn.start, end: offset + drawn.end })
+        commitSelection({
+          start: session.offset + drawn.start,
+          end: session.offset + drawn.end,
+        })
         return
       }
-      if (pointerType !== "mouse") setScrubIndex(null)
+      // A press that drew nothing leaves no cursor behind unless the pointer
+      // is still hovering the plot — a mouse released off the chart can never
+      // send the `pointerleave` that would otherwise clear it.
+      if (pointerType !== "mouse" || !overPlot) setScrubIndex(null)
     },
-    [draft, visible.length, offset, commitSelection, setScrubIndex],
+    [visible.length, commitSelection, setScrubIndex],
   )
 
   // The pointer can be released anywhere — off the plot, off the window — so
@@ -453,7 +566,16 @@ function PriceChart({
   React.useEffect(() => {
     if (!dragging) return
     const finish = (event: PointerEvent) => {
-      endDrag(event.pointerId, event.pointerType)
+      const plot = plotRef.current
+      const bounds = plot?.getBoundingClientRect()
+      const overPlot = Boolean(
+        bounds &&
+          event.clientX >= bounds.left &&
+          event.clientX <= bounds.right &&
+          event.clientY >= bounds.top &&
+          event.clientY <= bounds.bottom,
+      )
+      endDrag(event.pointerId, event.pointerType, overPlot)
     }
     window.addEventListener("pointerup", finish)
     window.addEventListener("pointercancel", finish)
@@ -467,7 +589,10 @@ function PriceChart({
     keyboardAnchorRef.current = null
     setDraft(null)
     setScrubIndex(null)
-    commitSelection(null)
+    // Only a committed window is worth reporting as cleared; an abandoned
+    // draft was never a selection the host heard about.
+    if (selection) commitSelection(null)
+    cursorRef.current?.focus()
   }
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -485,6 +610,9 @@ function PriceChart({
       End: lastVisible,
     }
     if (event.key === "Escape") {
+      // Escape only belongs to the chart while it has something to drop;
+      // otherwise it stays available to whatever layer contains the chart.
+      if (!draft && !selection && activeIndex === null) return
       event.preventDefault()
       if (draft || selection) clearSelection()
       else setScrubIndex(null)
@@ -507,11 +635,10 @@ function PriceChart({
     if (next === undefined) return
     event.preventDefault()
     setScrubIndex(offset + next)
-    if (
-      selectable &&
-      event.shiftKey &&
-      (event.key === "ArrowLeft" || event.key === "ArrowRight")
-    ) {
+    // Shift turns any move into a window, anchored where the walk began —
+    // Home, End and the page keys extend it exactly like the arrows rather
+    // than throwing away the window in progress.
+    if (canSelect && event.shiftKey) {
       const anchor = keyboardAnchorRef.current ?? current
       keyboardAnchorRef.current = anchor
       setDraft({ start: anchor, end: next })
@@ -528,6 +655,14 @@ function PriceChart({
   )
   const drawable =
     geometry.width > 0 && geometry.height > 0 && visible.length > 0
+  const newestX =
+    resolvedView === "candle"
+      ? (candles[candles.length - 1]?.center ??
+        priceChartPointX(lastVisibleIndex, geometry))
+      : priceChartPointX(lastVisibleIndex, geometry)
+  // A zoomed window usually ends before the series does, and a marker that
+  // says "live" has to sit on the bar that actually is.
+  const showsNewestBar = offset + lastVisibleIndex === series.length - 1
   const localActive = activeIndex === null ? null : activeIndex - offset
   // A transform transition animates from wherever the element was born,
   // which for a freshly mounted cursor is the plot's left edge. The glide is
@@ -537,9 +672,13 @@ function PriceChart({
   React.useEffect(() => {
     cursorWasVisible.current = activeIndex !== null
   })
-  const cursorTransition = glideCursor
-    ? "transform var(--nessa-motion-duration-fast) var(--nessa-motion-easing-standard)"
-    : "none"
+  // A live region that exists from first paint (an assistive technology only
+  // observes regions it was already watching) and speaks once per committed
+  // window, rather than once per bar crossed during the drag.
+  const [announcement, setAnnouncement] = React.useState("")
+  const cursorGlideClass = glideCursor
+    ? "transition-transform duration-(--nessa-motion-duration-fast) ease-(--nessa-motion-easing-standard)"
+    : undefined
   const cursorX =
     localActive === null
       ? 0
@@ -604,7 +743,7 @@ function PriceChart({
       title={labels.clearSelection}
       onClick={clearSelection}
       className={cn(
-        "flex size-6 items-center justify-center rounded-md border-0 bg-transparent text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring [&_svg]:size-3.5",
+        "flex size-7 items-center justify-center rounded-md border-0 bg-transparent text-muted-foreground outline-none transition-colors duration-(--nessa-motion-duration-fast) hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring [&_svg]:size-3.5",
         axes ? "absolute top-0 right-0" : "absolute top-1 right-1 border border-border bg-background",
       )}
     >
@@ -688,7 +827,7 @@ function PriceChart({
               </g>
             ) : null}
             {resolvedView === "line" ? (
-              <g className={toneTextClass[tone]}>
+              <g className={toneTextClass(tone)}>
                 {fill ? (
                   <>
                     <defs>
@@ -729,7 +868,7 @@ function PriceChart({
               </g>
             ) : (
               candles.map((candle) => (
-                <g key={candle.index} className={toneTextClass[candle.tone]}>
+                <g key={candle.index} className={toneTextClass(candle.tone)}>
                   <line
                     x1={candle.center}
                     x2={candle.center}
@@ -764,10 +903,10 @@ function PriceChart({
                 strokeOpacity={0.7}
               />
             ) : null}
-            {live && resolvedView === "line" && lastValue !== null ? (
-              <g className={toneTextClass[tone]}>
+            {live && showsNewestBar && lastValue !== null ? (
+              <g className={toneTextClass(tone)}>
                 <circle
-                  cx={priceChartPointX(lastVisibleIndex, geometry)}
+                  cx={newestX}
                   cy={priceChartValueY(lastValue, geometry)}
                   r={4}
                   fill="currentColor"
@@ -777,7 +916,7 @@ function PriceChart({
                   className="origin-center [transform-box:fill-box] motion-safe:animate-ping"
                 />
                 <circle
-                  cx={priceChartPointX(lastVisibleIndex, geometry)}
+                  cx={newestX}
                   cy={priceChartValueY(lastValue, geometry)}
                   r={3}
                   fill="currentColor"
@@ -795,10 +934,8 @@ function PriceChart({
                     third line through the band. */}
                 {draftBounds ? null : (
                   <g
-                    style={{
-                      transform: `translateX(${cursorX}px)`,
-                      transition: cursorTransition,
-                    }}
+                    className={cursorGlideClass}
+                    style={{ transform: `translateX(${cursorX}px)` }}
                   >
                     <line
                       x1={0}
@@ -813,14 +950,14 @@ function PriceChart({
                 )}
                 {activeValue !== null && resolvedView === "line" ? (
                   <g
+                    className={cursorGlideClass}
                     style={{
                       transform: `translate(${cursorX}px, ${priceChartValueY(activeValue, geometry)}px)`,
-                      transition: cursorTransition,
                     }}
                   >
                     <circle
                       r={4}
-                      className={toneTextClass[tone]}
+                      className={toneTextClass(tone)}
                       fill="currentColor"
                       stroke="var(--background)"
                       strokeWidth={2}
@@ -833,6 +970,7 @@ function PriceChart({
         ) : null}
         {scrubbable ? (
           <div
+            ref={cursorRef}
             role="slider"
             tabIndex={0}
             aria-label={ariaLabel ?? labels.cursor}
@@ -841,8 +979,12 @@ function PriceChart({
             aria-valuemin={offset}
             aria-valuemax={offset + Math.max(0, lastVisibleIndex)}
             aria-valuenow={announcedIndex}
-            aria-valuetext={valueText}
+            aria-valuetext={visible.length === 0 ? labels.empty : valueText}
             aria-disabled={visible.length === 0 || undefined}
+            aria-describedby={canSelect ? hintId : undefined}
+            aria-keyshortcuts={
+              canSelect ? "Shift+ArrowLeft Shift+ArrowRight Enter Escape" : undefined
+            }
             data-slot="price-chart-cursor"
             // Horizontal drags scrub, vertical drags still scroll the page.
             className="absolute inset-0 touch-pan-y outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
@@ -851,9 +993,11 @@ function PriceChart({
             // The element's own release is handled directly as well as
             // globally: a press and release inside one frame can finish
             // before the window listener is attached.
-            onPointerUp={(event) => endDrag(event.pointerId, event.pointerType)}
+            onPointerUp={(event) =>
+              endDrag(event.pointerId, event.pointerType, true)
+            }
             onPointerCancel={(event) =>
-              endDrag(event.pointerId, event.pointerType)
+              endDrag(event.pointerId, event.pointerType, false)
             }
             onPointerLeave={() => {
               if (dragRef.current === null) setScrubIndex(null)
@@ -865,7 +1009,7 @@ function PriceChart({
         {draftBounds && draftBounds.width > 0 && draftWindow ? (
           <div
             data-slot="price-chart-selection-summary"
-            role="status"
+            aria-hidden="true"
             className="pointer-events-none absolute top-0 rounded-md border border-border bg-popover px-2 py-1 nessa-text-1 whitespace-nowrap text-popover-foreground tabular-nums shadow-sm"
             style={{
               left: `${summaryX}px`,
@@ -876,7 +1020,7 @@ function PriceChart({
               {`${formatTime((visible[draftWindow.start] as PriceChartBar).time)} – ${formatTime((visible[draftWindow.end] as PriceChartBar).time)}`}
             </span>
             {draftChange ? (
-              <span className={cn("ml-1.5", toneTextClass[draftTone])}>
+              <span className={cn("ml-1.5", toneTextClass(draftTone))}>
                 {formatPercent(draftChange.percent)}
               </span>
             ) : null}
@@ -913,10 +1057,16 @@ function PriceChart({
           </div>
         ) : null}
         {axes ? (
+          // Deliberately not TimelineHeader: that band lays out `start`/
+          // `width` cells for a scale whose units have extent (a day, a
+          // week), and pins a label while its cell is in view. These ticks
+          // are points on a continuous plot with no cell to pin to and no
+          // scroll container to pin against, so they are positioned rather
+          // than celled.
           <div
             data-slot="price-chart-time-axis"
             aria-hidden="true"
-            className="relative h-6 min-w-0 nessa-text-1 text-muted-foreground tabular-nums"
+            className="relative h-7 min-w-0 nessa-text-1 text-muted-foreground tabular-nums"
           >
             {timeTicks.map((tick) => (
               <span
@@ -936,6 +1086,14 @@ function PriceChart({
           <div className="relative">{selection ? clearControl : null}</div>
         ) : null}
       </div>
+      {canSelect ? (
+        <span id={hintId} className="sr-only">
+          {labels.selectionHint}
+        </span>
+      ) : null}
+      <span role="status" aria-live="polite" className="sr-only">
+        {announcement}
+      </span>
       {children}
     </div>
   )

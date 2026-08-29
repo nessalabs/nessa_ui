@@ -152,6 +152,7 @@ export const Playground: Story = {
       { label: "P/E ratio", value: "48.3" },
     ],
     onRangeChange: fn(),
+    onSelectionChange: fn(),
   },
   parameters: storyDocumentation(
     "The flagship panel: a live session with an after-hours print, and four key figures. It is handed one window per range, so the range control redraws the chart on its own. The play test scrubs with the keyboard and proves the headline follows the cursor — the interaction the whole panel exists for — then switches to candles, and finally picks a range and proves the chart is plotting different bars.",
@@ -192,6 +193,22 @@ export const Playground: Story = {
         Number(cursor.getAttribute("aria-valuemin")),
       ).toBeGreaterThan(0)
     })
+    // The window reaches the host with the bars at each end and the move
+    // across them — what it needs to fetch that span at a finer resolution.
+    await expect(args.onSelectionChange).toHaveBeenCalled()
+    const reported = (args.onSelectionChange as ReturnType<typeof fn>).mock
+      .calls.at(-1)?.[0] as {
+      start: number
+      end: number
+      startBar: { time: number }
+      endBar: { time: number }
+      changePercent: number
+    }
+    await expect(reported.end).toBeGreaterThan(reported.start)
+    await expect(reported.startBar.time).toBe(SESSION[reported.start]?.time)
+    await expect(reported.endBar.time).toBe(SESSION[reported.end]?.time)
+    await expect(Number.isFinite(reported.changePercent)).toBe(true)
+
     const zoomedHeadline = canvasElement.querySelector(
       '[data-slot="stock-quote-price"]',
     )?.textContent

@@ -91,8 +91,14 @@ export function priceChartExtent(
     values.push(baseline)
   }
   if (!values.length) return { min: 0, max: 1 }
-  const min = Math.min(...values)
-  const max = Math.max(...values)
+  // Reduced rather than spread: a tick-level series carries more values than
+  // an argument list can hold, and Math.min(...values) would throw there.
+  let min = values[0] as number
+  let max = values[0] as number
+  for (const value of values) {
+    if (value < min) min = value
+    if (value > max) max = value
+  }
   if (min === max) {
     const padding = Math.abs(min) * 0.01 || 0.5
     return { min: min - padding, max: max + padding }
@@ -164,24 +170,35 @@ export function priceChartValueY(
   return geometry.inset + (1 - ratio) * band
 }
 
-function pathCommands(
+/**
+ * The subpaths a series draws: one run of `M`/`L` commands per unbroken run
+ * of priced bars. A run of a single bar repeats its own point so a round
+ * stroke cap renders it as a dot — an observation stranded between two gaps
+ * is still an observation, and a lone `M` would draw nothing at all.
+ */
+function pathRuns(
   series: readonly PriceChartBar[],
   geometry: PriceChartGeometry,
 ): string[] {
-  const commands: string[] = []
-  let open = false
+  const runs: string[] = []
+  let current: string[] = []
+  const close = () => {
+    if (!current.length) return
+    runs.push(current.length === 1 ? `${current[0]}L${current[0]!.slice(1)}` : current.join(""))
+    current = []
+  }
   series.forEach((bar, index) => {
     const value = priceChartBarValue(bar)
     if (value === null) {
-      open = false
+      close()
       return
     }
     const x = priceChartPointX(index, geometry).toFixed(2)
     const y = priceChartValueY(value, geometry).toFixed(2)
-    commands.push(`${open ? "L" : "M"}${x},${y}`)
-    open = true
+    current.push(`${current.length ? "L" : "M"}${x},${y}`)
   })
-  return commands
+  close()
+  return runs
 }
 
 /**
@@ -200,7 +217,7 @@ export function priceChartLinePath(
     const y = priceChartValueY(value, geometry).toFixed(2)
     return `M0,${y}L${geometry.width.toFixed(2)},${y}`
   }
-  return pathCommands(series, geometry).join("")
+  return pathRuns(series, geometry).join("")
 }
 
 /**
@@ -212,19 +229,23 @@ export function priceChartAreaPath(
   series: readonly PriceChartBar[],
   geometry: PriceChartGeometry,
 ): string {
-  const line = priceChartLinePath(series, geometry)
-  if (!line) return ""
-  const first = series.findIndex((bar) => priceChartBarValue(bar) !== null)
-  let last = -1
-  series.forEach((bar, index) => {
-    if (priceChartBarValue(bar) !== null) last = index
-  })
-  if (first < 0) return ""
-  const startX = geometry.count === 1 ? 0 : priceChartPointX(first, geometry)
-  const endX =
-    geometry.count === 1 ? geometry.width : priceChartPointX(last, geometry)
-  const floor = geometry.height.toFixed(2)
-  return `${line}L${endX.toFixed(2)},${floor}L${startX.toFixed(2)},${floor}Z`
+  if (geometry.count === 1) {
+    const line = priceChartLinePath(series, geometry)
+    if (!line) return ""
+    const floor = geometry.height.toFixed(2)
+    return `${line}L${geometry.width.toFixed(2)},${floor}L0.00,${floor}Z`
+  }
+  // Each run closes to the floor on its own. Closing only the last one would
+  // shade straight across the gaps the line deliberately leaves empty.
+  return pathRuns(series, geometry)
+    .map((run) => {
+      const points = run.slice(1).split("L")
+      const startX = (points[0] as string).split(",")[0] as string
+      const endX = (points[points.length - 1] as string).split(",")[0] as string
+      const floor = geometry.height.toFixed(2)
+      return `${run}L${endX},${floor}L${startX},${floor}Z`
+    })
+    .join("")
 }
 
 /** The pixel rectangle and wick of one candle. */
@@ -244,7 +265,7 @@ export interface PriceChartCandle {
   highY: number
   /** Bottom of the wick. */
   lowY: number
-  /** Whether the interval closed at or above its open. */
+  /** The direction the interval closed in: up, down, or unchanged. */
   tone: PriceChartTone
 }
 
@@ -287,15 +308,17 @@ export function priceChartCandles(
 /**
  * The bar nearest a pointer position, in the same coordinate space the view
  * uses: candles are slot-centered, the line is spread edge to edge. Returns
- * `-1` for an empty series.
+ * `-1` when no bar can be resolved — an empty series, or a plot that has not
+ * been measured yet, where every position would otherwise collapse onto the
+ * first bar and anchor a gesture there.
  */
 export function priceChartIndexAt(
   x: number,
   geometry: PriceChartGeometry,
   view: PriceChartView = "line",
 ): number {
-  if (geometry.count === 0) return -1
-  if (geometry.count === 1 || geometry.width === 0) return 0
+  if (geometry.count === 0 || geometry.width === 0) return -1
+  if (geometry.count === 1) return 0
   const ratio =
     view === "candle"
       ? (x / geometry.width) * geometry.count - 0.5
@@ -399,22 +422,34 @@ export function priceChartSelectionBounds(
   return { left, right, width: Math.max(0, right - left) }
 }
 
-/** The move across a selected window, in price and in percent. */
+/** The move across a selected window. */
 export interface PriceChartChange {
+  /** The move in the series' own price units. */
   amount: number
+  /** The same move as a percentage, on a 0–100 scale rather than 0–1. */
   percent: number
 }
 
 /**
- * The change between the first and last plotted price of a window. Returns
- * `null` when either end carries no price.
+ * The change between the first and last plotted price inside a window. Both
+ * ends scan inward past bars that carry no price, so a window whose outer
+ * bars are gaps still reports the move its prices actually made; `null` means
+ * the window holds no price at all.
  */
 export function priceChartSelectionChange(
   series: readonly PriceChartBar[],
   selection: PriceChartSelection,
 ): PriceChartChange | null {
-  const from = priceChartBarValue(series[selection.start] as PriceChartBar)
-  const to = priceChartBarValue(series[selection.end] as PriceChartBar)
+  let from: number | null = null
+  for (let index = selection.start; index <= selection.end; index += 1) {
+    from = priceChartBarValue(series[index] as PriceChartBar)
+    if (from !== null) break
+  }
+  let to: number | null = null
+  for (let index = selection.end; index >= selection.start; index -= 1) {
+    to = priceChartBarValue(series[index] as PriceChartBar)
+    if (to !== null) break
+  }
   if (from === null || to === null) return null
   const amount = to - from
   return { amount, percent: from === 0 ? 0 : (amount / from) * 100 }
@@ -451,9 +486,11 @@ function niceStep(rough: number): number {
 }
 
 /**
- * Price ticks across the plotted extent, snapped to readable 1/2/5 steps and
- * spaced roughly `count` apart. Ticks that would sit within four pixels of an
- * edge are dropped so a label never collides with the plot's boundary.
+ * Price ticks across the plotted extent, snapped to readable 1/2/5/10 steps.
+ * `count` is the number of intervals asked for, not a pixel spacing, and the
+ * step is rounded to the nearest readable value, so the tick count lands near
+ * it rather than on it. Ticks that would sit within four pixels of an edge are
+ * dropped so a label never collides with the plot's boundary.
  */
 export function priceChartValueTicks(
   geometry: PriceChartGeometry,
