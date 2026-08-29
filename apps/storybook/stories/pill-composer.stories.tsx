@@ -12,11 +12,13 @@ import {
   ChatComposerAttachments,
   ChatComposerInput,
   ChatComposerAttachmentIcon,
+  Input,
   FilePreviewJson,
   FilePreviewMarkdown,
   SelectionTooltip,
   SelectionTooltipAction,
   SelectionTooltipLabel,
+  SelectionTooltipSeparator,
   ChatComposerEditor,
   ChatComposerTrigger,
   type ChatComposerContentPart,
@@ -54,9 +56,9 @@ import {
   type ModelPickerGroup,
   type ModelPickerValue,
 } from "@nessa-ui/react"
-import { Braces, ChevronLeft, ChevronRight, FileText, Folder, Image as ImageIcon, Paperclip, Plus, SlidersHorizontal, Sparkles, Puzzle, Square, X } from "lucide-react"
+import { Braces, Check, ChevronLeft, ChevronRight, FileText, Folder, Image as ImageIcon, Paperclip, Plus, SlidersHorizontal, Sparkles, Puzzle, Square, X } from "lucide-react"
 
-import { ChatAddIcon } from "./icons/nucleo"
+import { ChatAddIcon, CommentIcon } from "./icons/nucleo"
 import { storyDocumentation } from "./story-documentation"
 import {
   filterSlashSections,
@@ -225,10 +227,14 @@ function chipFileMock(item: SlashItem): {
  */
 function DocumentSurface({
   item,
-  onAddToChat,
+  onAttach,
+  onComment,
 }: {
   item: SlashItem
-  onAddToChat: (text: string) => void
+  /** Attaches the selection to the pending quotes; the document stays open. */
+  onAttach: (text: string) => void
+  /** Posts a comment message that carries the selection as its quote. */
+  onComment: (text: string, comment: string) => void
 }) {
   const file = chipFileMock(item)
   const previewFile = {
@@ -242,7 +248,10 @@ function DocumentSurface({
     left: number
     top: number
   } | null>(null)
+  const [mode, setMode] = React.useState<"actions" | "comment">("actions")
+  const [draft, setDraft] = React.useState("")
   const captureSelection = () => {
+    if (mode === "comment") return
     const container = containerRef.current
     const live = container?.ownerDocument.getSelection()
     if (!container || !live || live.isCollapsed) {
@@ -279,18 +288,78 @@ function DocumentSurface({
           className="absolute z-10 -translate-x-1/2 -translate-y-full"
           style={{ left: selection.left, top: Math.max(selection.top - 8, 0) }}
         >
-          <SelectionTooltipAction
-            aria-label="Add to chat"
-            tooltip="Add to chat"
-            onClick={() => {
-              onAddToChat(selection.text)
-              containerRef.current?.ownerDocument.getSelection()?.removeAllRanges()
-              setSelection(null)
-            }}
-          >
-            <ChatAddIcon aria-hidden="true" />
-            <SelectionTooltipLabel>Add to chat</SelectionTooltipLabel>
-          </SelectionTooltipAction>
+          {mode === "actions" ? (
+            <>
+              <SelectionTooltipAction
+                aria-label="Add to chat"
+                tooltip="Add to chat"
+                onClick={() => {
+                  onAttach(selection.text)
+                  containerRef.current?.ownerDocument.getSelection()?.removeAllRanges()
+                  setSelection(null)
+                }}
+              >
+                <ChatAddIcon aria-hidden="true" />
+                <SelectionTooltipLabel>Add to chat</SelectionTooltipLabel>
+              </SelectionTooltipAction>
+              <SelectionTooltipSeparator />
+              <SelectionTooltipAction
+                aria-label="Comment"
+                tooltip="Comment on the selection"
+                onClick={() => setMode("comment")}
+              >
+                <CommentIcon aria-hidden="true" />
+                <SelectionTooltipLabel>Comment</SelectionTooltipLabel>
+              </SelectionTooltipAction>
+            </>
+          ) : (
+            // The pill swaps its actions for a comment composer in place —
+            // saving posts the note with the selected passage attached, and
+            // the document never leaves the screen.
+            <>
+              <Input
+                autoFocus
+                aria-label="Comment"
+                placeholder="Comment on the selection"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" || !draft.trim()) return
+                  event.preventDefault()
+                  onComment(selection.text, draft.trim())
+                  setDraft("")
+                  setMode("actions")
+                  containerRef.current?.ownerDocument.getSelection()?.removeAllRanges()
+                  setSelection(null)
+                }}
+                className="h-8 w-52 border-0 bg-transparent shadow-none dark:bg-transparent"
+              />
+              <SelectionTooltipAction
+                aria-label="Save comment"
+                tooltip="Save comment"
+                onClick={() => {
+                  if (!draft.trim()) return
+                  onComment(selection.text, draft.trim())
+                  setDraft("")
+                  setMode("actions")
+                  containerRef.current?.ownerDocument.getSelection()?.removeAllRanges()
+                  setSelection(null)
+                }}
+              >
+                <Check aria-hidden="true" />
+              </SelectionTooltipAction>
+              <SelectionTooltipAction
+                aria-label="Cancel comment"
+                tooltip="Cancel"
+                onClick={() => {
+                  setDraft("")
+                  setMode("actions")
+                }}
+              >
+                <X aria-hidden="true" />
+              </SelectionTooltipAction>
+            </>
+          )}
         </SelectionTooltip>
       ) : null}
     </div>
@@ -434,6 +503,8 @@ interface DemoMessage {
   text: string
   /** The quoted text of the message this one replies to, iMessage-style. */
   replyTo?: string
+  /** Passages lifted from previewed documents, quoted above the bubble. */
+  quotes?: string[]
   /** The id of the message this one replies to, linking it into a thread. */
   replyToId?: number
   /** Photos, files, and folders sent with the message. */
@@ -719,6 +790,9 @@ function DemoBubble({
             </ChatAttachmentStack>
           ) : null}
       {message.replyTo ? <ChatMessageQuote>{message.replyTo}</ChatMessageQuote> : null}
+      {message.quotes?.map((quote, index) => (
+        <ChatMessageQuote key={index}>{quote}</ChatMessageQuote>
+      ))}
       {message.text ? (
         /* Right-click / long-press raises the ContextMenu with the tapback
            row and a Reply action. Opening it never frosts the transcript —
@@ -938,8 +1012,8 @@ function PlaygroundExample({
   const generating = generatingTabId !== null && generatingTabId === activeTabId
   const [model, setModel] = React.useState<ModelPickerValue>(defaultModel)
   const [modelCardOpen, setModelCardOpen] = React.useState(false)
-  // A passage lifted out of a previewed document, quoted on the next send.
-  const [quoteText, setQuoteText] = React.useState<string | null>(null)
+  // Passages lifted out of previewed documents, quoted on the next send.
+  const [quotes, setQuotes] = React.useState<string[]>([])
   // Chips open their file directly: plain press previews in the current
   // tab, a modified press (Cmd/Ctrl) parks the file as its own tab.
   const openChipFromLabel = (label: string, newTab: boolean) => {
@@ -1100,7 +1174,7 @@ function PlaygroundExample({
     setOverlay(null)
     setModelCardOpen(false)
     setInlinePreview(null)
-    setQuoteText(null)
+    setQuotes([])
   }
 
   const addAttachment = (kind: DemoAttachmentKind) => {
@@ -1310,11 +1384,23 @@ function PlaygroundExample({
         // be added to the chat and discussed in place.
         <DocumentSurface
           item={activeFileItem}
-          onAddToChat={(text) => {
-            setQuoteText(text)
-            setInlinePreview(null)
-            if (fileTabs[activeTabId]) setActiveTabId(auditTabId)
-            inputRef.current?.focus()
+          // Both actions leave the document open for further selections;
+          // Comment additionally hands focus to the composer (jumping back
+          // to the conversation from a file tab, which has no composer).
+          onAttach={(text) => setQuotes((current) => [...current, text])}
+          onComment={(text, comment) => {
+            // The comment posts straight into the conversation the file
+            // belongs to, quoting the selected passage — the document stays.
+            const target = fileTabs[activeTabId] ? auditTabId : activeTabId
+            updateMessages(target, (current) => [
+              ...current,
+              {
+                id: nextId.current++,
+                role: "user",
+                text: comment,
+                quotes: [text],
+              },
+            ])
           }}
         />
       ) : (
@@ -1410,20 +1496,74 @@ function PlaygroundExample({
           onClose={() => setModelCardOpen(false)}
         />
       ) : null}
-      {quoteText ? (
-        // The lifted passage waits above the pill until it is sent or
-        // dismissed; the next message quotes it, iMessage reply style.
-        <div className="flex items-start gap-2 self-start">
-          <ChatMessageQuote className="m-0">{quoteText}</ChatMessageQuote>
-          <button
-            type="button"
-            aria-label="Discard quoted selection"
-            title="Discard quoted selection"
-            onClick={() => setQuoteText(null)}
-            className="mt-1 inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3"
-          >
-            <X aria-hidden="true" />
-          </button>
+      {quotes.length > 0 ? (
+        // Lifted passages ride one horizontal row above the pill — numbered,
+        // fixed-width, scrolling sideways. Past three they collapse to bare
+        // numbers; tapping any opens the shared overlay with the full list.
+        <div className="flex max-w-full items-center gap-1.5 self-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {quotes.map((quote, index) => (
+            <span key={index} className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                title={quote}
+                aria-label={`Quoted selection ${index + 1}: ${quote}`}
+                onClick={() =>
+                  setOverlay({
+                    summary: `${quotes.length} quoted ${
+                      quotes.length === 1 ? "selection" : "selections"
+                    }`,
+                    body: (
+                      <div className="flex w-full flex-col gap-2 text-left">
+                        {quotes.map((entry, at) => (
+                          <div key={at} className="flex items-start gap-2">
+                            <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-accent font-sans nessa-text-1 font-semibold">
+                              {at + 1}
+                            </span>
+                            <ChatMessageQuote className="m-0 flex-1">
+                              {entry}
+                            </ChatMessageQuote>
+                            <button
+                              type="button"
+                              aria-label={`Discard quoted selection ${at + 1}`}
+                              onClick={() => {
+                                const next = quotes.filter(
+                                  (_, index2) => index2 !== at,
+                                )
+                                setQuotes(next)
+                                if (next.length === 0) setOverlay(null)
+                              }}
+                              className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3"
+                            >
+                              <X aria-hidden="true" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ),
+                  })
+                }
+                className="inline-flex cursor-pointer items-center gap-1 rounded-full border-0 bg-transparent p-0 text-start font-sans outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                <ChatMessageQuote className="m-0 inline-flex max-w-40 items-center gap-1 truncate whitespace-nowrap">
+                  <span className="font-semibold">{index + 1}</span>
+                  {quotes.length <= 3 ? quote : null}
+                </ChatMessageQuote>
+              </button>
+              <button
+                type="button"
+                aria-label={`Discard quoted selection ${index + 1}`}
+                title="Discard quoted selection"
+                onClick={() =>
+                  setQuotes((current) =>
+                    current.filter((_, at) => at !== index),
+                  )
+                }
+                className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3"
+              >
+                <X aria-hidden="true" />
+              </button>
+            </span>
+          ))}
         </div>
       ) : null}
       {fileTabs[activeTabId] ? null : (
@@ -1434,9 +1574,10 @@ function PlaygroundExample({
           const content = inputRef.current?.getContent()
           const text = (content?.text ?? message).trim()
           if (
-            (!text && attachments.length === 0) ||
+            (!text && attachments.length === 0 && quotes.length === 0) ||
             generatingTabId !== null ||
-            activeFileItem !== undefined
+            // A dedicated file tab has no conversation to send into.
+            fileTabs[activeTabId] !== undefined
           )
             return
           // Chips travel with the message: the bubble re-renders them with
@@ -1449,7 +1590,8 @@ function PlaygroundExample({
               role: "user",
               text,
               parts: hasChips ? content?.parts : undefined,
-              replyTo: quoteText ?? replyTarget?.text,
+              quotes: quotes.length > 0 ? quotes : undefined,
+              replyTo: replyTarget?.text,
               replyToId: replyTarget?.id,
               attachments: attachments.length > 0 ? attachments : undefined,
             },
@@ -1458,7 +1600,7 @@ function PlaygroundExample({
           setMessage("")
           setAttachments([])
           setReplyTarget(null)
-          setQuoteText(null)
+          setQuotes([])
           setGeneratingTabId(activeTabId)
           startReply(activeTabId, replyDelay)
         }}
