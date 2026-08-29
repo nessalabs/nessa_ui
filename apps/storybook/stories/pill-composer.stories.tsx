@@ -286,7 +286,19 @@ function DocumentSurface({
       {selection ? (
         <SelectionTooltip
           className="absolute z-10 -translate-x-1/2 -translate-y-full"
-          style={{ left: selection.left, top: Math.max(selection.top - 8, 0) }}
+          style={{
+            // The comment composer is wider than the action pill, so it
+            // centers on the surface; the action pill hugs the selection,
+            // clamped so neither ever clips at the panel's edges.
+            left:
+              mode === "comment"
+                ? "50%"
+                : Math.min(
+                    Math.max(selection.left, 120),
+                    (containerRef.current?.clientWidth ?? 480) - 120,
+                  ),
+            top: Math.max(selection.top - 8, 0),
+          }}
         >
           {mode === "actions" ? (
             <>
@@ -497,6 +509,13 @@ function StopAction({
   )
 }
 
+interface PendingQuote {
+  /** The passage lifted from the document. */
+  text: string
+  /** The note attached to it from the selection tooltip, if any. */
+  comment?: string
+}
+
 interface DemoMessage {
   id: number
   role: "user" | "assistant"
@@ -504,7 +523,7 @@ interface DemoMessage {
   /** The quoted text of the message this one replies to, iMessage-style. */
   replyTo?: string
   /** Passages lifted from previewed documents, quoted above the bubble. */
-  quotes?: string[]
+  quotes?: PendingQuote[]
   /** The id of the message this one replies to, linking it into a thread. */
   replyToId?: number
   /** Photos, files, and folders sent with the message. */
@@ -791,7 +810,14 @@ function DemoBubble({
           ) : null}
       {message.replyTo ? <ChatMessageQuote>{message.replyTo}</ChatMessageQuote> : null}
       {message.quotes?.map((quote, index) => (
-        <ChatMessageQuote key={index}>{quote}</ChatMessageQuote>
+        <span key={index} className="flex flex-col items-inherit gap-0.5">
+          <ChatMessageQuote>{quote.text}</ChatMessageQuote>
+          {quote.comment ? (
+            <span className="px-1 font-sans nessa-text-2 italic text-muted-foreground">
+              {quote.comment}
+            </span>
+          ) : null}
+        </span>
       ))}
       {message.text ? (
         /* Right-click / long-press raises the ContextMenu with the tapback
@@ -974,6 +1000,55 @@ function attachmentSummary(attachments: DemoAttachment[]) {
 }
 
 /**
+ * One pending quote in the full-list view: collapsed to a single line, and
+ * togglable — tap to unfold the whole passage, tap again to fold it back.
+ */
+function QuoteRow({
+  quote,
+  onRemove,
+}: {
+  quote: PendingQuote
+  onRemove: () => void
+}) {
+  const [expanded, setExpanded] = React.useState(false)
+  return (
+    <div className="flex items-start gap-2">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        title={expanded ? "Collapse" : "Show the whole passage"}
+        onClick={() => setExpanded((current) => !current)}
+        className="flex min-w-0 flex-1 cursor-pointer flex-col gap-0.5 rounded-2xl border-0 bg-transparent p-0 text-start font-sans outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        <ChatMessageQuote
+          className={cn("m-0 w-full", expanded && "whitespace-normal")}
+        >
+          {quote.text}
+        </ChatMessageQuote>
+        {quote.comment ? (
+          <span
+            className={cn(
+              "max-w-full px-1 font-sans nessa-text-2 italic text-muted-foreground",
+              expanded ? "whitespace-normal" : "truncate",
+            )}
+          >
+            {quote.comment}
+          </span>
+        ) : null}
+      </button>
+      <button
+        type="button"
+        aria-label="Discard quoted selection"
+        onClick={onRemove}
+        className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3"
+      >
+        <X aria-hidden="true" />
+      </button>
+    </div>
+  )
+}
+
+/**
  * A small-surface host: an iMessage-style transcript over the pill
  * composer. Enter is the only send affordance; tapping a bubble starts a
  * reply, quoted through the composer's attachment primitives; and typing
@@ -1012,8 +1087,12 @@ function PlaygroundExample({
   const generating = generatingTabId !== null && generatingTabId === activeTabId
   const [model, setModel] = React.useState<ModelPickerValue>(defaultModel)
   const [modelCardOpen, setModelCardOpen] = React.useState(false)
-  // Passages lifted out of previewed documents, quoted on the next send.
-  const [quotes, setQuotes] = React.useState<string[]>([])
+  // Passages lifted out of previewed documents — with any comments made on
+  // them — attached to the next send.
+  const [quotes, setQuotes] = React.useState<PendingQuote[]>([])
+  // The full-list view of pending quotes, rendered live so removals and
+  // expands reflect immediately.
+  const [quotesOpen, setQuotesOpen] = React.useState(false)
   // Chips open their file directly: plain press previews in the current
   // tab, a modified press (Cmd/Ctrl) parks the file as its own tab.
   const openChipFromLabel = (label: string, newTab: boolean) => {
@@ -1175,6 +1254,7 @@ function PlaygroundExample({
     setModelCardOpen(false)
     setInlinePreview(null)
     setQuotes([])
+    setQuotesOpen(false)
   }
 
   const addAttachment = (kind: DemoAttachmentKind) => {
@@ -1329,6 +1409,7 @@ function PlaygroundExample({
           setMenuTargetId(null)
           setOverlay(null)
           setModelCardOpen(false)
+          setQuotesOpen(false)
         }}
         onClose={(id) => {
           if (id === generatingTabId) {
@@ -1387,21 +1468,13 @@ function PlaygroundExample({
           // Both actions leave the document open for further selections;
           // Comment additionally hands focus to the composer (jumping back
           // to the conversation from a file tab, which has no composer).
-          onAttach={(text) => setQuotes((current) => [...current, text])}
-          onComment={(text, comment) => {
-            // The comment posts straight into the conversation the file
-            // belongs to, quoting the selected passage — the document stays.
-            const target = fileTabs[activeTabId] ? auditTabId : activeTabId
-            updateMessages(target, (current) => [
-              ...current,
-              {
-                id: nextId.current++,
-                role: "user",
-                text: comment,
-                quotes: [text],
-              },
-            ])
-          }}
+          onAttach={(text) =>
+            setQuotes((current) => [...current, { text }])
+          }
+          // A comment attaches too — nothing sends until the user sends.
+          onComment={(text, comment) =>
+            setQuotes((current) => [...current, { text, comment }])
+          }
         />
       ) : (
       <div
@@ -1484,6 +1557,28 @@ function PlaygroundExample({
           {overlay.body}
         </ChatAttachmentViewer>
       ) : null}
+      {quotesOpen ? (
+        <ChatAttachmentViewer
+          summary={`${quotes.length} quoted ${
+            quotes.length === 1 ? "selection" : "selections"
+          }`}
+          onClose={() => setQuotesOpen(false)}
+        >
+          <div className="flex w-full flex-col gap-2 text-left">
+            {quotes.map((entry, at) => (
+              <QuoteRow
+                key={at}
+                quote={entry}
+                onRemove={() => {
+                  const next = quotes.filter((_, index2) => index2 !== at)
+                  setQuotes(next)
+                  if (next.length === 0) setQuotesOpen(false)
+                }}
+              />
+            ))}
+          </div>
+        </ChatAttachmentViewer>
+      ) : null}
       </div>
       {modelCardOpen ? (
         <ModelCard
@@ -1496,74 +1591,43 @@ function PlaygroundExample({
           onClose={() => setModelCardOpen(false)}
         />
       ) : null}
-      {quotes.length > 0 ? (
-        // Lifted passages ride one horizontal row above the pill — numbered,
-        // fixed-width, scrolling sideways. Past three they collapse to bare
-        // numbers; tapping any opens the shared overlay with the full list.
-        <div className="flex max-w-full items-center gap-1.5 self-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {quotes.map((quote, index) => (
-            <span key={index} className="flex shrink-0 items-center gap-1">
-              <button
-                type="button"
-                title={quote}
-                aria-label={`Quoted selection ${index + 1}: ${quote}`}
-                onClick={() =>
-                  setOverlay({
-                    summary: `${quotes.length} quoted ${
-                      quotes.length === 1 ? "selection" : "selections"
-                    }`,
-                    body: (
-                      <div className="flex w-full flex-col gap-2 text-left">
-                        {quotes.map((entry, at) => (
-                          <div key={at} className="flex items-start gap-2">
-                            <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-accent font-sans nessa-text-1 font-semibold">
-                              {at + 1}
-                            </span>
-                            <ChatMessageQuote className="m-0 flex-1">
-                              {entry}
-                            </ChatMessageQuote>
-                            <button
-                              type="button"
-                              aria-label={`Discard quoted selection ${at + 1}`}
-                              onClick={() => {
-                                const next = quotes.filter(
-                                  (_, index2) => index2 !== at,
-                                )
-                                setQuotes(next)
-                                if (next.length === 0) setOverlay(null)
-                              }}
-                              className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3"
-                            >
-                              <X aria-hidden="true" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    ),
-                  })
-                }
-                className="inline-flex cursor-pointer items-center gap-1 rounded-full border-0 bg-transparent p-0 text-start font-sans outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              >
-                <ChatMessageQuote className="m-0 inline-flex max-w-40 items-center gap-1 truncate whitespace-nowrap">
-                  <span className="font-semibold">{index + 1}</span>
-                  {quotes.length <= 3 ? quote : null}
-                </ChatMessageQuote>
-              </button>
-              <button
-                type="button"
-                aria-label={`Discard quoted selection ${index + 1}`}
-                title="Discard quoted selection"
-                onClick={() =>
-                  setQuotes((current) =>
-                    current.filter((_, at) => at !== index),
-                  )
-                }
-                className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3"
-              >
-                <X aria-hidden="true" />
-              </button>
-            </span>
-          ))}
+      {quotes.length > 0 && !quotesOpen && !overlay ? (
+        // One quote pill stands for the whole set — it, or "+ N other",
+        // opens the full list over the transcript.
+        <div className="flex max-w-full items-center gap-1.5 self-start">
+          <button
+            type="button"
+            title={
+              quotes[0]!.comment
+                ? `${quotes[0]!.comment} — “${quotes[0]!.text}”`
+                : quotes[0]!.text
+            }
+            aria-label={`Quoted selection: ${quotes[0]!.text}`}
+            onClick={() => setQuotesOpen(true)}
+            className="inline-flex min-w-0 cursor-pointer items-center rounded-full border-0 bg-transparent p-0 text-start font-sans outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            <ChatMessageQuote className="m-0 inline-block max-w-52 truncate whitespace-nowrap">
+              {quotes[0]!.comment ?? quotes[0]!.text}
+            </ChatMessageQuote>
+          </button>
+          {quotes.length > 1 ? (
+            <button
+              type="button"
+              onClick={() => setQuotesOpen(true)}
+              className="shrink-0 cursor-pointer whitespace-nowrap rounded-full border-0 bg-transparent p-0 font-sans nessa-text-1 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              + {quotes.length - 1} other{quotes.length > 2 ? "s" : ""}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            aria-label="Discard quoted selections"
+            title="Discard quoted selections"
+            onClick={() => setQuotes([])}
+            className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3"
+          >
+            <X aria-hidden="true" />
+          </button>
         </div>
       ) : null}
       {fileTabs[activeTabId] ? null : (
@@ -1601,6 +1665,7 @@ function PlaygroundExample({
           setAttachments([])
           setReplyTarget(null)
           setQuotes([])
+          setQuotesOpen(false)
           setGeneratingTabId(activeTabId)
           startReply(activeTabId, replyDelay)
         }}
