@@ -1,0 +1,331 @@
+"use client"
+
+import * as React from "react"
+
+import { cn } from "@/lib/utils"
+
+import {
+  ChatComposerContext,
+  type ChatComposerInputAdapter,
+} from "./chat-composer"
+
+const reducedMotionQuery = "(prefers-reduced-motion: reduce)"
+
+function subscribeToReducedMotion(callback: () => void) {
+  const query = window.matchMedia(reducedMotionQuery)
+  query.addEventListener("change", callback)
+  return () => query.removeEventListener("change", callback)
+}
+
+/** Returns the live, server-safe reduced-motion preference. */
+function useReducedMotion() {
+  return React.useSyncExternalStore(
+    subscribeToReducedMotion,
+    () => window.matchMedia(reducedMotionQuery).matches,
+    () => false,
+  )
+}
+
+/** Parses a CSS duration token value into milliseconds. */
+function cssDurationInMilliseconds(value: string, fallback: number) {
+  const parsed = Number.parseFloat(value)
+  if (!Number.isFinite(parsed)) return fallback
+  return value.trim().endsWith("ms") ? parsed : parsed * 1000
+}
+
+/**
+ * One revolution of iridescence wrapping the whole rim: the
+ * Apple-Intelligence-style spectrum — amber through pink and purple into
+ * cyan — decays continuously from the crisp near-white head all the way
+ * around, faintest just behind the head's sharp cutoff. The stops are the
+ * --nessa-chat-rim-* tokens, identical in both themes — a light source.
+ */
+const pillComposerRimSpinnerBaseClassName =
+  "absolute left-1/2 top-1/2 aspect-square w-[200%] -translate-x-1/2 -translate-y-1/2"
+
+/** The full-wrap trail: the spectrum decays around the whole revolution. */
+const pillComposerRimTrailClassName =
+  "bg-[conic-gradient(from_0deg,var(--nessa-chat-rim-0)_0deg,var(--nessa-chat-rim-1)_90deg,var(--nessa-chat-rim-2)_180deg,var(--nessa-chat-rim-3)_260deg,var(--nessa-chat-rim-4)_320deg,var(--nessa-chat-rim-head)_356deg,transparent_360deg)]"
+
+/** The comet: a compact bright dart, the rest of the rim dark behind it. */
+const pillComposerRimCometClassName =
+  "bg-[conic-gradient(from_0deg,transparent_0deg,transparent_280deg,var(--nessa-chat-rim-3)_280deg,var(--nessa-chat-rim-4)_330deg,var(--nessa-chat-rim-head)_356deg,transparent_360deg)]"
+
+/**
+ * Masks a full-bleed layer down to an edge band: two stacked masks, the
+ * inner clipped to the content box, composited away from the outer. The
+ * mask only needs any opaque paint, so it borrows the foreground token.
+ */
+const pillComposerRimBandClassName =
+  "[mask-image:linear-gradient(var(--foreground)_0_0),linear-gradient(var(--foreground)_0_0)] [mask-clip:content-box,border-box] [mask-composite:exclude] [-webkit-mask-image:linear-gradient(var(--foreground)_0_0),linear-gradient(var(--foreground)_0_0)] [-webkit-mask-clip:content-box,border-box] [-webkit-mask-composite:xor]"
+
+// The spinner square is twice the pill's width, so rotating it never
+// exposes a corner on any wider-than-tall pill.
+
+export type PillComposerRimVariant = "orbit" | "comet" | "pulse" | "aurora"
+
+/**
+ * The traveling-light overlay: a thin crisp gradient band on the pill's
+ * rim, plus a blurred copy bleeding a few pixels inward as a soft glow —
+ * nothing renders outside the pill. It fades in and out with `active` and
+ * keeps animating until the fade-out finishes, so toggling reads as the
+ * light dimming, not stopping. The motion itself comes in structurally
+ * distinct variants: `orbit` revolves the full decaying trail, `comet`
+ * laps a compact bright dart around an otherwise dark rim, `pulse` holds
+ * the lit rim still and breathes, and `aurora` never revolves — the
+ * full-wrap spectrum morphs hue in place under a slow intensity wave.
+ */
+function PillComposerRim({
+  active,
+  variant = "orbit",
+}: {
+  active: boolean
+  variant?: PillComposerRimVariant
+}) {
+  const reducedMotion = useReducedMotion()
+  const [present, setPresent] = React.useState(false)
+  const wrapperRef = React.useRef<HTMLSpanElement>(null)
+  const ringSpinRef = React.useRef<HTMLSpanElement>(null)
+  const glowSpinRef = React.useRef<HTMLSpanElement>(null)
+
+  React.useEffect(() => {
+    // With reduced motion the opacity transition is suppressed, so no
+    // transitionend will retire the presence flag; mirror `active` directly.
+    if (active || reducedMotion) {
+      setPresent(active)
+      return
+    }
+    // A fade-out with a zeroed duration token never fires transitionend
+    // either — retire the flag immediately, matching the spin effect's
+    // zero-duration guards.
+    const node = wrapperRef.current
+    if (!node) return
+    const duration = cssDurationInMilliseconds(
+      getComputedStyle(node).transitionDuration,
+      0,
+    )
+    if (duration === 0) setPresent(false)
+  }, [active, reducedMotion])
+
+  const spinning = present && !reducedMotion
+  React.useEffect(() => {
+    const ring = ringSpinRef.current
+    const glow = glowSpinRef.current
+    if (!ring || !glow || !spinning) return
+    const ambient = cssDurationInMilliseconds(
+      getComputedStyle(ring).getPropertyValue("--nessa-motion-duration-ambient"),
+      3200,
+    )
+    if (ambient === 0) return
+    if (typeof ring.animate !== "function") return
+    const spin = [{ rotate: "0deg" }, { rotate: "360deg" }]
+    const animations: Animation[] = []
+    if (variant === "orbit") {
+      const options = { duration: ambient, easing: "linear", iterations: Infinity }
+      animations.push(ring.animate(spin, options), glow.animate(spin, options))
+    }
+    if (variant === "comet") {
+      // A compact dart lapping fast — most of the rim stays dark behind it.
+      const options = {
+        duration: ambient * 0.45,
+        easing: "linear",
+        iterations: Infinity,
+      }
+      animations.push(ring.animate(spin, options), glow.animate(spin, options))
+    }
+    if (variant === "pulse") {
+      const options = {
+        duration: ambient / 2,
+        easing: "ease-in-out",
+        iterations: Infinity,
+      }
+      animations.push(
+        ring.animate(
+          [{ opacity: 1 }, { opacity: 0.45 }, { opacity: 1 }],
+          options,
+        ),
+        glow.animate(
+          [{ opacity: 0.35 }, { opacity: 0.12 }, { opacity: 0.35 }],
+          options,
+        ),
+      )
+    }
+    if (variant === "aurora") {
+      // No revolution at all: the full-wrap spectrum stays put while its
+      // hues cycle and the intensity waves — colors morphing in place.
+      const hueOptions = {
+        duration: ambient * 1.2,
+        easing: "linear",
+        iterations: Infinity,
+      }
+      const waveOptions = {
+        duration: ambient,
+        easing: "ease-in-out",
+        iterations: Infinity,
+      }
+      animations.push(
+        ring.animate(
+          [{ filter: "hue-rotate(0deg)" }, { filter: "hue-rotate(360deg)" }],
+          hueOptions,
+        ),
+        // The glow's blur rides along in the keyframes: animating `filter`
+        // replaces the class value for the animation's duration.
+        glow.animate(
+          [
+            { filter: "blur(6px) hue-rotate(0deg)" },
+            { filter: "blur(6px) hue-rotate(360deg)" },
+          ],
+          hueOptions,
+        ),
+        ring.animate(
+          [{ opacity: 1 }, { opacity: 0.65 }, { opacity: 1 }],
+          waveOptions,
+        ),
+      )
+    }
+    return () => animations.forEach((animation) => animation.cancel())
+  }, [spinning, variant])
+
+  return (
+    <span
+      ref={wrapperRef}
+      aria-hidden="true"
+      data-slot="pill-composer-rim"
+      data-active={active || undefined}
+      data-variant={variant}
+      onTransitionEnd={(event) => {
+        if (event.target === event.currentTarget && !active) setPresent(false)
+      }}
+      onTransitionCancel={(event) => {
+        // A fade-out interrupted by display:none (hidden panel, switched
+        // tab) cancels instead of ending — retire the flag so the infinite
+        // spin animations do not run forever on an invisible overlay.
+        if (event.target === event.currentTarget && !active) setPresent(false)
+      }}
+      className="pointer-events-none absolute -inset-px z-10 rounded-[inherit] opacity-0 transition-opacity [transition-duration:var(--nessa-motion-duration-normal)] [transition-timing-function:var(--nessa-motion-easing-standard)] data-[active]:opacity-100 motion-reduce:transition-none"
+    >
+      <span
+        data-slot="pill-composer-rim-glow"
+        className={cn(
+          "absolute inset-0 overflow-hidden rounded-[inherit] p-[5px]",
+          pillComposerRimBandClassName,
+        )}
+      >
+        <span
+          ref={glowSpinRef}
+          className={cn(
+            pillComposerRimSpinnerBaseClassName,
+            variant === "comet"
+              ? pillComposerRimCometClassName
+              : pillComposerRimTrailClassName,
+            "blur-[6px] opacity-35",
+          )}
+        />
+      </span>
+      <span
+        data-slot="pill-composer-rim-ring"
+        className={cn(
+          "absolute inset-0 overflow-hidden rounded-[inherit] p-[2px]",
+          pillComposerRimBandClassName,
+        )}
+      >
+        <span
+          ref={ringSpinRef}
+          className={cn(
+            pillComposerRimSpinnerBaseClassName,
+            variant === "comet"
+              ? pillComposerRimCometClassName
+              : pillComposerRimTrailClassName,
+          )}
+        />
+      </span>
+    </span>
+  )
+}
+
+/** A compact pill-shaped message-entry form with a traveling-light working state. */
+export interface PillComposerProps extends React.ComponentProps<"form"> {
+  /**
+   * Shows the iridescent light traveling the pill's rim while the agent
+   * works. Toggling fades the light in and out rather than switching it.
+   */
+  generating?: boolean
+  /** Chooses the rim's motion while generating. Defaults to `orbit`. */
+  rimVariant?: PillComposerRimVariant
+  /** Sets the preferred width in CSS pixels while preserving host containment. */
+  width?: number
+  submitOnEnter?: boolean
+}
+
+/**
+ * Renders the pill form and provides the ChatComposer slot context, so
+ * ChatComposerInput, ChatComposerAttachments, ChatComposerAction, and
+ * ChatComposerTrigger compose inside it unchanged. Lay the single control
+ * row out with PillComposerRow; attachments stack above it and round the
+ * pill's corners as it grows.
+ */
+function PillComposer({
+  generating = false,
+  rimVariant = "orbit",
+  width,
+  submitOnEnter = true,
+  className,
+  children,
+  style,
+  ...props
+}: PillComposerProps) {
+  const [inputAdapter, setInputAdapter] =
+    React.useState<ChatComposerInputAdapter | null>(null)
+
+  // The pill reads as `constrained` so ChatComposerInput drops its min-height
+  // floor and hugs a single line, growing only with content; the attachments
+  // row inherits its scroll cap the same way.
+  const context = React.useMemo(
+    () => ({
+      composerMaxHeight: undefined,
+      constrained: true,
+      submitOnEnter,
+      size: "compact" as const,
+      inputAdapter,
+      registerInput: setInputAdapter,
+    }),
+    [inputAdapter, submitOnEnter],
+  )
+
+  return (
+    <ChatComposerContext.Provider value={context}>
+      <form
+        data-slot="pill-composer"
+        data-generating={generating || undefined}
+        aria-busy={generating || undefined}
+        className={cn(
+          // No focus-within ring or border shift: the caret carries focus, as
+          // in ChatComposer's borderMode "none" (owner preference, Aug 2026).
+          "relative flex min-w-0 w-full max-w-full flex-col gap-1.5 rounded-[1.625rem] border border-border bg-card p-1.5 font-sans text-card-foreground",
+          className,
+        )}
+        style={{
+          ...style,
+          ...(width === undefined ? undefined : { width: `min(${width}px, 100%)` }),
+        }}
+        {...props}
+      >
+        <PillComposerRim active={generating} variant={rimVariant} />
+        {children}
+      </form>
+    </ChatComposerContext.Provider>
+  )
+}
+
+/** Lays out the pill's single control row: leading actions, input, trailing actions. */
+function PillComposerRow({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="pill-composer-row"
+      className={cn("flex min-w-0 max-w-full items-end gap-1", className)}
+      {...props}
+    />
+  )
+}
+
+export { PillComposer, PillComposerRow }

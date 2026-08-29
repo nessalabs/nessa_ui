@@ -612,7 +612,7 @@ function RandomAvatar({
   const bleeding = finite(bleed, 1) > 0
   // Pools screen on ink and multiply on paper: the same passes have to build
   // toward the light on a dark ground and toward the dark on a light one.
-  const blendMode = ground === "ink" ? "screen" : "multiply"
+  const blendModeClass = ground === "ink" ? "mix-blend-screen" : "mix-blend-multiply"
 
   const reducedMotion = useReducedMotion()
   const busyMotion = busy && !reducedMotion
@@ -1005,14 +1005,14 @@ function RandomAvatar({
               far enough to open a bare crescent. */}
           <g
             filter={bleeding ? `url(#${bleedId})` : undefined}
-            style={{ mixBlendMode: blendMode, isolation: "isolate" }}
+            className={cn(blendModeClass, "isolate")}
           >
             <g ref={poolsRef}>
               {pools.map((pool, index) => (
                 <g
                   key={index}
+                  className={blendModeClass}
                   style={{
-                    mixBlendMode: blendMode,
                     transformOrigin: `${pool.origin.x}px ${pool.origin.y}px`,
                     // Without an explicit box the origin above resolves
                     // against the pool's own bounding box on engines that
@@ -1045,7 +1045,7 @@ function RandomAvatar({
               height={100}
               filter={`url(#${grainId})`}
               opacity={(ground === "ink" ? 0.055 : 0.085) * finite(grain, 1)}
-              style={{ mixBlendMode: blendMode }}
+              className={blendModeClass}
             />
           ) : null}
         </g>

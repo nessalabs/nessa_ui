@@ -1,0 +1,7 @@
+{"type":"thread.started","thread_id":"01a04964-3b66-7951-9622-0c47194ae0d0"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"I’ll run that command and report the result in one sentence."}}
+{"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"/bin/zsh -lc 'cat /nonexistent/definitely-missing-file'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"/bin/zsh -lc 'cat /nonexistent/definitely-missing-file'","aggregated_output":"cat: /nonexistent/definitely-missing-file: No such file or directory\n","exit_code":1,"status":"failed"}}
+{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"The command failed because the file does not exist, producing a “No such file or directory” error and exit code 1."}}
+{"type":"turn.completed","usage":{"input_tokens":34320,"cached_input_tokens":26112,"output_tokens":193,"reasoning_output_tokens":15}}

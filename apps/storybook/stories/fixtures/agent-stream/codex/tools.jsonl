@@ -1,0 +1,9 @@
+{"type":"thread.started","thread_id":"01a04963-ab10-7b23-8dec-457ce8864cf1"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"I’ll create the file, read it back, and run the line count."}}
+{"type":"item.started","item":{"id":"item_1","type":"file_change","changes":[{"path":"/home/dev/workspace/sandbox/notes.txt","kind":"add"}],"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_1","type":"file_change","changes":[{"path":"/home/dev/workspace/sandbox/notes.txt","kind":"add"}],"status":"completed"}}
+{"type":"item.started","item":{"id":"item_2","type":"command_execution","command":"/bin/zsh -lc 'cat notes.txt && wc -l notes.txt'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_2","type":"command_execution","command":"/bin/zsh -lc 'cat notes.txt && wc -l notes.txt'","aggregated_output":"First line.\nSecond line.\nThird line.\n       3 notes.txt\n","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"Created and read back `notes.txt`:\n\n```text\nFirst line.\nSecond line.\nThird line.\n```\n\n`wc -l notes.txt` → `3`"}}
+{"type":"turn.completed","usage":{"input_tokens":34372,"cached_input_tokens":26112,"output_tokens":255,"reasoning_output_tokens":30}}

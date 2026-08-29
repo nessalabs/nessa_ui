@@ -1,6 +1,6 @@
-import type * as React from "react"
+import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { expect, userEvent, within } from "storybook/test"
+import { expect, userEvent, waitFor, within } from "storybook/test"
 import {
   Badge,
   Button,
@@ -13,12 +13,13 @@ import {
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
+  SidebarAction,
   SidebarMenuItem,
   SidebarMenuSkeleton,
   SidebarProvider,
   SidebarTrigger,
 } from "@nessa-ui/react"
-import { Folder, MoreHorizontal } from "lucide-react"
+import { Folder, LoaderCircle, MoreHorizontal, Settings } from "lucide-react"
 
 import { SidebarToggleIcon } from "./icons/sidebar-toggle-icon"
 import {
@@ -37,7 +38,23 @@ const menuDescriptions = {
     "SidebarMenuSkeleton is a list-item loading state that adapts icon and text placeholders across collapsed and expanded sidebars.",
   NestedMenu:
     "Nested navigation reuses SidebarMenu and SidebarMenuItem, preserving valid ul/li structure without a second submenu component family.",
+  NestedMenuGuides:
+    "The guides variant of a nested SidebarMenu draws decorative branch lines from the parent row to each child, terminating in an elbow on the last row. Guides are presentation only: hierarchy stays in the nested list structure, and the logical-start offset retunes through --nessa-sidebar-guide-inset.",
+  TrailingAction:
+    "SidebarAction is the trailing icon control on a row — settings, a kebab menu, a dismiss. Paired with a badge and showTrailingOnHover the two share one cell and swap, so revealing the action costs the reader neither width nor the row's resting count. The reveal answers hover and keyboard focus only: :focus-within would keep the row you last clicked revealed while you hover another, showing two rows' actions at once.",
+  CollapsibleSubmenu:
+    "A submenu becomes a disclosure through the collapsible prop. In row mode the parent row is the disclosure button; in chevron mode a separate control at the logical start toggles it so the row itself stays free to navigate. Open state is uncontrolled through defaultOpen or host-controlled through open and onOpenChange.",
 } as const
+
+/** Trailing spinner standing in for a host's own in-progress indicator. */
+function RunningIndicator() {
+  return (
+    <LoaderCircle
+      aria-hidden="true"
+      className="size-3.5 animate-spin text-sidebar-foreground/50"
+    />
+  )
+}
 
 interface MenuPrimitiveFrameProps {
   children: React.ReactNode
@@ -378,5 +395,369 @@ export const NestedMenu: StoryObj<NestedMenuStoryArgs> = {
     await expect(label.getBoundingClientRect().left).toBeGreaterThan(
       nestedItem.getBoundingClientRect().left,
     )
+  },
+}
+
+
+interface NestedMenuGuidesStoryArgs {
+  guideColor: string
+  guideInset: string
+  guideWidth: string
+  parentLabel: string
+}
+
+export const NestedMenuGuides: StoryObj<NestedMenuGuidesStoryArgs> = {
+  args: {
+    guideColor: "var(--color-sidebar-border)",
+    guideInset: "1.25rem",
+    guideWidth: "1px",
+    parentLabel: "Record orchestration demo",
+  },
+  argTypes: {
+    parentLabel: { control: "text", description: "Parent row label." },
+    guideInset: {
+      control: "text",
+      description:
+        "Logical-start offset of the branch guides, applied as --nessa-sidebar-guide-inset.",
+    },
+    guideWidth: {
+      control: "text",
+      description:
+        "Guide line thickness, applied as --nessa-sidebar-guide-width.",
+    },
+    guideColor: {
+      control: "text",
+      description: "Guide line colour, applied as --nessa-sidebar-guide-color.",
+    },
+  },
+  parameters: storyDocumentation(menuDescriptions.NestedMenuGuides),
+  render: ({ guideColor, guideInset, guideWidth, parentLabel }) => (
+    <MenuPrimitiveFrame description={menuDescriptions.NestedMenuGuides}>
+      <SidebarMenu>
+        <SidebarMenuItem
+          isActive
+          trailing={<RunningIndicator />}
+          submenu={
+            <SidebarMenu
+              nested
+              guides
+              style={
+                {
+                  "--nessa-sidebar-guide-color": guideColor,
+                  "--nessa-sidebar-guide-inset": guideInset,
+                  "--nessa-sidebar-guide-width": guideWidth,
+                } as React.CSSProperties
+              }
+            >
+              <SidebarMenuItem
+                size="sm"
+                trailing={<RunningIndicator />}
+                tooltip="Your only task is to spin up a worker and report back"
+              >
+                Your only task is to spin up a worker and report back
+              </SidebarMenuItem>
+              <SidebarMenuItem
+                size="sm"
+                trailing={<RunningIndicator />}
+                tooltip="Greet the user. Write a short hello and stop."
+              >
+                Greet the user. Write a short hello and stop.
+              </SidebarMenuItem>
+            </SidebarMenu>
+          }
+        >
+          {parentLabel}
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </MenuPrimitiveFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const guidedMenu = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="sidebar-menu"][data-guides="true"]',
+    )!
+    const rows = [
+      ...guidedMenu.querySelectorAll<HTMLElement>(
+        ':scope > [data-slot="sidebar-menu-item"]',
+      ),
+    ]
+    await expect(rows).toHaveLength(2)
+
+    // Every row draws the elbow; only a row with a row after it draws the
+    // trunk that carries the line on to the next elbow.
+    const guideColor = getComputedStyle(guidedMenu).getPropertyValue(
+      "--nessa-sidebar-guide-color",
+    )
+    for (const row of rows) {
+      const elbow = getComputedStyle(row, "::before")
+      await expect(elbow.content).not.toBe("none")
+      // Width and colour, not style: preflight sets `border: 0 solid` on
+      // every pseudo-element, so asserting the style passes even with the
+      // elbow's border utilities deleted and nothing rendered.
+      await expect(Number.parseFloat(elbow.borderBottomWidth)).toBeGreaterThan(0)
+      await expect(Number.parseFloat(elbow.borderLeftWidth)).toBeGreaterThan(0)
+      await expect(elbow.borderBottomColor).not.toBe("rgba(0, 0, 0, 0)")
+      await expect(elbow.borderBottomColor).toBe(elbow.borderLeftColor)
+      await expect(guideColor.trim()).not.toBe("")
+    }
+
+    // The spine is painted, not just positioned.
+    const paintedSpine = getComputedStyle(rows[0], "::after")
+    await expect(paintedSpine.backgroundColor).not.toBe("rgba(0, 0, 0, 0)")
+    await expect(Number.parseFloat(paintedSpine.width)).toBeGreaterThan(0)
+    await expect(getComputedStyle(rows[0], "::after").content).not.toBe("none")
+    await expect(getComputedStyle(rows[1], "::after").content).toBe("none")
+
+    // The spine runs the row's whole height and overshoots into the list's
+    // row gap, so it meets the next elbow with no break at the elbow's
+    // rounded corner.
+    const spine = getComputedStyle(rows[0], "::after")
+    await expect(spine.top).toBe("0px")
+    await expect(Number.parseFloat(spine.height)).toBeGreaterThan(
+      rows[0].getBoundingClientRect().height,
+    )
+
+    // Trailing content centres on its own row's midline whatever its height,
+    // and a nested row's size never displaces its parent row's trailing.
+    for (const row of [
+      ...guidedMenu.closest<HTMLElement>('[data-slot="sidebar-menu-item"]')!
+        .parentElement!.querySelectorAll<HTMLElement>(
+          '[data-slot="sidebar-menu-item"]',
+        ),
+    ]) {
+      const control = row.querySelector<HTMLElement>(
+        '[data-slot="sidebar-menu-item-control"]',
+      )!
+      const spinner = row.querySelector<HTMLElement>(
+        '[data-slot="sidebar-menu-item-trailing"] svg',
+      )!
+      const controlBox = control.getBoundingClientRect()
+      const spinnerBox = spinner.getBoundingClientRect()
+      await expect(spinnerBox.top + spinnerBox.height / 2).toBeCloseTo(
+        controlBox.top + controlBox.height / 2,
+        0,
+      )
+    }
+
+    // The guides sit clear of the nested label, which keeps its indentation.
+    const label = canvas
+      .getByRole("button", { name: "Greet the user. Write a short hello and stop." })
+      .querySelector<HTMLElement>('[data-slot="sidebar-menu-item-label"]')!
+    const elbowEnd =
+      guidedMenu.getBoundingClientRect().left +
+      Number.parseFloat(getComputedStyle(rows[1], "::before").left) +
+      Number.parseFloat(getComputedStyle(rows[1], "::before").width)
+    await expect(label.getBoundingClientRect().left).toBeGreaterThan(elbowEnd)
+  },
+}
+
+function CollapsibleSubmenuExample() {
+  // The chevron-mode row is host-controlled to show the controlled path;
+  // the row-mode one owns its own state through defaultOpen.
+  const [reportsOpen, setReportsOpen] = React.useState(false)
+
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem
+        collapsible="row"
+        defaultOpen
+        icon={<Folder />}
+        submenu={
+          <SidebarMenu nested guides>
+            <SidebarMenuItem size="sm">Spin up a worker</SidebarMenuItem>
+            <SidebarMenuItem size="sm">Greet the user</SidebarMenuItem>
+          </SidebarMenu>
+        }
+      >
+        Record orchestration demo
+      </SidebarMenuItem>
+      <SidebarMenuItem
+        asChild
+        collapsible="chevron"
+        collapsibleLabel="Toggle reports"
+        open={reportsOpen}
+        onOpenChange={setReportsOpen}
+        submenu={
+          <SidebarMenu nested guides>
+            <SidebarMenuItem size="sm">Weekly rollup</SidebarMenuItem>
+            <SidebarMenuItem size="sm">Incident log</SidebarMenuItem>
+          </SidebarMenu>
+        }
+      >
+        <a href="#reports">Reports</a>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  )
+}
+
+export const CollapsibleSubmenu: StoryObj = {
+  parameters: storyDocumentation(menuDescriptions.CollapsibleSubmenu),
+  render: () => (
+    <MenuPrimitiveFrame description={menuDescriptions.CollapsibleSubmenu}>
+      <CollapsibleSubmenuExample />
+    </MenuPrimitiveFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+
+    // Row mode: the row control is itself the disclosure.
+    const parentRow = canvas.getByRole("button", {
+      name: "Record orchestration demo",
+    })
+    await expect(parentRow).toHaveAttribute("aria-expanded", "true")
+    await expect(
+      canvas.getByRole("button", { name: "Spin up a worker" }),
+    ).toBeVisible()
+
+    await userEvent.click(parentRow)
+    await expect(parentRow).toHaveAttribute("aria-expanded", "false")
+    await expect(
+      canvas.queryByRole("button", { name: "Spin up a worker" }),
+    ).toBeNull()
+
+    // A closed chevron points toward the inline end in BOTH directions.
+    // The chevron is the row's first glyph, before any `icon`.
+    // The disclosure names the element it controls, open or closed.
+    const controlled = document.getElementById(
+      parentRow.getAttribute("aria-controls")!,
+    )
+    await expect(controlled).not.toBeNull()
+
+    // Chevron mode: the row keeps navigating, a separate control discloses.
+    const reportsLink = canvas.getByRole("link", { name: "Reports" })
+    await expect(reportsLink).not.toHaveAttribute("aria-expanded")
+    const chevron = canvas.getByRole("button", { name: "Toggle reports" })
+    await expect(chevron).toHaveAttribute("aria-expanded", "false")
+    await expect(
+      canvas.queryByRole("button", { name: "Weekly rollup" }),
+    ).toBeNull()
+
+    await userEvent.click(chevron)
+    await expect(chevron).toHaveAttribute("aria-expanded", "true")
+    const nestedRow = canvas.getByRole("button", { name: "Weekly rollup" })
+    await expect(nestedRow).toBeVisible()
+
+    // A "chevron" row reserves logical-start space for the disclosure, so
+    // the two controls never overlap however wide the row is.
+    await expect(
+      Number.parseFloat(getComputedStyle(reportsLink).paddingInlineStart),
+    ).toBeGreaterThanOrEqual(chevron.getBoundingClientRect().width)
+
+    // Direction is asserted last: the row transitions `padding`, so flipping
+    // `dir` animates `padding-inline-start` and would leave any assertion
+    // after this one reading a mid-transition value.
+    //
+    // A closed chevron points toward the inline end in BOTH directions. The
+    // chevron is the row's first glyph, before any `icon`, and its rotation
+    // transitions, so computed style has to settle before each read.
+    const chevronGlyph = parentRow.querySelector<HTMLElement>("svg")!
+    await waitFor(async () => {
+      await expect(getComputedStyle(chevronGlyph).rotate).toBe("-90deg")
+    })
+    const root = document.documentElement
+    const previousDir = root.getAttribute("dir")
+    try {
+      root.setAttribute("dir", "rtl")
+      await waitFor(async () => {
+        await expect(getComputedStyle(chevronGlyph).rotate).toBe("90deg")
+      })
+    } finally {
+      if (previousDir === null) root.removeAttribute("dir")
+      else root.setAttribute("dir", previousDir)
+    }
+  },
+}
+
+
+export const TrailingAction: StoryObj = {
+  parameters: storyDocumentation(menuDescriptions.TrailingAction),
+  render: () => (
+    <MenuPrimitiveFrame description={menuDescriptions.TrailingAction}>
+      <SidebarMenu>
+        {["eng-sidebar", "eng-tabs"].map((channel, index) => (
+          <SidebarMenuItem
+            key={channel}
+            icon={<Folder />}
+            badge={String(index === 0 ? 5 : 2)}
+            showTrailingOnHover
+            trailing={
+              <SidebarAction aria-label={`Settings for ${channel}`}>
+                <Settings aria-hidden="true" />
+              </SidebarAction>
+            }
+          >
+            {channel}
+          </SidebarMenuItem>
+        ))}
+      </SidebarMenu>
+    </MenuPrimitiveFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const first = canvas.getByRole("button", { name: "Settings for eng-sidebar" })
+    const second = canvas.getByRole("button", { name: "Settings for eng-tabs" })
+    const firstRow = first.closest<HTMLElement>(
+      '[data-slot="sidebar-menu-item"]',
+    )!
+    const opacityOf = (element: HTMLElement) =>
+      Number.parseFloat(getComputedStyle(element.parentElement!).opacity)
+
+    if (!matchMedia("(hover: hover) and (pointer: fine)").matches) {
+      // Without a fine pointer there is nothing to reveal on: both halves
+      // stay present, which keeps the action reachable by touch. They must
+      // then sit side by side — sharing one grid cell would print the badge
+      // through the action.
+      await expect(opacityOf(first)).toBe(1)
+      await expect(opacityOf(second)).toBe(1)
+      const touchBadge = firstRow.querySelector<HTMLElement>(
+        '[data-slot="sidebar-menu-item-badge"]',
+      )!
+      await expect(getComputedStyle(touchBadge).opacity).toBe("1")
+      await expect(
+        touchBadge.getBoundingClientRect().right,
+      ).toBeLessThanOrEqual(first.getBoundingClientRect().left + 0.5)
+      return
+    }
+
+    // Both actions rest hidden; the counts hold the trailing cell, and the
+    // two share it rather than sitting side by side.
+    await expect(opacityOf(first)).toBe(0)
+    await expect(opacityOf(second)).toBe(0)
+    const badge = firstRow.querySelector<HTMLElement>(
+      '[data-slot="sidebar-menu-item-badge"]',
+    )!
+    await expect(getComputedStyle(badge).opacity).toBe("1")
+    await expect(badge.getBoundingClientRect().left).toBeCloseTo(
+      first.parentElement!.getBoundingClientRect().left,
+      0,
+    )
+
+    // The reveal must key off :focus-visible, not :focus-within — a mouse
+    // click leaves focus inside the row it clicked, and :focus-within would
+    // keep that row revealed while the pointer moved to another row.
+    //
+    // This is asserted as a class contract rather than behaviourally on
+    // purpose: in this runner userEvent.click grants :focus-visible (probed —
+    // `row.matches(":focus-visible")` is true after a click), so the two
+    // selectors are behaviourally indistinguishable here and any click-based
+    // assertion would pass against both. The class assertion fails if the
+    // selector regresses; a real browser does the discriminating.
+    const reveal = first.parentElement!
+    await expect(reveal.className).toContain(
+      "group-has-[:focus-visible]/menu-item:opacity-100",
+    )
+    await expect(reveal.className).not.toContain("group-focus-within")
+    await expect(badge.className).not.toContain("group-focus-within")
+
+    // Keyboard focus reveals the action and retires the badge — the swap, in
+    // both directions, on the row that holds focus and only that row.
+    first.focus()
+    await waitFor(async () => {
+      await expect(opacityOf(first)).toBe(1)
+    })
+    await waitFor(async () => {
+      await expect(getComputedStyle(badge).opacity).toBe("0")
+    })
+    await expect(opacityOf(second)).toBe(0)
   },
 }

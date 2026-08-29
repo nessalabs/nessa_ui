@@ -81,8 +81,35 @@
       "nessa-thinking-fill-current": "oklch(0.68 0.2 304)",
       "nessa-thinking-fill-highlight": "oklch(0.86 0.11 214)",
       "nessa-fast-mode-active": "oklch(0.57 0.22 300)",
+      "nessa-chart-series-1": "oklch(0.7732 0.075 265)",
+      "nessa-chart-series-1-strong": "oklch(0.46 0.1 265)",
+      "nessa-chart-series-2": "oklch(0.8656 0.075 45)",
+      "nessa-chart-series-2-strong": "oklch(0.68 0.1 45)",
+      "nessa-chart-series-3": "oklch(0.8236 0.075 190)",
+      "nessa-chart-series-3-strong": "oklch(0.58 0.1 190)",
+      "nessa-chart-series-4": "oklch(0.9076 0.075 85)",
+      "nessa-chart-series-4-strong": "oklch(0.78 0.1 85)",
+      "nessa-chart-series-5": "oklch(0.8446 0.075 15)",
+      "nessa-chart-series-5-strong": "oklch(0.63 0.1 15)",
+      "nessa-chart-series-6": "oklch(0.7984 0.075 145)",
+      "nessa-chart-series-6-strong": "oklch(0.52 0.1 145)",
+      "nessa-chart-series-7": "oklch(0.79 0.075 305)",
+      "nessa-chart-series-7-strong": "oklch(0.5 0.1 305)",
+      "nessa-chart-series-8": "oklch(0.8824 0.071 230)",
+      "nessa-chart-series-8-strong": "oklch(0.72 0.1 230)",
       "nessa-diff-addition": "oklch(0.5 0.137 150)",
-      "nessa-diff-deletion": "oklch(0.55 0.19 27)"
+      "nessa-diff-deletion": "oklch(0.55 0.19 27)",
+      "nessa-market-gain": "oklch(0.5 0.135 148)",
+      "nessa-market-loss": "oklch(0.55 0.19 27)",
+      "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 20%, transparent)",
+      "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)",
+      "nessa-chat-accent": "#0071e3",
+      "nessa-chat-rim-0": "rgba(245, 158, 11, 0.06)",
+      "nessa-chat-rim-1": "rgba(245, 158, 11, 0.22)",
+      "nessa-chat-rim-2": "rgba(236, 72, 153, 0.42)",
+      "nessa-chat-rim-3": "rgba(168, 85, 247, 0.62)",
+      "nessa-chat-rim-4": "rgba(56, 189, 248, 0.85)",
+      "nessa-chat-rim-head": "#ffffff"
     },
     "dark": {
       "background": "oklch(0.145 0 0)",
@@ -114,8 +141,35 @@
       "nessa-thinking-fill-current": "oklch(0.67 0.2 306)",
       "nessa-thinking-fill-highlight": "oklch(0.82 0.12 210)",
       "nessa-fast-mode-active": "oklch(0.72 0.185 306)",
+      "nessa-chart-series-1": "oklch(0.3442 0.07 265)",
+      "nessa-chart-series-1-strong": "oklch(0.56 0.1 265)",
+      "nessa-chart-series-2": "oklch(0.3922 0.07 45)",
+      "nessa-chart-series-2-strong": "oklch(0.66 0.1 45)",
+      "nessa-chart-series-3": "oklch(0.3634 0.062 190)",
+      "nessa-chart-series-3-strong": "oklch(0.6 0.1 190)",
+      "nessa-chart-series-4": "oklch(0.421 0.07 85)",
+      "nessa-chart-series-4-strong": "oklch(0.72 0.1 85)",
+      "nessa-chart-series-5": "oklch(0.373 0.07 15)",
+      "nessa-chart-series-5-strong": "oklch(0.62 0.1 15)",
+      "nessa-chart-series-6": "oklch(0.3346 0.07 145)",
+      "nessa-chart-series-6-strong": "oklch(0.54 0.1 145)",
+      "nessa-chart-series-7": "oklch(0.3538 0.07 305)",
+      "nessa-chart-series-7-strong": "oklch(0.58 0.1 305)",
+      "nessa-chart-series-8": "oklch(0.4018 0.07 230)",
+      "nessa-chart-series-8-strong": "oklch(0.68 0.1 230)",
       "nessa-diff-addition": "oklch(0.77 0.17 152)",
-      "nessa-diff-deletion": "oklch(0.7 0.19 25)"
+      "nessa-diff-deletion": "oklch(0.7 0.19 25)",
+      "nessa-market-gain": "oklch(0.8 0.19 150)",
+      "nessa-market-loss": "oklch(0.7 0.19 25)",
+      "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 40%, transparent)",
+      "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)",
+      "nessa-chat-accent": "#0071e3",
+      "nessa-chat-rim-0": "rgba(245, 158, 11, 0.06)",
+      "nessa-chat-rim-1": "rgba(245, 158, 11, 0.22)",
+      "nessa-chat-rim-2": "rgba(236, 72, 153, 0.42)",
+      "nessa-chat-rim-3": "rgba(168, 85, 247, 0.62)",
+      "nessa-chat-rim-4": "rgba(56, 189, 248, 0.85)",
+      "nessa-chat-rim-head": "#ffffff"
     }
   },
   "css": {
@@ -136,6 +190,9 @@
     },
     ":where([data-nessa-scale=\"110\"])": {
       "--_nessa-scale-factor": "1.1"
+    },
+    ":where([data-nessa-scale=\"125\"])": {
+      "--_nessa-scale-factor": "1.25"
     },
     ":where(:root, [data-nessa-root], [data-nessa-theme], [data-nessa-scale])": {
       "--_nessa-font-size-1": "calc(var(--nessa-font-size-1) * var(--_nessa-scale-factor))",
@@ -159,6 +216,9 @@
       "--_nessa-letter-spacing-5": "var(--nessa-letter-spacing-5)",
       "--_nessa-letter-spacing-6": "var(--nessa-letter-spacing-6)",
       "--_nessa-letter-spacing-7": "var(--nessa-letter-spacing-7)"
+    },
+    ":root, :where([data-nessa-root], [data-nessa-theme], [data-nessa-scale])": {
+      "--spacing": "calc(0.25rem * var(--_nessa-scale-factor))"
     },
     "@layer components": {
       ".nessa-text-1": {
@@ -201,9 +261,17 @@
         "line-height": "var(--_nessa-line-height-4)",
         "letter-spacing": "var(--_nessa-letter-spacing-4)"
       },
+      ".nessa-text-input-2": {
+        "font-size": "max(1rem, var(--_nessa-font-size-2))",
+        "line-height": "var(--_nessa-line-height-2)",
+        "letter-spacing": "var(--_nessa-letter-spacing-2)"
+      },
       "@media (width >= 48rem)": {
         ".nessa-text-input": {
           "font-size": "var(--_nessa-font-size-4)"
+        },
+        ".nessa-text-input-2": {
+          "font-size": "var(--_nessa-font-size-2)"
         }
       }
     },

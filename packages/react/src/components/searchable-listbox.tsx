@@ -277,7 +277,10 @@ function SearchableListbox<Item>({
                     if (!itemDisabled) onValueChange?.(itemId, item)
                   }}
                   className={cn(
-                    "w-full rounded-xl text-start font-sans outline-none transition-colors focus-visible:bg-accent focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-disabled:opacity-45",
+                    // Rows carry real padding and a text level by default so a
+                    // bare renderItem gets a finished row; content-styled
+                    // consumers strip it back via optionClassName.
+                    "w-full rounded-2xl px-2.5 py-2 text-start font-sans nessa-text-4 outline-none transition-colors focus-visible:bg-accent focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-disabled:opacity-45",
                     highlighted && "bg-accent/70",
                     optionClassName,
                   )}

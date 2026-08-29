@@ -364,6 +364,7 @@ export const NessaScale = {
   Default: "100",
   Large: "105",
   Larger: "110",
+  Largest: "125",
 } as const
 
 export type NessaScale =
@@ -390,13 +391,20 @@ Scale does not affect:
 Do not implement scale with CSS `zoom`, transforms, or mutation of `html`/wrapper `font-size`. Use the same modern CSS arithmetic baseline as Tailwind CSS v4: Chrome 111+, Safari 16.4+, and Firefox 128+. The Vite, Next, registry, and browser fixtures gate this contract. A private factor keeps nested scale and later consumer baseline overrides composable without a selector cross-product:
 
 ```css
+/* The zero-specificity baseline must precede the presets: on the root
+   provider, which carries data-nessa-root and data-nessa-scale together,
+   the preset wins purely by source order. */
+:where(:root, [data-nessa-root]) { --_nessa-scale-factor: 1; }
+
 :where([data-nessa-scale="90"]) { --_nessa-scale-factor: 0.9; }
 :where([data-nessa-scale="95"]) { --_nessa-scale-factor: 0.95; }
 :where([data-nessa-scale="100"]) { --_nessa-scale-factor: 1; }
 :where([data-nessa-scale="105"]) { --_nessa-scale-factor: 1.05; }
 :where([data-nessa-scale="110"]) { --_nessa-scale-factor: 1.1; }
+:where([data-nessa-scale="125"]) { --_nessa-scale-factor: 1.25; }
 
 :where(
+  :root,
   [data-nessa-root],
   [data-nessa-theme],
   [data-nessa-scale]
@@ -405,18 +413,32 @@ Do not implement scale with CSS `zoom`, transforms, or mutation of `html`/wrappe
     calc(var(--nessa-font-size-2) * var(--_nessa-scale-factor));
   --_nessa-line-height-2: var(--nessa-line-height-2);
   --_nessa-letter-spacing-2: var(--nessa-letter-spacing-2);
-  --_nessa-space-3:
-    calc(var(--nessa-space-3) * var(--_nessa-scale-factor));
-  --_nessa-control-height-md:
-    max(
-      1.5rem,
-      calc(
-        var(--nessa-control-height-md)
-        * var(--_nessa-scale-factor)
-      )
-    );
 }
 ```
+
+Geometry does not need a bespoke token ramp. Tailwind CSS v4 derives every
+spacing and sizing utility from a single `--spacing` base and resolves the
+variable at the element that uses the utility, so redeclaring that base per
+scope carries padding, gaps, control heights, and spacing-derived icon sizes
+through the same factor as type:
+
+```css
+:root,
+:where(
+  [data-nessa-root],
+  [data-nessa-theme],
+  [data-nessa-scale]
+) {
+  --spacing: calc(0.25rem * var(--_nessa-scale-factor));
+}
+```
+
+The bare `:root` (not `:where`) outranks Tailwind's own `:root, :host`
+declaration earlier in the shared theme layer. Radii, border widths, focus
+rings, and motion keep their own tokens and never resolve through
+`--spacing`. A dimension that must stay absolute under scale — a hairline, a
+focus ring, a border — is expressed as an arbitrary px value precisely
+because those opt out of the spacing base.
 
 These computed aliases are redeclared at every root, theme, and scale scope. This is necessary because an inherited custom property may otherwise retain the value computed against its parent's tokens. Theme overrides and nested scale changes always recompute locally while retaining consumer-overridden baselines.
 
@@ -424,7 +446,21 @@ Public typography sizes, spacing, control heights/padding, and icon sizes descri
 
 Scale is not density. A future density axis may alter whitespace/control compactness without changing text. Do not add density until real compact-layout requirements establish its semantics.
 
-TOKEN-004 enforces the typography axis of this contract, which is the axis whose tokens exist: the seven coordinated levels, the private computed aliases, the five preset factors, and the `nessa-text-*` helpers that Nessa-owned components name instead of a Tailwind size utility. Spacing, control geometry, and icon dimensions still come from Tailwind utilities and join the same scale chain when their ramps are tokenised; adding them extends this contract rather than replacing it. A descendant selector that cannot carry a helper class sizes in `em` so it continues to follow the active scale.
+TOKEN-004 enforces both axes of this contract: the seven coordinated levels, the private computed aliases, the six preset factors, the `nessa-text-*` helpers that Nessa-owned components name instead of a Tailwind size utility, and the `--spacing` redeclaration that carries geometry through the same factor. A descendant selector that cannot carry a helper class sizes in `em` so it continues to follow the active scale.
+
+### Styling discipline and inline-style escape hatch
+
+Component styling stays inside the semantic token system, with one narrow, exactly-ledgered escape hatch for values that only exist at runtime. Three invariants make styling-at-a-distance and token bypasses structurally difficult rather than merely discouraged:
+
+1. **Semantic color only (STYLE-001).** Class surfaces (`className`, `cn`, `cva`) never use raw Tailwind palette scales (`bg-red-500`, `text-zinc-400`) or literal color values in arbitrary utilities — hex, color constructors, and named colors alike (`bg-[#fff]`, `text-[oklch(...)]`, `bg-[red]`), including paint-setting arbitrary properties (`[color:red]`, `[background:linear-gradient(...,red,...)]`). Every color routes through a semantic token utility or a `--nessa-*` custom property, so a palette or theme change is a token edit, never a component sweep. `color-mix()` and `light-dark()` over token references are token-preserving and stay allowed, as are the token-neutral keywords (`transparent`, `currentColor`, `inherit`); a literal color constructor inside them is still a violation. This invariant has no exception ledger: a new raw color in a class surface is always a contract violation.
+2. **Frozen stacking scale (STYLE-002).** Class-surface z-index utilities are limited to `z-0`, `z-10`, `z-20`, `z-30`, `z-40`, `z-50`, and `z-auto`. Arbitrary, negative, variable, or arbitrary-property forms (`z-[60]`, `z-[1]`, `-z-10`, `z-(--layer)`, `[z-index:...]`) are off-scale violations. The ledger currently holds no stacking exceptions and should stay that way: local orderings inside a stacking context express themselves on the scale (`z-10` beats `z-auto` exactly as `z-[1]` did), and `z-50` is the repository-wide overlay ceiling — nothing stacks above it, so "one higher" is never a reason.
+3. **Inline styles are computed geometry only (STYLE-003).** Properties declared through the JSX `style` attribute are limited to CSS custom properties (`--*`) and a frozen allowlist of runtime-geometry properties: inset/position (`left`, `top`, `insetInlineStart`, …), sizing (`width`, `maxHeight`, `flexBasis`, …), transforms (`transform`, `translate`, `rotate`, `scale`, `transformOrigin`, `transformBox`), and `opacity`. Anything else — paint, spacing, layering, motion — either becomes a utility fed by a custom property or is an exact ledgered exception. Two hardenings keep the escape hatch auditable: dynamically keyed style properties (`{[key]: value}` with a non-literal key) are violations outright, and an inline custom property whose literal value embeds a raw color (`"--x": "#f00"`) is an exact ledgered exception rather than a free pass. Static values that a utility can express never belong in `style`.
+
+Categorical chart colour follows the same rule through a dedicated ramp of `--nessa-chart-series-*` tokens: the hues live in the token chain, and a chart chooses which step of the ramp its mark type calls for rather than naming a colour. What the ramp is, why its slot order is load-bearing, and the series budget that order buys are documented in [chart series ramp](./chart-series-ramp.md).
+
+The exception ledger is exact: each entry pins one file, one needle, and a maximum occurrence count, and the checker fails when an occurrence drifts in either direction. Genuinely runtime-computed surfaces (generated gradients, measured gaps, cascade-derived layering) remain expressible, but every such site is visible, counted, and carries its own removal condition.
+
+The checker resolves class strings and style objects statically — through const/let bindings in scope, template literals, conditionals, spreads, `useMemo`/`useCallback` results, and object-map lookups. Values it cannot resolve (results of other calls, imported style objects, prop-driven passthrough) are outside its reach; these invariants still govern such code through review, and resolver coverage may only widen, never narrow.
 
 ### Motion and reduced motion
 
@@ -671,7 +707,7 @@ Do not remap generic `--spacing`, `--text-*`, radius, shadow, or motion variable
 
 The generator audits compiled registry component classes. It allows exactly the semantic-color table above, including deliberate `card` → `surface` and `ring` → `focus` mappings; fails on any unlisted generic theme dependency; verifies every registry-used `nessa-*` helper exists in the registry `components` payload and package `nessa.components` output; and rejects generic Tailwind type/spacing/radius/shadow/motion dependencies. This is a focused shadcn color bridge, not permission to mirror the consumer's entire Tailwind theme.
 
-Browser tests verify computed styles for package and copied registry components under Default Light/Dark, all five scale presets, nested custom themes/scales, nested Default resets, custom font overrides, and host content outside Nessa.
+Browser tests verify computed styles for package and copied registry components under Default Light/Dark, all six scale presets, nested custom themes/scales, nested Default resets, custom font overrides, and host content outside Nessa.
 
 ## Simplified color-mode API
 
@@ -1035,6 +1071,36 @@ flowchart TB
     DEFAULT_ICON --> ACCORDION
 ```
 
+## Wire parsing discipline
+
+Nessa ships parsers for coding-agent output streams, which read untrusted bytes
+from a third-party CLI whose shapes change between releases. Three invariants
+keep that surface honest, and they are contracts rather than conventions
+because each one fails silently when it is broken.
+
+1. **Wire vocabularies are frozen objects with derived unions, never
+   TypeScript enums (PARSE-001).** An `enum` is a nominal type that does not
+   survive JSON: a value decoded from a wire could never *be* one without a
+   cast, so the naming that was supposed to add safety adds a cast instead. A
+   frozen object with a derived union gives the same autocomplete and
+   exhaustiveness checking while its values remain the literals the wire
+   actually carries.
+2. **Exported vocabularies are frozen at runtime, not only at compile time
+   (PARSE-002).** `as const` and `satisfies` describe a literal without
+   changing what it is, so an exported vocabulary a consumer can mutate is a
+   shared global anyone can corrupt.
+3. **Values decoded from a wire are narrowed through the shared readers, never
+   by hand (PARSE-003).** Everything past `JSON.parse` is unknown at runtime —
+   a declared type is a claim about the bytes, not a check on them — so
+   narrowing happens once, behind names, in one module. Scattered `typeof`
+   comparisons are the failure this forbids: they drift, they disagree, and
+   each one is a place a malformed line becomes a crash or a wrong value
+   instead of an absent one.
+
+The parsers themselves, and what the wire actually contains, are documented in
+[agent stream parsers](./agent-stream-parsers.md); this section governs only
+the discipline the gate enforces.
+
 ## Canonical source and generated files
 
 ```text
@@ -1126,6 +1192,12 @@ This table is the exhaustive machine-mirrored index of normative rule groups. De
 | A11Y-002 | Effective focus and invalid treatments meet non-text contrast or use exact transitional exceptions. | `#accessibility-and-rendering-invariants` |
 | A11Y-003 | Target size, zoom, reflow, focus geometry, and forced-colors evidence require review until browser gates land. | `#accessibility-and-rendering-invariants` |
 | A11Y-004 | Valid wider-gamut contrast requires color-managed browser evidence until automated support lands. | `#accessibility-and-rendering-invariants` |
+| STYLE-001 | Component class surfaces use semantic tokens only, never raw palette scales or literal color values. | `#styling-discipline-and-inline-style-escape-hatch` |
+| STYLE-002 | Class-surface stacking utilities stay on the frozen z-0 through z-50 scale. | `#styling-discipline-and-inline-style-escape-hatch` |
+| STYLE-003 | Inline style declarations are limited to custom properties and the computed-geometry allowlist. | `#styling-discipline-and-inline-style-escape-hatch` |
+| PARSE-001 | Wire vocabularies are frozen objects with derived unions rather than TypeScript enums. | `#wire-parsing-discipline` |
+| PARSE-002 | Exported const vocabularies are frozen at runtime, not only at compile time. | `#wire-parsing-discipline` |
+| PARSE-003 | Values decoded from a wire are narrowed through the shared readers, never by hand. | `#wire-parsing-discipline` |
 | PROVIDER-001 | Provider, scope, mode, SSR, wrapper, and context boundaries activate together under their frozen contract. | `#simplified-color-mode-api` |
 | ICON-001 | Semantic icons activate only with a real consuming component and frozen resolution/accessibility ownership. | `#real-icon-consumer-before-api-stability` |
 
@@ -1140,7 +1212,7 @@ The contract above is normative. The sequence below is planning guidance only an
 - document application-owned font delivery, preload/font-display decisions, fallback stacks, and metric adjustment;
 - create `tokens.ts`, `registry.source.ts`, and the deterministic generator;
 - generate namespaced theme CSS and live scoped registry aliases;
-- generate scale factors and locally recomputed private aliases for all five scale presets;
+- generate scale factors and locally recomputed private aliases for all six scale presets;
 - generate the semver-protected static `nessa-*` registry helpers and exact semantic-color bridge allowlist;
 - introduce `nessa.tokens` and `nessa.components` layers;
 - freeze the exact three-file package CSS graph and eliminate Nessa-owned `dark:*` dependencies in favor of semantic tokens;
@@ -1180,7 +1252,7 @@ Acceptance:
 
 - `<NessaProvider>` works with no props;
 - `data-nessa-mode` is always Light or Dark;
-- `data-nessa-scale` is always one of the five frozen presets and defaults to `100`;
+- `data-nessa-scale` is always one of the six frozen presets and defaults to `100`;
 - a theme-only scope inherits scale, while scale-only and theme-plus-scale scopes set an absolute value that recomputes locally;
 - every theme-bearing scope emits resolved mode locally, so nested Dark/Light providers are independent and no selector crosses a root boundary;
 - controlled System without a supplied resolution renders Light for SSR/first hydration, while a supplied resolution registers no media listener;
@@ -1275,7 +1347,7 @@ Fixtures verify:
 - Default Light/Dark;
 - unknown-theme fallback;
 - nested custom theme and a Default reset that restores all theme-owned categories while preserving inherited scale;
-- all five scales and a nested theme-plus-scale scope;
+- all six scales and a nested theme-plus-scale scope;
 - custom font-family/type-ramp and spacing/control-size overrides demonstrated at both 100 and 110;
 - 200% zoom/reflow, Input at least 1rem below 48rem and compact-token behavior at/above 48rem, focus visibility, exact AA contrast, and forced-colors behavior;
 - fallback-first then preferred-font rendering without clipped or unusable controls;
@@ -1321,7 +1393,7 @@ Public API includes:
 - package `nessa.tokens`/`nessa.components` layer names and registry `base`/`components` precedence mapping;
 - built-in theme names and fallback behavior;
 - color-mode constants, props, and resolution rules;
-- `NessaScale`, its five values, affected axes, and excluded axes;
+- `NessaScale`, its six values, affected axes, and excluded axes;
 - controlled-System dynamic `resolvedMode` handoff and Light SSR fallback behavior;
 - the Tailwind v4 browser floor used by scale arithmetic;
 - the 48rem Input text-size threshold and interactive target-size floors;
@@ -1360,7 +1432,7 @@ An implementation of this foundation conforms only when:
 2. Controlled applications own persistence and may supply System resolution without a separate strategy API.
 3. Unknown themes safely fall back and named nested themes/reset behavior work in Light and Dark.
 4. Typography, spacing, geometry, color, radius, shadow, and motion resolve through one live namespaced package/registry chain with a complete color allowlist and stable registry utilities.
-5. All five scale presets and nested absolute scaling work without context-driven component styling or host document mutation.
+5. All six scale presets and nested absolute scaling work without context-driven component styling or host document mutation.
 6. Font delivery remains application-owned, and fallback-to-preferred-font rendering remains usable without clipped controls.
 7. Zoom/reflow, the 48rem Input rule, target floors, focus, frozen WCAG 2.2 AA contrast thresholds, forced colors, and reduced motion pass accessibility checks.
 8. Controlled System supports Light SSR fallback, application-supplied resolution, and a listener-safe seed-to-Nessa handoff.

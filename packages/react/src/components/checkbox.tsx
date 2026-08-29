@@ -70,7 +70,7 @@ function Checkbox({
         // Fading the whole control keeps the box and its glyph in step; a
         // per-element opacity would leave a full-strength check on a faded
         // box when a checked control is disabled.
-        "relative inline-flex size-[18px] shrink-0 text-primary has-[:disabled]:opacity-50",
+        "relative inline-flex size-4.5 shrink-0 text-primary has-[:disabled]:opacity-50",
         className,
       )}
     >

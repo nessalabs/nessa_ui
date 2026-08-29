@@ -29,6 +29,27 @@ Git state.
   actionable finding and repeat review until zero actionable findings remain.
 - Follow the design-system contract and run validation proportionate to risk.
 
+## Merging and CI
+
+- A clean auto-merge is not evidence of a correct one. After any merge, diff the
+  branch against its base and account for every changed file: anything the
+  branch never intended to touch is a bad merge, not a merge.
+- Resolve a conflict in a file this branch has no intentional change in by
+  taking the base's version outright.
+- A play test must leave nothing running. A story that leaves a timer or
+  animation ticking past its assertions keeps taking main-thread time for the
+  rest of the suite, and surfaces as an unrelated story failing on a slow
+  machine.
+- Assert the end state, never a proxy for it. Waiting for "no running
+  animations" is satisfied by a transition that has not started yet; wait for
+  the value the test actually cares about.
+- When a check fails, first establish whether the base passes at the same
+  commit. Fix what this branch caused; report what it inherited rather than
+  quietly widening scope.
+- Do not claim a fix works until the failing check has actually run and passed.
+  For a load-sensitive test, one green run removes the trigger, not the cause —
+  say which of the two happened.
+
 ## UI and architecture
 
 - Build UI from Nessa UI components. Check for an existing component before
@@ -40,3 +61,11 @@ Git state.
   special case unless that scenario is itself an explicit product contract.
 - At handoff, explain the relevant before-and-after code path in detail with a
   Mermaid diagram.
+
+## Debugging interactive components
+
+When diagnosing or building interactive/animated components (scroll sync,
+animation timing, focus behavior), read
+[docs/testing/interaction-debugging.md](./docs/testing/interaction-debugging.md)
+— it covers the dev-only `debug` trace pattern and the
+reproduce-then-read-the-trace workflow that replaces screen recordings.

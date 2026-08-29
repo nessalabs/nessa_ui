@@ -1,10 +1,14 @@
 const sidebarFocusComponents = Object.freeze([
-  { component: "sidebar/sidebar-group", count: 1 },
-  { component: "sidebar/sidebar-menu", count: 1 },
+  // The group's action and a row's action share one recipe, so their outline
+  // is declared once in the module that owns it rather than in each.
+  { component: "sidebar/sidebar-action", count: 1 },
+  // The row control and a collapsible row's separate disclosure.
+  { component: "sidebar/sidebar-menu", count: 2 },
   { component: "sidebar/sidebar-trigger", count: 1 },
 ] as const)
 
 const composerFocusComponents = Object.freeze([
+  { component: "chat-bubbles", count: 5 },
   { component: "chat-composer", count: 3 },
   { component: "code-block", count: 1 },
   { component: "composer-access-mode", count: 2 },
@@ -20,6 +24,8 @@ const composerFocusComponents = Object.freeze([
   { component: "searchable-listbox", count: 1 },
   { component: "sectioned-listbox", count: 1 },
   { component: "tool-call", count: 3 },
+  // The label is the only target; the rules either side are decoration.
+  { component: "transcript-divider", count: 1 },
 ] as const)
 
 type FocusComponent =
@@ -29,7 +35,12 @@ type FocusComponent =
   | "conversation-rail"
   | "event-calendar"
   | "gantt-chart/gantt-chart-grid"
+  | "radar-chart/radar-chart"
   | "file-diff-list"
+  | "chat-tabs"
+  | "tabs"
+  | "file-preview/file-preview"
+  | "file-preview/file-preview-fallback"
   | "kanban/kanban-card"
   | "kanban/kanban-column"
   | "questionnaire"
@@ -40,6 +51,8 @@ type FocusComponent =
   | "checkbox"
   | "dropdown-menu"
   | "pagination"
+  | "page-outline"
+  | "price-chart/price-chart"
   | "table/table"
   | "table/table-toolbar"
   | "split-view/split-view-separator"
@@ -98,8 +111,7 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     component: "input",
     layer: "ring",
     state: "focus-visible:invalid",
-    className: "aria-invalid:ring-destructive/20",
-    darkClassName: "dark:aria-invalid:ring-destructive/40",
+    className: "aria-invalid:ring-(--nessa-invalid-ring)",
     light: { token: "--destructive", opacity: 0.2 },
     dark: { token: "--destructive", opacity: 0.4 },
   },
@@ -111,6 +123,17 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     state: "focus-visible",
     className: "focus-visible:outline-ring",
     count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The tab control and the panel, which Radix makes a focus stop so a
+  // reader arriving from the tab lands on the content.
+  {
+    component: "tabs",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 2,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -145,6 +168,28 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
+  // The tab trigger sits inside the horizontally scrolling tablist, so its
+  // outline draws inset to survive the overflow clipping; the new-tab
+  // control shares the treatment for consistency. (The close affordance is
+  // pointer-only and carries no focus treatment.)
+  {
+    component: "chat-tabs",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 2,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  {
+    component: "page-outline",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
   {
     component: "event-calendar",
     layer: "outline",
@@ -160,6 +205,19 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     state: "focus-visible",
     className: "focus-visible:outline-ring",
     count: 8,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The axis label is the spoke's keyboard handle: a spoke is not something
+  // a keyboard can point at, so focusing the label probes the axis. The
+  // series outlines carry their own treatment on the hit stroke instead —
+  // a transparent stroke that becomes the ring when focused.
+  {
+    component: "radar-chart/radar-chart",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -180,6 +238,39 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     state: "focus-visible",
     className: "focus-visible:outline-ring",
     count: 3,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The header download link sits in a padded header row and the fallback's
+  // download link sits on a padded empty-state surface, so both keep the
+  // standard outset outline.
+  {
+    component: "file-preview/file-preview",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The chart's scrub cursor covers the whole plot and its clear control sits
+  // in the corner its two scales leave, so both outlines draw inset — an
+  // outset ring would fall outside the panel that clips it.
+  {
+    component: "price-chart/price-chart",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 2,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  {
+    component: "file-preview/file-preview-fallback",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -345,6 +436,12 @@ export const focusGeometryClasses = Object.freeze([
   { component: "input", className: "focus-visible:ring-[3px]" },
   { component: "questionnaire", className: "focus-visible:outline-2", count: 1 },
   { component: "questionnaire", className: "focus-visible:outline-offset-2", count: 1 },
+  // The tab's outline draws inset: a horizontal strip scrolls, which clips
+  // both axes, so an outset ring would be cut off at top and bottom. The
+  // panel is not in that strip and keeps the standard outset offset.
+  { component: "tabs", className: "focus-visible:outline-2", count: 2 },
+  { component: "tabs", className: "focus-visible:-outline-offset-2", count: 1 },
+  { component: "tabs", className: "focus-visible:outline-offset-2", count: 1 },
   ...composerFocusComponents.flatMap(({ component, count }) => [
     { component, className: "focus-visible:outline-2", count },
     { component, className: "focus-visible:outline-offset-2", count },
@@ -356,9 +453,15 @@ export const focusGeometryClasses = Object.freeze([
   // The scrollable list region draws its outline inset so the card's
   // overflow clipping cannot swallow it; the row action and toggle buttons
   // sit inside padded rows and keep the standard outset offset.
+  { component: "chat-tabs", className: "focus-visible:outline-2", count: 2 },
+  { component: "chat-tabs", className: "focus-visible:-outline-offset-2", count: 2 },
   { component: "file-diff-list", className: "focus-visible:outline-2", count: 3 },
   { component: "file-diff-list", className: "focus-visible:outline-offset-2", count: 2 },
   { component: "file-diff-list", className: "focus-visible:-outline-offset-2", count: 1 },
+  { component: "file-preview/file-preview", className: "focus-visible:outline-2", count: 1 },
+  { component: "file-preview/file-preview", className: "focus-visible:outline-offset-2", count: 1 },
+  { component: "file-preview/file-preview-fallback", className: "focus-visible:outline-2", count: 1 },
+  { component: "file-preview/file-preview-fallback", className: "focus-visible:outline-offset-2", count: 1 },
   // The pager buttons and the scrollable excerpt region sit at the card
   // edge, so their outlines draw inset like file-diff-list's list region;
   // chip and links keep the outset offset.
@@ -390,10 +493,20 @@ export const focusGeometryClasses = Object.freeze([
   // outset outline would be swallowed at the region edges.
   { component: "gantt-chart/gantt-chart-grid", className: "focus-visible:outline-2", count: 8 },
   { component: "gantt-chart/gantt-chart-grid", className: "focus-visible:-outline-offset-2", count: 8 },
+  // The radar's axis label draws inset for the same reason: it sits against
+  // the plot edge, where an outset outline would be clipped by the gutter.
+  { component: "radar-chart/radar-chart", className: "focus-visible:outline-2", count: 1 },
+  { component: "radar-chart/radar-chart", className: "focus-visible:-outline-offset-2", count: 1 },
   { component: "gantt-chart/gantt-chart-grid", className: "focus-visible:ring-2", count: 1 },
   { component: "gantt-chart/gantt-chart-grid", className: "focus-visible:ring-offset-0", count: 1 },
+  { component: "price-chart/price-chart", className: "focus-visible:outline-2", count: 2 },
+  { component: "price-chart/price-chart", className: "focus-visible:-outline-offset-2", count: 2 },
   { component: "conversation-rail", className: "focus-visible:outline-2", count: 1 },
   { component: "conversation-rail", className: "focus-visible:outline-offset-2", count: 1 },
+  // The page-outline rows sit inside their own scrolling region, so the
+  // outline draws inset — an outset ring would be swallowed at its edges.
+  { component: "page-outline", className: "focus-visible:outline-2", count: 1 },
+  { component: "page-outline", className: "focus-visible:-outline-offset-2", count: 1 },
   { component: "kanban/kanban-card", className: "focus-visible:outline-2", count: 1 },
   { component: "kanban/kanban-column", className: "focus-visible:outline-2", count: 1 },
   { component: "kanban/kanban-column", className: "focus-visible:outline-offset-2", count: 1 },

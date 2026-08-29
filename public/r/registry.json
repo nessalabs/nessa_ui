@@ -96,8 +96,35 @@
           "nessa-thinking-fill-current": "oklch(0.68 0.2 304)",
           "nessa-thinking-fill-highlight": "oklch(0.86 0.11 214)",
           "nessa-fast-mode-active": "oklch(0.57 0.22 300)",
+          "nessa-chart-series-1": "oklch(0.7732 0.075 265)",
+          "nessa-chart-series-1-strong": "oklch(0.46 0.1 265)",
+          "nessa-chart-series-2": "oklch(0.8656 0.075 45)",
+          "nessa-chart-series-2-strong": "oklch(0.68 0.1 45)",
+          "nessa-chart-series-3": "oklch(0.8236 0.075 190)",
+          "nessa-chart-series-3-strong": "oklch(0.58 0.1 190)",
+          "nessa-chart-series-4": "oklch(0.9076 0.075 85)",
+          "nessa-chart-series-4-strong": "oklch(0.78 0.1 85)",
+          "nessa-chart-series-5": "oklch(0.8446 0.075 15)",
+          "nessa-chart-series-5-strong": "oklch(0.63 0.1 15)",
+          "nessa-chart-series-6": "oklch(0.7984 0.075 145)",
+          "nessa-chart-series-6-strong": "oklch(0.52 0.1 145)",
+          "nessa-chart-series-7": "oklch(0.79 0.075 305)",
+          "nessa-chart-series-7-strong": "oklch(0.5 0.1 305)",
+          "nessa-chart-series-8": "oklch(0.8824 0.071 230)",
+          "nessa-chart-series-8-strong": "oklch(0.72 0.1 230)",
           "nessa-diff-addition": "oklch(0.5 0.137 150)",
-          "nessa-diff-deletion": "oklch(0.55 0.19 27)"
+          "nessa-diff-deletion": "oklch(0.55 0.19 27)",
+          "nessa-market-gain": "oklch(0.5 0.135 148)",
+          "nessa-market-loss": "oklch(0.55 0.19 27)",
+          "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 20%, transparent)",
+          "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)",
+          "nessa-chat-accent": "#0071e3",
+          "nessa-chat-rim-0": "rgba(245, 158, 11, 0.06)",
+          "nessa-chat-rim-1": "rgba(245, 158, 11, 0.22)",
+          "nessa-chat-rim-2": "rgba(236, 72, 153, 0.42)",
+          "nessa-chat-rim-3": "rgba(168, 85, 247, 0.62)",
+          "nessa-chat-rim-4": "rgba(56, 189, 248, 0.85)",
+          "nessa-chat-rim-head": "#ffffff"
         },
         "dark": {
           "background": "oklch(0.145 0 0)",
@@ -129,8 +156,35 @@
           "nessa-thinking-fill-current": "oklch(0.67 0.2 306)",
           "nessa-thinking-fill-highlight": "oklch(0.82 0.12 210)",
           "nessa-fast-mode-active": "oklch(0.72 0.185 306)",
+          "nessa-chart-series-1": "oklch(0.3442 0.07 265)",
+          "nessa-chart-series-1-strong": "oklch(0.56 0.1 265)",
+          "nessa-chart-series-2": "oklch(0.3922 0.07 45)",
+          "nessa-chart-series-2-strong": "oklch(0.66 0.1 45)",
+          "nessa-chart-series-3": "oklch(0.3634 0.062 190)",
+          "nessa-chart-series-3-strong": "oklch(0.6 0.1 190)",
+          "nessa-chart-series-4": "oklch(0.421 0.07 85)",
+          "nessa-chart-series-4-strong": "oklch(0.72 0.1 85)",
+          "nessa-chart-series-5": "oklch(0.373 0.07 15)",
+          "nessa-chart-series-5-strong": "oklch(0.62 0.1 15)",
+          "nessa-chart-series-6": "oklch(0.3346 0.07 145)",
+          "nessa-chart-series-6-strong": "oklch(0.54 0.1 145)",
+          "nessa-chart-series-7": "oklch(0.3538 0.07 305)",
+          "nessa-chart-series-7-strong": "oklch(0.58 0.1 305)",
+          "nessa-chart-series-8": "oklch(0.4018 0.07 230)",
+          "nessa-chart-series-8-strong": "oklch(0.68 0.1 230)",
           "nessa-diff-addition": "oklch(0.77 0.17 152)",
-          "nessa-diff-deletion": "oklch(0.7 0.19 25)"
+          "nessa-diff-deletion": "oklch(0.7 0.19 25)",
+          "nessa-market-gain": "oklch(0.8 0.19 150)",
+          "nessa-market-loss": "oklch(0.7 0.19 25)",
+          "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 40%, transparent)",
+          "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)",
+          "nessa-chat-accent": "#0071e3",
+          "nessa-chat-rim-0": "rgba(245, 158, 11, 0.06)",
+          "nessa-chat-rim-1": "rgba(245, 158, 11, 0.22)",
+          "nessa-chat-rim-2": "rgba(236, 72, 153, 0.42)",
+          "nessa-chat-rim-3": "rgba(168, 85, 247, 0.62)",
+          "nessa-chat-rim-4": "rgba(56, 189, 248, 0.85)",
+          "nessa-chat-rim-head": "#ffffff"
         }
       },
       "css": {
@@ -151,6 +205,9 @@
         },
         ":where([data-nessa-scale=\"110\"])": {
           "--_nessa-scale-factor": "1.1"
+        },
+        ":where([data-nessa-scale=\"125\"])": {
+          "--_nessa-scale-factor": "1.25"
         },
         ":where(:root, [data-nessa-root], [data-nessa-theme], [data-nessa-scale])": {
           "--_nessa-font-size-1": "calc(var(--nessa-font-size-1) * var(--_nessa-scale-factor))",
@@ -174,6 +231,9 @@
           "--_nessa-letter-spacing-5": "var(--nessa-letter-spacing-5)",
           "--_nessa-letter-spacing-6": "var(--nessa-letter-spacing-6)",
           "--_nessa-letter-spacing-7": "var(--nessa-letter-spacing-7)"
+        },
+        ":root, :where([data-nessa-root], [data-nessa-theme], [data-nessa-scale])": {
+          "--spacing": "calc(0.25rem * var(--_nessa-scale-factor))"
         },
         "@layer components": {
           ".nessa-text-1": {
@@ -216,9 +276,17 @@
             "line-height": "var(--_nessa-line-height-4)",
             "letter-spacing": "var(--_nessa-letter-spacing-4)"
           },
+          ".nessa-text-input-2": {
+            "font-size": "max(1rem, var(--_nessa-font-size-2))",
+            "line-height": "var(--_nessa-line-height-2)",
+            "letter-spacing": "var(--_nessa-letter-spacing-2)"
+          },
           "@media (width >= 48rem)": {
             ".nessa-text-input": {
               "font-size": "var(--_nessa-font-size-4)"
+            },
+            ".nessa-text-input-2": {
+              "font-size": "var(--_nessa-font-size-2)"
             }
           }
         },
@@ -406,7 +474,7 @@
       "name": "generating-surface",
       "type": "registry:ui",
       "title": "Generating Surface",
-      "description": "An ambient placeholder for content that takes a while to generate — drifting smoke and a shimmering status label reserve the space, then morph into the finished content when generation completes.",
+      "description": "An ambient placeholder for content that takes a while to generate \u2014 drifting smoke and a shimmering status label reserve the space, then morph into the finished content when generation completes.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -420,10 +488,48 @@
       ]
     },
     {
+      "name": "transcript-divider",
+      "type": "registry:ui",
+      "title": "Transcript Divider",
+      "description": "A hairline rule with a label, marking a point in a transcript such as a context compaction.",
+      "dependencies": [
+        "lucide-react",
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/transcript-divider.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/transcript-divider.tsx"
+        }
+      ]
+    },
+    {
+      "name": "gradient-surface",
+      "type": "registry:ui",
+      "title": "Gradient Surface",
+      "description": "A decorative gradient backdrop for heroes and banners \u2014 a deep colour wash from a swappable palette, an optional contour, wave, or ring line overlay, and film grain over the whole frame.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/gradient-surface.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/gradient-surface.tsx"
+        }
+      ]
+    },
+    {
       "name": "mermaid-diagram",
       "type": "registry:ui",
       "title": "Mermaid Diagram",
-      "description": "Mermaid diagrams — flowcharts, sequence diagrams, and every other Mermaid grammar — rendered to SVG with app-wide light and dark theming and a fullscreen pan-and-zoom viewer.",
+      "description": "Mermaid diagrams \u2014 flowcharts, sequence diagrams, and every other Mermaid grammar \u2014 rendered to SVG with app-wide light and dark theming and a fullscreen pan-and-zoom viewer.",
       "dependencies": [
         "lucide-react",
         "mermaid"
@@ -568,6 +674,214 @@
           "path": "packages/react/src/components/split-view/split-view-options.ts",
           "type": "registry:ui",
           "target": "components/split-view/split-view-options.ts"
+        }
+      ]
+    },
+    {
+      "name": "agent-stream",
+      "type": "registry:lib",
+      "title": "Agent stream parser",
+      "description": "A framework-free parser for coding-agent output streams: decodes Claude Code's stream-json and Codex's exec --json into one harness-agnostic event log, and folds that log into the turns, tool groups, delegated runs and plan a transcript UI draws.",
+      "files": [
+        {
+          "path": "packages/react/src/lib/agent-stream/acp/frame.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/acp/frame.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/acp/index.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/acp/index.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/acp/mapper.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/acp/mapper.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/acp/mapping.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/acp/mapping.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/acp/wire.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/acp/wire.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/builder.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/builder.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/capabilities.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/capabilities.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/claude/index.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/claude/index.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/claude/store.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/claude/store.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/claude/stream/capabilities.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/claude/stream/capabilities.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/claude/stream/mapper.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/claude/stream/mapper.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/claude/stream/mapping.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/claude/stream/mapping.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/claude/stream/wire.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/claude/stream/wire.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/claude/tools.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/claude/tools.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/codex/app-server/capabilities.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/codex/app-server/capabilities.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/codex/app-server/mapper.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/codex/app-server/mapper.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/codex/app-server/mapping.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/codex/app-server/mapping.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/codex/app-server/wire.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/codex/app-server/wire.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/codex/exec/mapper.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/codex/exec/mapper.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/codex/exec/mapping.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/codex/exec/mapping.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/codex/exec/wire.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/codex/exec/wire.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/codex/index.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/codex/index.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/emitter.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/emitter.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/events.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/events.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/index.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/index.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/json.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/json.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/mapping.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/mapping.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/opencode/capabilities.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/opencode/capabilities.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/opencode/index.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/opencode/index.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/opencode/mapping.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/opencode/mapping.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/opencode/parts.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/opencode/parts.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/opencode/run/mapper.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/opencode/run/mapper.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/opencode/run/mapping.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/opencode/run/mapping.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/opencode/run/wire.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/opencode/run/wire.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/opencode/server/mapper.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/opencode/server/mapper.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/opencode/server/mapping.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/opencode/server/mapping.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/opencode/server/wire.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/opencode/server/wire.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/opencode/store.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/opencode/store.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/transcript.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/transcript.ts"
+        },
+        {
+          "path": "packages/react/src/lib/agent-stream/transports.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/transports.ts"
         }
       ]
     },
@@ -738,15 +1052,57 @@
       ]
     },
     {
+      "name": "chat-bubbles",
+      "type": "registry:ui",
+      "title": "Chat Bubbles",
+      "description": "iMessage-style transcript primitives: aligned message columns with spring-in bubbles, reply quotes, delivery receipts, a pulsing typing indicator, the tapback reaction row with per-emoji cascade, and square attachment tiles with a fanned stack and a full-surface grid viewer.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/chat-bubbles.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/chat-bubbles.tsx"
+        }
+      ]
+    },
+    {
+      "name": "chat-tabs",
+      "type": "registry:ui",
+      "title": "Chat Tabs",
+      "description": "The floating chat window's tab strip: pill tabs on a scrolling tablist with chat-accent-tinted active state, busy dots, attention badges, per-tab close controls, a new-tab button, and roving arrow-key navigation.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/chat-tabs.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/chat-tabs.tsx"
+        }
+      ]
+    },
+    {
       "name": "chat-composer",
       "type": "registry:ui",
       "title": "Chat Composer",
-      "description": "A compound chat-entry surface with input, footer, action, and submit primitives, plus attachment pills, paste-to-attachment capture, and key-triggered menus anchored above the composer.",
+      "description": "A compound chat-entry surface with input, footer, action, and submit primitives, plus attachment pills, paste-to-attachment capture, an opt-in fileDrop capability that attaches files dropped anywhere over the composer, and key-triggered menus anchored above the composer.",
       "dependencies": [
         "lucide-react",
         "radix-ui"
       ],
       "registryDependencies": [
+        "nessalabs/nessa_ui/file-drop-zone",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
       ],
@@ -755,6 +1111,24 @@
           "path": "packages/react/src/components/chat-composer.tsx",
           "type": "registry:ui",
           "target": "components/ui/chat-composer.tsx"
+        }
+      ]
+    },
+    {
+      "name": "pill-composer",
+      "type": "registry:ui",
+      "title": "Pill Composer",
+      "description": "A compact pill-shaped chat composer that hosts the ChatComposer input, attachment, action, and trigger primitives in a single row, with an iridescent traveling-light rim that fades in while the agent works.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/chat-composer",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/pill-composer.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/pill-composer.tsx"
         }
       ]
     },
@@ -839,6 +1213,26 @@
           "path": "packages/react/src/components/file-diff-list.tsx",
           "type": "registry:ui",
           "target": "components/ui/file-diff-list.tsx"
+        }
+      ]
+    },
+    {
+      "name": "file-drop-zone",
+      "type": "registry:ui",
+      "title": "File Drop Zone",
+      "description": "A wrapper that gives any children file drag-and-drop: nested-child drag tracking, accept, size and count rules, recursive folder expansion, and refusals reported with their reason \u2014 handing the host a filtered File list to store and render as attachments however it likes. It draws nothing and owns no controls, and asChild merges the whole protocol onto the child element.",
+      "dependencies": [
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/file-drop-zone.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-drop-zone.tsx"
         }
       ]
     },
@@ -992,10 +1386,35 @@
       ]
     },
     {
+      "name": "tabs",
+      "type": "registry:ui",
+      "title": "Tabs",
+      "description": "An accessible tab list and its panels: roving focus with arrow, Home and End keys, horizontal or vertical orientation, automatic or manual activation, and underline or pill presentation.",
+      "dependencies": [
+        "class-variance-authority",
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/segmented-control",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/tabs.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/tabs.tsx"
+        }
+      ]
+    },
+    {
       "name": "segmented-control",
       "type": "registry:ui",
       "title": "Segmented control",
       "description": "A compact single-choice switcher: a bordered pill of pressed/unpressed buttons for view and scale toggles, with controlled or uncontrolled value state.",
+      "dependencies": [
+        "class-variance-authority"
+      ],
       "registryDependencies": [
         "nessalabs/nessa_ui/button",
         "nessalabs/nessa_ui/nessa-base",
@@ -1013,7 +1432,7 @@
       "name": "timeline-header",
       "type": "registry:ui",
       "title": "Timeline header",
-      "description": "The band a horizontal scale lives on: pixel-offset cells with hairline dividers, and labels that pin at a chosen inset while any part of their cell is in view — the GanttChart's two-tier time header, extracted for any horizontally scrolled surface.",
+      "description": "The band a horizontal scale lives on: pixel-offset cells with hairline dividers, and labels that pin at a chosen inset while any part of their cell is in view \u2014 the GanttChart's two-tier time header, extracted for any horizontally scrolled surface.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -1106,6 +1525,7 @@
       "description": "A composable application sidebar with controlled collapse state and keyboard support.",
       "dependencies": [
         "class-variance-authority",
+        "lucide-react",
         "radix-ui"
       ],
       "registryDependencies": [
@@ -1164,6 +1584,11 @@
           "target": "components/ui/sidebar/sidebar-inset.tsx"
         },
         {
+          "path": "packages/react/src/components/sidebar/sidebar-action.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/sidebar/sidebar-action.tsx"
+        },
+        {
           "path": "packages/react/src/components/sidebar/sidebar-group.tsx",
           "type": "registry:ui",
           "target": "components/ui/sidebar/sidebar-group.tsx"
@@ -1189,7 +1614,7 @@
       "name": "workflow-canvas",
       "type": "registry:ui",
       "title": "WorkflowCanvas",
-      "description": "An infinite (or bounded) pan-and-zoom workflow canvas with draggable nodes that render any content, side handles for drawing connections, and edges that follow their endpoint nodes — built to stay responsive with thousands of nodes.",
+      "description": "An infinite (or bounded) pan-and-zoom workflow canvas with draggable nodes that render any content, side handles for drawing connections, and edges that follow their endpoint nodes \u2014 built to stay responsive with thousands of nodes.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -1292,6 +1717,23 @@
       ]
     },
     {
+      "name": "page-outline",
+      "type": "registry:ui",
+      "title": "Page outline",
+      "description": "A scroll-spy section outline drawn along a rail that jogs to trace the heading hierarchy, with a comet pulse \u2014 or a host-supplied marker \u2014 that travels the rail to the section being read. Sections come from props or are derived from the headings of rendered content such as a markdown surface, and an auto-collapse mode folds deep branches away except where the reader has settled.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/page-outline.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/page-outline.tsx"
+        }
+      ]
+    },
+    {
       "name": "pagination",
       "type": "registry:ui",
       "title": "Pagination",
@@ -1352,6 +1794,87 @@
       ]
     },
     {
+      "name": "flow-chart",
+      "type": "registry:ui",
+      "title": "Flow chart",
+      "description": "A flow (Sankey) diagram: node bars in columns joined by ribbons whose thickness is proportional to the flow they carry. Bars take soft tints from a built-in palette (overridable per node or disableable to a neutral wash); ribbons color by source, target, or a source-to-target gradient. Four alignments (justify, left, right, center), optional d3-style barycenter iterations that reorder columns to untangle crossings, and horizontal or vertical orientation. It fills the host's box on both axes, lays out any number of stages via longest-path columns, tolerates and reports partial mid-stream data, floats host-supplied hover detail beside the pointer, and makes every ribbon a keyboard-focusable button with hover isolation and multi-selectable links.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/flow-chart/index.ts",
+          "type": "registry:ui",
+          "target": "components/ui/flow-chart/index.ts"
+        },
+        {
+          "path": "packages/react/src/components/flow-chart/flow-chart.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/flow-chart/flow-chart.tsx"
+        },
+        {
+          "path": "packages/react/src/components/flow-chart/flow-chart-layout.ts",
+          "type": "registry:ui",
+          "target": "components/ui/flow-chart/flow-chart-layout.ts"
+        }
+      ]
+    },
+    {
+      "name": "radar-chart",
+      "type": "registry:ui",
+      "title": "Radar chart",
+      "description": "A radar (spider) chart: values plotted along spokes radiating from one centre, one closed outline per series. Series take soft tints from a built-in palette (overridable per series, or disableable to a neutral wash) and the area wash derives from each outline's own colour. Polygon, circular, or no grid; a curve control that relaxes the polygon into a closed spline; and a scale switch between one shared maximum and per-axis normalisation, with an explicit per-axis maximum overriding both. It fills the host's box on both axes, tolerates and reports partial mid-stream data, floats host-supplied hover detail beside the pointer, makes every outline a keyboard-focusable button with hover isolation and multi-selectable series, and adds an axis probe that marks and ranks every series' reading on one spoke.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/radar-chart/index.ts",
+          "type": "registry:ui",
+          "target": "components/ui/radar-chart/index.ts"
+        },
+        {
+          "path": "packages/react/src/components/radar-chart/radar-chart.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/radar-chart/radar-chart.tsx"
+        },
+        {
+          "path": "packages/react/src/components/radar-chart/radar-chart-geometry.ts",
+          "type": "registry:ui",
+          "target": "components/ui/radar-chart/radar-chart-geometry.ts"
+        }
+      ]
+    },
+    {
+      "name": "pie-chart",
+      "type": "registry:ui",
+      "title": "Pie chart",
+      "description": "A pie or donut chart: one wedge per slice, sized to its share of the total. Slices take soft tints from a built-in palette (overridable per slice, or disableable to a neutral wash), labels sit outside on leader lines, inside the wedge, or nowhere, and a donut's centre reads the total at rest and the engaged slice while one is hovered, focused, or solely selected. A long tail can be rolled into one bucket that keeps its members reachable, the sweep can be narrowed into a gauge, and slices sort by input order or value. It fills the host's box on both axes, tolerates and reports partial mid-stream data, floats host-supplied hover detail beside the pointer, and makes every wedge a keyboard-focusable button with hover isolation and multi-selectable slices that ease out of the ring.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/pie-chart/index.ts",
+          "type": "registry:ui",
+          "target": "components/ui/pie-chart/index.ts"
+        },
+        {
+          "path": "packages/react/src/components/pie-chart/pie-chart.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/pie-chart/pie-chart.tsx"
+        },
+        {
+          "path": "packages/react/src/components/pie-chart/pie-chart-geometry.ts",
+          "type": "registry:ui",
+          "target": "components/ui/pie-chart/pie-chart-geometry.ts"
+        }
+      ]
+    },
+    {
       "name": "random-avatar",
       "type": "registry:ui",
       "title": "Random avatar",
@@ -1365,6 +1888,163 @@
           "path": "packages/react/src/components/random-avatar.tsx",
           "type": "registry:ui",
           "target": "components/ui/random-avatar.tsx"
+        }
+      ]
+    },
+    {
+      "name": "file-preview",
+      "type": "registry:ui",
+      "title": "File preview",
+      "description": "A composable file previewer that delegates each file type to a renderer registry: images, PDFs via the browser's built-in viewer, video and audio via native elements, Markdown through MessageMarkdown, JSON through JsonTree, CSV/TSV through the Table kit, text and code through CodeBlock, and unknown kinds through a fallback surface. Office formats are detected but detection-only; consumers extend or override renderers per kind without library changes.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/code-block",
+        "nessalabs/nessa_ui/json-tree",
+        "nessalabs/nessa_ui/message-markdown",
+        "nessalabs/nessa_ui/table"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/file-preview/index.ts",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/index.ts"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-kind.ts",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-kind.ts"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-context.ts",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-context.ts"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-fallback.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-fallback.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-image.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-image.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-pdf.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-pdf.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-renderers.ts",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-renderers.ts"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/delimited-text.ts",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/delimited-text.ts"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/use-file-text.ts",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/use-file-text.ts"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-loading.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-loading.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-video.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-video.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-audio.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-audio.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-text.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-text.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-markdown.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-markdown.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-json.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-json.tsx"
+        },
+        {
+          "path": "packages/react/src/components/file-preview/file-preview-csv.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/file-preview/file-preview-csv.tsx"
+        }
+      ]
+    },
+    {
+      "name": "price-chart",
+      "type": "registry:ui",
+      "title": "Price chart",
+      "description": "A brokerage-style price plot: one hairline stroke in the market's colour with an optional tone wash, a dotted reference rule, a price scale over faint gridlines and a time scale that re-label themselves when a drag zooms into a window, a candle view over the same geometry, a pulsing marker for a streaming quote, and a cursor that scrubs by pointer, finger, or arrow key.",
+      "dependencies": [
+        "class-variance-authority",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/price-chart/index.ts",
+          "type": "registry:ui",
+          "target": "components/ui/price-chart/index.ts"
+        },
+        {
+          "path": "packages/react/src/components/price-chart/price-chart.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/price-chart/price-chart.tsx"
+        },
+        {
+          "path": "packages/react/src/components/price-chart/price-chart-math.ts",
+          "type": "registry:ui",
+          "target": "components/ui/price-chart/price-chart-math.ts"
+        }
+      ]
+    },
+    {
+      "name": "stock-quote",
+      "type": "registry:ui",
+      "title": "Stock quote",
+      "description": "A brokerage-style quote panel: ticker, name and trading status, the price in large type with its change in the market's colour, a scrubbable and zoomable price chart with line and candle views, range controls that switch windows on their own, an after-hours line, and a strip of key figures — built for agents streaming live market data into a card or a full-width page.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/price-chart",
+        "nessalabs/nessa_ui/segmented-control",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/stock-quote.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/stock-quote.tsx"
         }
       ]
     }

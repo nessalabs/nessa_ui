@@ -40,11 +40,11 @@ function cssDurationInMilliseconds(value: string, fallback: number) {
  * muted-foreground body, foreground crest — so they read in both schemes
  * without `dark:` variants.
  */
-const generatingLabelGradient =
-  "linear-gradient(90deg, var(--muted-foreground) 0%, var(--muted-foreground) 38%, var(--foreground) 50%, var(--muted-foreground) 62%, var(--muted-foreground) 100%)"
+const generatingLabelShimmerClasses =
+  "data-[shimmer=true]:[background-image:linear-gradient(90deg,var(--muted-foreground)_0%,var(--muted-foreground)_38%,var(--foreground)_50%,var(--muted-foreground)_62%,var(--muted-foreground)_100%)] data-[shimmer=true]:bg-[length:200%_100%] data-[shimmer=true]:bg-[position:150%_0] data-[shimmer=true]:bg-clip-text data-[shimmer=true]:[-webkit-background-clip:text] data-[shimmer=true]:text-transparent"
 
-const generatingPlumeGradient =
-  "radial-gradient(closest-side, var(--foreground), transparent)"
+const generatingPlumeGradientClass =
+  "[background:radial-gradient(closest-side,var(--foreground),transparent)]"
 
 /**
  * Where each smoke plume sits and how it drifts. Sizes are fractions of the
@@ -115,9 +115,8 @@ function GeneratingSurfaceSmoke() {
         // plumes would paint one untransformed frame and then snap.
         <div
           key={plume.className}
-          className={cn("absolute rounded-full opacity-[0.07] blur-2xl", plume.className)}
+          className={cn("absolute rounded-full opacity-[0.07] blur-2xl", generatingPlumeGradientClass, plume.className)}
           style={{
-            background: generatingPlumeGradient,
             transform: plume.drift[0].transform,
           }}
         />
@@ -156,19 +155,8 @@ function GeneratingSurfaceLabel({ children }: { children: React.ReactNode }) {
     <span
       ref={ref}
       data-slot="generating-surface-label"
-      className="relative text-sm text-muted-foreground"
-      style={
-        reducedMotion
-          ? undefined
-          : {
-              backgroundImage: generatingLabelGradient,
-              backgroundSize: "200% 100%",
-              backgroundPosition: "150% 0",
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              color: "transparent",
-            }
-      }
+      data-shimmer={reducedMotion ? undefined : "true"}
+      className={cn("relative nessa-text-4 text-muted-foreground", generatingLabelShimmerClasses)}
     >
       {children}
     </span>
