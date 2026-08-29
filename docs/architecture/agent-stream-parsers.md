@@ -555,12 +555,12 @@ ended the turn — the rest of the instruction had been summarised away. A
 consumer on `exec` sees an agent that simply stopped early, with no way to know
 why.
 
-The app-server transport does better. Its schema declares a
-`ContextCompaction` thread item and a deprecated `ContextCompacted`
-notification, plus a `thread/compact/start` request so a client can compact on
-demand. The item carries `{id, type}` and nothing else — no token counts, no
-duration. So on Codex the fact is available on one transport and absent on the
-other, and even where present it is a marker rather than a measurement.
+The app-server transport does better. Its schema declares a `ContextCompaction`
+thread item, plus a `thread/compact/start` request so a client can compact on
+demand — something Claude's stream offers no way to ask for. The item carries
+`{id, type}` and nothing else: no token counts, no duration. So on Codex the
+fact is available on one transport and absent on the other, and even where
+present it is a marker rather than a measurement.
 
 | | Claude (`stream-json`) | Codex (`exec --json`) | Codex (app-server) |
 | --- | --- | --- | --- |

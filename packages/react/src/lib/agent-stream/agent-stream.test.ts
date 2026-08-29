@@ -18,7 +18,7 @@ import {
 } from "./claude/store"
 import { TranscriptBuilder } from "./builder"
 import { ClaudeStreamMapper, mapClaudeStream } from "./claude/mapper"
-import { applyDeltas, buildTranscript, isToolGroup, previewOf } from "./transcript"
+import { applyDeltas, buildTranscript, isCompacting, isToolGroup, previewOf } from "./transcript"
 import { ClaudeSystemSubtype, ClaudeWireType, parseWireLines } from "./claude/wire"
 import { asRecord } from "./json"
 
@@ -1230,4 +1230,28 @@ test("the transcript survives its own history being dropped", () => {
   const finished = events.flatMap((event) => (event.payload.type === "turn_completed" ? [event.payload] : []))
   assert.equal(finished.length, 1)
   assert.equal(finished[0].status, "completed")
+})
+
+test("a surface can tell that compaction is in flight, not just that it happened", () => {
+  const events = mapClaudeStream(capture("compaction"))
+  // Replayed line by line, the pending state has to be true across the whole
+  // summary call and false everywhere else — that window is 17 to 41 seconds
+  // here, which is exactly the stretch a surface must not look idle for.
+  const windows: number[] = []
+  let open = -1
+  for (let index = 0; index < events.length; index += 1) {
+    const compacting = isCompacting(events.slice(0, index + 1))
+    if (compacting && open === -1) open = index
+    if (!compacting && open !== -1) {
+      windows.push(index - open)
+      open = -1
+    }
+  }
+  assert.equal(windows.length, 2, "one pending window per boundary")
+  assert.ok(windows.every((width) => width > 0))
+
+  // It is false before anything happens and false once the run is over, so a
+  // finished transcript never renders a marker that will not resolve.
+  assert.equal(isCompacting([]), false)
+  assert.equal(isCompacting(events), false)
 })

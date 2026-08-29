@@ -63,6 +63,7 @@ export {
   assembleTurn,
   buildTranscript,
   groupTools,
+  isCompacting,
   isToolGroup,
   previewOf,
   rendersRow,

@@ -38,12 +38,15 @@ import {
   ToolCallContent,
   ToolCallTabs,
   ToolCallTrigger,
+  TranscriptDivider,
   applyDeltas,
+  isCompacting,
   unreportedCapabilities,
   TranscriptBuilder,
   isToolGroup,
   previewOf,
   type AgentEvent,
+  type AgentEventPayload,
   type DelegatedRun,
   type PlanStep,
   type DeltaBuffers,
@@ -698,6 +701,11 @@ function WorkRow({ item, transcript, previews }: { item: WorkItem; transcript: T
     )
   }
   if (payload.type === "user_message") {
+    // The harness writes its own messages into the user's lane — after a
+    // compaction it injects the summary as "This session is being continued…".
+    // Drawing it as the user's words puts something in their mouth, and it is
+    // machinery the divider above it already accounts for.
+    if (payload.synthetic) return null
     return (
       <Message from="user">
         <MessageContent>
@@ -713,6 +721,63 @@ function WorkRow({ item, transcript, previews }: { item: WorkItem; transcript: T
   if (payload.type === "file_edits") return null
   if (payload.type === "error") {
     return <p className="text-destructive text-xs">{payload.message}</p>
+  }
+  // A compaction is not a step the agent took — it happened *to* the
+  // conversation — so it marks the transcript with a rule rather than taking a
+  // card's weight beside the work it sits between.
+  if (payload.type === "context_compacted") {
+    const summary = compactionSummary(transcript, item.seq)
+    return (
+      <TranscriptDivider
+        meta={compactionDetail(payload)}
+        data-testid="compaction-boundary"
+        detail={
+          summary === null ? null : (
+            <div className="max-h-64 overflow-auto rounded-lg border border-border bg-muted/40 p-3 whitespace-pre-wrap">
+              {summary}
+            </div>
+          )
+        }
+      >
+        {payload.trigger === "manual" ? "Context compacted on request" : "Context compacted"}
+      </TranscriptDivider>
+    )
+  }
+  return null
+}
+
+/** Rounds a token count the way a reader reads it, not the way it is billed. */
+function tokens(value: number | null): string | null {
+  if (value === null) return null
+  return value >= 1000 ? `${Math.round(value / 100) / 10}k` : String(value)
+}
+
+/**
+ * What the boundary is worth saying out loud: how much smaller the window got,
+ * and how long the agent was busy doing it. The cumulative figure is left to
+ * the raw pane — it is a session total, and this row is about one moment.
+ */
+function compactionDetail(payload: Extract<AgentEventPayload, { type: "context_compacted" }>): string | null {
+  const before = tokens(payload.preTokens)
+  const after = tokens(payload.postTokens)
+  const seconds = payload.durationMs === null ? null : `${Math.round(payload.durationMs / 1000)}s`
+  const size = before !== null && after !== null ? `${before} → ${after} tokens` : null
+  return [size, seconds].filter((part) => part !== null).join(" · ") || null
+}
+
+/**
+ * The summary the agent carries forward in place of the history it dropped.
+ *
+ * The harness writes it into the user's lane as a synthetic message right
+ * after the boundary. It is worth keeping — it is the only record of what
+ * survived the drop — but not worth putting in the user's voice, so it hides
+ * behind the marker rather than being drawn as something they said.
+ */
+function compactionSummary(transcript: Transcript, seq: number): string | null {
+  for (const event of transcript.events) {
+    if (event.seq <= seq) continue
+    if (event.payload.type !== "user_message") continue
+    return event.payload.synthetic ? event.payload.text : null
   }
   return null
 }
@@ -820,7 +885,7 @@ function TranscriptView({
             </Message>
             {transcript.turns.map((turn) => (
               <div key={turn.key} className="flex flex-col gap-3 py-2">
-                {turn.prompt === null || turn.prompt.payload.type !== "user_message" ? null : (
+                {turn.prompt === null || turn.prompt.payload.type !== "user_message" || turn.prompt.payload.synthetic ? null : (
                   <Message from="user">
                     <MessageAvatar fallback="You" alt="You" />
                     <MessageContent>
@@ -849,6 +914,14 @@ function TranscriptView({
                 <TurnFileEdits edits={turnFileEdits(turn.work)} />
               </div>
             ))}
+            {/* Bottom of the transcript, because it is happening now: the
+                summary call can run for the better part of a minute, and a
+                view that shows nothing for that long reads as hung. */}
+            {isCompacting(transcript.events) ? (
+              <TranscriptDivider pending data-testid="compacting">
+                Compacting…
+              </TranscriptDivider>
+            ) : null}
           </MessageScrollerContent>
         </MessageScrollerViewport>
         <MessageScrollerButton />

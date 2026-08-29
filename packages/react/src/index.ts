@@ -219,6 +219,10 @@ export {
   type GeneratingSurfaceProps,
 } from "./components/generating-surface"
 export {
+  TranscriptDivider,
+  type TranscriptDividerProps,
+} from "./components/transcript-divider"
+export {
   GradientSurface,
   gradientSurfacePatterns,
   gradientSurfacePresets,
