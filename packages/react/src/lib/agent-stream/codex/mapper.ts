@@ -357,9 +357,12 @@ export class CodexStreamMapper implements AgentStreamMapper {
                   label: asString(item.tool),
                   description: asString(item.prompt) ?? "",
                   prompt: asString(item.prompt),
+<<<<<<< HEAD
                   // Codex names the receiver thread but exposes no way to read
                   // it, so there is no transcript to point a consumer at.
                   transcriptId: null,
+=======
+>>>>>>> origin/main
                 },
                 [],
                 raw,
