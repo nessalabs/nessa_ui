@@ -337,3 +337,92 @@ test("the two Codex transports are described separately, with their own commands
   assert.equal(transportOf("codex", "exec")?.supports.streaming, false)
   assert.equal(transportOf("codex", "app-server")?.supports.streaming, true)
 })
+
+/**
+ * A table may only promise what something has seen.
+ *
+ * The conformance checks are one-directional: they prove a mapper never
+ * exceeds its table, not that a declared row is real. A row no capture
+ * exercises is a claim about a wire nobody has read — which is how
+ * `item.completed/error` came to declare an `error` event the mapper never
+ * emitted. Each such row is acknowledged here or it fails.
+ */
+const EXEC_UNEXERCISED: ReadonlyMap<string, string> = new Map([
+  ["turn.failed", "needs a turn the model itself aborts"],
+  ["error", "a thread-level failure outside any item"],
+  ["item.started/agent_message", "the captures open and settle a message in one line"],
+  ["item.started/reasoning", "the same"],
+  ["item.completed/reasoning", "these models emitted no disclosed reasoning"],
+  ["item.updated/agent_message", "no capture ran long enough to be updated mid-item"],
+  ["item.updated/reasoning", "the same"],
+  ["item.updated/command_execution", "needs a command slow enough to report partial output"],
+  ["item.updated/file_change", "the same"],
+  ["item.updated/web_search", "the same"],
+  ["item.updated/collab_tool_call", "needs a spawned agent watched while it works"],
+  ["item.started/mcp_tool_call", "no MCP server was configured for the captures"],
+  ["item.completed/mcp_tool_call", "the same"],
+  ["item.started/error", "an error opens and settles in one line"],
+  ["item.completed/error", "no capture produced an item-level failure; the row is checked by a synthetic line below"],
+])
+
+test("every codex exec row the captures never reach is acknowledged as unexercised", () => {
+  const seen = new Set<string>()
+  for (const name of NAMES) {
+    for (const result of parseCodexLines(capture(name))) {
+      if (result.ok) seen.add(codexWireKind(result.line))
+    }
+  }
+  const declared = Object.keys(CODEX_EVENT_MAPPING)
+  assert.deepEqual(
+    declared.filter((kind) => !seen.has(kind) && !EXEC_UNEXERCISED.has(kind)).sort(),
+    [],
+    "a table row no fixture exercises must be listed in EXEC_UNEXERCISED",
+  )
+  for (const kind of EXEC_UNEXERCISED.keys()) {
+    assert.ok(!seen.has(kind), `${kind} is listed as unexercised but a fixture reaches it`)
+    assert.ok(declared.includes(kind), `${kind} is listed as unexercised but is not a row in the table`)
+  }
+})
+
+test("a declared row with no capture is still checked, where a line can be written by hand", () => {
+  // The cheapest defence against a fictional row: feed the shape the table
+  // describes and assert it produces what the table promises. This one was
+  // fiction — the item fell through to the tool-call default and settled as a
+  // *successful* call with no text, so a failed turn read as a silent one.
+  const events = mapCodexStream(
+    JSON.stringify({ type: "item.completed", item: { id: "item_9", type: "error", message: "the model refused" } }),
+  )
+  assert.deepEqual(
+    events.map((event) => event.payload.type),
+    CODEX_EVENT_MAPPING[`${CodexWireType.ItemCompleted}/${CodexItemType.Error}`]!.emits,
+  )
+  assert.equal((events[0]!.payload as { message: string }).message, "the model refused")
+})
+
+/**
+ * The app-server's table is written from the schema the CLI publishes, not
+ * from a capture, so most of it is unexercised by design. Listing the ones a
+ * capture *does* reach is the honest direction here.
+ */
+test("the app-server capture reaches the rows it should, and the rest are schema-only", () => {
+  const seen = new Set<string>()
+  for (const result of parseCodexAppServer(readFileSync(`${FIXTURES}appserver_tools.jsonl`, "utf8"))) {
+    if (!result.ok) continue
+    const frame = result.line as { method?: string; params?: { item?: { type?: string } } }
+    if (frame.method === undefined) continue
+    seen.add(codexAppServerKind(frame.method, frame.params?.item?.type ?? null))
+  }
+  for (const kind of ["thread/started", "turn/start", "item/agentMessage/delta", "item/completed/agentMessage"]) {
+    assert.ok(seen.has(kind), `the capture should reach ${kind}`)
+  }
+  // Everything declared but unseen comes from `codex app-server
+  // generate-json-schema`. That is a weaker warrant than a capture, and saying
+  // how much weaker is the point of this assertion.
+  const declared = Object.keys(CODEX_APP_SERVER_MAPPING)
+  const schemaOnly = declared.filter((kind) => !seen.has(kind))
+  assert.ok(schemaOnly.length > 0)
+  assert.ok(
+    schemaOnly.length <= declared.length - 8,
+    "at least eight rows should be backed by a capture rather than by the schema alone",
+  )
+})

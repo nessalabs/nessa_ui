@@ -54,14 +54,17 @@ export class OpencodeRunMapper implements AgentStreamMapper {
         const reason = asString(part.reason)
         // A tool loop finishes a step per call, so only a step that stopped for
         // its own sake ends the turn. Treating every step as a turn would break
-        // one answer into four.
-        if (reason !== OpencodeFinishReason.Stop && reason !== OpencodeFinishReason.Error) return opened
+        // one answer into four — but every reason that is *not* the loop going
+        // round again is terminal, including the two that end a turn badly.
+        // Listing only `stop` left a run that hit the token ceiling open for
+        // ever.
+        if (reason === null || reason === OpencodeFinishReason.ToolCalls) return opened
         return [
           ...opened,
           this.emit.build(
             {
               type: "turn_completed",
-              status: reason === OpencodeFinishReason.Error ? "error" : "completed",
+              status: reason === OpencodeFinishReason.Stop ? "completed" : "error",
               stopReason: reason,
               terminalReason: null,
               finalText: null,

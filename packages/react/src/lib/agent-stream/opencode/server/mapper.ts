@@ -4,7 +4,7 @@ import type { AgentEvent, AgentStreamMapper, MapperOptions, SessionInfo } from "
 import { asNumber, asRecord, asString } from "../../json"
 import type { JsonValue } from "../../json"
 import { EventSink } from "../../emitter"
-import { OpencodeFinishReason, OpencodePartType, planOf, usageOf, toolEvents } from "../parts"
+import { OpencodeFinishReason, OpencodePartType, blockOf, planOf, toolEvents, usageOf } from "../parts"
 import type { OpencodeRawLine } from "../run/wire"
 import { OpencodeDeltaField, OpencodeServerEventType, parseOpencodeSseLine } from "./wire"
 
@@ -18,6 +18,27 @@ import { OpencodeDeltaField, OpencodeServerEventType, parseOpencodeSseLine } fro
  */
 export class OpencodeServerMapper implements AgentStreamMapper {
   private readonly emit: EventSink
+  /** Messages the bus said were the user's, so their text parts read as the prompt. */
+  private readonly userMessages = new Set<string>()
+  /**
+   * Tool names by call id.
+   *
+   * A permission ask names the *rule* that escalated and the call it belongs
+   * to, never the tool. The tool part that opened that call did, so the name
+   * is remembered from there rather than the rule being reported as one.
+   */
+  private readonly toolNames = new Map<string, string>()
+  /** The model in force per session, so a change is reported as one rather than restated. */
+  private readonly models = new Map<string, string>()
+  /**
+   * Sessions whose current turn has already ended.
+   *
+   * A failed step ends the turn, and the session then goes idle as it always
+   * does — two terminators for one turn, which closes it twice and lets the
+   * later idle make a failure look like a clean finish. Cleared when the next
+   * step opens.
+   */
+  private readonly finishedTurns = new Set<string>()
 
   constructor(options: MapperOptions = {}) {
     this.emit = new EventSink(options.startSeq ?? 0)
@@ -64,8 +85,8 @@ export class OpencodeServerMapper implements AgentStreamMapper {
         const id = asString(info.id)
         if (id === null) return []
         const model = asString(asRecord(info.model).id)
-        const previous = this.emit.models.get(id) ?? null
-        if (model !== null) this.emit.models.set(id, model)
+        const previous = this.models.get(id) ?? null
+        if (model !== null) this.models.set(id, model)
 
         if (!this.emit.openedSessions.has(id)) return this.open(info, raw, stamp)
 
@@ -84,9 +105,13 @@ export class OpencodeServerMapper implements AgentStreamMapper {
           ),
         ]
 
-      case OpencodeServerEventType.SessionIdle:
+      case OpencodeServerEventType.SessionIdle: {
         // The turn's real end on this transport. A step finishing is the tool
-        // loop; going idle is the agent stopping.
+        // loop; going idle is the agent stopping — unless a failed step has
+        // already ended it, in which case this idle is the same turn's echo.
+        const already = sessionId !== null && this.finishedTurns.has(sessionId)
+        if (sessionId !== null) this.finishedTurns.add(sessionId)
+        if (already) return []
         return [
           this.emit.build(
             {
@@ -104,6 +129,7 @@ export class OpencodeServerMapper implements AgentStreamMapper {
             stamp,
           ),
         ]
+      }
 
       case OpencodeServerEventType.MessageUpdated: {
         const info = asRecord(properties.info)
@@ -111,7 +137,7 @@ export class OpencodeServerMapper implements AgentStreamMapper {
         // Remembered rather than acted on: a message's totals are republished
         // as it grows, but which side sent it is what makes its text a prompt
         // or an answer.
-        if (id !== null && asString(info.role) === "user") this.emit.userMessages.add(id)
+        if (id !== null && asString(info.role) === "user") this.userMessages.add(id)
         return []
       }
 
@@ -135,10 +161,12 @@ export class OpencodeServerMapper implements AgentStreamMapper {
               type: "permission_requested",
               requestId: asString(properties.id) ?? "",
               callId: asString(tool.callID) ?? "",
-              // The rule's name is what opencode escalates on — the tool's own
-              // name is not on the ask.
-              toolName: asString(properties.permission) ?? "",
+              // The tool the call is for, remembered from the part that opened
+              // it. Reporting the rule here instead made every ask look like a
+              // call to a tool named `external_directory`.
+              toolName: this.toolNames.get(asString(tool.callID) ?? "") ?? "",
               input: properties.metadata ?? null,
+              // What escalated: the rule's own name.
               reason: asString(properties.permission),
               displayName: null,
               description: null,
@@ -194,12 +222,12 @@ export class OpencodeServerMapper implements AgentStreamMapper {
         if (text === null || text === "") return []
         // A text part on the *user's* message is the prompt echoed back — the
         // one thing this transport carries that the one-way stream does not.
-        const isPrompt = this.emit.userMessages.has(asString(part.messageID) ?? "")
+        const isPrompt = this.userMessages.has(asString(part.messageID) ?? "")
         return [
           this.emit.build(
             isPrompt
               ? { type: "user_message", text, synthetic: false }
-              : { type: "assistant_text", text, block: this.emit.blockOf(part) },
+              : { type: "assistant_text", text, block: blockOf(this.emit, part) },
             raw,
             ts,
           ),
@@ -207,14 +235,25 @@ export class OpencodeServerMapper implements AgentStreamMapper {
       }
       case OpencodePartType.Reasoning: {
         const text = asString(part.text)
-        return [this.emit.build({ type: "reasoning", text: text ?? "", block: this.emit.blockOf(part) }, raw, ts)]
+        return [this.emit.build({ type: "reasoning", text: text ?? "", block: blockOf(this.emit, part) }, raw, ts)]
       }
-      case OpencodePartType.Tool:
+      case OpencodePartType.Tool: {
+        const callId = asString(part.callID) ?? asString(part.id)
+        const tool = asString(part.tool)
+        if (callId !== null && tool !== null) this.toolNames.set(callId, tool)
         return toolEvents(this.emit, part, raw, ts)
+      }
+      case OpencodePartType.StepStart:
+        // A new step means a new turn is under way, so a previous terminal no
+        // longer applies.
+        if (this.emit.current !== null) this.finishedTurns.delete(this.emit.current)
+        return []
+
       case OpencodePartType.StepFinish: {
         // A step ending mid-turn is the tool loop; `session.idle` is what ends
         // the turn here. Only a failed step is worth reporting on its own.
         if (asString(part.reason) !== OpencodeFinishReason.Error) return []
+        if (this.emit.current !== null) this.finishedTurns.add(this.emit.current)
         return [
           this.emit.build(
             {

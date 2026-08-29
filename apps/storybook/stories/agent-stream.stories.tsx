@@ -14,6 +14,7 @@ import {
   claude,
   codex,
   opencode,
+  transportOf,
   transportsOf,
   mapClaudeStream,
   JsonTree,
@@ -261,7 +262,7 @@ interface Capture {
 
 const CAPTURES: readonly Capture[] = [
   { provider: "claude", transport: "stream", id: "printed", label: "Plain text", blurb: "One streamed message and nothing else — the delta path with no tools in the way.", prompt: "Print exactly: hello world. Do not use any tools.", source: printed },
-  { provider: "claude", transport: "stream", id: "tools", label: "Tools", blurb: "Write, read and a shell command: three calls, three results, one reasoning block.", prompt: "Create a file notes.txt containing three lines of text, then read it back, then run 'wc -l notes.txt'. Keep it brief.", source: tools },
+  { provider: "claude", transport: "stream", id: "tools", label: "Tools", blurb: "One shell command doing the whole job, its result, and a reasoning block — the model chained it rather than making three calls.", prompt: "Create a file notes.txt containing three lines of text, then read it back, then run 'wc -l notes.txt'. Keep it brief.", source: tools },
   { provider: "claude", transport: "stream", id: "todos", label: "Plan", blurb: "The incremental plan tools — TaskCreate and TaskUpdate — folded into one checklist.", prompt: "Use your todo list to plan and then do these three steps: create a.txt with 'a', create b.txt with 'b', then run 'ls *.txt'. Track each step in your todos.", source: todos },
   { provider: "claude", transport: "stream", id: "subagent", label: "Subagent", blurb: "An Explore subagent, its own events filed under the call that spawned it.", prompt: "Use the Explore subagent to find out what files are in this directory, then tell me what it found in one line.", source: subagent },
   { provider: "claude", transport: "stream", id: "workflow", label: "Workflow", blurb: "Three parallel agents behind one Workflow call: no inner transcripts, but a full phase-and-agent board with state, cost and results.", prompt: "Use a workflow to run three agents in parallel, each printing a different greeting (hello, hola, bonjour), then summarize what they returned. Keep it tiny.", source: workflow },
@@ -300,8 +301,8 @@ const CAPTURES: readonly Capture[] = [
 
   { provider: "opencode", transport: "serve", id: "oc-sse-printed", label: "Streamed answer", blurb: "The server's bus, where opencode does stream: 254 token deltas for one paragraph, each joinable to the part that supersedes it. Its `/event` endpoint is server-wide, so this capture carries a second session too.", prompt: "Write one paragraph of four sentences about the tide. Do not use tools.", source: opencodeSsePrinted },
   { provider: "opencode", transport: "serve", id: "oc-sse-tools", label: "Streamed + refused", blurb: "The same bus with a tool call: arguments stream as partial JSON, the session names its model, and a permission ask is held open and answered rather than auto-rejected.", prompt: "Create sse-notes.txt with two lines, then run 'wc -l sse-notes.txt'.", source: opencodeSseTools },
-  { provider: "opencode", transport: "acp", id: "oc-acp-printed", label: "Plain text", blurb: "The Agent Client Protocol over stdio: a conversation, not a stream. Nine frames, and the client's own request is what carries the prompt — the only opencode wire where what was asked is on the wire.", prompt: "Reply with exactly: hello world. Do not use any tools.", source: opencodeAcpPrinted },
-  { provider: "opencode", transport: "acp", id: "oc-acp-tools", label: "Tools", blurb: "Thoughts and prose stream as separate chunk kinds, and a call opens before it settles — the one transport that shows a tool actually running. The kind is the protocol's, not a guess from a tool's name.", prompt: "Create acp-notes.txt with two lines, then run 'wc -l acp-notes.txt'.", source: opencodeAcpTools },
+  { provider: "opencode", transport: "acp", id: "oc-acp-printed", label: "Plain text", blurb: "The Agent Client Protocol over stdio: a conversation, not a stream. Nine frames, and the client's own request is what carries the prompt. The one-way stream never echoes it; the bus repeats it back as a part.", prompt: "Reply with exactly: hello world. Do not use any tools.", source: opencodeAcpPrinted },
+  { provider: "opencode", transport: "acp", id: "oc-acp-tools", label: "Tools", blurb: "Thoughts and prose stream as separate chunk kinds, and a call opens before it settles, the way the bus also republishes a running one. The kind is the protocol's, not a guess from a tool's name.", prompt: "Create acp-notes.txt with two lines, then run 'wc -l acp-notes.txt'.", source: opencodeAcpTools },
   { provider: "opencode", transport: "serve", id: "oc-sse-plan", label: "Plan", blurb: "The same todo list as the one-way stream, arriving as settled parts between the token deltas.", prompt: "Use your todo list to plan and do three steps: create a.txt, create b.txt, then run 'ls *.txt'.", source: opencodeSsePlan },
   { provider: "opencode", transport: "serve", id: "oc-sse-subagent", label: "Subagent", blurb: "A delegation on the bus — and because `/event` is server-wide, the child's own session publishes here too rather than being hidden behind the call.", prompt: "Use a subagent to find out what files are in this directory, then tell me what it found.", source: opencodeSseSubagent },
   { provider: "opencode", transport: "serve", id: "oc-sse-websearch", label: "Web search", blurb: "A search tool call, with its arguments streaming in as partial JSON before the results settle.", prompt: "Search the web for the current version of the TypeScript compiler.", source: opencodeSseWebsearch },
@@ -377,6 +378,16 @@ function ProviderSupport({ provider, transport }: { provider: Provider; transpor
   )
 }
 
+/** Whether a capture's transport publishes more than one session on one stream. */
+function sharedBusCapture(captureId: string): boolean {
+  const capture = CAPTURES.find((entry) => entry.id === captureId)
+  if (capture === undefined) return false
+  return transportOf(capture.provider, capture.transport ?? "")?.supports.sharedBus === true
+}
+
+/** What a fold looks like before its first event, on a bus whose session is not yet known. */
+const EMPTY_TRANSCRIPT: Transcript = new TranscriptBuilder().snapshot()
+
 /** Which provider a capture came from. */
 function providerOf(captureId: string): ProviderId {
   return CAPTURES.find((entry) => entry.id === captureId)?.provider ?? "claude"
@@ -400,7 +411,7 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
     captureId: string
     count: number
     mapper: { push(line: string): readonly AgentEvent[] }
-    builder: TranscriptBuilder
+    builder: TranscriptBuilder | null
     buffers: Map<string, string>
     events: AgentEvent[]
     produced: number[]
@@ -413,7 +424,9 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
       captureId,
       count: 0,
       mapper: mapperFor(captureId),
-      builder: new TranscriptBuilder(),
+      // On a bus the builder cannot be made until a session is known, because
+      // a transcript is one conversation and the stream carries several.
+      builder: sharedBusCapture(captureId) ? null : new TranscriptBuilder(),
       buffers: new Map(),
       events: [],
       produced: [],
@@ -432,7 +445,13 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
     const mapped = current.mapper.push(line)
     current.produced.push(mapped.length)
     current.events.push(...mapped)
-    current.builder.push(mapped)
+    // The first session seen is the one being watched; the rest of the bus —
+    // a subagent's own session, another window's work — is filtered out rather
+    // than folded into this conversation.
+    if (current.builder === null && mapped[0] !== undefined) {
+      current.builder = new TranscriptBuilder({ sessionId: mapped[0].sessionId })
+    }
+    current.builder?.push(mapped)
     applyDeltas(mapped, current.buffers)
   }
   current.count = target
@@ -440,7 +459,7 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
   return {
     events: current.events,
     produced: current.produced,
-    transcript: current.builder.snapshot({ live }),
+    transcript: current.builder?.snapshot({ live }) ?? EMPTY_TRANSCRIPT,
     previews: current.buffers,
   }
 }
@@ -2041,7 +2060,7 @@ const STRUCTURE = `classDiagram
 /**
  * The exchange only an interactive transport has.
  *
- * Three of the five wires are one-way: bytes arrive and a surface renders
+ * Three of the six wires are one-way: bytes arrive and a surface renders
  * them. ACP is a conversation, and drawing it beside the one-way flow is the
  * clearest way to show why "does this agent support approvals" is a question
  * about the transport rather than the agent.
@@ -2233,7 +2252,7 @@ function TransportMatrix() {
 
 export const Architecture: Story = {
   parameters: storyDocumentation(
-    "How the parser is put together, now that three agents and five wires have been read. Each transport owns its own envelope types, its own mapping table and its own mapper — they are separate protocols with separate versions, and opencode alone speaks three. Only what is genuinely identical is shared: opencode's `run` and `serve` carry the same message parts, so those are read once. Everything to the right of AgentEvent is agent-agnostic, which is what makes a fourth provider a new column here and no change to any component. The three diagrams are the structure, one line's journey on a one-way wire, and the exchange only an interactive one has.",
+    "How the parser is put together, now that three agents and six wires have been read. Each transport owns its own envelope types, its own mapping table and its own mapper — they are separate protocols with separate versions, and opencode alone speaks three. Only what is genuinely identical is shared: opencode's `run` and `serve` carry the same message parts, so those are read once. Everything to the right of AgentEvent is agent-agnostic, which is what makes a fourth provider a new column here and no change to any component. The three diagrams are the structure, one line's journey on a one-way wire, and the exchange only an interactive one has.",
   ),
   args: {},
   render: () => (
@@ -2261,7 +2280,8 @@ export const Architecture: Story = {
       <section className="flex flex-col gap-2">
         <h3 className="text-sm font-medium">And the exchange only an interactive transport has</h3>
         <p className="text-muted-foreground text-sm">
-          Five of the six wires are one-way. ACP is a conversation, and the same conversation whichever agent is behind it —
+          Three of the six wires are one-way; the other three are conversations. ACP is the same conversation whichever agent is
+          behind it —
           Claude Code, Codex and opencode all speak it, so one reader serves all three. The agent asks the client for permission
           and blocks until answered, which is why &ldquo;does this agent support approvals&rdquo; is a question about the
           transport rather than the agent.

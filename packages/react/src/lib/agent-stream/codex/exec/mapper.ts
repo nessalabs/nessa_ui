@@ -311,6 +311,13 @@ export class CodexStreamMapper implements AgentStreamMapper {
         if (!completed) return []
         return [this.build({ type: "assistant_text", text: asString(item.text) ?? "", block: null }, [], raw)]
 
+      // An item that *is* the failure. Without this it fell through to the
+      // tool-call default and settled as a successful call with no text, so a
+      // failed turn read as a silent one.
+      case CodexItemType.Error:
+        if (!completed) return []
+        return [this.build({ type: "error", message: asString(item.message) ?? "error" }, [], raw)]
+
       case CodexItemType.Reasoning:
         if (!completed) return []
         return [this.build({ type: "reasoning", text: asString(item.text) ?? "", block: null }, [], raw)]

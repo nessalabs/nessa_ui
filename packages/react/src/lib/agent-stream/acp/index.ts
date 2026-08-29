@@ -2,7 +2,7 @@
 
 export {
   ACP_TOOL_NAME,
-  ACP_PROVENANCE,
+  ACP_PROTOCOL_VERSION,
   AcpMethod,
   AcpPermissionKind,
   AcpToolKind,

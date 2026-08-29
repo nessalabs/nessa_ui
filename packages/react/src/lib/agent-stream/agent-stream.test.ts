@@ -7,6 +7,7 @@ import test from "node:test"
 
 import { AgentEventType, isEvent, type AgentEvent } from "./events"
 import { sessionCapabilities } from "./claude/stream/capabilities"
+import { CLAUDE_EVENT_MAPPING, claudeMappingFor, claudeWireKind } from "./claude/stream/mapping"
 import {
   collectTranscriptRefs,
   parseSubagentMeta,
@@ -19,7 +20,7 @@ import {
 import { TranscriptBuilder } from "./builder"
 import { ClaudeStreamMapper, mapClaudeStream } from "./claude/stream/mapper"
 import { applyDeltas, buildTranscript, isCompacting, isToolGroup, previewOf } from "./transcript"
-import { ClaudeSystemSubtype, ClaudeWireType, parseWireLines } from "./claude/stream/wire"
+import { CLAUDE_STREAM_PROVENANCE, ClaudeSystemSubtype, ClaudeWireType, parseWireLines } from "./claude/stream/wire"
 import { asRecord } from "./json"
 
 const FIXTURES = fileURLToPath(new URL("../../../../../apps/storybook/stories/fixtures/agent-stream/", import.meta.url))
@@ -39,6 +40,9 @@ const NAMES = [
   "resume_turn1",
   "resume_turn2",
   "workflow_phases",
+  "approval_allow",
+  "approval_deny",
+  "compaction",
   "disk_subagent_a37fefefbc61e13e3",
   "disk_workflow_agent_a35ea63276cd501aa",
 ] as const
@@ -583,10 +587,7 @@ test("a replayed tail is absorbed once; a genuinely earlier event is refused", (
  * about — `turn_started` sat in the union unemitted until this test existed.
  */
 const UNCAPTURED: ReadonlyMap<string, string> = new Map([
-  ["context_compacted", "needs a session long enough to auto-compact, or a /compact"],
   ["error", "needs an interrupted turn, which headless cannot produce"],
-  ["permission_requested", "needs --permission-prompt-tool stdio"],
-  ["permission_decided", "needs --permission-prompt-tool stdio"],
   ["permission_denied", "needs a sandbox path refusal or a mode that cannot ask"],
   ["rate_limited", "only emitted when a limit is actually reached"],
   ["model_changed", "derived across two captures; covered by the resume test"],
@@ -1254,4 +1255,85 @@ test("a surface can tell that compaction is in flight, not just that it happened
   // finished transcript never renders a marker that will not resolve.
   assert.equal(isCompacting([]), false)
   assert.equal(isCompacting(events), false)
+})
+
+/**
+ * The test `claude/stream/mapping.ts` says exists.
+ *
+ * Its header promised "the test suite walks every fixture line and asserts the
+ * mapper emitted exactly what this table promises" — and nothing did. The
+ * table was decorative for the oldest wire in the library, which is how a line
+ * kind reached it undeclared.
+ */
+test("every Claude line kind the captures contain is declared, and emits what the table promises", () => {
+  for (const name of NAMES) {
+    const mapper = new ClaudeStreamMapper()
+    for (const result of parseWireLines(capture(name))) {
+      if (!result.ok) continue
+      const kind = claudeWireKind(result.line)
+      const entry = claudeMappingFor(kind)
+      assert.notEqual(entry, null, `${name}: ${kind} is not in CLAUDE_EVENT_MAPPING`)
+      const declared = new Set<string>(entry!.emits)
+      for (const event of mapper.map(result.line)) {
+        assert.ok(declared.has(event.payload.type), `${name}: ${kind} emitted an undeclared ${event.payload.type}`)
+      }
+    }
+  }
+})
+
+/**
+ * A table may only promise what something has seen.
+ *
+ * The conformance checks above are one-directional: they prove the mapper
+ * never exceeds its table, not that a declared row is real. A row no capture
+ * exercises is a claim about a wire nobody has read, so each one has to be
+ * acknowledged here — which is what stops a table growing fiction.
+ */
+const CLAUDE_UNEXERCISED: ReadonlyMap<string, string> = new Map([
+  ["system/permission_denied", "needs a sandbox path refusal, or a mode that cannot ask"],
+])
+
+test("every Claude row the captures never reach is acknowledged as unexercised", () => {
+  const seen = new Set<string>()
+  for (const name of NAMES) {
+    for (const result of parseWireLines(capture(name))) {
+      if (result.ok) seen.add(claudeWireKind(result.line))
+    }
+  }
+  const declared = Object.keys(CLAUDE_EVENT_MAPPING)
+  const unexercised = declared.filter((kind) => !seen.has(kind))
+  assert.deepEqual(
+    unexercised.filter((kind) => !CLAUDE_UNEXERCISED.has(kind)).sort(),
+    [],
+    "a table row no fixture exercises must be listed in CLAUDE_UNEXERCISED, with a capture or a reason",
+  )
+  for (const kind of CLAUDE_UNEXERCISED.keys()) {
+    // The ledger may not outlive the gap it records…
+    assert.ok(!seen.has(kind), `${kind} is listed as unexercised but a fixture reaches it`)
+    // …nor name a row that does not exist, which is how a ledger becomes
+    // decoration that passes whatever the table says.
+    assert.ok(declared.includes(kind), `${kind} is listed as unexercised but is not a row in the table`)
+  }
+})
+
+test("the recorded build is the newest the fixtures actually came from", () => {
+  // This wire stamps its own version, so the constant can be checked rather
+  // than trusted. The fixtures span two builds; the provenance must name the
+  // newest of them, and every capture must be one this build has seen.
+  const versions = new Set<string>()
+  for (const name of NAMES) {
+    for (const result of parseWireLines(capture(name))) {
+      if (!result.ok) continue
+      const line = result.line as { type?: string; subtype?: string; claude_code_version?: unknown }
+      if (line.type === "system" && line.subtype === "init" && typeof line.claude_code_version === "string") {
+        versions.add(line.claude_code_version)
+      }
+    }
+  }
+  assert.ok(versions.size > 0)
+  assert.ok(versions.has(CLAUDE_STREAM_PROVENANCE.version), "the provenance names a build no fixture came from")
+  const newest = [...versions].sort((left, right) =>
+    left.localeCompare(right, undefined, { numeric: true }),
+  )[versions.size - 1]
+  assert.equal(CLAUDE_STREAM_PROVENANCE.version, newest)
 })

@@ -1,4 +1,4 @@
-/** @responsibility States, as data, which `opencode acp` frame becomes which normalized event. */
+/** @responsibility States, as data, which Agent Client Protocol frame becomes which normalized event. */
 
 import { AgentEventType, ToolKind } from "../events"
 import type { MappingEntry } from "../mapping"

@@ -175,6 +175,10 @@ export const CLAUDE_EVENT_MAPPING: Readonly<Record<ClaudeWireKind, ClaudeMapping
     emits: [AgentEventType.PermissionDenied],
     note: "a call refused without being asked about",
   },
+  [ClaudeWireType.Attachment]: {
+    emits: [AgentEventType.Unknown],
+    note: "the CLI's own bookkeeping in a saved transcript — a deferred tool list, not a turn; carried as unknown so the raw line survives",
+  },
   [ClaudeWireType.RateLimit]: {
     emits: [AgentEventType.RateLimited],
     note: "only when a limit is reached or overage is in use; the steady state emits nothing",

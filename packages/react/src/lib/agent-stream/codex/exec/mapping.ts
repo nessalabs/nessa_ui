@@ -149,6 +149,10 @@ export const CODEX_EVENT_MAPPING: Readonly<Record<CodexWireKind, CodexMappingEnt
   },
 
   // ---------- fallback ----------
+  [`${CodexWireType.ItemStarted}/${CodexItemType.Error}`]: {
+    emits: [],
+    note: "an error opens and settles in one step; the completion carries the message",
+  },
   [`${CodexWireType.ItemCompleted}/${CodexItemType.Error}`]: {
     emits: [AgentEventType.Error],
     note: "an item-level failure",

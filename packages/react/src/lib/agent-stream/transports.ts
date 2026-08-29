@@ -1,6 +1,14 @@
 /** @responsibility Describes each provider's transports and what one can report, so a surface reads capability rather than hardcoding it. */
 
 import type { WireProvenance } from "./events"
+// Each wire already records the build it was read from. Naming those constants
+// here rather than restating their values is what keeps a recapture from
+// updating one copy and leaving this table asserting the old one.
+import { CLAUDE_STREAM_PROVENANCE } from "./claude/stream/wire"
+import { CODEX_APP_SERVER_PROVENANCE } from "./codex/app-server/wire"
+import { CODEX_EXEC_PROVENANCE } from "./codex/exec/wire"
+import { OPENCODE_RUN_PROVENANCE } from "./opencode/run/wire"
+import { OPENCODE_SERVER_PROVENANCE } from "./opencode/server/wire"
 
 /**
  * What a transport can report.
@@ -20,7 +28,13 @@ export interface TransportSupport {
   readonly capabilities: Supported
   /** Asks for permission before running what its rules cover, and takes an answer. */
   readonly approvals: Supported
-  /** Accepts a message mid-turn, to steer or queue. */
+  /**
+   * Accepts a message mid-turn, to steer or queue.
+   *
+   * Every interactive transport has a method for it and no capture exercises
+   * one, so this is `null` across the board rather than a row of `true`s taken
+   * from documentation.
+   */
   readonly steering: Supported
   /** Names the model in force for the session. */
   readonly namesModel: Supported
@@ -70,48 +84,6 @@ export interface ProviderDescriptor {
   readonly label: string
   readonly transports: readonly TransportDescriptor[]
 }
-
-const CLAUDE_STREAM_PROVENANCE: WireProvenance = Object.freeze({
-  cli: "Claude Code",
-  version: "2.1.251",
-  command: "claude -p --output-format stream-json --include-partial-messages --verbose",
-  capturedOn: "2026-08-29",
-})
-
-const CODEX_EXEC_PROVENANCE: WireProvenance = Object.freeze({
-  cli: "codex-cli",
-  version: "0.144.1",
-  command: "codex exec --json",
-  capturedOn: "2026-08-29",
-})
-
-const CODEX_APP_SERVER: WireProvenance = Object.freeze({
-  cli: "codex-cli",
-  version: "0.144.1",
-  command: "codex app-server",
-  capturedOn: "2026-08-29",
-})
-
-const OPENCODE_RUN: WireProvenance = Object.freeze({
-  cli: "opencode",
-  version: "1.18.25",
-  command: "opencode run --format json",
-  capturedOn: "2026-08-29",
-})
-
-const OPENCODE_SERVE: WireProvenance = Object.freeze({
-  cli: "opencode",
-  version: "1.18.25",
-  command: "opencode serve  →  GET /event",
-  capturedOn: "2026-08-29",
-})
-
-const OPENCODE_ACP: WireProvenance = Object.freeze({
-  cli: "opencode",
-  version: "1.18.25",
-  command: "opencode acp",
-  capturedOn: "2026-08-29",
-})
 
 /**
  * Claude Code and Codex reach ACP through Zed's adapters rather than a
@@ -171,8 +143,10 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
         supports: Object.freeze({
           streaming: true,
           capabilities: true,
+          // Captured both ways: `approval_allow` and `approval_deny` are this
+          // transport answering a control request on stdin.
           approvals: true,
-          steering: true,
+          steering: null,
           namesModel: true,
           fileEdits: false,
           sharedBus: false,
@@ -191,12 +165,14 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
           streaming: true,
           capabilities: true,
           approvals: true,
-          steering: true,
+          steering: null,
           namesModel: true,
           fileEdits: true,
           sharedBus: false,
           sessionControl: true,
-          contextWindow: false,
+          // This adapter sent no usage frame at all, so the window's size is
+          // unrecorded here even though the other two ACP agents report it.
+          contextWindow: null,
         }),
         note: "Claude Code through Zed's ACP adapter. It asks for permission over the protocol without the stdio flag its own stream needs, and `session/new` advertises the models it can switch to. Refuses to start inside another Claude Code session unless CLAUDECODE is unset.",
       }),
@@ -230,21 +206,24 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
         label: "app-server",
         command: "codex app-server",
         interactive: true,
-        provenance: CODEX_APP_SERVER,
+        provenance: CODEX_APP_SERVER_PROVENANCE,
         supports: Object.freeze({
           // Recorded now: a driven session sent fifteen agentMessage deltas for
           // one short answer, which `exec --json` never sends at all.
           streaming: true,
           capabilities: true,
-          approvals: true,
-          steering: true,
+          // The capture set an approval *policy* and never reached an approval
+          // exchange, ran no command and changed no file — a short session, so
+          // these answers are unrecorded rather than known.
+          approvals: null,
+          steering: null,
           namesModel: true,
-          fileEdits: true,
+          fileEdits: null,
           // A thread is opened explicitly and its notifications name it, but a
           // single connection was only ever driven for one.
           sharedBus: null,
           sessionControl: true,
-          contextWindow: false,
+          contextWindow: null,
         }),
         note: "Interactive JSON-RPC. Answers model, skill, plugin and hook lists on request, streams the answer as agentMessage deltas, and asks before running untrusted commands.",
       }),
@@ -257,13 +236,18 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
         supports: Object.freeze({
           streaming: true,
           capabilities: true,
-          approvals: true,
-          steering: true,
+          // The protocol carries approvals and this agent never asked for one
+          // in the capture, so nothing here demonstrates it either way.
+          approvals: null,
+          // Advertised in the handshake (`_meta.steering.supported`) and not
+          // exercised, which is an advert rather than an observation.
+          steering: null,
           namesModel: true,
           fileEdits: true,
           sharedBus: false,
           sessionControl: true,
-          contextWindow: false,
+          // `usage_update` carries `size: 258400` beside what was used.
+          contextWindow: true,
         }),
         note: "Codex through the ACP adapter. Streams where `exec --json` does not, and `session/new` reports the sandbox modes — read-only, auto, full-access — that are its nearest thing to a permission mode.",
       }),
@@ -278,7 +262,7 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
         label: "run --format json",
         command: "opencode run --format json",
         interactive: false,
-        provenance: OPENCODE_RUN,
+        provenance: OPENCODE_RUN_PROVENANCE,
         supports: Object.freeze({
           streaming: false,
           capabilities: false,
@@ -297,16 +281,18 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
         label: "serve",
         command: "opencode serve  →  GET /event",
         interactive: true,
-        provenance: OPENCODE_SERVE,
+        provenance: OPENCODE_SERVER_PROVENANCE,
         supports: Object.freeze({
           streaming: true,
           capabilities: true,
           approvals: true,
-          steering: true,
+          steering: null,
           namesModel: true,
           fileEdits: true,
           sharedBus: true,
-          sessionControl: true,
+          // The captures are receive-only: nothing drove the server's own
+          // session endpoints over this connection.
+          sessionControl: null,
           contextWindow: false,
         }),
         note: "The headless server's own bus, and the first place opencode streams. `/event` is server-wide, so a reader has to filter by session.",
@@ -316,12 +302,12 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
         label: "acp",
         command: "opencode acp",
         interactive: true,
-        provenance: OPENCODE_ACP,
+        provenance: Object.freeze({ ...OPENCODE_RUN_PROVENANCE, command: "opencode acp" }),
         supports: Object.freeze({
           streaming: true,
           capabilities: true,
           approvals: true,
-          steering: true,
+          steering: null,
           namesModel: true,
           // ACP names the files a call touched as `locations`, which is a
           // stronger claim than a path read off a tool's input.

@@ -1,27 +1,20 @@
-/** @responsibility Describes the `opencode acp` JSON-RPC envelope and decodes one frame into it without interpreting it. */
+/** @responsibility Describes the Agent Client Protocol envelope — one protocol, several agents — without interpreting it. */
 
-import type { WireProvenance } from "../events"
-import { parseJsonObjectLine } from "../json"
 import type { JsonValue } from "../json"
-import type { AcpParseResult, AcpRawFrame } from "./frame"
 
 /**
- * The build this envelope was read from.
+ * The protocol revision this module reads.
  *
- * ACP is the only one of opencode's three wires that states its own version:
- * `initialize` replies with `agentInfo: { name, version }`, so a consumer can
- * compare the process it is talking to against what was modelled without being
- * told out of band. `protocolVersion` is the protocol's own number, which moves
- * independently of both the agent and the server API.
+ * Deliberately not a [`WireProvenance`]: unlike every other wire here, this
+ * module is not true of one build of one CLI. Three different agents speak it
+ * — Claude Code and Codex through adapters, opencode natively — so the build
+ * belongs to each of them and lives on their transport descriptors instead.
+ *
+ * ACP is also the one wire that does not need a constant to answer the
+ * question: `initialize` replies with `agentInfo: { name, version }`, so a
+ * consumer can read which process it is actually talking to.
  */
-export const ACP_PROVENANCE: WireProvenance & { readonly protocolVersion: number } = Object.freeze({
-  cli: "opencode",
-  version: "1.18.25",
-  /** The ACP revision the agent negotiated. */
-  protocolVersion: 1,
-  command: "opencode acp",
-  capturedOn: "2026-08-29",
-})
+export const ACP_PROTOCOL_VERSION = 1
 
 /**
  * The JSON-RPC methods this wire uses.
@@ -152,31 +145,4 @@ export interface AcpFrame {
   readonly params?: JsonValue
   readonly result?: JsonValue
   readonly error?: JsonValue
-}
-
-/**
- * Decodes one ACP frame.
- *
- * The transport is newline-delimited JSON over stdio, so the decoding is the
- * shared one; what belongs here is the naming and the fact that a frame may be
- * a request, a response or a notification, which is what the mapper turns on.
- */
-export function parseAcpLine(line: string): AcpParseResult | null {
-  const trimmed = line.trim()
-  if (trimmed.length === 0) return null
-  const result = parseJsonObjectLine(trimmed)
-  if (!result.ok) return result
-  // A JSON-RPC frame has no `type`; the shared decoder only promises an object,
-  // and that is all this claims too.
-  return { ok: true, line: result.line as AcpRawFrame }
-}
-
-/** Decodes a whole ACP capture, dropping only blank lines. */
-export function parseAcp(text: string): readonly AcpParseResult[] {
-  const results: AcpParseResult[] = []
-  for (const line of text.split("\n")) {
-    const result = parseAcpLine(line)
-    if (result !== null) results.push(result)
-  }
-  return results
 }

@@ -1,4 +1,4 @@
-/** @responsibility Turns `opencode acp` JSON-RPC frames into normalized agent events. */
+/** @responsibility Turns Agent Client Protocol frames into normalized agent events. */
 
 import type { AgentEvent, AgentStreamMapper, FileEdit, MapperOptions, PlanStep, SessionInfo } from "../events"
 import { PlanStepStatus } from "../events"
@@ -8,7 +8,8 @@ import { EventSink } from "../emitter"
 import { TaskKind } from "../events"
 import type { AcpRawFrame } from "./frame"
 import { acpToolKind, acpToolKindByName } from "./mapping"
-import { ACP_TOOL_NAME, AcpMethod, AcpToolStatus, AcpUpdate, parseAcpLine } from "./wire"
+import { parseAcpLine } from "./frame"
+import { ACP_TOOL_NAME, AcpMethod, AcpToolStatus, AcpUpdate } from "./wire"
 
 /**
  * A call's kind, preferring opencode's own tool name over ACP's coarser one.
@@ -62,6 +63,15 @@ export class AcpMapper implements AgentStreamMapper {
   private readonly emit: EventSink
   /** Which pending request id belongs to a prompt, so its reply can end the turn. */
   private readonly prompts = new Set<string>()
+  /**
+   * Pending permission asks, and what each option means.
+   *
+   * The answer comes back as a plain JSON-RPC response naming an `optionId`,
+   * so the ask's own option list is the only place that says whether that id
+   * allows or refuses. Without this the ask never retires and a surface shows
+   * a blocking prompt for the rest of the session.
+   */
+  private readonly asks = new Map<string, ReadonlyMap<string, string>>()
   /** Tool kinds by call id, so an update that omits the kind keeps the one the call opened with. */
   private readonly kinds = new Map<string, string>()
   /**
@@ -119,6 +129,14 @@ export class AcpMapper implements AgentStreamMapper {
 
       case AcpMethod.SessionRequestPermission: {
         const call = asRecord(params.toolCall)
+        const options = new Map<string, string>()
+        for (const entry of asArray(params.options)) {
+          const option = asRecord(entry)
+          const optionId = asString(option.optionId)
+          const kind = asString(option.kind)
+          if (optionId !== null && kind !== null) options.set(optionId, kind)
+        }
+        if (id !== null) this.asks.set(id, options)
         return [
           this.emit.build(
             {
@@ -306,6 +324,40 @@ export class AcpMapper implements AgentStreamMapper {
 
   /** A response frame: a new session, or the end of a turn. */
   private response(id: string | null, result: Record<string, JsonValue>, raw: JsonValue): readonly AgentEvent[] {
+    // The client's answer to a permission ask, which is what retires it.
+    //
+    // Matched on the id *and* the shape: the two directions of a JSON-RPC pipe
+    // number their requests independently, so an agent's ask and a client's
+    // prompt can share an id. Keying on the id alone read a prompt's own reply
+    // as a permission answer and swallowed the turn's ending.
+    if (id !== null && this.asks.has(id) && asRecord(result.outcome) !== null && "outcome" in asRecord(result.outcome)) {
+      const options = this.asks.get(id)!
+      this.asks.delete(id)
+      const outcome = asRecord(result.outcome)
+      const optionId = asString(outcome.optionId)
+      const kind = optionId === null ? null : (options.get(optionId) ?? null)
+      return [
+        this.emit.build(
+          {
+            type: "permission_decided",
+            requestId: id,
+            // The option's *kind* decides, not its id: an agent names its
+            // options whatever it likes, and only the kind says which way one
+            // goes. A cancelled outcome answered nothing, so it stays unknown.
+            decision:
+              asString(outcome.outcome) === "cancelled" || kind === null
+                ? null
+                : kind.startsWith("reject")
+                  ? "deny"
+                  : "allow",
+            message: null,
+          },
+          raw,
+          null,
+        ),
+      ]
+    }
+
     const sessionId = asString(result.sessionId)
     if (sessionId !== null && !this.emit.openedSessions.has(sessionId)) {
       this.emit.openedSessions.add(sessionId)

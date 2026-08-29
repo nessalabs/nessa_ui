@@ -290,9 +290,17 @@ export function groupTools(work: readonly AgentEvent[]): readonly WorkItem[] {
  */
 export function buildTranscript(
   source: readonly AgentEvent[],
-  options: { readonly live?: boolean; readonly liveTaskIds?: ReadonlySet<string> } = {},
+  options: {
+    readonly live?: boolean
+    readonly liveTaskIds?: ReadonlySet<string>
+    /**
+     * Fold only this session. Required on a transport whose stream is a bus —
+     * see [`TranscriptBuilder`] — and unnecessary everywhere else.
+     */
+    readonly sessionId?: string
+  } = {},
 ): Transcript {
-  const builder = new TranscriptBuilder()
+  const builder = new TranscriptBuilder({ sessionId: options.sessionId })
   builder.push(inSeqOrder(source))
   return builder.snapshot(options)
 }

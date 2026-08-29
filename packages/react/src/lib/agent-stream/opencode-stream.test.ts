@@ -491,9 +491,12 @@ test("the server asks before running what its rules cover, and records the answe
   assert.equal(asks.length, 1)
   assert.equal(decisions.length, 1)
 
-  // The ask names the rule that escalated and the call it belongs to, so a
-  // surface can attach it to the tool row already on screen.
-  assert.equal(asks[0]!.toolName, "external_directory")
+  // The ask names the tool and the call it belongs to, so a surface can attach
+  // it to the row already on screen. The wire itself names only the *rule*, so
+  // the tool is remembered from the part that opened the call — without that,
+  // every ask looked like a call to a tool named `external_directory`.
+  assert.equal(asks[0]!.toolName, "write")
+  assert.equal(asks[0]!.reason, "external_directory")
   assert.ok(asks[0]!.callId.startsWith("call-"))
   assert.equal(decisions[0]!.requestId, asks[0]!.requestId)
   // opencode says "reject"; one vocabulary reaches the consumer.
@@ -710,4 +713,152 @@ test("opencode does not compact: it runs out of window and fails", () => {
   // "error"; the message is nested two levels down.
   assert.notEqual(errors[0], "error")
   assert.ok(usage.every((total) => total !== null))
+})
+
+/**
+ * A table may only promise what something has seen.
+ *
+ * One-directional conformance proves a mapper never exceeds its table, not
+ * that a declared row is real. Each row no capture reaches is acknowledged
+ * here, or the test fails.
+ */
+const RUN_UNEXERCISED: ReadonlyMap<string, string> = new Map([
+  ["reasoning", "these models disclosed none on this wire; the export reader carries the shape"],
+  ["user_message", "not on the live stream at all — only an exported session carries the prompt"],
+  ["tool_use", "the bare row is the fallback for an unlisted tool, reached by name rather than as an exact key"],
+  ["tool_use/edit", "the captures wrote whole files rather than editing in place"],
+  ["tool_use/patch", "no capture applied a patch"],
+])
+
+test("every opencode run row the captures never reach is acknowledged as unexercised", () => {
+  const seen = new Set<string>()
+  for (const name of NAMES) {
+    for (const result of parseOpencodeLines(capture(name))) {
+      if (result.ok) seen.add(opencodeWireKind(result.line))
+    }
+  }
+  const declared = Object.keys(OPENCODE_RUN_MAPPING)
+  assert.deepEqual(
+    declared.filter((kind) => !seen.has(kind) && !RUN_UNEXERCISED.has(kind)).sort(),
+    [],
+    "a table row no fixture exercises must be listed in RUN_UNEXERCISED",
+  )
+  for (const kind of RUN_UNEXERCISED.keys()) {
+    assert.ok(declared.includes(kind), `${kind} is listed as unexercised but is not a row in the table`)
+  }
+})
+
+const SERVER_UNEXERCISED: ReadonlyMap<string, string> = new Map([
+  ["server.heartbeat", "a keep-alive, stripped from the captures as this machine's noise"],
+  ["plugin.added", "the installed plugin set is this machine's, so it is stripped from the captures"],
+])
+
+test("every opencode server row the captures never reach is acknowledged as unexercised", () => {
+  const seen = new Set<string>()
+  for (const name of SSE_NAMES) {
+    for (const result of parseOpencodeSse(sse(name))) {
+      if (result.ok) seen.add(String((result.line as { type?: unknown }).type))
+    }
+  }
+  const declared = Object.keys(OPENCODE_SERVER_MAPPING)
+  assert.deepEqual(
+    declared.filter((kind) => !seen.has(kind) && !SERVER_UNEXERCISED.has(kind)).sort(),
+    [],
+    "a table row no fixture exercises must be listed in SERVER_UNEXERCISED",
+  )
+  for (const kind of SERVER_UNEXERCISED.keys()) {
+    assert.ok(declared.includes(kind), `${kind} is listed as unexercised but is not a row in the table`)
+  }
+})
+
+test("a tool call on the bus opens once, however often its part is republished", () => {
+  // The bus republishes the same tool part at every status it passes through.
+  // Opening the row on each one reported a turn as having run its tools three
+  // or four times: `sse_tools` showed eight calls for two, `sse_plan` 23 for 7.
+  for (const name of SSE_NAMES) {
+    const events = mapOpencodeServerStream(sse(name))
+    const started = events.flatMap((event) => (event.payload.type === "tool_call_started" ? [event.payload.callId] : []))
+    const completed = events.flatMap((event) =>
+      event.payload.type === "tool_call_completed" ? [event.payload.callId] : [],
+    )
+    assert.equal(new Set(started).size, started.length, `${name}: a call opened more than once`)
+    assert.equal(new Set(completed).size, completed.length, `${name}: a call settled more than once`)
+    assert.deepEqual(new Set(completed), new Set(completed.filter((id) => started.includes(id))), name)
+  }
+
+  // And the turn agrees with the wire: two calls in the tools capture.
+  const transcript = buildTranscript(mapOpencodeServerStream(sse("sse_tools")))
+  assert.equal(
+    transcript.turns.reduce((total, turn) => total + turn.toolCalls, 0),
+    2,
+  )
+})
+
+test("a bus row says what the tool actually ran, not what the first frame knew", () => {
+  // The bus opens a call with a `pending` part whose input is `{}` and which
+  // has no title. Opening the row there — which deduplicating naively does —
+  // produced rows that never said what ran, because nothing revises an open
+  // row afterwards.
+  const started = mapOpencodeServerStream(sse("sse_tools")).flatMap((event) =>
+    event.payload.type === "tool_call_started" ? [event.payload] : [],
+  )
+  assert.equal(started.length, 2)
+  for (const call of started) {
+    assert.ok(Object.keys(call.input as Record<string, unknown>).length > 0, "an opened row with no input says nothing")
+    assert.notEqual(call.title, call.name, "the title should be what ran, not the tool's own name")
+  }
+  assert.match(started[1]!.title, /wc -l/)
+})
+
+test("two sessions on the bus may name a call the same thing", () => {
+  // `openedCalls` is keyed by session as well as call id. Keyed by call id
+  // alone, the second session's call was mistaken for a republish of the
+  // first's and vanished entirely — no row, no result.
+  const mapper = new OpencodeServerMapper()
+  const part = (session: string) =>
+    JSON.stringify({
+      type: "message.part.updated",
+      properties: {
+        sessionID: session,
+        part: {
+          type: "tool",
+          id: "prt_1",
+          callID: "call_dup",
+          tool: "bash",
+          messageID: "msg_1",
+          state: { status: "completed", input: { command: `echo ${session}` }, output: "ok", metadata: { exit: 0 } },
+        },
+      },
+    })
+  for (const session of ["ses_a", "ses_b"]) {
+    const events = mapper.push(part(session))
+    // No `session_started` here: on this wire a session is announced by its own
+    // description frame, not by a part that happens to name it.
+    assert.deepEqual(
+      events.map((event) => event.payload.type),
+      ["tool_call_started", "tool_call_completed"],
+      session,
+    )
+    assert.ok(events.every((event) => event.sessionId === session), session)
+  }
+})
+
+test("a transcript is one conversation, even when the stream is a bus", () => {
+  // `/event` carries every session on the server. Folding them together merges
+  // two conversations' turns; naming the session is how a consumer reads the
+  // one it is showing.
+  const events = mapOpencodeServerStream(sse("sse_printed"))
+  const sessions = [...new Set(events.map((event) => event.sessionId))]
+  assert.ok(sessions.length > 1, "the capture really does carry more than one session")
+
+  const merged = buildTranscript(events)
+  const one = buildTranscript(events, { sessionId: sessions[0] })
+  assert.equal(merged.sessions.length, sessions.length)
+  assert.equal(one.sessions.length, 1)
+  assert.ok(one.turns.length < merged.turns.length)
+  for (const turn of one.turns) {
+    for (const item of turn.work) {
+      if (!isToolGroup(item)) assert.equal(item.sessionId, sessions[0])
+    }
+  }
 })

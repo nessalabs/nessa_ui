@@ -1,16 +1,18 @@
 /** @responsibility Emits normalized events in order, holding the small amount of state that requires. */
 
-import type { AgentEvent, AgentEventPayload } from "./events"
-import { asString } from "./json"
+import type { AgentEvent, AgentEventPayload, AgentPath } from "./events"
 import type { JsonValue } from "./json"
 
 /**
  * The bookkeeping every mapper needs, and nothing else.
  *
- * Five wires across three agents all have to do the same four things: number
- * their events, remember which session a frame belongs to, announce a session
- * once, and give a streamed chunk a block to be superseded on. Written once
- * because a second copy is a second place for the ordering to drift.
+ * Every wire has to do the same four things: number its events, remember which
+ * session a frame belongs to, announce a session once, and give a streamed
+ * chunk a block to be superseded on. Written once because a second copy is a
+ * second place for the ordering to drift.
+ *
+ * Deliberately knows nothing about any wire's field names — a caller reads its
+ * own frame and passes ids in.
  */
 export class EventSink {
   private seq: number
@@ -20,10 +22,15 @@ export class EventSink {
   primary: string | null = null
   /** Sessions already announced. The server's bus carries more than one. */
   readonly openedSessions = new Set<string>()
-  /** Messages the server said were the user's, so their text parts read as the prompt. */
-  readonly userMessages = new Set<string>()
-  /** The model in force per session, so a change is reported as one rather than restated. */
-  readonly models = new Map<string, string>()
+  /**
+   * Calls already opened, and already settled.
+   *
+   * A one-way stream publishes a call once; a bus republishes the same part at
+   * every status it passes through. Without this the row opens three or four
+   * times for one call, and a turn reports several times the tools it ran.
+   */
+  readonly openedCalls = new Set<string>()
+  readonly settledCalls = new Set<string>()
   /**
    * Which index each streamed part holds in its message.
    *
@@ -38,11 +45,19 @@ export class EventSink {
     this.seq = startSeq
   }
 
-  build(payload: AgentEventPayload, raw: JsonValue, ts: string | null): AgentEvent {
+  /**
+   * One event, numbered and stamped with the session it belongs to.
+   *
+   * `path` is where a wire that nests agents says so; most do not, and an
+   * empty path is the main conversation. Taking it as an argument is what lets
+   * a wire that *does* nest — Claude's subagents — use this rather than
+   * keeping a fourth copy of the numbering.
+   */
+  build(payload: AgentEventPayload, raw: JsonValue, ts: string | null, path: AgentPath = []): AgentEvent {
     const seq = this.seq
     this.seq += 1
     const sessionId = this.current ?? this.primary ?? "unknown"
-    return { id: `${sessionId}:${seq}`, sessionId, seq, ts, agentPath: [], payload, raw }
+    return { id: `${sessionId}:${seq}`, sessionId, seq, ts, agentPath: path, payload, raw }
   }
 
   /** A part's position in its message, assigned in order of first appearance. */
@@ -56,11 +71,4 @@ export class EventSink {
     return next
   }
 
-  /** The block a settled part occupies, so a preview can be superseded by it. */
-  blockOf(part: Record<string, JsonValue>): { messageId: string; index: number } | null {
-    const messageId = asString(part.messageID)
-    const partId = asString(part.id)
-    if (messageId === null || partId === null) return null
-    return { messageId, index: this.indexOf(messageId, partId) }
-  }
 }

@@ -8,7 +8,7 @@ import test from "node:test"
 import { ACP_MAPPING, acpMappingFor } from "./acp/mapping"
 import { AcpMapper, mapAcpStream } from "./acp/mapper"
 import { parseAcp, parseAcpLine } from "./acp/frame"
-import { ACP_PROVENANCE } from "./acp/wire"
+import { ACP_PROTOCOL_VERSION } from "./acp/wire"
 
 import { asRecord, asString } from "./json"
 import { applyDeltas, buildTranscript, previewOf } from "./transcript"
@@ -236,7 +236,122 @@ test("Claude and Codex reach approvals and streaming through this protocol", () 
   for (const provider of ["claude", "codex", "opencode"]) {
     const transport = transportOf(provider, "acp")
     assert.notEqual(transport, null, `${provider} has no acp transport`)
-    assert.equal(transport!.supports.approvals, true, provider)
+    // Streaming is captured for all three.
     assert.equal(transport!.supports.streaming, true, provider)
   }
+  // Approvals are captured for two of them. Codex's session never asked for
+  // one, so its answer is unrecorded rather than a no — the distinction the
+  // tri-state exists to keep.
+  assert.equal(transportOf("claude", "acp")?.supports.approvals, true)
+  assert.equal(transportOf("opencode", "acp")?.supports.approvals, true)
+  assert.equal(transportOf("codex", "acp")?.supports.approvals, null)
+  assert.equal(mapAcpStream(acp("acp/codex_tools")).filter((event) => event.payload.type === "permission_requested").length, 0)
+})
+
+/**
+ * A table may only promise what something has seen.
+ *
+ * ACP's table is the one most tempted into fiction: the protocol declares more
+ * than any single agent uses, and three agents use different parts of it.
+ */
+const ACP_UNEXERCISED: ReadonlyMap<string, string> = new Map([
+  ["session/load", "resuming a session; the captures all open a new one"],
+  ["session/cancel", "needs a turn interrupted by the client"],
+  ["session/set_mode", "no capture switched the agent's mode"],
+  ["session/set_model", "no capture switched model mid-session"],
+  ["session/update/user_message_chunk", "every capture's client sent the prompt itself, so none was echoed back"],
+  ["session/update/plan", "the protocol's own plan update, which opencode does not use — it sends a todowrite call instead"],
+  ["session/update/current_mode_update", "follows a set_mode nobody sent"],
+])
+
+test("every ACP row the captures never reach is acknowledged as unexercised", () => {
+  const seen = new Set<string>()
+  for (const name of ACP_NAMES) {
+    for (const result of parseAcp(acp(name))) {
+      if (!result.ok) continue
+      const frame = result.line as { method?: string; params?: { update?: { sessionUpdate?: string } } }
+      if (frame.method === undefined) continue
+      const update = frame.params?.update?.sessionUpdate
+      seen.add(update === undefined ? frame.method : `${frame.method}/${update}`)
+    }
+  }
+  const declared = Object.keys(ACP_MAPPING)
+  assert.deepEqual(
+    declared.filter((kind) => !seen.has(kind) && !ACP_UNEXERCISED.has(kind)).sort(),
+    [],
+    "a table row no fixture exercises must be listed in ACP_UNEXERCISED",
+  )
+  for (const kind of ACP_UNEXERCISED.keys()) {
+    assert.ok(!seen.has(kind), `${kind} is listed as unexercised but a fixture reaches it`)
+    assert.ok(declared.includes(kind), `${kind} is listed as unexercised but is not a row in the table`)
+  }
+})
+
+test("an answered permission ask retires, so nothing renders a prompt that is already settled", () => {
+  // The reply is a bare JSON-RPC response naming an `optionId`; only the ask's
+  // own option list says whether that id allows or refuses. Without joining the
+  // two the ask never retired and a surface showed a blocking prompt for the
+  // rest of the session.
+  for (const name of ["opencode/acp_permission", "acp/claude_tools"]) {
+    const events = mapAcpStream(acp(name))
+    const asks = events.flatMap((event) => (event.payload.type === "permission_requested" ? [event.payload] : []))
+    const decided = events.flatMap((event) => (event.payload.type === "permission_decided" ? [event.payload] : []))
+    assert.equal(asks.length, 1, name)
+    assert.equal(decided.length, 1, name)
+    assert.equal(decided[0]!.requestId, asks[0]!.requestId, name)
+    // Both captures were answered by allowing the call.
+    assert.equal(decided[0]!.decision, "allow", name)
+    assert.equal(buildTranscript(events).pendingAsks.length, 0, name)
+  }
+})
+
+test("a reply is matched by shape as well as id, because both directions number their own", () => {
+  // JSON-RPC over a bidirectional pipe has two independent id spaces, and the
+  // captures prove they collide: the agent's ask uses id 0 while the client
+  // counts from 1. Keying a permission answer on the id alone read a prompt's
+  // own reply as one — swallowing the turn's ending and leaving the real ask
+  // outstanding for ever.
+  const frames = [
+    { jsonrpc: "2.0", id: 3, method: "session/prompt", params: { sessionId: "s", prompt: [{ type: "text", text: "hi" }] } },
+    {
+      jsonrpc: "2.0",
+      id: 3,
+      method: "session/request_permission",
+      params: { sessionId: "s", toolCall: { toolCallId: "c1" }, options: [{ optionId: "once", kind: "allow_once", name: "Allow" }] },
+    },
+    { jsonrpc: "2.0", id: 3, result: { stopReason: "end_turn" } },
+  ]
+    .map((frame) => JSON.stringify(frame))
+    .join("\n")
+
+  assert.deepEqual(
+    mapAcpStream(frames).map((event) => event.payload.type),
+    ["user_message", "permission_requested", "turn_completed"],
+  )
+})
+
+test("the answer's meaning comes from the option's kind, not its id", () => {
+  // An agent names its options whatever it likes — the captures use `once`,
+  // `always` and `reject` — so only the kind says which way one goes.
+  const frames = [
+    {
+      jsonrpc: "2.0",
+      id: 7,
+      method: "session/request_permission",
+      params: {
+        sessionId: "s",
+        toolCall: { toolCallId: "c1" },
+        options: [{ optionId: "allow-looking-id", kind: "reject_once", name: "No" }],
+      },
+    },
+    { jsonrpc: "2.0", id: 7, result: { outcome: { outcome: "selected", optionId: "allow-looking-id" } } },
+  ]
+    .map((frame) => JSON.stringify(frame))
+    .join("\n")
+
+  const decided = mapAcpStream(frames).flatMap((event) =>
+    event.payload.type === "permission_decided" ? [event.payload] : [],
+  )
+  assert.equal(decided.length, 1)
+  assert.equal(decided[0]!.decision, "deny")
 })

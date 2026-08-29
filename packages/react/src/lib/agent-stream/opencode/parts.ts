@@ -256,6 +256,14 @@ export function resultOf(state: Record<string, JsonValue>): ToolResult {
   }
 }
 
+/** The block a settled part occupies, so a streamed preview can be superseded by it. */
+export function blockOf(emit: EventSink, part: Record<string, JsonValue>): { messageId: string; index: number } | null {
+  const messageId = asString(part.messageID)
+  const partId = asString(part.id)
+  if (messageId === null || partId === null) return null
+  return { messageId, index: emit.indexOf(messageId, partId) }
+}
+
 /** The session shape a transport that never describes one has to fall back to. */
 export function bareSession(sessionId: string, initIndex: number): SessionInfo {
   return {
@@ -303,25 +311,43 @@ export function toolEvents(
   const state = asRecord(part.state)
   const input = asRecord(state.input)
   const status = asString(state.status)
-  const events: AgentEvent[] = [
-    emit.build(
-      {
-        type: "tool_call_started",
-        callId,
-        name: tool,
-        kind: opencodeToolKind(tool),
-        input: state.input ?? null,
-        title: toolTitle(tool, input, asString(state.title)),
-      },
-      raw,
-      ts,
-    ),
-  ]
+  const events: AgentEvent[] = []
+  // Keyed by session as well as call: the bus multiplexes sessions onto one
+  // connection, and two of them may name a call the same thing. Without the
+  // session the second one is mistaken for a republish and vanishes.
+  const key = `${emit.current ?? "unknown"}:${callId}`
+  const settled = status !== OpencodeToolStatus.Pending && status !== OpencodeToolStatus.Running
+
+  // The row opens once, and not until the call says what it is running. On the
+  // bus the first sighting is a `pending` part whose input is `{}` and which
+  // has no title — opening on that produced rows that never said what the tool
+  // actually ran, because nothing later revises an open row.
+  const describes = settled || Object.keys(input).length > 0
+  if (describes && !emit.openedCalls.has(key)) {
+    emit.openedCalls.add(key)
+    events.push(
+      emit.build(
+        {
+          type: "tool_call_started",
+          callId,
+          name: tool,
+          kind: opencodeToolKind(tool),
+          input: state.input ?? null,
+          title: toolTitle(tool, input, asString(state.title)),
+        },
+        raw,
+        ts,
+      ),
+    )
+  }
 
   // A call still running has opened but not settled. The one-way stream
   // publishes calls already settled; the server's bus does not, and this is
   // what keeps it from reporting a result nobody produced.
-  if (status === OpencodeToolStatus.Pending || status === OpencodeToolStatus.Running) return events
+  if (!settled) return events
+  // And settles once, however many times the settled part is republished.
+  if (emit.settledCalls.has(key)) return events
+  emit.settledCalls.add(key)
 
   const metadata = asRecord(state.metadata)
 

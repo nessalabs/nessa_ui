@@ -223,6 +223,44 @@ export class CodexAppServerMapper implements AgentStreamMapper {
         if (edits.length > 0) events.push(this.emit.build({ type: "file_edits", callId: id, edits }, raw, null))
         return events
       }
+      case CodexAppServerItemType.McpToolCall:
+      case CodexAppServerItemType.WebSearch: {
+        const isSearch = type === CodexAppServerItemType.WebSearch
+        const title = isSearch ? (asString(item.query) ?? "web search") : (asString(item.tool) ?? "mcp tool")
+        if (opening) {
+          return [
+            this.emit.build(
+              {
+                type: "tool_call_started",
+                callId: id,
+                name: title,
+                kind: isSearch ? "web" : "mcp",
+                input: (isSearch ? item.query : item.arguments) ?? null,
+                title,
+              },
+              raw,
+              null,
+            ),
+          ]
+        }
+        return [
+          this.emit.build(
+            {
+              type: "tool_call_completed",
+              callId: id,
+              result: {
+                text: asString(item.result) ?? textOf(item),
+                isError: asString(item.status) === "failed",
+                structured: item.result ?? null,
+                images: [],
+              },
+            },
+            raw,
+            null,
+          ),
+        ]
+      }
+
       case CodexAppServerItemType.Todo:
         return opening ? [] : this.plan(asArray(item.items ?? item.todos), raw)
       case CodexAppServerItemType.Error:
