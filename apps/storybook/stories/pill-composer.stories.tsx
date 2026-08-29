@@ -12,6 +12,7 @@ import {
   ChatComposerAttachments,
   ChatComposerInput,
   ChatComposerAttachmentIcon,
+  FilePreview,
   ChatComposerEditor,
   ChatComposerTrigger,
   type ChatComposerContentPart,
@@ -170,31 +171,33 @@ const modelCommand: SlashItem = {
 }
 
 /** The mocked file behind a chip: skills carry a SKILL.md, plugins a manifest. */
-function chipFileMock(item: SlashItem): { name: string; body: string } {
+function chipFileMock(item: SlashItem): {
+  name: string
+  mimeType: string
+  content: string
+} {
   const slug = item.label.toLowerCase().replace(/\s+/g, "-")
   if (item.kind === "plugin") {
     return {
-      name: `${slug}/manifest.json`,
-      body: [
-        "```json",
-        JSON.stringify(
-          {
-            name: slug,
-            kind: "plugin",
-            description: item.description,
-            permissions: ["read", "search"],
-            entry: "index.ts",
-          },
-          null,
-          2,
-        ),
-        "```",
-      ].join("\n"),
+      name: "manifest.json",
+      mimeType: "application/json",
+      content: JSON.stringify(
+        {
+          name: slug,
+          kind: "plugin",
+          description: item.description,
+          permissions: ["read", "search"],
+          entry: "index.ts",
+        },
+        null,
+        2,
+      ),
     }
   }
   return {
-    name: `${slug}/SKILL.md`,
-    body: [
+    name: "SKILL.md",
+    mimeType: "text/markdown",
+    content: [
       `# ${item.label}`,
       "",
       item.description + ".",
@@ -274,7 +277,7 @@ function ChipCard({
         onClick={onPreview}
         className="self-start rounded-full border-0 bg-transparent p-0 font-sans nessa-text-2 font-medium text-(--nessa-chat-accent) outline-none hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
-        Preview {chipFileMock(item).name.split("/")[1]}
+        Preview {chipFileMock(item).name}
       </button>
     </Card>
   )
@@ -958,11 +961,15 @@ function PlaygroundExample({
     setOverlay({
       summary: file.name,
       body: (
-        <div className="max-w-full self-start rounded-2xl bg-accent px-4 py-3 text-left">
-          <MessageMarkdown className="nessa-text-2 leading-5">
-            {file.body}
-          </MessageMarkdown>
-        </div>
+        <FilePreview
+          file={{
+            src: `data:${file.mimeType};charset=utf-8,${encodeURIComponent(file.content)}`,
+            name: file.name,
+            mimeType: file.mimeType,
+            size: file.content.length,
+          }}
+          className="h-full max-h-full w-full"
+        />
       ),
     })
   }
