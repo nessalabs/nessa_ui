@@ -59,6 +59,14 @@ export interface DelegatedRun {
   readonly kind: "agent" | "workflow" | "bash" | "other"
   readonly label: string | null
   readonly description: string | null
+  /**
+   * The run's own transcript, where the provider named one.
+   *
+   * Only opencode does: it puts the child session id on the spawning call, and
+   * `opencode export <id>` reads it. Null everywhere else, which is what tells
+   * a surface whether "open this subagent" is an offer it can honour.
+   */
+  readonly transcriptId: string | null
   /** Latest progress line, rewritten per event, so it drives a live status row. */
   readonly status: string | null
   readonly lastTool: string | null

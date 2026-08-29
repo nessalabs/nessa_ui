@@ -19,6 +19,7 @@ export {
   type MapperOptions,
   type PlanStep,
   type SessionInfo,
+  type WireProvenance,
   type ToolKind,
   type ToolResult,
   type TurnStatus,
@@ -88,8 +89,10 @@ export {
  */
 export * as claude from "./claude"
 export * as codex from "./codex"
+export * as opencode from "./opencode"
 
 // The two entry points are also exported flat, because reaching for a parser by
 // name is the common case and `claude.ClaudeStreamMapper` stutters.
 export { ClaudeStreamMapper, mapClaudeStream } from "./claude/mapper"
 export { CodexStreamMapper, mapCodexStream } from "./codex/mapper"
+export { OpencodeStreamMapper, mapOpencodeStream } from "./opencode/mapper"

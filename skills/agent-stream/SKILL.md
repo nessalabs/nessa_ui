@@ -69,6 +69,12 @@ memoize on the revision counter the snapshot carries, not on object identity.
   path; each further element is the tool call that spawned the next level down.
 - **Never invent data to fill a field.** Usage counters are nullable precisely
   so a provider that reports only a total cannot claim zero input tokens.
+- **A wire is only true of a build.** Every provider records the CLI version its
+  shapes were read from; check it before trusting a field, and update it in the
+  same commit as any recapture.
+- **One provider can have several wires.** opencode streams nothing on its
+  one-way stream and a token at a time on its server bus, so "does this agent
+  stream" is a question about the transport, not the agent.
 - **Compaction removes history from the model, not from the transcript.** Keep
   drawing what was already drawn; mark the boundary instead of trimming to it.
   A compacted run is not a failed one, and one provider does not announce it at
@@ -123,6 +129,10 @@ claude -p --output-format stream-json --include-partial-messages --verbose \
 Put the prompt **before** `--allowed-tools`; the flag is variadic and swallows
 it otherwise. Design against captures, never against remembered field names —
 the wire moves, and a fixture is what tells you where it moved to.
+
+opencode's one-way stream is `opencode run --format json`; its streaming wire is
+the SSE bus at `GET /event` on `opencode serve`. Root the sandbox in a git repo
+first, or every write lands outside the project root and is auto-rejected.
 
 To capture an approval, the sandbox needs a settings file that escalates
 something, or nothing will ever ask. Run with `--input-format stream-json` and

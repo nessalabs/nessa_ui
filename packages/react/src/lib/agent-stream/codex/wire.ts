@@ -2,6 +2,21 @@
 
 import { parseJsonLine } from "../json"
 import type { JsonValue } from "../json"
+import type { WireProvenance } from "../events"
+
+/**
+ * The build these shapes were read from.
+ *
+ * Codex publishes no version on its stream, so this constant is the only
+ * record of which build the fixtures describe. `codex --version` is what a
+ * maintainer compares it against.
+ */
+export const CODEX_WIRE_PROVENANCE: WireProvenance = Object.freeze({
+  cli: "codex-cli",
+  version: "0.144.1",
+  command: "codex exec --json",
+  capturedOn: "2026-08-29",
+})
 
 /** Re-exported so one import gives a consumer this wire's whole vocabulary. */
 export type { JsonValue }

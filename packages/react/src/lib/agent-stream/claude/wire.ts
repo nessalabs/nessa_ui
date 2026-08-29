@@ -2,6 +2,21 @@
 
 import { parseJsonLine } from "../json"
 import type { JsonValue } from "../json"
+import type { WireProvenance } from "../events"
+
+/**
+ * The build these shapes were read from.
+ *
+ * Claude Code is the one of the three that stamps its own version on the
+ * stream — `system/init` carries it — so a consumer can compare what it is
+ * reading against this and know when the two have drifted apart.
+ */
+export const CLAUDE_WIRE_PROVENANCE: WireProvenance = Object.freeze({
+  cli: "Claude Code",
+  version: "2.1.251",
+  command: "claude -p --output-format stream-json --include-partial-messages --verbose",
+  capturedOn: "2026-08-29",
+})
 
 /** Re-exported so one import gives a consumer this wire's whole vocabulary. */
 export type { JsonValue }

@@ -13,6 +13,7 @@ interface MutableRun {
   kind: DelegatedRun["kind"]
   label: string | null
   description: string | null
+  transcriptId: string | null
   status: string | null
   lastTool: string | null
   done: boolean
@@ -165,6 +166,7 @@ export class TranscriptBuilder {
         kind: "other",
         label: null,
         description: null,
+        transcriptId: null,
         status: null,
         lastTool: null,
         done: false,
@@ -201,6 +203,7 @@ export class TranscriptBuilder {
       run.kind = payload.taskKind
       run.label = payload.label
       run.description = payload.description
+      run.transcriptId = payload.transcriptId
       return
     }
     if (payload.type === "task_progress") {

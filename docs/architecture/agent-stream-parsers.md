@@ -486,7 +486,81 @@ copies — copying a session's events per frame is the cost the class exists to
 avoid — so a consumer memoizes on `transcript.revision`, which changes when the
 content does. Anything still being written to (a run's own events) *is* copied.
 
-## 10. Capturing your own fixtures
+## 10. opencode, and the version every one of these is true of
+
+opencode is the third provider, and the first with two wires of its own worth
+reading. Both are captured.
+
+### `opencode run --format json`
+
+Three lines for a whole turn. A step opens, parts carry the answer, a step
+finishes — and there is **no init line at all**: no model, no working
+directory, no tool list, nothing. `SessionInfo` is therefore almost entirely
+null here, which is what those nullable fields were for.
+
+Four things this wire will mislead you about:
+
+| What it looks like | What it is |
+| --- | --- |
+| Several `step_finish` lines | A tool loop finishes a step per call. Only a `stop` reason ends the turn. |
+| A tool call `completed` | The *call* worked. A shell command that exited non-zero is still `completed`, with the failure only in `metadata.exit`. |
+| A tool call `error` | The call never ran — it threw, or a permission rule refused it. |
+| A turn with no ending | Unattended, opencode auto-rejects anything its rules ask about and the run then **stops**: no closing message, no terminator, exit 0. |
+
+Its delegations are the best of the three: the spawning call names the child's
+own session id, and `opencode export <id>` returns that conversation with its
+prompt, its tool calls, its tokens and its cost. Claude's subagent transcripts
+have to be located on disk from a path contract; Codex names threads it never
+lets you read. Only opencode hands the id over and answers to it — which is why
+`task_started` now carries `transcriptId`, null for the other two.
+
+### `opencode serve` — the bus, where it does stream
+
+The one-way stream carries no partials at all. The headless server does: its
+`GET /event` endpoint is an SSE stream, and one paragraph of prose arrived as
+**254 `message.part.delta` frames**. The same bus also names the model, reports
+the working directory and the build, and — unlike the unattended stream — holds
+a permission ask open and publishes the answer.
+
+Two things to design around. The endpoint is **server-wide**, not one session's:
+a capture taken while two sessions ran carries both, so every event has to be
+stamped with the session that produced it or a background run's work is filed
+under the conversation someone is reading. And a session is announced by
+`session.created` *without* a model — the `session.updated` that follows
+immediately is the first line that describes it, which is why the mapper opens
+a session on the update rather than on the creation.
+
+| | `run --format json` | `serve` / `acp` |
+| --- | --- | --- |
+| Streams tokens | no | **yes** |
+| Names the model | no | yes |
+| Approvals | auto-rejected, run ends | asked and answered |
+| Session scope | one | every session on the server |
+
+Capabilities come from neither: `opencode models` and `opencode agent list`
+print them, and nothing on either wire does.
+
+### Which version each of these is true of
+
+None of these shapes is a published contract, and two of the three CLIs put no
+version anywhere on the stream. Each provider therefore records the build its
+description was read from, next to the command that produces it:
+
+| Provider | Build | Command |
+| --- | --- | --- |
+| Claude Code | 2.1.251 | `claude -p --output-format stream-json --include-partial-messages --verbose` |
+| codex-cli | 0.144.1 | `codex exec --json` |
+| opencode | 1.18.25 | `opencode run --format json` |
+
+These live in code as `CLAUDE_WIRE_PROVENANCE`, `CODEX_WIRE_PROVENANCE` and
+`OPENCODE_WIRE_PROVENANCE`, so a consumer can compare what it is reading against
+what was modelled. **When a capture is retaken against a newer build, update the
+version and the date in the same commit as the fixtures.** If nothing changed,
+that is itself worth recording. Claude Code is the only one that stamps its own
+version on the wire (`system/init`), so it is the only one where the two can be
+compared automatically.
+
+## 11. Capturing your own fixtures
 
 ```bash
 claude -p --output-format stream-json --include-partial-messages --verbose \

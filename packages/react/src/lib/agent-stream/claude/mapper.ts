@@ -401,6 +401,10 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
             label: asString(line.subagent_type) ?? asString(line.workflow_name),
             description: asString(line.description) ?? "",
             prompt: asString(line.prompt),
+            // Claude names no transcript for a delegated run. A subagent's
+            // sits on disk under a path derived from the session, which
+            // `claude/store` works out; a workflow agent's is watchable only.
+            transcriptId: null,
           },
           sessionId,
           path,
