@@ -89,6 +89,11 @@
   --nessa-diff-deletion: oklch(0.55 0.19 27);
   --nessa-invalid-ring: color-mix(in oklab, var(--destructive) 20%, transparent);
   --nessa-diff-dark-addition: oklch(0.6222 0.1661 146.22);
+  /* Market direction. Deliberately outside both the categorical series ramp
+     and the diff pair: a quote's rise and fall are one semantic axis, not a
+     series slot, and a theme may want them louder than a code review's. */
+  --nessa-market-gain: oklch(0.5 0.135 148);
+  --nessa-market-loss: oklch(0.55 0.19 27);
 }
 
 .dark {
@@ -149,6 +154,8 @@
   --nessa-diff-deletion: oklch(0.7 0.19 25);
   --nessa-invalid-ring: color-mix(in oklab, var(--destructive) 40%, transparent);
   --nessa-diff-dark-addition: oklch(0.6222 0.1661 146.22);
+  --nessa-market-gain: oklch(0.8 0.19 150);
+  --nessa-market-loss: oklch(0.7 0.19 25);
 }
 
 /* Constrained UI scale. The private factor keeps nested scopes and consumer

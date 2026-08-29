@@ -52,6 +52,7 @@ type FocusComponent =
   | "dropdown-menu"
   | "pagination"
   | "page-outline"
+  | "price-chart/price-chart"
   | "table/table"
   | "table/table-toolbar"
   | "split-view/split-view-separator"
@@ -249,6 +250,18 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     state: "focus-visible",
     className: "focus-visible:outline-ring",
     count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The chart's scrub cursor covers the whole plot and its clear control sits
+  // in the corner its two scales leave, so both outlines draw inset — an
+  // outset ring would fall outside the panel that clips it.
+  {
+    component: "price-chart/price-chart",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 2,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -486,6 +499,8 @@ export const focusGeometryClasses = Object.freeze([
   { component: "radar-chart/radar-chart", className: "focus-visible:-outline-offset-2", count: 1 },
   { component: "gantt-chart/gantt-chart-grid", className: "focus-visible:ring-2", count: 1 },
   { component: "gantt-chart/gantt-chart-grid", className: "focus-visible:ring-offset-0", count: 1 },
+  { component: "price-chart/price-chart", className: "focus-visible:outline-2", count: 2 },
+  { component: "price-chart/price-chart", className: "focus-visible:-outline-offset-2", count: 2 },
   { component: "conversation-rail", className: "focus-visible:outline-2", count: 1 },
   { component: "conversation-rail", className: "focus-visible:outline-offset-2", count: 1 },
   // The page-outline rows sit inside their own scrolling region, so the

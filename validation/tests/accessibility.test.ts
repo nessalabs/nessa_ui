@@ -75,6 +75,10 @@ test("custom text tokens are enforced on their rendered surfaces, including the 
     "--nessa-diff-addition|--card|--accent@0.5",
     "--nessa-diff-deletion|--card|",
     "--nessa-diff-deletion|--card|--accent@0.5",
+    "--nessa-market-gain|--card|",
+    "--nessa-market-gain|--background|",
+    "--nessa-market-loss|--card|",
+    "--nessa-market-loss|--background|",
     "--nessa-fast-mode-active|--card|",
     "--nessa-fast-mode-active|--background|",
   ]) {
