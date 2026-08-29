@@ -851,3 +851,11 @@ export {
   type TooltipContentProps,
 } from "./components/tooltip"
 export { ScrollArea, ScrollBar } from "./components/scroll-area"
+export {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "./components/accordion"
+export { Switch } from "./components/switch"
+export { Textarea } from "./components/textarea"

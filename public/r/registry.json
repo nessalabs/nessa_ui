@@ -1848,6 +1848,64 @@
           "target": "components/ui/scroll-area.tsx"
         }
       ]
+    },
+    {
+      "name": "switch",
+      "type": "registry:ui",
+      "title": "Switch",
+      "description": "An on/off toggle for settings that take effect immediately, drawn to Checkbox's control scale: the checked track and thumb take the primary wash, motion runs on the design system's tokens, and name/value enroll the switch in the surrounding form.",
+      "dependencies": [
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/switch.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/switch.tsx"
+        }
+      ]
+    },
+    {
+      "name": "textarea",
+      "type": "registry:ui",
+      "title": "Textarea",
+      "description": "A multi-line text field that matches Input exactly — the same hairline field border, invalid and disabled states, and focus treatment — growing with its content from a four-line minimum.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/textarea.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/textarea.tsx"
+        }
+      ]
+    },
+    {
+      "name": "accordion",
+      "type": "registry:ui",
+      "title": "Accordion",
+      "description": "Vertically stacked disclosure sections, one open at a time or several at once: hairline-separated items whose trigger rows rotate a chevron and animate content height through Radix's measured size with the design system's motion tokens.",
+      "dependencies": [
+        "lucide-react",
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/accordion.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/accordion.tsx"
+        }
+      ]
     }
   ]
 }

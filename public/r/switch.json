@@ -1,0 +1,22 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "switch",
+  "title": "Switch",
+  "description": "An on/off toggle for settings that take effect immediately, drawn to Checkbox's control scale: the checked track and thumb take the primary wash, motion runs on the design system's tokens, and name/value enroll the switch in the surrounding form.",
+  "dependencies": [
+    "radix-ui"
+  ],
+  "registryDependencies": [
+    "nessalabs/nessa_ui/nessa-base",
+    "nessalabs/nessa_ui/utils"
+  ],
+  "files": [
+    {
+      "path": "packages/react/src/components/switch.tsx",
+      "content": "\"use client\"\n\nimport * as React from \"react\"\nimport { Switch as SwitchPrimitive } from \"radix-ui\"\n\nimport { cn } from \"@/lib/utils\"\n\n/**\n * An on/off toggle for a setting that takes effect immediately, drawn to\n * Checkbox's 18-pixel control scale so the two read as one family in a\n * settings list. Controlled through `checked`/`onCheckedChange` or\n * uncontrolled through `defaultChecked`; `name` and `value` enroll the\n * switch in the surrounding form like a native input. Give it an accessible\n * name through a `label htmlFor`/`id` pair, `aria-label`, or\n * `aria-labelledby`.\n */\nfunction Switch({\n  className,\n  ...props\n}: React.ComponentProps<typeof SwitchPrimitive.Root>) {\n  return (\n    <SwitchPrimitive.Root\n      data-slot=\"switch\"\n      className={cn(\n        \"inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center rounded-full border bg-transparent p-px shadow-xs outline-none transition-[border-color,background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none\",\n        // Like Checkbox, the unchecked control is identified by its border\n        // alone, so it carries a boundary-strength tone; the checked track\n        // takes the same primary wash as a checked box.\n        \"border-muted-foreground data-[state=checked]:border-primary data-[state=checked]:bg-primary/20\",\n        \"focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring\",\n        className,\n      )}\n      {...props}\n    >\n      <SwitchPrimitive.Thumb\n        data-slot=\"switch-thumb\"\n        className=\"pointer-events-none block size-3 rounded-full bg-muted-foreground transition-[translate,background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] data-[state=checked]:translate-x-4 data-[state=checked]:bg-primary motion-reduce:transition-none\"\n      />\n    </SwitchPrimitive.Root>\n  )\n}\n\nexport { Switch }\n",
+      "type": "registry:ui",
+      "target": "components/ui/switch.tsx"
+    }
+  ],
+  "type": "registry:ui"
+}

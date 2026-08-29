@@ -319,4 +319,30 @@
       scale: 0.96;
     }
   }
+
+  --animate-nessa-accordion-down: nessa-accordion-down
+    var(--nessa-motion-duration-normal) var(--nessa-motion-easing-standard);
+  --animate-nessa-accordion-up: nessa-accordion-up
+    var(--nessa-motion-duration-normal) var(--nessa-motion-easing-standard);
+
+  /* Accordion content height, from and to Radix's measured
+     --radix-accordion-content-height. The duration token collapses to 0ms
+     under reduced motion, so sections cut open and closed instantly. */
+  @keyframes nessa-accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+
+  @keyframes nessa-accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
 }

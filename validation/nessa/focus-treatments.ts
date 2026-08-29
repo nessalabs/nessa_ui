@@ -45,8 +45,11 @@ type FocusComponent =
   | "json-tree"
   | "selection-tooltip"
   | "tool-approval"
+  | "accordion"
   | "checkbox"
   | "dialog"
+  | "switch"
+  | "textarea"
   | "dropdown-menu"
   | "pagination"
   | "page-outline"
@@ -114,6 +117,26 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--destructive", opacity: 0.2 },
     dark: { token: "--destructive", opacity: 0.4 },
   },
+  // Textarea mirrors Input's field treatment exactly so single-line and
+  // multi-line entry read as one family; its ledgered exceptions retire
+  // together with Input's.
+  {
+    component: "textarea",
+    layer: "ring",
+    state: "focus-visible:valid",
+    className: "focus-visible:ring-ring/40",
+    light: { token: "--ring", opacity: 0.4 },
+    dark: { token: "--ring", opacity: 0.4 },
+  },
+  {
+    component: "textarea",
+    layer: "ring",
+    state: "focus-visible:invalid",
+    className: "aria-invalid:ring-destructive/20",
+    darkClassName: "dark:aria-invalid:ring-destructive/40",
+    light: { token: "--destructive", opacity: 0.2 },
+    dark: { token: "--destructive", opacity: 0.4 },
+  },
   // The questionnaire choice indicator is a native input styled in place; it
   // takes the standard full-strength outline treatment.
   {
@@ -140,6 +163,8 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
   { component: "badge", layer: "border", state: "focus-visible:border", className: "focus-visible:border-ring", light: { token: "--ring", opacity: 1 }, dark: { token: "--ring", opacity: 1 } },
   { component: "input", layer: "border", state: "focus-visible:border", className: "focus-visible:border-ring", light: { token: "--ring", opacity: 1 }, dark: { token: "--ring", opacity: 1 } },
   { component: "input", layer: "border", state: "aria-invalid:border", className: "aria-invalid:border-destructive", light: { token: "--destructive", opacity: 1 }, dark: { token: "--destructive", opacity: 1 } },
+  { component: "textarea", layer: "border", state: "focus-visible:border", className: "focus-visible:border-ring", light: { token: "--ring", opacity: 1 }, dark: { token: "--ring", opacity: 1 } },
+  { component: "textarea", layer: "border", state: "aria-invalid:border", className: "aria-invalid:border-destructive", light: { token: "--destructive", opacity: 1 }, dark: { token: "--destructive", opacity: 1 } },
   ...composerFocusComponents.map(({ component, count }) => ({
     component,
     layer: "outline",
@@ -338,6 +363,29 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
+  // The switch is a free-standing toggle at Checkbox's scale; it takes the
+  // standard full-strength outline with the outset offset.
+  {
+    component: "switch",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The accordion trigger is the section's only focusable surface; like the
+  // tab triggers, the rows stack flush against their hairline rules, so the
+  // standard outline draws inset.
+  {
+    component: "accordion",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
   // The box is a native input styled in place, like the questionnaire
   // choice indicator; it takes the standard full-strength outline.
   {
@@ -441,6 +489,7 @@ export const focusGeometryClasses = Object.freeze([
   { component: "button", className: "focus-visible:ring-[3px]" },
   { component: "badge", className: "focus-visible:ring-[3px]" },
   { component: "input", className: "focus-visible:ring-[3px]" },
+  { component: "textarea", className: "focus-visible:ring-[3px]" },
   { component: "questionnaire", className: "focus-visible:outline-2", count: 1 },
   { component: "questionnaire", className: "focus-visible:outline-offset-2", count: 1 },
   // The tab's outline draws inset: a horizontal strip scrolls, which clips
@@ -527,6 +576,13 @@ export const focusGeometryClasses = Object.freeze([
   { component: "table/table-toolbar", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "checkbox", className: "focus-visible:outline-2", count: 1 },
   { component: "checkbox", className: "focus-visible:outline-offset-2", count: 1 },
+  // The switch floats free like the checkbox and keeps the outset offset.
+  { component: "switch", className: "focus-visible:outline-2", count: 1 },
+  { component: "switch", className: "focus-visible:outline-offset-2", count: 1 },
+  // The accordion trigger row sits flush between its item hairlines, so its
+  // lone outline draws inset like the tab triggers.
+  { component: "accordion", className: "focus-visible:outline-2", count: 1 },
+  { component: "accordion", className: "focus-visible:-outline-offset-2", count: 1 },
   // Menu items draw inset: the content surface clips its overflow, so an
   // outset outline would land on (or past) the padding edge.
   { component: "dropdown-menu", className: "focus-visible:outline-2", count: 4 },
