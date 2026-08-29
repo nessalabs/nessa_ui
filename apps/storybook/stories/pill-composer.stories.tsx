@@ -810,12 +810,10 @@ function DemoBubble({
           ) : null}
       {message.replyTo ? <ChatMessageQuote>{message.replyTo}</ChatMessageQuote> : null}
       {message.quotes?.map((quote, index) => (
-        <span key={index} className="flex flex-col items-inherit gap-0.5">
+        <span key={index} className="flex max-w-full flex-col items-inherit gap-0.5">
           <ChatMessageQuote>{quote.text}</ChatMessageQuote>
           {quote.comment ? (
-            <span className="px-1 font-sans nessa-text-2 italic text-muted-foreground">
-              {quote.comment}
-            </span>
+            <ChatBubble className="mb-1">{quote.comment}</ChatBubble>
           ) : null}
         </span>
       ))}
@@ -999,6 +997,35 @@ function attachmentSummary(attachments: DemoAttachment[]) {
     .join(", ")
 }
 
+// A pile of pending annotations in every shape — one-liners, paragraphs,
+// commented and bare — for exercising the pending row and the list view.
+const seededAnnotations: PendingQuote[] = [
+  {
+    text: "Gather the relevant context from the current chat.",
+    comment: "This should spell out how much history counts as relevant.",
+  },
+  { text: "Apply the checklist this skill carries." },
+  {
+    text: "Report the result back into the thread. The report should stay short enough to read in the transcript, with the full detail behind a link, so the conversation keeps moving while the evidence stays reachable for whoever wants to dig in later.",
+    comment:
+      "Way too long for one step — split the summary rule and the linking rule into separate steps, and give each a concrete length budget so agents stop guessing.",
+  },
+  { text: "Invoke with /skill-creator from any conversation.", comment: "Mention the trigger menu too." },
+  {
+    text: "Draft a reusable skill from this conversation.",
+  },
+  {
+    text: "The checklist this skill carries should include accessibility, performance, and error handling, each with at least one concrete check the reviewer can run without leaving the editor.",
+    comment: "a11y first.",
+  },
+  { text: "When to use" },
+  {
+    text: "Steps",
+    comment:
+      "The whole Steps section reads as written for humans; add a machine-readable variant so the runner can verify each step actually happened.",
+  },
+]
+
 /**
  * One pending quote in the full-list view, styled as a message: the lifted
  * passage as a received-style bubble, the comment beneath it, a remove
@@ -1014,12 +1041,16 @@ function QuoteRow({
   return (
     <div className="flex items-start gap-2">
       <ChatMessage tone="received" className="max-w-full flex-1">
-        <ChatBubble>{quote.text}</ChatBubble>
         {quote.comment ? (
-          <span className="px-1 pt-0.5 font-sans nessa-text-2 italic text-muted-foreground">
-            {quote.comment}
-          </span>
-        ) : null}
+          // A commented annotation reads as a reply: the lifted passage as
+          // the quote chip, the comment as the bubble beneath it.
+          <>
+            <ChatMessageQuote>{quote.text}</ChatMessageQuote>
+            <ChatBubble>{quote.comment}</ChatBubble>
+          </>
+        ) : (
+          <ChatBubble>{quote.text}</ChatBubble>
+        )}
       </ChatMessage>
       <button
         type="button"
@@ -1044,9 +1075,11 @@ function QuoteRow({
 function PlaygroundExample({
   replyDelay = 900,
   initialTabId = "chat-1",
+  initialQuotes = [],
 }: {
   replyDelay?: number
   initialTabId?: string
+  initialQuotes?: PendingQuote[]
 }) {
   const [message, setMessage] = React.useState("")
   const [tabs, setTabs] = React.useState([
@@ -1074,7 +1107,7 @@ function PlaygroundExample({
   const [modelCardOpen, setModelCardOpen] = React.useState(false)
   // Passages lifted out of previewed documents — with any comments made on
   // them — attached to the next send.
-  const [quotes, setQuotes] = React.useState<PendingQuote[]>([])
+  const [quotes, setQuotes] = React.useState<PendingQuote[]>(initialQuotes)
   // The full-list view of pending quotes, rendered live so removals and
   // expands reflect immediately.
   const [quotesOpen, setQuotesOpen] = React.useState(false)
@@ -1374,7 +1407,11 @@ function PlaygroundExample({
                   />
                 ) : null}
               </span>
-            ) : undefined,
+            ) : (
+              // Every conversation is an agent: each chat tab carries its
+              // own watercolor avatar, seeded by the conversation id.
+              <RandomAvatar seed={tab.id} className="size-4" />
+            ),
             loading: sub ? false : generatingTabId === tab.id,
           }
         })}
@@ -2478,6 +2515,47 @@ export const Subagents: Story = {
         )
       expect(running).toHaveLength(0)
     }, { timeout: 4000 })
+  },
+}
+
+export const Annotations: Story = {
+  tags: ["reduced-motion"],
+  parameters: storyDocumentation(
+    "The pending-annotation surfaces under load: the playground opens on the Repo audit conversation with eight selections already lifted from documents — one-liners, full paragraphs, some carrying comments of very different lengths, some bare. The row above the pill stays one truncated pill plus '+ 7 others'; opening it shows every selection as a message bubble with its comment beneath, scrolling within the transcript area, each removable, with Back to chat underneath. Sending delivers the whole set on one message.",
+  ),
+  render: () => (
+    <PlaygroundExample
+      initialTabId={auditTabId}
+      initialQuotes={seededAnnotations}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
+    const canvas = within(canvasElement)
+    // The row compresses the whole set into one pill plus a count.
+    const more = await canvas.findByRole("button", { name: "+ 7 others" })
+    await userEvent.click(more)
+    // Every annotation reads as a bubble; comments sit beneath their quotes.
+    await expect(
+      canvas.getByText(/Way too long for one step/),
+    ).toBeInTheDocument()
+    await expect(
+      canvas.getByText(/machine-readable variant/),
+    ).toBeInTheDocument()
+    await expect(
+      canvas.getAllByRole("button", { name: "Discard quoted selection" }),
+    ).toHaveLength(8)
+    // Removing one keeps the list live.
+    await userEvent.click(
+      canvas.getAllByRole("button", { name: "Discard quoted selection" })[1]!,
+    )
+    await expect(
+      canvas.getAllByRole("button", { name: "Discard quoted selection" }),
+    ).toHaveLength(7)
+    await userEvent.click(canvas.getByRole("button", { name: "Back to chat" }))
+    await expect(
+      canvas.getByRole("button", { name: "+ 6 others" }),
+    ).toBeInTheDocument()
   },
 }
 
