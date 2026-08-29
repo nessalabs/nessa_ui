@@ -9,6 +9,7 @@ import {
   OpencodeAcpMapper,
   OpencodeRunMapper,
   OpencodeServerMapper,
+  AGENT_TRANSPORTS,
   claude,
   codex,
   opencode,
@@ -1867,89 +1868,175 @@ export const Delegation: Story = {
 const STRUCTURE = `classDiagram
     direction LR
 
-    class WireEvent {
+    class ClaudeWire {
         <<claude/wire.ts>>
-        +system
-        +stream_event
-        +assistant / user
-        +result
-        +control_request
-        parseWireLine(line) WireParseResult
+        +ClaudeWireType
+        +CLAUDE_WIRE_PROVENANCE
+        parseWireLine(line)
+    }
+    class CodexWire {
+        <<codex/wire.ts>>
+        +CodexWireType
+        +CODEX_WIRE_PROVENANCE
+        parseCodexLine(line)
+    }
+    class OpencodeRunWire {
+        <<opencode/run/wire.ts>>
+        +OpencodeRunType
+        +OPENCODE_RUN_PROVENANCE
+        parseOpencodeLine(line)
+    }
+    class OpencodeServerWire {
+        <<opencode/server/wire.ts>>
+        +OpencodeServerEventType
+        +apiVersion 1.0.0
+        parseOpencodeSseLine(frame)
+    }
+    class OpencodeAcpWire {
+        <<opencode/acp/wire.ts>>
+        +OpencodeAcpMethod
+        +protocolVersion 1
+        parseOpencodeAcpLine(frame)
     }
 
-    class ClaudeStreamMapper {
-        <<claude/mapper.ts>>
-        -currentMessageId
-        -committedBlocks Map
-        -pathByCall Map
-        -planSteps
-        -seq
+    class OpencodeParts {
+        <<opencode/parts.ts — shared by run + serve>>
+        +OpencodePartType
+        +OpencodeToolName
+        +OpencodeEmitter
+        resultOf(state) ToolResult
+    }
+
+    class Mappers {
+        <<one per transport — the only stateful layer>>
+        ClaudeStreamMapper
+        CodexStreamMapper
+        OpencodeRunMapper
+        OpencodeServerMapper
+        OpencodeAcpMapper
         +push(line) AgentEvent[]
     }
 
+    class MappingTables {
+        <<data, not code>>
+        CLAUDE_EVENT_MAPPING
+        CODEX_EVENT_MAPPING
+        OPENCODE_RUN_MAPPING
+        OPENCODE_SERVER_MAPPING
+        OPENCODE_ACP_MAPPING
+    }
+
     class AgentEvent {
-        <<events.ts — shared>>
+        <<events.ts — shared contract>>
         +id
         +sessionId
         +seq
+        +ts
         +agentPath string[]
         +payload AgentEventPayload
         +raw
     }
-
     class AgentEventPayload {
-        <<27 variants — shared>>
+        <<28 variants>>
         +assistant_text
-        +tool_call_started
         +delta
-        +task_progress
-        +workflow_progress
+        +tool_call_started
+        +tool_call_completed
         +plan_updated
+        +task_started
+        +permission_requested
+        +context_compacted
         +unknown
+    }
+
+    class TransportDescriptor {
+        <<transports.ts>>
+        +id
+        +provenance WireProvenance
+        +supports TransportSupport
+    }
+    class TransportSupport {
+        <<true | false | null>>
+        +streaming
+        +capabilities
+        +approvals
+        +steering
+        +namesModel
+        +multiSession
+        +sessionControl
+        +contextWindow
     }
 
     class TranscriptBuilder {
         <<builder.ts — shared>>
-        -closedTurns
-        -runs Map
         +push(events)
         +snapshot(live) Transcript
     }
-
     class Transcript {
         +turns Turn[]
         +runs DelegatedRun[]
-        +resultByCallId Map
         +plan PlanStep[]
-        +pendingAsks
     }
 
-    class SessionStore {
-        <<claude/store.ts>>
-        +subagentTranscriptPath()
-        +workflowAgentTranscriptPath()
-        +collectTranscriptRefs() TranscriptRef[]
+    class Stores {
+        <<a delegated run's own transcript>>
+        claude/store.ts — derived from a path
+        opencode/store.ts — named by the wire
+    }
+    class Capabilities {
+        <<what a picker needs>>
+        claude/capabilities.ts — from init
+        codex/capabilities.ts — from app-server
+        opencode/capabilities.ts — from CLI listings
     }
 
-    class CodexMapper {
-        <<codex/mapper.ts>>
-        +push(line) AgentEvent[]
-    }
-
-    class AcpMapper {
-        <<acp/ — not built>>
-        +push(notification) AgentEvent[]
-    }
-
-    WireEvent --> ClaudeStreamMapper : decoded, no state
-    ClaudeStreamMapper --> AgentEvent : emits
+    ClaudeWire --> Mappers
+    CodexWire --> Mappers
+    OpencodeRunWire --> Mappers
+    OpencodeServerWire --> Mappers
+    OpencodeAcpWire --> Mappers
+    OpencodeRunWire ..> OpencodeParts : same payload
+    OpencodeServerWire ..> OpencodeParts : same payload
+    MappingTables ..> Mappers : declares what each may emit
+    Mappers --> AgentEvent : emits
     AgentEvent *-- AgentEventPayload
     AgentEvent --> TranscriptBuilder : appended
     TranscriptBuilder --> Transcript : snapshot per frame
-    SessionStore ..> AgentEvent : keys read off task_started
-    SessionStore ..> ClaudeStreamMapper : disk transcripts reuse it
-    CodexMapper --> AgentEvent : same contract
-    AcpMapper ..> AgentEvent : same contract
+    TransportDescriptor *-- TransportSupport
+    TransportDescriptor ..> Mappers : which one to read with
+    Stores ..> AgentEvent : same events, read from a saved session
+    Capabilities ..> TransportDescriptor : answered off-stream
+`
+
+/**
+ * The exchange only an interactive transport has.
+ *
+ * Three of the five wires are one-way: bytes arrive and a surface renders
+ * them. ACP is a conversation, and drawing it beside the one-way flow is the
+ * clearest way to show why "does this agent support approvals" is a question
+ * about the transport rather than the agent.
+ */
+const DUPLEX = `sequenceDiagram
+    autonumber
+    participant UI as Surface
+    participant Map as OpencodeAcpMapper
+    participant Agent as opencode acp
+
+    UI->>Agent: session/prompt with the prompt text
+    Note over Map: the request itself is mapped —<br/>the only opencode wire that carries<br/>what was asked
+    Agent--)Map: session/update agent_thought_chunk
+    Map--)UI: delta, streamed reasoning
+    Agent--)Map: session/update tool_call (pending)
+    Map--)UI: tool_call_started, kind from the protocol
+
+    Agent->>UI: session/request_permission
+    Note over Agent,UI: the tool is blocked until answered;<br/>the options are the agent's, not the surface's
+    UI->>Agent: outcome selected allow_once
+    Agent--)Map: tool_call_update completed
+    Map--)UI: tool_call_completed plus file_edits
+
+    Agent->>UI: session/prompt reply — stopReason, usage
+    Map--)UI: turn_completed
 `
 
 /**
@@ -2040,9 +2127,76 @@ export const Providers: Story = {
   },
 }
 
+/**
+ * The capability table, rendered from the library rather than described.
+ *
+ * The point of moving this into `transports.ts` was that a surface should read
+ * what a wire can do instead of knowing it; a story that hardcoded the same
+ * grid would be the drift this exists to prevent.
+ */
+function TransportMatrix() {
+  const features = [
+    ["streams tokens", "streaming"],
+    ["names the model", "namesModel"],
+    ["session capabilities", "capabilities"],
+    ["approvals", "approvals"],
+    ["steering", "steering"],
+    ["structured file edits", "fileEdits"],
+    ["multi-session", "multiSession"],
+    ["client opens sessions", "sessionControl"],
+    ["context window size", "contextWindow"],
+  ] as const
+
+  const columns = AGENT_TRANSPORTS.flatMap((provider) =>
+    provider.transports.map((transport) => ({ provider, transport })),
+  )
+
+  return (
+    <div className="border-border overflow-x-auto rounded-xl border">
+      <table className="w-full border-collapse text-left nessa-text-2">
+        <thead>
+          <tr className="border-border border-b">
+            <th className="text-muted-foreground p-2 font-medium">Transport</th>
+            {columns.map(({ provider, transport }) => (
+              <th key={`${provider.id}/${transport.id}`} className="p-2 font-medium whitespace-nowrap">
+                <span className="text-muted-foreground">{provider.label}</span> {transport.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="border-border border-b">
+            <td className="text-muted-foreground p-2">read from build</td>
+            {columns.map(({ provider, transport }) => (
+              <td key={`${provider.id}/${transport.id}`} className="text-muted-foreground p-2 whitespace-nowrap">
+                {transport.provenance.version}
+              </td>
+            ))}
+          </tr>
+          {features.map(([label, key]) => (
+            <tr key={key} className="border-border border-b last:border-0">
+              <td className="text-muted-foreground p-2">{label}</td>
+              {columns.map(({ provider, transport }) => {
+                const value = transport.supports[key]
+                return (
+                  <td key={`${provider.id}/${transport.id}`} className="p-2">
+                    {/* A dash is deliberately not a no: it says nobody has
+                        captured this transport for this yet. */}
+                    {value === true ? "yes" : value === false ? <span className="text-muted-foreground">no</span> : "—"}
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export const Architecture: Story = {
   parameters: storyDocumentation(
-    "How the parser is put together, and where a second harness plugs in. The class diagram shows which type each layer owns: the wire layer is stateless and disposable, the mapper holds the only state, and everything to the right of AgentEvent is harness-agnostic — so Codex or an ACP agent is a new wire type and a new mapper, and no component changes. The sequence shows one line's journey, including the two rules that are easy to get wrong: a delta is a preview the committed event supersedes, and the fold is appended to rather than recomputed.",
+    "How the parser is put together, now that three agents and five wires have been read. Each transport owns its own envelope types, its own mapping table and its own mapper — they are separate protocols with separate versions, and opencode alone speaks three. Only what is genuinely identical is shared: opencode's `run` and `serve` carry the same message parts, so those are read once. Everything to the right of AgentEvent is agent-agnostic, which is what makes a fourth provider a new column here and no change to any component. The three diagrams are the structure, one line's journey on a one-way wire, and the exchange only an interactive one has.",
   ),
   args: {},
   render: () => (
@@ -2050,8 +2204,8 @@ export const Architecture: Story = {
       <section className="flex flex-col gap-2">
         <h3 className="text-sm font-medium">Layers, and what each one owns</h3>
         <p className="text-muted-foreground text-sm">
-          One direction of dependency. A harness that speaks a different wire supplies the two boxes on the left; the contract and
-          everything past it is shared.
+          One direction of dependency, and one column per wire. A new transport supplies its own envelope types, its own mapping
+          table and its own mapper; everything from AgentEvent rightwards is shared and does not move.
         </p>
         <MermaidDiagram chart={STRUCTURE} className="w-full" />
       </section>
@@ -2062,6 +2216,25 @@ export const Architecture: Story = {
           Including the lines that produce no event at all, which is most of what makes the counts in the raw pane not match.
         </p>
         <MermaidDiagram chart={FLOW} className="w-full" />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h3 className="text-sm font-medium">And the exchange only an interactive transport has</h3>
+        <p className="text-muted-foreground text-sm">
+          Four of the five wires are one-way. ACP is a conversation: the agent asks the client for permission and blocks until
+          answered, which is why &ldquo;does this agent support approvals&rdquo; is a question about the transport rather than the
+          agent.
+        </p>
+        <MermaidDiagram chart={DUPLEX} className="w-full" />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h3 className="text-sm font-medium">What each transport was observed to report</h3>
+        <p className="text-muted-foreground text-sm">
+          Read from the library&rsquo;s own table rather than restated here, so this cannot drift from what the parsers know. A
+          dash means nobody has captured that transport for it yet — which is not the same answer as no.
+        </p>
+        <TransportMatrix />
       </section>
     </div>
   ),

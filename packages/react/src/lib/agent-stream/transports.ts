@@ -222,7 +222,7 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
       }),
       Object.freeze({
         id: "serve",
-        label: "serve / acp",
+        label: "serve",
         command: "opencode serve  →  GET /event",
         interactive: true,
         provenance: OPENCODE_SERVE,
