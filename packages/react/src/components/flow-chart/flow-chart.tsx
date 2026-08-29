@@ -30,18 +30,28 @@ export interface FlowChartNode {
 }
 
 /**
- * Pastel tints node bars cycle through by default — dilute enough that
- * overlapping ribbons stay readable, distinct enough that each origin's
- * flows read as one family: peach, aqua, lilac, butter, rose, sky, sage.
+ * The design system's categorical chart ramp, in slot order: blue, orange,
+ * aqua, sand, rose, moss, violet, sky. Node bars take a slot in input order and a
+ * slot always means the same entity, so a slice arriving or overtaking
+ * another never repaints the ones already on screen.
+ *
+ * The ramp has two steps per slot, and a component takes the one its mark
+ * calls for: a ribbon is a large translucent area, so it takes the pale fill step. Both are tokens, so each theme carries
+ * its own pair — a pale tint on the light surface, a deep one on the dark.
+ * The slot ORDER is the colour-vision-deficiency safety mechanism:
+ * neighbouring slots are the pairs a reader compares, and this order is the
+ * one that clears the separation gates in both themes. Reordering it, or
+ * generating a ninth hue, breaks that guarantee.
  */
 export const flowChartPalette: readonly string[] = Object.freeze([
-  "oklch(0.87 0.07 45)",
-  "oklch(0.86 0.07 185)",
-  "oklch(0.84 0.08 310)",
-  "oklch(0.89 0.08 100)",
-  "oklch(0.85 0.07 5)",
-  "oklch(0.85 0.06 235)",
-  "oklch(0.87 0.07 150)",
+  "var(--nessa-chart-series-1)",
+  "var(--nessa-chart-series-2)",
+  "var(--nessa-chart-series-3)",
+  "var(--nessa-chart-series-4)",
+  "var(--nessa-chart-series-5)",
+  "var(--nessa-chart-series-6)",
+  "var(--nessa-chart-series-7)",
+  "var(--nessa-chart-series-8)",
 ])
 
 /** A weighted flow between two nodes. */
@@ -198,9 +208,13 @@ const RIBBON_CLASSES = cn(
   "transition-[opacity,d] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
   "hover:opacity-35",
   "data-[emphasis=active]:opacity-55 data-[emphasis=dim]:opacity-[0.06] data-[emphasis=dim]:hover:opacity-25",
-  // Tinted ribbons run a stronger ramp: the dilute pigments read paler
-  // than the gray wash at equal opacity.
-  "data-[tinted=true]:opacity-50 data-[tinted=true]:hover:opacity-75",
+  // Tinted ribbons run their own ramp, well above the neutral wash: a hue has
+  // to be identifiable to be worth having, where the gray only has to suggest
+  // a path. The resting alpha is the tightest of the four numbers — a Sankey
+  // stacks many ribbons over each other, so too high and an overlap reads as
+  // one blot, while too low disappears on the dark surface, where alpha over
+  // near-black loses far more than the same alpha over white.
+  "data-[tinted=true]:opacity-45 data-[tinted=true]:hover:opacity-70",
   "data-[tinted=true]:data-[emphasis=active]:opacity-90 data-[tinted=true]:data-[emphasis=dim]:opacity-15 data-[tinted=true]:data-[emphasis=dim]:hover:opacity-40",
   "focus-visible:stroke-ring focus-visible:stroke-2",
 )
@@ -209,7 +223,9 @@ const BAR_CLASSES = cn(
   "fill-[var(--nessa-flow-chart-color,var(--muted-foreground))] opacity-45",
   "transition-[opacity,x,y,width,height] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
   "data-[emphasis=active]:fill-[var(--nessa-flow-chart-color,var(--foreground))] data-[emphasis=active]:opacity-100 data-[emphasis=dim]:opacity-30",
-  "data-[tinted=true]:opacity-95 data-[tinted=true]:data-[emphasis=active]:opacity-100 data-[tinted=true]:data-[emphasis=dim]:opacity-40",
+  // The bars are small, solid, and never overlap, so they carry the pigment
+  // at close to full strength — they are where the tint is read from.
+  "data-[tinted=true]:opacity-90 data-[tinted=true]:data-[emphasis=active]:opacity-100 data-[tinted=true]:data-[emphasis=dim]:opacity-35",
 )
 
 const LABEL_CLASSES = cn(
@@ -339,19 +355,18 @@ function FlowChart({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [issuesKey])
 
-  // Nodes cycle through the palette in input order; a node's own color
-  // always wins.
+  // A node takes the slot at its own input position, and an explicit colour
+  // occupies that slot rather than skipping it: a counter that advanced only
+  // on un-coloured nodes would re-slot — and repaint — every node after any
+  // one of them gained a colour.
   const colorOf = React.useMemo(() => {
     const colors = new Map<string, string>()
-    let slot = 0
-    for (const node of uniqueNodes) {
-      if (node.color) {
-        colors.set(node.id, node.color)
-      } else if (palette && palette.length > 0) {
-        colors.set(node.id, palette[slot % palette.length])
-        slot += 1
+    uniqueNodes.forEach((node, index) => {
+      if (node.color) colors.set(node.id, node.color)
+      else if (palette && palette.length > 0) {
+        colors.set(node.id, palette[index % palette.length])
       }
-    }
+    })
     return colors
   }, [uniqueNodes, palette])
 
@@ -539,17 +554,25 @@ function FlowChart({
   return (
     <div
       data-slot="flow-chart"
+      // The host names the chart through aria-label, which a role-less
+      // generic element may not carry. "group" permits the name and, unlike
+      // "img", leaves the focusable ribbons inside reachable.
+      role="group"
       className={cn(
         "relative flex h-full min-h-0 w-full min-w-0 font-sans text-foreground",
         className,
       )}
+      {...props}
+      // Spread first, then compose: a host that passes its own onKeyDown
+      // would otherwise replace this one and silently lose Escape-to-clear.
       onKeyDown={(event) => {
+        props.onKeyDown?.(event)
+        if (event.defaultPrevented) return
         if (event.key === "Escape" && selection.length > 0) {
           event.stopPropagation()
           applySelection([])
         }
       }}
-      {...props}
     >
       <div
         ref={plotRef}
