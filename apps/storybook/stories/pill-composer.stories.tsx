@@ -734,6 +734,7 @@ function PlaygroundExample({
   const [menuTargetId, setMenuTargetId] = React.useState<number | null>(null)
   const attachmentCounters = React.useRef<Record<DemoAttachmentKind, number>>({ photo: 0, file: 0, folder: 0, skill: 0, plugin: 0 })
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
+  const logRef = React.useRef<HTMLDivElement>(null)
   const [frameElement, setFrameElement] = React.useState<HTMLDivElement | null>(
     null,
   )
@@ -795,6 +796,13 @@ function PlaygroundExample({
   }
 
   const lastUserId = [...messages].reverse().find((entry) => entry.role === "user")?.id
+
+  // An overflowing transcript keeps its newest message in view: switching
+  // tabs jumps to the end and new or streaming messages follow it.
+  React.useEffect(() => {
+    const log = logRef.current
+    if (log) log.scrollTop = log.scrollHeight
+  }, [activeTabId, messages])
 
   // The subagent whose conversation is on screen, when a sub: tab is active.
   const activeSubagent = activeTabId.startsWith("sub:")
@@ -920,18 +928,38 @@ function PlaygroundExample({
           return {
             ...tab,
             icon: sub ? (
-              <RandomAvatar
-                seed={sub.id}
-                busy={sub.status === "running"}
-                className="size-4"
-              />
+              // On the tab you are already inside, hovering swaps the
+              // avatar for a back glyph: clicking the active subagent tab
+              // returns to the conversation that spawned it (handled in
+              // onValueChange, since re-selecting it is otherwise a no-op).
+              <span className="relative flex size-4 items-center justify-center">
+                <RandomAvatar
+                  seed={sub.id}
+                  busy={sub.status === "running"}
+                  className={cn(
+                    "size-4",
+                    tab.id === activeTabId &&
+                      "[[data-slot=chat-tab]:hover_&]:opacity-0",
+                  )}
+                />
+                {tab.id === activeTabId ? (
+                  <ChevronLeft
+                    aria-hidden="true"
+                    className="absolute inset-0 m-auto hidden size-3.5 text-foreground [[data-slot=chat-tab]:hover_&]:block"
+                  />
+                ) : null}
+              </span>
             ) : undefined,
             loading: sub ? false : generatingTabId === tab.id,
           }
         })}
         value={activeTabId}
         onValueChange={(id) => {
-          setActiveTabId(id)
+          // Re-selecting the subagent tab you are inside goes back to the
+          // conversation that spawned it — the hover back glyph's action.
+          const target =
+            id === activeTabId && id.startsWith("sub:") ? auditTabId : id
+          setActiveTabId(target)
           setReplyTarget(null)
           setMenuTargetId(null)
           setViewerAttachments(null)
@@ -978,21 +1006,20 @@ function PlaygroundExample({
         className="flex min-h-0 flex-1 flex-col"
       >
       <div
+        ref={logRef}
         aria-label="Conversation"
         role="log"
-        className="flex min-h-0 flex-1 flex-col justify-end gap-2 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
+        {/* Bottom-anchors a short transcript without justify-end, which
+            would trap overflowing messages above an unscrollable top. */}
+        <div aria-hidden="true" className="mt-auto shrink-0" />
         {activeSubagent ? (
-          // The provenance line is itself the way back: one tap returns to
-          // the conversation this subagent was spawned from.
-          <button
-            type="button"
-            onClick={() => setActiveTabId(auditTabId)}
-            className="mx-auto inline-flex items-center gap-1 rounded-full border-0 bg-transparent px-2.5 py-1 font-sans nessa-text-1 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          >
-            <ChevronLeft aria-hidden="true" className="size-3" />
+          // A plain provenance caption — the way back lives on the tab:
+          // hovering the active subagent tab reveals the back glyph.
+          <p className="m-0 self-center px-2.5 py-1 text-center font-sans nessa-text-1 text-muted-foreground">
             Subagent · {activeSubagent.task}
-          </button>
+          </p>
         ) : null}
         {messages.map((entry) => (
           <React.Fragment key={entry.id}>
@@ -1857,7 +1884,7 @@ export const Playground: Story = {
 export const Subagents: Story = {
   tags: ["reduced-motion"],
   parameters: storyDocumentation(
-    "The playground opened on the seeded Repo audit tab, where an agent turn split its work across two subagents. Each subagent renders as a drill-in chip under the spawning bubble — watercolor avatar, name, and status, the avatar animating while it runs — and clicking one opens that subagent's own conversation as a closeable tab whose glyph is the same animating avatar, so no busy dot is needed. Inside, the provenance line above the transcript ('‹ Subagent · task') is itself the way back to the parent conversation, the composer retargets to the subagent, and every chat capability — tapbacks, replies, dictation — works unchanged.",
+    "The playground opened on the seeded Repo audit tab, where an agent turn split its work across two subagents. Each subagent renders as a drill-in chip under the spawning bubble — watercolor avatar, name, and status, the avatar animating while it runs — and clicking one opens that subagent's own conversation as a closeable tab whose glyph is the same animating avatar, so no busy dot is needed. Inside, hovering the active subagent tab swaps its avatar for a back glyph, and clicking it returns to the parent conversation; the caption above the transcript names the subagent's task, the composer retargets to the subagent, and every chat capability — tapbacks, replies, dictation — works unchanged.",
   ),
   render: () => <PlaygroundExample initialTabId={auditTabId} />,
   play: async ({ canvasElement }) => {
@@ -1885,11 +1912,13 @@ export const Subagents: Story = {
     await expect(
       canvas.getByRole("textbox", { name: "Message" }),
     ).toHaveAttribute("placeholder", "Message Reviewer…")
-    // The provenance line above the transcript is the way back.
-    const back = canvas.getByRole("button", {
-      name: /Subagent · Review the transcript diff/,
-    })
-    await userEvent.click(back)
+    // The provenance caption names the task; the way back is the tab
+    // itself — re-selecting the subagent tab you are inside (the hover
+    // back glyph's action) returns to the spawning conversation.
+    await expect(
+      canvas.getByText(/Subagent · Review the transcript diff/),
+    ).toBeInTheDocument()
+    await userEvent.click(reviewerTab)
     await expect(
       canvas.getByText(/Explorer is back — nine call sites/),
     ).toBeInTheDocument()
