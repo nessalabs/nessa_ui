@@ -1000,8 +1000,9 @@ function attachmentSummary(attachments: DemoAttachment[]) {
 }
 
 /**
- * One pending quote in the full-list view: collapsed to a single line, and
- * togglable — tap to unfold the whole passage, tap again to fold it back.
+ * One pending quote in the full-list view, styled as a message: the lifted
+ * passage as a received-style bubble, the comment beneath it, a remove
+ * control beside.
  */
 function QuoteRow({
   quote,
@@ -1010,37 +1011,21 @@ function QuoteRow({
   quote: PendingQuote
   onRemove: () => void
 }) {
-  const [expanded, setExpanded] = React.useState(false)
   return (
     <div className="flex items-start gap-2">
-      <button
-        type="button"
-        aria-expanded={expanded}
-        title={expanded ? "Collapse" : "Show the whole passage"}
-        onClick={() => setExpanded((current) => !current)}
-        className="flex min-w-0 flex-1 cursor-pointer flex-col gap-0.5 rounded-2xl border-0 bg-transparent p-0 text-start font-sans outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-      >
-        <ChatMessageQuote
-          className={cn("m-0 w-full", expanded && "whitespace-normal")}
-        >
-          {quote.text}
-        </ChatMessageQuote>
+      <ChatMessage tone="received" className="max-w-full flex-1">
+        <ChatBubble>{quote.text}</ChatBubble>
         {quote.comment ? (
-          <span
-            className={cn(
-              "max-w-full px-1 font-sans nessa-text-2 italic text-muted-foreground",
-              expanded ? "whitespace-normal" : "truncate",
-            )}
-          >
+          <span className="px-1 pt-0.5 font-sans nessa-text-2 italic text-muted-foreground">
             {quote.comment}
           </span>
         ) : null}
-      </button>
+      </ChatMessage>
       <button
         type="button"
         aria-label="Discard quoted selection"
         onClick={onRemove}
-        className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3"
+        className="mt-1.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3"
       >
         <X aria-hidden="true" />
       </button>
@@ -1558,13 +1543,10 @@ function PlaygroundExample({
         </ChatAttachmentViewer>
       ) : null}
       {quotesOpen ? (
-        <ChatAttachmentViewer
-          summary={`${quotes.length} quoted ${
-            quotes.length === 1 ? "selection" : "selections"
-          }`}
-          onClose={() => setQuotesOpen(false)}
-        >
-          <div className="flex w-full flex-col gap-2 text-left">
+        // The pending selections read as messages over the transcript; the
+        // way back is spelled out where the summary line used to be.
+        <div className="absolute inset-0 z-10 flex flex-col bg-background">
+          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto py-2 text-left [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {quotes.map((entry, at) => (
               <QuoteRow
                 key={at}
@@ -1577,7 +1559,14 @@ function PlaygroundExample({
               />
             ))}
           </div>
-        </ChatAttachmentViewer>
+          <button
+            type="button"
+            onClick={() => setQuotesOpen(false)}
+            className="mx-auto shrink-0 cursor-pointer rounded-full border-0 bg-transparent px-3 py-1.5 font-sans nessa-text-2 font-medium text-(--nessa-chat-accent) outline-none hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            Back to chat
+          </button>
+        </div>
       ) : null}
       </div>
       {modelCardOpen ? (
