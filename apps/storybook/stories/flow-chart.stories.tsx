@@ -88,7 +88,7 @@ export const MonthlyBudget: Story = {
       name: "Salary to Housing, $1,450",
     })
     await waitFor(() =>
-      expect(parseFloat(getComputedStyle(ribbon).opacity)).toBeCloseTo(0.5, 1),
+      expect(parseFloat(getComputedStyle(ribbon).opacity)).toBeCloseTo(0.45, 2),
     )
 
     await userEvent.click(ribbon)
@@ -116,7 +116,7 @@ export const MonthlyBudget: Story = {
     await userEvent.unhover(ribbon)
     ribbonElement.blur()
     await waitFor(() =>
-      expect(parseFloat(getComputedStyle(other).opacity)).toBeCloseTo(0.5, 1),
+      expect(parseFloat(getComputedStyle(other).opacity)).toBeCloseTo(0.45, 2),
     )
     // Keyboard focus alone isolates the flow the way hover does.
     ribbonElement.focus()
@@ -125,7 +125,7 @@ export const MonthlyBudget: Story = {
     )
     ribbonElement.blur()
     await waitFor(() =>
-      expect(parseFloat(getComputedStyle(other).opacity)).toBeCloseTo(0.5, 1),
+      expect(parseFloat(getComputedStyle(other).opacity)).toBeCloseTo(0.45, 2),
     )
   },
 }
@@ -557,7 +557,7 @@ export const Configured: Story = {
     )
     await expect(tinted).toHaveAttribute("data-tinted", "true")
     await waitFor(() =>
-      expect(parseFloat(getComputedStyle(tinted).opacity)).toBeCloseTo(0.5, 1),
+      expect(parseFloat(getComputedStyle(tinted).opacity)).toBeCloseTo(0.45, 2),
     )
     const barWidths = new Set(
       Array.from(

@@ -133,6 +133,24 @@ export const TaskKind = Object.freeze({
 
 export type TaskKind = (typeof TaskKind)[keyof typeof TaskKind]
 
+/** How a file changed. Shared: every provider that reports edits reports one of these. */
+export const FileChange = Object.freeze({
+  Add: "add",
+  Update: "update",
+  Delete: "delete",
+  Rename: "rename",
+} as const)
+
+export type FileChange = (typeof FileChange)[keyof typeof FileChange]
+
+/** One file an agent touched. */
+export interface FileEdit {
+  readonly path: string
+  readonly change: FileChange
+  /** A unified diff when the provider supplies one; Codex reports paths only. */
+  readonly unifiedDiff: string | null
+}
+
 /** How a turn ended. */
 export type TurnStatus = "completed" | "interrupted" | "error"
 
@@ -151,14 +169,30 @@ export interface Usage {
   readonly outputTokens: number | null
   readonly cacheReadTokens: number | null
   readonly cacheCreationTokens: number | null
+  /**
+   * Tokens spent reasoning, where a provider counts them separately.
+   *
+   * Codex reports this; Claude Code folds reasoning into its output count and
+   * reports none. Null therefore means "not reported", never "none spent", and
+   * a total that includes it must not also add it twice.
+   */
+  readonly reasoningTokens: number | null
   readonly totalCostUsd?: number
 }
 
 /** What one `system/init` said the session was configured with. */
 export interface SessionInfo {
+  /** The only field every provider asserts. */
   readonly sessionId: string
-  readonly model: string
-  readonly cwd: string
+  /**
+   * Null where the provider does not say.
+   *
+   * Codex's thread line carries an id and nothing else, so filling these with
+   * `"unknown"` would put a placeholder on screen and state something the wire
+   * never did — the same reason the token counters are nullable.
+   */
+  readonly model: string | null
+  readonly cwd: string | null
   readonly tools: readonly string[]
   readonly slashCommands: readonly string[]
   readonly agents: readonly string[]
@@ -167,9 +201,9 @@ export interface SessionInfo {
   /** Commands the terminal owns rather than the session (`/doctor`, `/color`). */
   readonly terminalSlashCommands: readonly string[]
   readonly plugins: readonly { readonly name: string; readonly version: string | null; readonly source: string }[]
-  readonly permissionMode: string
-  readonly version: string
-  readonly outputStyle: string
+  readonly permissionMode: string | null
+  readonly version: string | null
+  readonly outputStyle: string | null
   /**
    * Which `init` this is within the mapped stream, counting from zero.
    *
@@ -229,7 +263,12 @@ export type AgentEventPayload =
       readonly usage: Usage | null
       readonly durationMs: number | null
       readonly numTurns: number | null
-      readonly permissionDenials: readonly JsonValue[]
+      /**
+       * What the operator refused during the turn. Present and empty on a
+       * clean run, so an empty list means "nothing was refused" rather than
+       * "the harness does not report refusals".
+       */
+      readonly permissionDenials: readonly PermissionDenial[]
     }
   // ---------- conversation ----------
   | { readonly type: "user_message"; readonly text: string; readonly synthetic: boolean }
@@ -248,8 +287,18 @@ export type AgentEventPayload =
     }
   | { readonly type: "tool_call_completed"; readonly callId: string; readonly result: ToolResult }
   /**
-   * The agent's plan, republished whole on every `TodoWrite`. Latest wins —
-   * consumers replace rather than accumulate.
+   * Files an agent changed, reported as structure rather than as prose.
+   *
+   * Only some providers report this: Codex publishes the touched paths and how
+   * each changed, while Claude Code surfaces the same work as ordinary file
+   * tool calls a consumer would have to parse. A view that wants a changed-file
+   * list reads this where it exists and falls back to tool calls where it does
+   * not — the absence is a property of the provider, not an error.
+   */
+  | { readonly type: "file_edits"; readonly callId: string | null; readonly edits: readonly FileEdit[] }
+  /**
+   * The agent's plan, republished whole. Latest wins — consumers replace rather
+   * than accumulate.
    */
   | { readonly type: "plan_updated"; readonly steps: readonly PlanStep[] }
   // ---------- delegated work ----------
@@ -315,7 +364,22 @@ export type AgentEventPayload =
       readonly window: string | null
       readonly usingOverage: boolean
     }
-  | { readonly type: "context_compacted"; readonly trigger: string | null; readonly preTokens: number | null; readonly postTokens: number | null }
+  | {
+      readonly type: "context_compacted"
+      /** `auto` when the window filled on its own, `manual` when asked for. */
+      readonly trigger: string | null
+      readonly preTokens: number | null
+      readonly postTokens: number | null
+      /**
+       * What has been dropped across the whole session, not just this
+       * boundary — it keeps climbing as a long session compacts repeatedly,
+       * which is what makes it the honest measure of how much the agent can no
+       * longer see.
+       */
+      readonly droppedTokens: number | null
+      /** Compaction is a model call of its own, and a slow one. */
+      readonly durationMs: number | null
+    }
   | { readonly type: "background_tasks_changed"; readonly tasks: readonly { readonly taskId: string; readonly description: string }[] }
   // ---------- asks ----------
   | {
@@ -323,10 +387,27 @@ export type AgentEventPayload =
       readonly requestId: string
       readonly callId: string
       readonly toolName: string
+      /** What the tool would run with. The ask is worth nothing without it. */
       readonly input: JsonValue
+      /** Why the harness escalated — a settings rule, a mode, a hook. */
       readonly reason: string | null
+      /** The harness's own label for the tool, when it differs from the name. */
+      readonly displayName: string | null
+      /** The agent's one-line account of what it is about to do. */
+      readonly description: string | null
     }
-  | { readonly type: "permission_decided"; readonly requestId: string }
+  | {
+      readonly type: "permission_decided"
+      readonly requestId: string
+      /**
+       * Which way it went. Null when the answer came back in a shape we could
+       * not read — the ask is retired either way, but a consumer must not draw
+       * an unknown answer as an approval.
+       */
+      readonly decision: "allow" | "deny" | null
+      /** The reason given for a refusal, which becomes the tool's error text. */
+      readonly message: string | null
+    }
   | { readonly type: "permission_denied"; readonly callId: string; readonly toolName: string; readonly message: string }
   // ---------- fallbacks ----------
   | { readonly type: "error"; readonly message: string }
@@ -352,6 +433,17 @@ export type AgentEventPayload =
  * literal. The values are the literals themselves, so the two are
  * interchangeable and both survive JSON.
  */
+/**
+ * A tool the operator refused, as summarised on the turn's own result. It
+ * repeats what the ask already said, which is what lets a consumer show a
+ * refusal on a transcript replayed from the result alone.
+ */
+export interface PermissionDenial {
+  readonly toolName: string
+  readonly callId: string
+  readonly input: JsonValue
+}
+
 export const AgentEventType = Object.freeze({
   SessionStarted: "session_started",
   ModelChanged: "model_changed",
@@ -363,6 +455,7 @@ export const AgentEventType = Object.freeze({
   ToolCallStarted: "tool_call_started",
   ToolCallCompleted: "tool_call_completed",
   PlanUpdated: "plan_updated",
+  FileEdits: "file_edits",
   TaskStarted: "task_started",
   TaskProgress: "task_progress",
   TaskCompleted: "task_completed",

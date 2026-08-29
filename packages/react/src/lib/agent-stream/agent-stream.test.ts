@@ -18,8 +18,9 @@ import {
 } from "./claude/store"
 import { TranscriptBuilder } from "./builder"
 import { ClaudeStreamMapper, mapClaudeStream } from "./claude/mapper"
-import { applyDeltas, buildTranscript, isToolGroup, previewOf } from "./transcript"
+import { applyDeltas, buildTranscript, isCompacting, isToolGroup, previewOf } from "./transcript"
 import { ClaudeSystemSubtype, ClaudeWireType, parseWireLines } from "./claude/wire"
+import { asRecord } from "./json"
 
 const FIXTURES = fileURLToPath(new URL("../../../../../apps/storybook/stories/fixtures/agent-stream/", import.meta.url))
 
@@ -246,27 +247,33 @@ test("a session's own advertisement is readable for a composer's pickers", () =>
   const capabilities = sessionCapabilities(mapClaudeStream(capture("tools")))
   assert.notEqual(capabilities, null)
   const { commands, skills, agents, tools, mcpServers, plugins } = capabilities!
+  // Claude reports every one of these on its stream, so a null here would mean
+  // the reader stopped filling a section it can fill.
+  assert.ok(
+    [commands, skills, agents, tools, mcpServers, plugins].every((section) => section !== null),
+    "Claude advertises all of these; none should read as unreported",
+  )
 
-  assert.ok(commands.length > 0)
-  assert.ok(skills.length > 0)
-  assert.ok(agents.includes("Explore"))
+  assert.ok(commands!.length > 0)
+  assert.ok(skills!.length > 0)
+  assert.ok(agents!.includes("Explore"))
   // A skill and a slash command are the same entry seen twice; the command
   // carries the source so a picker can group them rather than list them twice.
-  assert.ok(commands.some((command) => command.source === "skill"))
+  assert.ok(commands!.some((command) => command.source === "skill"))
   // A plugin command is `plugin:command`, which is where the plugin name is.
-  assert.ok(commands.some((command) => command.source === "plugin" && command.plugin !== null))
+  assert.ok(commands!.some((command) => command.source === "plugin" && command.plugin !== null))
   // Terminal commands are the session's to advertise but not to run.
-  assert.ok(commands.some((command) => command.source === "terminal"))
-  assert.ok(plugins.length > 0)
+  assert.ok(commands!.some((command) => command.source === "terminal"))
+  assert.ok(plugins!.length > 0)
 
   // MCP tools are matched back to their server across the naming mismatch:
   // "example Mail" supplies `mcp__example_Mail__*`.
-  const connected = mcpServers.filter((server) => server.connected)
+  const connected = mcpServers!.filter((server) => server.connected)
   assert.ok(connected.length > 0)
   assert.ok(connected.some((server) => server.tools.length > 0), "a connected server should own tools")
-  assert.ok(mcpServers.some((server) => !server.connected), "an unauthenticated server still appears, with its status")
-  assert.ok(tools.some((tool) => tool.kind === "shell"))
-  assert.ok(tools.some((tool) => tool.kind === "mcp" && tool.server !== null))
+  assert.ok(mcpServers!.some((server) => !server.connected), "an unauthenticated server still appears, with its status")
+  assert.ok(tools!.some((tool) => tool.kind === "shell"))
+  assert.ok(tools!.some((tool) => tool.kind === "mcp" && tool.server !== null))
 })
 
 test("tools that arrive in a later init are marked deferred", () => {
@@ -276,7 +283,7 @@ test("tools that arrive in a later init are marked deferred", () => {
   assert.notEqual(capabilities, null)
   const first = mapClaudeStream(capture("todos")).find((event) => event.payload.type === "session_started")
   assert.notEqual(first, undefined)
-  assert.ok(capabilities!.tools.length >= (first!.payload as { session: { tools: readonly string[] } }).session.tools.length)
+  assert.ok((capabilities!.tools ?? []).length >= (first!.payload as { session: { tools: readonly string[] } }).session.tools.length)
 })
 
 test("a workflow's agents are visible through its progress board", () => {
@@ -407,7 +414,7 @@ test("every conversation in a session comes back as a pointer a host can act on"
   const session = transcript.session
   assert.notEqual(session, null)
 
-  const location = sessionLocationOf("/home/me/.claude/projects", session!)
+  const location = sessionLocationOf("/home/me/.claude/projects", session!)!
   const refs = collectTranscriptRefs(location, transcript.runs)
 
   // The main conversation is in the list, so a switcher over "what is open" is
@@ -426,7 +433,7 @@ test("every conversation in a session comes back as a pointer a host can act on"
 
 test("a pointer that cannot be built says what is missing instead of guessing", () => {
   const transcript = buildTranscript(mapClaudeStream(capture("workflow_phases")))
-  const location = sessionLocationOf("/home/me/.claude/projects", transcript.session!)
+  const location = sessionLocationOf("/home/me/.claude/projects", transcript.session!)!
 
   // A workflow agent needs a run id, and the stream never carries one.
   const blocked = collectTranscriptRefs(location, transcript.runs).filter((ref) => ref.kind === "workflow_agent")
@@ -583,37 +590,20 @@ const UNCAPTURED: ReadonlyMap<string, string> = new Map([
   ["permission_denied", "needs a sandbox path refusal or a mode that cannot ask"],
   ["rate_limited", "only emitted when a limit is actually reached"],
   ["model_changed", "derived across two captures; covered by the resume test"],
+  // A capability Claude Code does not have: it surfaces edits as ordinary file
+  // tool calls. Codex reports them as structure, and covers this in its own
+  // suite.
+  ["file_edits", "Claude Code reports no structured edits; the Codex captures cover it"],
 ])
 
-const DECLARED: ReadonlySet<string> = new Set([
-  "activity",
-  "assistant_text",
-  "background_tasks_changed",
-  "context_compacted",
-  "delta",
-  "error",
-  "hook",
-  "model_changed",
-  "permission_decided",
-  "permission_denied",
-  "permission_requested",
-  "plan_updated",
-  "post_turn_summary",
-  "rate_limited",
-  "reasoning",
-  "session_started",
-  "status_changed",
-  "task_completed",
-  "task_progress",
-  "task_started",
-  "thinking_progress",
-  "tool_call_completed",
-  "tool_call_started",
-  "turn_completed",
-  "unknown",
-  "user_message",
-  "workflow_progress",
-])
+/**
+ * Derived, not repeated.
+ *
+ * A second hand-kept list of the payload kinds is a list that drifts from the
+ * union it mirrors; `AgentEventType` is already the inventory, so the coverage
+ * check reads it.
+ */
+const DECLARED: ReadonlySet<string> = new Set(Object.values(AgentEventType))
 
 test("every declared payload variant is either exercised or knowingly uncaptured", () => {
   const emitted = new Set<string>()
@@ -669,7 +659,7 @@ test("structured payloads carry the fields their consumers switch on", () => {
           assert.ok(payload.block.index >= 0)
           break
         case "session_started":
-          assert.ok(payload.session.model.length > 0)
+          assert.ok(payload.session.model === null || payload.session.model.length > 0)
           assert.ok(payload.session.sessionId.length > 0)
           assert.ok(payload.session.initIndex >= 0)
           break
@@ -1011,4 +1001,257 @@ test("the skill's frontmatter is the shape a skill loader reads", () => {
   // a one-word one is a skill nobody finds.
   const description = /^description: (.+)$/m.exec(frontmatter!)?.[1]
   assert.ok((description?.length ?? 0) > 80, "the description must say when to use the skill, not just what it is")
+})
+
+test("a tool result made only of non-text blocks keeps its content in the sidecar", () => {
+  // `ToolSearch` answers with `tool_reference` blocks and no prose, so
+  // flattening to text gives an empty string — correct, and the reason a
+  // consumer must read `structured` rather than assume `text` carries
+  // everything a call returned.
+  const transcript = buildTranscript(mapClaudeStream(capture("websearch")))
+  const results = [...transcript.resultByCallId.values()]
+  const blocksOnly = results.filter((result) => result.text === "")
+  assert.ok(blocksOnly.length > 0, "this capture contains a result with no text blocks")
+  for (const result of blocksOnly) {
+    assert.notEqual(result.structured, null, "the sidecar is where such a result survives")
+    assert.equal(result.isError, false)
+  }
+
+  // And the search itself does return prose, so the two shapes coexist in one
+  // capture — which is why the flattening cannot assume either.
+  assert.ok(results.some((result) => result.text.includes("Web search results")))
+})
+
+test("reasoning reaches the transcript as its own kind, even when its text is withheld", () => {
+  const events = mapClaudeStream(capture("tools"))
+  const reasoning = events.filter((event) => event.payload.type === "reasoning")
+  assert.ok(reasoning.length > 0)
+  for (const event of reasoning) {
+    const payload = event.payload as { type: "reasoning"; text: string; block: unknown }
+    // Empty on purpose, and the common case: the model signs a thinking block
+    // without disclosing it, so the event says reasoning *happened* while
+    // carrying nothing to read. A consumer must render that as a step rather
+    // than assume text.
+    assert.equal(typeof payload.text, "string")
+    // The block ref is still there, so a streamed preview is superseded the
+    // same way prose is.
+    assert.notEqual(payload.block, null)
+  }
+
+  // Where a model does disclose it, the text arrives on the same payload.
+  const disclosed = mapClaudeStream(capture("resume_turn2")).filter((event) => event.payload.type === "reasoning")
+  assert.ok(disclosed.some((event) => (event.payload as { text: string }).text.length > 0))
+  // And it is not also emitted as assistant text, which would print the
+  // agent's private reasoning as its answer.
+  const answers = events.filter((event) => event.payload.type === "assistant_text")
+  const reasoningText = new Set(reasoning.map((event) => (event.payload as { text: string }).text))
+  assert.ok(answers.every((event) => !reasoningText.has((event.payload as { text: string }).text)))
+})
+
+test("the session's own reports carry what a status surface needs", () => {
+  // These are the lines that say what the agent is doing between turns. None
+  // of them draws a transcript row, which is why they are easy to leave
+  // half-mapped — a sweep that only checks they parse would not notice.
+  const events = mapClaudeStream(capture("todos"))
+
+  const hooks = events.flatMap((event) => (event.payload.type === "hook" ? [event.payload] : []))
+  assert.ok(hooks.length > 0)
+  assert.ok(hooks.some((hook) => hook.phase === "started"))
+  assert.ok(hooks.some((hook) => hook.phase === "finished" && hook.name.length > 0))
+
+  const status = events.flatMap((event) => (event.payload.type === "status_changed" ? [event.payload] : []))
+  assert.ok(status.some((entry) => entry.status !== null))
+
+  const thinking = events.flatMap((event) => (event.payload.type === "thinking_progress" ? [event.payload] : []))
+  assert.ok(thinking.length > 0)
+  assert.ok(thinking.every((entry) => entry.tokens >= 0))
+  // The estimate grows while a block is produced; a counter that never moved
+  // would be a figure nobody could use.
+  assert.ok(Math.max(...thinking.map((entry) => entry.tokens)) > Math.min(...thinking.map((entry) => entry.tokens)))
+
+  const summary = events.flatMap((event) => (event.payload.type === "post_turn_summary" ? [event.payload] : []))
+  assert.ok(summary.every((entry) => entry.detail.length > 0))
+})
+
+test("background tasks are republished whole, which is half of whether a session is idle", () => {
+  const events = mapClaudeStream(capture("workflow"))
+  const sets = events.flatMap((event) =>
+    event.payload.type === "background_tasks_changed" ? [event.payload.tasks] : [],
+  )
+  assert.ok(sets.length > 1, "the set is republished on every change")
+  // A turn's result can land while tasks are still open, so an empty set is a
+  // meaningful state rather than an absence — it is what says the work drained.
+  assert.ok(sets.some((tasks) => tasks.length > 0))
+  assert.ok(sets.some((tasks) => tasks.length === 0))
+  for (const tasks of sets) {
+    for (const task of tasks) assert.ok(task.taskId.length > 0 && task.description.length > 0)
+  }
+})
+
+test("an activity line names what the agent is doing right now", () => {
+  const events = mapClaudeStream(capture("subagent"))
+  const activity = events.flatMap((event) => (event.payload.type === "activity" ? [event.payload.detail] : []))
+  assert.ok(activity.length > 0)
+  assert.ok(activity.every((detail) => detail.length > 0), "an activity with no detail is dropped, not emitted blank")
+})
+
+/**
+ * Approvals are the one part of the wire that is a conversation rather than a
+ * broadcast: the harness blocks, asks, and will not proceed until answered.
+ * These two captures are real runs against a sandbox whose settings escalate
+ * Bash, recorded once answering allow and once answering deny.
+ */
+test("an approval ask carries everything needed to answer it", () => {
+  const events = mapClaudeStream(capture("approval_allow"))
+  const asks = events.flatMap((event) => (event.payload.type === "permission_requested" ? [event.payload] : []))
+  assert.equal(asks.length, 1)
+  const [ask] = asks
+  // The id is what an answer is addressed to, and the call id is what ties the
+  // ask to the tool row already on screen.
+  assert.ok(ask.requestId.length > 0)
+  assert.ok(ask.callId.startsWith("toolu_"))
+  assert.equal(ask.toolName, "Bash")
+  // Without the input there is nothing to approve: this is the text a person
+  // reads before deciding.
+  assert.equal(asRecord(ask.input).command, "echo approved-and-ran")
+  // The harness says why it escalated. It sends `decision_reason_type`, not
+  // `decision_reason` — reading the documented name alone returned null here,
+  // which is exactly the kind of thing only a capture catches.
+  assert.equal(ask.reason, "rule")
+  assert.equal(ask.displayName, "Bash")
+  assert.ok((ask.description ?? "").length > 0)
+})
+
+test("a decision records which way it went, not merely that it happened", () => {
+  for (const [name, expected] of [["approval_allow", "allow"], ["approval_deny", "deny"]] as const) {
+    const events = mapClaudeStream(capture(name))
+    const asks = events.flatMap((event) => (event.payload.type === "permission_requested" ? [event.payload] : []))
+    const decisions = events.flatMap((event) => (event.payload.type === "permission_decided" ? [event.payload] : []))
+    assert.equal(decisions.length, 1, name)
+    assert.equal(decisions[0].decision, expected, name)
+    // Every ask is retired by a decision addressed to it. A pending ask with no
+    // matching id is a stuck session, so the join has to hold.
+    assert.equal(decisions[0].requestId, asks[0].requestId, name)
+    // Control frames carry no timestamp of their own — both directions of the
+    // ask arrive with a null `ts`. Ordering here rests on `seq` alone, which is
+    // why `seq` and not time is the ordering key.
+    const control = events.filter((event) => event.payload.type === "permission_requested" || event.payload.type === "permission_decided")
+    assert.ok(control.every((event) => event.ts === null), name)
+    assert.ok(control[0].seq < control[1].seq, name)
+  }
+})
+
+test("a refusal reaches the model as a failed tool result, and the turn still succeeds", () => {
+  const events = mapClaudeStream(capture("approval_deny"))
+  const ask = events.flatMap((event) => (event.payload.type === "permission_requested" ? [event.payload] : []))[0]
+  const decision = events.flatMap((event) => (event.payload.type === "permission_decided" ? [event.payload] : []))[0]
+  // The reason given for the refusal is not decoration: it is handed to the
+  // model verbatim as the tool's error text, which is how the agent knows to
+  // stop rather than retry.
+  assert.equal(decision.message, "The operator declined this command.")
+  const failed = events.flatMap((event) =>
+    event.payload.type === "tool_call_completed" && event.payload.result.isError ? [event.payload.result] : [],
+  )
+  assert.equal(failed.length, 1)
+  assert.equal(failed[0].text, decision.message)
+
+  // A refused tool is not a failed run. The result line reports success, and
+  // the refusal is recorded separately — drawing the turn as an error here
+  // would be wrong.
+  const result = events.flatMap((event) => (event.payload.type === "turn_completed" ? [event.payload] : []))[0]
+  assert.equal(result.status, "completed")
+  // The refusal is reported on the result too, which is what lets a transcript
+  // rebuilt from the result alone still show that something was declined.
+  assert.equal(result.permissionDenials.length, 1)
+  const [denial] = result.permissionDenials
+  assert.equal(denial.toolName, "Bash")
+  // Reported under the same call id the ask used, so the two join up.
+  assert.equal(denial.callId, ask.callId)
+  assert.equal(asRecord(denial.input).command, "echo approved-and-ran")
+
+  // And the transcript ends with the agent explaining the refusal rather than
+  // with a dangling call.
+  const transcript = buildTranscript(events)
+  const last = transcript.turns[transcript.turns.length - 1]
+  assert.equal(last.toolCalls, 1)
+  assert.ok((last.finalText ?? "").includes("declined"))
+})
+
+test("the allowed run reaches the same place by the other road", () => {
+  const events = mapClaudeStream(capture("approval_allow"))
+  const results = events.flatMap((event) => (event.payload.type === "tool_call_completed" ? [event.payload.result] : []))
+  assert.equal(results.length, 1)
+  assert.equal(results[0].isError, false)
+  assert.equal(results[0].text, "approved-and-ran")
+  const finished = events.flatMap((event) => (event.payload.type === "turn_completed" ? [event.payload] : []))[0]
+  assert.equal(finished.permissionDenials.length, 0)
+})
+
+/**
+ * Compaction is the shape a long session cannot avoid, and the only one that
+ * silently removes what a consumer has already drawn. The capture is a Haiku
+ * run forced over the window by reading a generated corpus; the corpus bodies
+ * are elided in the fixture because they are machine filler with nothing to
+ * assert, and every line, field and count around them is untouched.
+ */
+test("a compaction boundary reports what the agent can no longer see", () => {
+  const events = mapClaudeStream(capture("compaction"))
+  const boundaries = events.flatMap((event) => (event.payload.type === "context_compacted" ? [event.payload] : []))
+  assert.equal(boundaries.length, 2, "a long enough session compacts more than once")
+
+  for (const boundary of boundaries) {
+    assert.equal(boundary.trigger, "auto")
+    // The window shrinks. A boundary that did not shrink it would be a summary
+    // that failed, and drawing it as a success would be wrong.
+    assert.ok((boundary.preTokens ?? 0) > (boundary.postTokens ?? 0))
+    // Compaction is itself a model call, and a slow one — tens of seconds here.
+    // A view that blocks on it without saying why looks hung.
+    assert.ok((boundary.durationMs ?? 0) > 1000)
+  }
+
+  // Dropped tokens accumulate across the session rather than resetting per
+  // boundary, which is what makes the figure meaningful in a long run.
+  const dropped = boundaries.map((boundary) => boundary.droppedTokens ?? 0)
+  assert.ok(dropped[0] > 0)
+  assert.ok(dropped[1] > dropped[0])
+})
+
+test("the transcript survives its own history being dropped", () => {
+  const events = mapClaudeStream(capture("compaction"))
+  // Compaction removes history from the *model*, not from the transcript. The
+  // work already drawn stays drawn — a consumer that trimmed its own view to
+  // match would delete what the user is reading.
+  const transcript = buildTranscript(events)
+  const calls = events.filter((event) => event.payload.type === "tool_call_completed")
+  assert.equal(calls.length, 15)
+  assert.equal(transcript.turns[transcript.turns.length - 1].toolCalls, calls.length)
+
+  // And the run still ends normally: a compacted session is not a failed one.
+  const finished = events.flatMap((event) => (event.payload.type === "turn_completed" ? [event.payload] : []))
+  assert.equal(finished.length, 1)
+  assert.equal(finished[0].status, "completed")
+})
+
+test("a surface can tell that compaction is in flight, not just that it happened", () => {
+  const events = mapClaudeStream(capture("compaction"))
+  // Replayed line by line, the pending state has to be true across the whole
+  // summary call and false everywhere else — that window is 17 to 41 seconds
+  // here, which is exactly the stretch a surface must not look idle for.
+  const windows: number[] = []
+  let open = -1
+  for (let index = 0; index < events.length; index += 1) {
+    const compacting = isCompacting(events.slice(0, index + 1))
+    if (compacting && open === -1) open = index
+    if (!compacting && open !== -1) {
+      windows.push(index - open)
+      open = -1
+    }
+  }
+  assert.equal(windows.length, 2, "one pending window per boundary")
+  assert.ok(windows.every((width) => width > 0))
+
+  // It is false before anything happens and false once the run is over, so a
+  // finished transcript never renders a marker that will not resolve.
+  assert.equal(isCompacting([]), false)
+  assert.equal(isCompacting(events), false)
 })

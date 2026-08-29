@@ -24,6 +24,8 @@ const composerFocusComponents = Object.freeze([
   { component: "searchable-listbox", count: 1 },
   { component: "sectioned-listbox", count: 1 },
   { component: "tool-call", count: 3 },
+  // The label is the only target; the rules either side are decoration.
+  { component: "transcript-divider", count: 1 },
 ] as const)
 
 type FocusComponent =
@@ -33,6 +35,7 @@ type FocusComponent =
   | "conversation-rail"
   | "event-calendar"
   | "gantt-chart/gantt-chart-grid"
+  | "radar-chart/radar-chart"
   | "file-diff-list"
   | "chat-tabs"
   | "tabs"
@@ -228,6 +231,19 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     state: "focus-visible",
     className: "focus-visible:outline-ring",
     count: 8,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The axis label is the spoke's keyboard handle: a spoke is not something
+  // a keyboard can point at, so focusing the label probes the axis. The
+  // series outlines carry their own treatment on the hit stroke instead —
+  // a transparent stroke that becomes the ring when focused.
+  {
+    component: "radar-chart/radar-chart",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -548,6 +564,10 @@ export const focusGeometryClasses = Object.freeze([
   // outset outline would be swallowed at the region edges.
   { component: "gantt-chart/gantt-chart-grid", className: "focus-visible:outline-2", count: 8 },
   { component: "gantt-chart/gantt-chart-grid", className: "focus-visible:-outline-offset-2", count: 8 },
+  // The radar's axis label draws inset for the same reason: it sits against
+  // the plot edge, where an outset outline would be clipped by the gutter.
+  { component: "radar-chart/radar-chart", className: "focus-visible:outline-2", count: 1 },
+  { component: "radar-chart/radar-chart", className: "focus-visible:-outline-offset-2", count: 1 },
   { component: "gantt-chart/gantt-chart-grid", className: "focus-visible:ring-2", count: 1 },
   { component: "gantt-chart/gantt-chart-grid", className: "focus-visible:ring-offset-0", count: 1 },
   { component: "conversation-rail", className: "focus-visible:outline-2", count: 1 },

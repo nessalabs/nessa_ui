@@ -219,6 +219,10 @@ export {
   type GeneratingSurfaceProps,
 } from "./components/generating-surface"
 export {
+  TranscriptDivider,
+  type TranscriptDividerProps,
+} from "./components/transcript-divider"
+export {
   GradientSurface,
   gradientSurfacePatterns,
   gradientSurfacePresets,
@@ -763,6 +767,49 @@ export {
   type FlowChartLinkInput,
   type FlowChartNodeInput,
 } from "./components/flow-chart"
+export {
+  RadarChart,
+  computeRadarChartLayout,
+  radarChartOutlinePath,
+  radarChartPalette,
+  radarChartPoint,
+  radarChartRingPath,
+  type RadarChartAxis,
+  type RadarChartAxisContext,
+  type RadarChartAxisInput,
+  type RadarChartHoverContext,
+  type RadarChartLayout,
+  type RadarChartLayoutAxis,
+  type RadarChartLayoutIssue,
+  type RadarChartLayoutOptions,
+  type RadarChartLayoutPoint,
+  type RadarChartLayoutSeries,
+  type RadarChartProps,
+  type RadarChartReading,
+  type RadarChartScale,
+  type RadarChartSeries,
+  type RadarChartSeriesContext,
+  type RadarChartSeriesInput,
+} from "./components/radar-chart"
+export {
+  PieChart,
+  computePieChartLayout,
+  pieChartCentroid,
+  pieChartLeaderPath,
+  pieChartPalette,
+  pieChartSlicePath,
+  type PieChartCenterContext,
+  type PieChartHoverContext,
+  type PieChartLayout,
+  type PieChartLayoutIssue,
+  type PieChartLayoutOptions,
+  type PieChartLayoutSlice,
+  type PieChartProps,
+  type PieChartSlice,
+  type PieChartSliceContext,
+  type PieChartSliceInput,
+  type PieChartSort,
+} from "./components/pie-chart"
 export {
   FilePreview,
   FilePreviewAudio,

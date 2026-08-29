@@ -1,56 +1,13 @@
 /** @responsibility Derives what a session can do — commands, skills, agents, tools and MCP servers — for a composer's pickers. */
 
-import type { AgentEvent, SessionInfo, ToolKind } from "../events"
+import type {
+  AgentCapabilities,
+  CapabilityCommand,
+  CapabilityServer,
+  CapabilityTool,
+} from "../capabilities"
+import type { AgentEvent, SessionInfo } from "../events"
 import { toolKind } from "./tools"
-
-/** Where a slash command comes from, which is what a picker groups by. */
-export type CommandSource = "skill" | "plugin" | "session" | "terminal"
-
-export interface CommandEntry {
-  /** As typed, without the leading slash. */
-  readonly name: string
-  readonly source: CommandSource
-  /** The plugin that supplies it, for a `plugin:command` name. */
-  readonly plugin: string | null
-}
-
-export interface ToolEntry {
-  readonly name: string
-  readonly kind: ToolKind
-  /** The MCP server that supplies it, parsed from the `mcp__server__tool` name. */
-  readonly server: string | null
-  /**
-   * True when the tool was absent from the session's first `init` and appeared
-   * in a later one — which is what a deferred tool loading through ToolSearch
-   * looks like from outside.
-   */
-  readonly deferred: boolean
-}
-
-export interface McpServerEntry {
-  readonly name: string
-  readonly status: string
-  /** `connected` is the only status that means the tools are usable now. */
-  readonly connected: boolean
-  /** The tools this server contributed, matched back from their prefixed names. */
-  readonly tools: readonly string[]
-}
-
-/** Everything a session advertised about itself, merged across every `init` it emitted. */
-export interface SessionCapabilities {
-  readonly sessionId: string
-  readonly model: string
-  readonly cwd: string
-  readonly permissionMode: string
-  readonly version: string
-  readonly outputStyle: string
-  readonly commands: readonly CommandEntry[]
-  readonly skills: readonly string[]
-  readonly agents: readonly string[]
-  readonly tools: readonly ToolEntry[]
-  readonly mcpServers: readonly McpServerEntry[]
-  readonly plugins: readonly { readonly name: string; readonly version: string | null; readonly source: string }[]
-}
 
 /**
  * The prefix an MCP tool carries, normalized for comparison against a server's
@@ -72,7 +29,7 @@ export function mcpServerOf(toolName: string): string | null {
   return separator === -1 ? rest : rest.slice(0, separator)
 }
 
-function classifyCommand(name: string, skills: ReadonlySet<string>): CommandEntry {
+function classifyCommand(name: string, skills: ReadonlySet<string>): CapabilityCommand {
   const [head, tail] = name.split(":")
   if (tail !== undefined) return { name, source: "plugin", plugin: head! }
   if (skills.has(name)) return { name, source: "skill", plugin: null }
@@ -88,7 +45,7 @@ function classifyCommand(name: string, skills: ReadonlySet<string>): CommandEntr
  * entries. What the first init did *not* carry is reported as `deferred`, which
  * is the only signal the stream gives that a tool arrived late.
  */
-export function sessionCapabilities(events: readonly AgentEvent[]): SessionCapabilities | null {
+export function sessionCapabilities(events: readonly AgentEvent[]): AgentCapabilities | null {
   const inits: SessionInfo[] = []
   for (const event of events) {
     if (event.payload.type === "session_started") inits.push(event.payload.session)
@@ -102,14 +59,14 @@ export function sessionCapabilities(events: readonly AgentEvent[]): SessionCapab
   const toolNames = new Set<string>()
   for (const init of inits) for (const name of init.tools) toolNames.add(name)
 
-  const tools: ToolEntry[] = [...toolNames].map((name) => ({
+  const tools: CapabilityTool[] = [...toolNames].map((name) => ({
     name,
     kind: toolKind(name),
     server: mcpServerOf(name),
     deferred: !firstTools.has(name),
   }))
 
-  const servers = new Map<string, McpServerEntry>()
+  const servers = new Map<string, CapabilityServer>()
   for (const init of inits) {
     for (const server of init.mcpServers) {
       const matched = tools.filter((tool) => tool.server !== null && slug(tool.server) === slug(server.name))
@@ -125,7 +82,7 @@ export function sessionCapabilities(events: readonly AgentEvent[]): SessionCapab
   const skills = new Set<string>()
   for (const init of inits) for (const skill of init.skills) skills.add(skill)
 
-  const commands = new Map<string, CommandEntry>()
+  const commands = new Map<string, CapabilityCommand>()
   for (const init of inits) {
     for (const name of init.slashCommands) commands.set(name, classifyCommand(name, skills))
     for (const name of init.terminalSlashCommands) commands.set(name, { name, source: "terminal", plugin: null })
@@ -139,21 +96,29 @@ export function sessionCapabilities(events: readonly AgentEvent[]): SessionCapab
     model: latest.model,
     cwd: latest.cwd,
     permissionMode: latest.permissionMode,
-    version: latest.version,
-    outputStyle: latest.outputStyle,
     commands: [...commands.values()],
-    skills: [...skills],
+    skills: [...skills].map((name) => ({ name, description: null })),
     agents: [...agents],
     tools,
     mcpServers: [...servers.values()],
-    plugins: latest.plugins,
+    plugins: latest.plugins.map((plugin) => ({
+      name: plugin.name,
+      version: plugin.version,
+      source: plugin.source,
+    })),
+    // Null rather than empty: the CLI does not advertise the models a session
+    // could switch to, or the catalogues a plugin came from, so a picker omits
+    // those sections here rather than showing them bare.
+    models: null,
+    pluginSources: null,
+    hooks: null,
   }
 }
 
 /** Groups tools for a picker: first-party tools by kind, MCP tools by their server. */
-export function groupTools(capabilities: SessionCapabilities): ReadonlyMap<string, readonly ToolEntry[]> {
-  const groups = new Map<string, ToolEntry[]>()
-  for (const tool of capabilities.tools) {
+export function groupTools(capabilities: AgentCapabilities): ReadonlyMap<string, readonly CapabilityTool[]> {
+  const groups = new Map<string, CapabilityTool[]>()
+  for (const tool of capabilities.tools ?? []) {
     const key = tool.server === null ? tool.kind : `mcp:${tool.server}`
     const bucket = groups.get(key)
     if (bucket === undefined) groups.set(key, [tool])

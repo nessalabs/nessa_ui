@@ -187,8 +187,12 @@ export interface TranscriptRef {
 /** Derives a session's location from its own `init`, so a host supplies only the projects directory. */
 export function sessionLocationOf(
   projectsDir: string,
-  session: { readonly cwd: string; readonly sessionId: string },
-): SessionLocation {
+  session: { readonly cwd: string | null; readonly sessionId: string },
+): SessionLocation | null {
+  // The project folder is named after the working directory, so a session that
+  // never reported one cannot be addressed on disk. Null says that plainly
+  // rather than building a path rooted at an empty string.
+  if (session.cwd === null || session.cwd === "") return null
   return { projectsDir, cwd: session.cwd, sessionId: session.sessionId }
 }
 

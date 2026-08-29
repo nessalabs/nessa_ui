@@ -3,6 +3,7 @@
 // ---------- the contract every provider maps onto ----------
 export {
   AgentEventType,
+  FileChange,
   PlanStepStatus,
   TaskKind,
   isEvent,
@@ -14,6 +15,7 @@ export {
   type AgentPath,
   type BlockRef,
   type DeltaPayload,
+  type FileEdit,
   type MapperOptions,
   type PlanStep,
   type SessionInfo,
@@ -25,6 +27,19 @@ export {
   type WorkflowPhaseProgress,
 } from "./events"
 export {
+  unreportedCapabilities,
+  type AgentCapabilities,
+  type CapabilityCommand,
+  type CapabilityHook,
+  type CapabilityModel,
+  type CapabilityPlugin,
+  type CapabilityPluginSource,
+  type CapabilityServer,
+  type CapabilitySkill,
+  type CapabilityTool,
+  type CommandSource,
+} from "./capabilities"
+export {
   asArray,
   asBoolean,
   asNumber,
@@ -33,6 +48,10 @@ export {
   asRecord,
   asString,
   asStrings,
+  parseJsonLine,
+  parseJsonLines,
+  shortenPath,
+  type JsonLineResult,
   type JsonValue,
 } from "./json"
 
@@ -44,6 +63,7 @@ export {
   assembleTurn,
   buildTranscript,
   groupTools,
+  isCompacting,
   isToolGroup,
   previewOf,
   rendersRow,
@@ -67,7 +87,9 @@ export {
  * the "nothing else moves" claim the layering exists to keep.
  */
 export * as claude from "./claude"
+export * as codex from "./codex"
 
 // The two entry points are also exported flat, because reaching for a parser by
 // name is the common case and `claude.ClaudeStreamMapper` stutters.
 export { ClaudeStreamMapper, mapClaudeStream } from "./claude/mapper"
+export { CodexStreamMapper, mapCodexStream } from "./codex/mapper"

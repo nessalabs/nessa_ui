@@ -16,10 +16,11 @@ import type {
   WorkflowPhaseProgress,
 } from "../events"
 import { claudePlanStatus, claudeTaskKind } from "./mapping"
-import { asNumber, asObject, asRecord, asString, asStrings } from "../json"
+import { asArray, asNumber, asObject, asOneOf, asRecord, asString, asStrings } from "../json"
 import { toolKind, toolTitle } from "./tools"
 import type {
   JsonValue,
+  WireLine,
   WireContentBlock,
   WireEvent,
   WireStreamFrame,
@@ -81,6 +82,9 @@ function normalizeUsage(usage: JsonValue | undefined, costUsd: number | null): U
     outputTokens: output,
     cacheReadTokens: cacheRead,
     cacheCreationTokens: cacheCreation,
+    // Claude folds reasoning into its output count and reports no separate
+    // figure, so this is unreported rather than zero.
+    reasoningTokens: null,
     ...(costUsd === null ? {} : { totalCostUsd: costUsd }),
   }
 }
@@ -212,12 +216,13 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
         ),
       ]
     }
-    return this.map(parsed.event)
+    return this.map(parsed.line)
   }
 
   /** Maps an already-decoded line. */
-  map(event: WireEvent): readonly AgentEvent[] {
-    const raw = event as unknown as JsonValue
+  map(event: WireLine): readonly AgentEvent[] {
+    const raw = event as JsonValue
+    const line = asRecord(raw)
     // A line delivered twice — a replayed tail, two captures concatenated —
     // must be absorbed once: counting a committed block a second time shifts
     // every later index in that message and breaks the delta join silently.
@@ -230,15 +235,16 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
         if (!oldest.done) this.seenUuids.delete(oldest.value)
       }
     }
-    const sessionId = asString(asRecord(raw).session_id) ?? this.lastSession?.sessionId ?? "unknown"
-    const path = this.pathOf(asRecord(raw).parent_tool_use_id)
-    const ts = asString(asRecord(raw).timestamp)
+    const sessionId = asString(line.session_id) ?? this.lastSession?.sessionId ?? "unknown"
+    const path = this.pathOf(line.parent_tool_use_id)
+    const ts = asString(line.timestamp)
 
     switch (event.type) {
       case ClaudeWireType.System:
         return this.mapSystem(asString(asRecord(raw).subtype) ?? "unknown", sessionId, path, ts, raw)
       case ClaudeWireType.StreamEvent:
-        return this.wrap(this.mapStreamFrame((event as { event: WireStreamFrame }).event, path), sessionId, path, ts, raw)
+        // Read, not asserted: `mapStreamFrame` narrows every field it uses.
+        return this.wrap(this.mapStreamFrame(asRecord(line.event) as WireStreamFrame, path), sessionId, path, ts, raw)
       case ClaudeWireType.Assistant:
         return this.mapAssistant(asRecord(raw), sessionId, path, ts, raw)
       case ClaudeWireType.User:
@@ -278,7 +284,13 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
             callId: asString(request.tool_use_id) ?? "",
             toolName: asString(request.tool_name) ?? "",
             input: request.input ?? null,
-            reason: asString(request.decision_reason),
+            // The wire names this `decision_reason_type` ("rule", "mode", ...).
+            // `decision_reason` is accepted too because older builds sent it,
+            // and a null reason would quietly turn a rule-driven ask into an
+            // unexplained one.
+            reason: asString(request.decision_reason_type) ?? asString(request.decision_reason),
+            displayName: asString(request.display_name),
+            description: asString(request.description),
           },
           sessionId,
           path,
@@ -286,8 +298,22 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
           raw,
         )
       }
-      case ClaudeWireType.ControlResponse:
-        return this.wrap({ type: "permission_decided", requestId: asString(asRecord(asRecord(raw).response).request_id) ?? "" }, sessionId, path, ts, raw)
+      case ClaudeWireType.ControlResponse: {
+        const envelope = asRecord(asRecord(raw).response)
+        const answer = asRecord(envelope.response)
+        return this.wrap(
+          {
+            type: "permission_decided",
+            requestId: asString(envelope.request_id) ?? "",
+            decision: asOneOf(answer.behavior, ["allow", "deny"] as const),
+            message: asString(answer.message),
+          },
+          sessionId,
+          path,
+          ts,
+          raw,
+        )
+      }
       default:
         return this.wrap({ type: "unknown", wireType: event.type, subtype: asString(asRecord(raw).subtype) }, sessionId, path, ts, raw)
     }
@@ -305,8 +331,8 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
       case ClaudeSystemSubtype.Init: {
         const session: SessionInfo = {
           sessionId,
-          model: asString(line.model) ?? "unknown",
-          cwd: asString(line.cwd) ?? "",
+          model: asString(line.model),
+          cwd: asString(line.cwd),
           tools: asStrings(line.tools),
           slashCommands: asStrings(line.slash_commands),
           agents: asStrings(line.agents),
@@ -325,9 +351,9 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
                 source: asString(asRecord(entry).source) ?? "",
               }))
             : [],
-          permissionMode: asString(line.permissionMode) ?? "default",
-          version: asString(line.claude_code_version) ?? "",
-          outputStyle: asString(line.output_style) ?? "",
+          permissionMode: asString(line.permissionMode),
+          version: asString(line.claude_code_version),
+          outputStyle: asString(line.output_style),
           initIndex: this.initCount,
         }
         const previous = this.lastSession
@@ -337,7 +363,14 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
         const events = [this.build({ type: "session_started", session }, sessionId, path, ts, raw)]
         // A resumed run with `--model` looks exactly like this and nothing else
         // announces it, so the change is derived from two inits or not seen.
-        if (previous !== null && previous.sessionId === sessionId && previous.model !== session.model) {
+        // A change is only a change when both sides said something.
+        if (
+          previous !== null &&
+          previous.sessionId === sessionId &&
+          previous.model !== null &&
+          session.model !== null &&
+          previous.model !== session.model
+        ) {
           events.push(this.build({ type: "model_changed", from: previous.model, to: session.model }, sessionId, path, ts, raw))
         }
         return events
@@ -501,7 +534,14 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
       case ClaudeSystemSubtype.CompactBoundary: {
         const meta = asRecord(line.compact_metadata)
         return this.wrap(
-          { type: "context_compacted", trigger: asString(meta.trigger), preTokens: asNumber(meta.pre_tokens), postTokens: asNumber(meta.post_tokens) },
+          {
+            type: "context_compacted",
+            trigger: asString(meta.trigger),
+            preTokens: asNumber(meta.pre_tokens),
+            postTokens: asNumber(meta.post_tokens),
+            droppedTokens: asNumber(meta.cumulative_dropped_tokens),
+            durationMs: asNumber(meta.duration_ms),
+          },
           sessionId,
           path,
           ts,
@@ -743,7 +783,14 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
         usage: normalizeUsage(line.usage, asNumber(line.total_cost_usd)),
         durationMs: asNumber(line.duration_ms),
         numTurns: asNumber(line.num_turns),
-        permissionDenials: Array.isArray(line.permission_denials) ? line.permission_denials : [],
+        permissionDenials: asArray(line.permission_denials).map((entry) => {
+          const denial = asRecord(entry)
+          return {
+            toolName: asString(denial.tool_name) ?? "",
+            callId: asString(denial.tool_use_id) ?? "",
+            input: denial.tool_input ?? null,
+          }
+        }),
       },
       sessionId,
       path,
@@ -956,6 +1003,7 @@ function taskUsage(usage: Record<string, JsonValue>): Usage | null {
     outputTokens: null,
     cacheReadTokens: null,
     cacheCreationTokens: null,
+    reasoningTokens: null,
   }
 }
 
