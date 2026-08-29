@@ -41,10 +41,11 @@ import {
   SegmentedControlOption,
   type PillComposerRimVariant,
   SectionedListbox,
+  RandomAvatar,
   type ModelPickerGroup,
   type ModelPickerValue,
 } from "@nessa-ui/react"
-import { Folder, Image as ImageIcon, Paperclip, Plus, SlidersHorizontal, Sparkles, Puzzle, Square, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, Folder, Image as ImageIcon, Paperclip, Plus, SlidersHorizontal, Sparkles, Puzzle, Square, X } from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"
 import {
@@ -301,6 +302,132 @@ interface DemoMessage {
   reaction?: string
   /** True while this assistant reply is still streaming in. */
   streaming?: boolean
+  /** Subagent ids this assistant turn spawned, rendered as drill-in chips. */
+  spawned?: string[]
+}
+
+interface DemoSubagent {
+  id: string
+  name: string
+  task: string
+  status: "running" | "done"
+}
+
+/** The tab id a subagent's own conversation lives under. */
+const subagentTabId = (id: string) => `sub:${id}`
+
+const demoSubagents: Record<string, DemoSubagent> = {
+  explorer: {
+    id: "explorer",
+    name: "Explorer",
+    task: "Map the composer call sites",
+    status: "done",
+  },
+  reviewer: {
+    id: "reviewer",
+    name: "Reviewer",
+    task: "Review the transcript diff",
+    status: "running",
+  },
+}
+
+// The seeded "Repo audit" conversation: an agent turn that split its work
+// across two subagents, each with its own transcript under a sub: tab. Ids
+// sit far above the live counter so canned replies never collide.
+const auditTabId = "audit"
+const seededMessagesByTab: Record<string, DemoMessage[]> = {
+  [auditTabId]: [
+    {
+      id: 901,
+      role: "user",
+      text: "Where do we compose the chat composer today, and is the transcript diff safe to land?",
+    },
+    {
+      id: 902,
+      role: "assistant",
+      text: "I'll split that: one agent maps the composer call sites while another reviews the diff.",
+      spawned: ["explorer", "reviewer"],
+    },
+    {
+      id: 903,
+      role: "assistant",
+      text: "Explorer is back — nine call sites, one of them re-implements the footer. Reviewer has two findings so far and is still going.",
+    },
+    {
+      id: 904,
+      role: "user",
+      text: "Show me the reviewer's findings as they land.",
+    },
+  ],
+  [subagentTabId("explorer")]: [
+    {
+      id: 911,
+      role: "user",
+      text: "Find every place the ChatComposer primitives are composed into a full surface, and note which slots each one uses.",
+    },
+    {
+      id: 912,
+      role: "assistant",
+      text: "Nine call sites. The app shell panes and the message edit-in-place both use the compact size; only the catalog stories use attachment rows. Full table in the report.",
+    },
+    {
+      id: 913,
+      role: "assistant",
+      text: "One surprise: composer-queue re-implements the footer row instead of using ChatComposerFooter — worth folding back.",
+    },
+  ],
+  [subagentTabId("reviewer")]: [
+    {
+      id: 921,
+      role: "user",
+      text: "Review the transcript virtualization diff for correctness and accessibility regressions.",
+    },
+    {
+      id: 922,
+      role: "assistant",
+      text: "Two findings so far: the log role moved off the scrolling element, and the pinned-state check reads layout in a loop. Still reading the resize path…",
+    },
+  ],
+}
+
+/**
+ * A drill-in chip for a subagent an assistant turn spawned: watercolor
+ * avatar, name, status line, and a chevron; clicking opens that subagent's
+ * own conversation as a tab.
+ */
+function SubagentChip({
+  sub,
+  onOpen,
+}: {
+  sub: DemoSubagent
+  onOpen: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full items-center gap-2 rounded-xl border border-border bg-card px-2.5 py-2 text-start font-sans shadow-xs outline-none transition-colors hover:bg-accent focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+    >
+      <RandomAvatar
+        seed={sub.id}
+        busy={sub.status === "running"}
+        className="size-7"
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate nessa-text-2 font-medium">
+          {sub.name}
+        </span>
+        <span className="block truncate nessa-text-1 text-muted-foreground">
+          {sub.status === "running" ? "Running · " : "Done · "}
+          {sub.task}
+        </span>
+      </span>
+      <ChevronRight
+        aria-hidden="true"
+        className="size-3.5 shrink-0 text-muted-foreground"
+      />
+    </button>
+  )
 }
 
 /**
@@ -564,15 +691,22 @@ function attachmentSummary(attachments: DemoAttachment[]) {
  * space on a standing picker. The rim lights while the "agent" works and a
  * canned reply lands.
  */
-function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
+function PlaygroundExample({
+  replyDelay = 900,
+  initialTabId = "chat-1",
+}: {
+  replyDelay?: number
+  initialTabId?: string
+}) {
   const [message, setMessage] = React.useState("")
   const [tabs, setTabs] = React.useState([
     { id: "chat-1", title: "Release notes" },
+    { id: auditTabId, title: "Repo audit" },
   ] as { id: string; title: string; closeable?: boolean }[])
-  const [activeTabId, setActiveTabId] = React.useState("chat-1")
+  const [activeTabId, setActiveTabId] = React.useState(initialTabId)
   const [messagesByTab, setMessagesByTab] = React.useState<
     Record<string, DemoMessage[]>
-  >({})
+  >(seededMessagesByTab)
   const messages = messagesByTab[activeTabId] ?? []
   const updateMessages = React.useCallback(
     (tabId: string, updater: (current: DemoMessage[]) => DemoMessage[]) =>
@@ -661,6 +795,29 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
   }
 
   const lastUserId = [...messages].reverse().find((entry) => entry.role === "user")?.id
+
+  // The subagent whose conversation is on screen, when a sub: tab is active.
+  const activeSubagent = activeTabId.startsWith("sub:")
+    ? demoSubagents[activeTabId.slice("sub:".length)]
+    : undefined
+
+  /** Opens (or re-fronts) a subagent's conversation as its own tab. */
+  const openSubagent = (id: string) => {
+    const tabId = subagentTabId(id)
+    setTabs((current) =>
+      current.some((tab) => tab.id === tabId)
+        ? current
+        : [
+            ...current,
+            { id: tabId, title: demoSubagents[id]!.name, closeable: true },
+          ],
+    )
+    setActiveTabId(tabId)
+    setReplyTarget(null)
+    setMenuTargetId(null)
+    setViewerAttachments(null)
+    setModelCardOpen(false)
+  }
 
   const addAttachment = (kind: DemoAttachmentKind) => {
     const samples = attachmentSamples[kind]
@@ -753,10 +910,25 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
           the busy dot follows wherever a reply streams. */}
       <ChatTabs
         className="px-1"
-        tabs={tabs.map((tab) => ({
-          ...tab,
-          loading: generatingTabId === tab.id,
-        }))}
+        tabs={tabs.map((tab) => {
+          // A subagent tab carries its watercolor avatar as the glyph; a
+          // running subagent's avatar animates (busy), which already says
+          // "working" — so the tab's own busy dot stays off for them.
+          const sub = tab.id.startsWith("sub:")
+            ? demoSubagents[tab.id.slice("sub:".length)]
+            : undefined
+          return {
+            ...tab,
+            icon: sub ? (
+              <RandomAvatar
+                seed={sub.id}
+                busy={sub.status === "running"}
+                className="size-4"
+              />
+            ) : undefined,
+            loading: sub ? false : generatingTabId === tab.id,
+          }
+        })}
         value={activeTabId}
         onValueChange={(id) => {
           setActiveTabId(id)
@@ -810,9 +982,21 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
         role="log"
         className="flex min-h-0 flex-1 flex-col justify-end gap-2 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
+        {activeSubagent ? (
+          // The provenance line is itself the way back: one tap returns to
+          // the conversation this subagent was spawned from.
+          <button
+            type="button"
+            onClick={() => setActiveTabId(auditTabId)}
+            className="mx-auto inline-flex items-center gap-1 rounded-full border-0 bg-transparent px-2.5 py-1 font-sans nessa-text-1 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            <ChevronLeft aria-hidden="true" className="size-3" />
+            Subagent · {activeSubagent.task}
+          </button>
+        ) : null}
         {messages.map((entry) => (
+          <React.Fragment key={entry.id}>
           <DemoBubble
-            key={entry.id}
             message={entry}
             delivered={entry.id === lastUserId}
             onOpenAttachments={setViewerAttachments}
@@ -847,6 +1031,18 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
             }}
 
           />
+          {entry.spawned ? (
+            <div className="me-8 flex max-w-[85%] flex-col gap-1.5 self-start">
+              {entry.spawned.map((id) => (
+                <SubagentChip
+                  key={id}
+                  sub={demoSubagents[id]!}
+                  onOpen={() => openSubagent(id)}
+                />
+              ))}
+            </div>
+          ) : null}
+          </React.Fragment>
         ))}
         {generating && !messages.some((message) => message.streaming) ? (
           <ChatTypingIndicator label="Assistant is typing" />
@@ -965,7 +1161,13 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
             ref={inputRef}
             value={message}
             onChange={(event) => setMessage(event.target.value)}
-            placeholder={replyTarget ? "Reply" : "Ask me anything"}
+            placeholder={
+              replyTarget
+                ? "Reply"
+                : activeSubagent
+                  ? `Message ${activeSubagent.name}…`
+                  : "Ask me anything"
+            }
             className={cn("self-center", listening && "text-muted-foreground")}
           />
           {generating ? (
@@ -1649,6 +1851,66 @@ export const Playground: Story = {
     await userEvent.type(input, " tomorrow")
     await expect((input as HTMLTextAreaElement).value).toMatch(/ tomorrow$/)
     await waitForSettledAnimations(canvasElement)
+  },
+}
+
+export const Subagents: Story = {
+  tags: ["reduced-motion"],
+  parameters: storyDocumentation(
+    "The playground opened on the seeded Repo audit tab, where an agent turn split its work across two subagents. Each subagent renders as a drill-in chip under the spawning bubble — watercolor avatar, name, and status, the avatar animating while it runs — and clicking one opens that subagent's own conversation as a closeable tab whose glyph is the same animating avatar, so no busy dot is needed. Inside, the provenance line above the transcript ('‹ Subagent · task') is itself the way back to the parent conversation, the composer retargets to the subagent, and every chat capability — tapbacks, replies, dictation — works unchanged.",
+  ),
+  render: () => <PlaygroundExample initialTabId={auditTabId} />,
+  play: async ({ canvasElement }) => {
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
+    const canvas = within(canvasElement)
+    // The seeded audit conversation surfaces both subagent chips.
+    const reviewerChip = await canvas.findByRole("button", {
+      name: /Reviewer.*Running/,
+    })
+    await expect(
+      canvas.getByRole("button", { name: /Explorer.*Done/ }),
+    ).toBeInTheDocument()
+    // Drilling in opens the subagent as a closeable tab and swaps the
+    // transcript to its conversation; a running subagent's tab shows no
+    // busy dot — its animating avatar already carries that meaning.
+    await userEvent.click(reviewerChip)
+    const reviewerTab = await canvas.findByRole("tab", { name: /Reviewer/ })
+    await expect(reviewerTab).toHaveAttribute("aria-selected", "true")
+    await expect(
+      reviewerTab.querySelector('[data-slot="chat-tab-loading"]'),
+    ).toBeNull()
+    await expect(
+      canvas.getByText(/Two findings so far/),
+    ).toBeInTheDocument()
+    await expect(
+      canvas.getByRole("textbox", { name: "Message" }),
+    ).toHaveAttribute("placeholder", "Message Reviewer…")
+    // The provenance line above the transcript is the way back.
+    const back = canvas.getByRole("button", {
+      name: /Subagent · Review the transcript diff/,
+    })
+    await userEvent.click(back)
+    await expect(
+      canvas.getByText(/Explorer is back — nine call sites/),
+    ).toBeInTheDocument()
+    // The Reviewer tab stays parked in the strip for hopping back.
+    await expect(
+      canvas.getByRole("tab", { name: /Reviewer/ }),
+    ).toHaveAttribute("aria-selected", "false")
+    // The messages pop in on a transition; the a11y pass that follows the
+    // play reads computed colors, so the finite animations must settle
+    // first. The busy subagent avatars animate forever by design, so only
+    // finite animations count here.
+    await waitFor(() => {
+      const running = canvasElement
+        .getAnimations({ subtree: true })
+        .filter(
+          (animation) =>
+            animation.playState === "running" &&
+            animation.effect?.getTiming().iterations !== Infinity,
+        )
+      expect(running).toHaveLength(0)
+    }, { timeout: 4000 })
   },
 }
 
