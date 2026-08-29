@@ -40,3 +40,11 @@ Git state.
   special case unless that scenario is itself an explicit product contract.
 - At handoff, explain the relevant before-and-after code path in detail with a
   Mermaid diagram.
+
+## Debugging interactive components
+
+When diagnosing or building interactive/animated components (scroll sync,
+animation timing, focus behavior), read
+[docs/testing/interaction-debugging.md](./docs/testing/interaction-debugging.md)
+— it covers the dev-only `debug` trace pattern and the
+reproduce-then-read-the-trace workflow that replaces screen recordings.

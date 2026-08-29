@@ -49,6 +49,7 @@ type FocusComponent =
   | "checkbox"
   | "dropdown-menu"
   | "pagination"
+  | "page-outline"
   | "table/table"
   | "table/table-toolbar"
   | "split-view/split-view-separator"
@@ -174,6 +175,15 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     state: "focus-visible",
     className: "focus-visible:outline-ring",
     count: 2,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  {
+    component: "page-outline",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -476,6 +486,10 @@ export const focusGeometryClasses = Object.freeze([
   { component: "gantt-chart/gantt-chart-grid", className: "focus-visible:ring-offset-0", count: 1 },
   { component: "conversation-rail", className: "focus-visible:outline-2", count: 1 },
   { component: "conversation-rail", className: "focus-visible:outline-offset-2", count: 1 },
+  // The page-outline rows sit inside their own scrolling region, so the
+  // outline draws inset — an outset ring would be swallowed at its edges.
+  { component: "page-outline", className: "focus-visible:outline-2", count: 1 },
+  { component: "page-outline", className: "focus-visible:-outline-offset-2", count: 1 },
   { component: "kanban/kanban-card", className: "focus-visible:outline-2", count: 1 },
   { component: "kanban/kanban-column", className: "focus-visible:outline-2", count: 1 },
   { component: "kanban/kanban-column", className: "focus-visible:outline-offset-2", count: 1 },
