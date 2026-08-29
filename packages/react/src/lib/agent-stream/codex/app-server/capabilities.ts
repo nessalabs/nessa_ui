@@ -6,9 +6,9 @@ import type {
   CapabilityModel,
   CapabilityPluginSource,
   CapabilitySkill,
-} from "../capabilities"
-import { asArray, asNumber, asRecord, asString } from "../json"
-import type { JsonValue } from "../json"
+} from "../../capabilities"
+import { asArray, asNumber, asRecord, asString } from "../../json"
+import type { JsonValue } from "../../json"
 
 /**
  * Codex reports capabilities on a different channel from its stream.

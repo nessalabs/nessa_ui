@@ -7,11 +7,15 @@ import test from "node:test"
 
 import { TranscriptBuilder } from "./builder"
 import { AgentEventType, isEvent } from "./events"
-import { CODEX_EVENT_MAPPING, codexWireKind } from "./codex/mapping"
-import { CODEX_CAPABILITY_METHODS, codexCapabilities } from "./codex/capabilities"
-import { CodexStreamMapper, mapCodexStream } from "./codex/mapper"
-import { CodexItemType, CodexWireType, parseCodexLines } from "./codex/wire"
-import { applyDeltas, buildTranscript, isToolGroup } from "./transcript"
+import { CODEX_EVENT_MAPPING, codexWireKind } from "./codex/exec/mapping"
+import { CODEX_CAPABILITY_METHODS, codexCapabilities } from "./codex/app-server/capabilities"
+import { CodexStreamMapper, mapCodexStream } from "./codex/exec/mapper"
+import { CODEX_APP_SERVER_MAPPING, codexAppServerKind, codexAppServerMappingFor } from "./codex/app-server/mapping"
+import { mapCodexAppServerStream } from "./codex/app-server/mapper"
+import { CODEX_APP_SERVER_PROVENANCE, parseCodexAppServer } from "./codex/app-server/wire"
+import { transportOf } from "./transports"
+import { CODEX_EXEC_PROVENANCE, CodexItemType, CodexWireType, parseCodexLines } from "./codex/exec/wire"
+import { applyDeltas, buildTranscript, isToolGroup, previewOf } from "./transcript"
 
 const FIXTURES = fileURLToPath(new URL("../../../../../apps/storybook/stories/fixtures/agent-stream/codex/", import.meta.url))
 
@@ -277,4 +281,59 @@ test("a search reports what was searched, and only once it settles", () => {
   // the query lives where a detail view can read it.
   assert.equal(result!.text, "")
   assert.match(JSON.stringify(result!.structured), /TypeScript/)
+})
+
+/**
+ * The other Codex transport.
+ *
+ * `codex app-server` is JSON-RPC, not a stream of lines, and it reports the
+ * same agent's work differently enough that it needs its own reader: it
+ * carries the prompt, streams the answer, and settles items rather than
+ * publishing them once.
+ */
+test("the app-server carries what exec never does", () => {
+  const events = mapCodexAppServerStream(
+    readFileSync(`${FIXTURES}appserver_tools.jsonl`, "utf8"),
+  )
+
+  // The prompt, which `exec --json` never echoes — it is in the client's own
+  // `turn/start` request.
+  const prompts = events.filter((event) => event.payload.type === "user_message")
+  assert.equal(prompts.length, 1)
+  assert.match((prompts[0]!.payload as { text: string }).text, /notes\.txt/)
+
+  // And the token stream, which exec does not send at all.
+  const deltas = events.filter((event) => event.payload.type === "delta")
+  assert.ok(deltas.length > 5, "the answer arrived a token at a time")
+
+  // The committed message supersedes those deltas, joined on the same block.
+  const committed = events.find((event) => event.payload.type === "assistant_text")!
+  const block = (committed.payload as { block: { messageId: string; index: number } }).block
+  assert.equal(previewOf(applyDeltas(events), block), (committed.payload as { text: string }).text)
+
+  assert.equal(events.filter((event) => event.payload.type === "session_started").length, 1)
+})
+
+test("every app-server frame kind the capture contains is declared in its own table", () => {
+  for (const result of parseCodexAppServer(readFileSync(`${FIXTURES}appserver_tools.jsonl`, "utf8"))) {
+    if (!result.ok) continue
+    const frame = result.line as { method?: string; params?: { item?: { type?: string } } }
+    if (frame.method === undefined) continue
+    const kind = codexAppServerKind(frame.method, frame.params?.item?.type ?? null)
+    assert.notEqual(codexAppServerMappingFor(kind), null, `${kind} is not in CODEX_APP_SERVER_MAPPING`)
+  }
+})
+
+test("the two Codex transports are described separately, with their own commands", () => {
+  // They were one module until the app-server turned out to be a different
+  // protocol with a schema of its own.
+  assert.equal(CODEX_EXEC_PROVENANCE.command, "codex exec --json")
+  assert.equal(CODEX_APP_SERVER_PROVENANCE.command, "codex app-server")
+  assert.equal(CODEX_EVENT_MAPPING["thread/started"], undefined)
+  assert.equal(CODEX_APP_SERVER_MAPPING[CodexWireType.ThreadStarted], undefined)
+
+  // Streaming is now a recorded fact for the app-server rather than an
+  // unrecorded guess.
+  assert.equal(transportOf("codex", "exec")?.supports.streaming, false)
+  assert.equal(transportOf("codex", "app-server")?.supports.streaming, true)
 })

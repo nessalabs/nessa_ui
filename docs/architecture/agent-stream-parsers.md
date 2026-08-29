@@ -649,6 +649,25 @@ Capabilities come from a fourth place for the first two: `opencode models` and
 `opencode agent list` print them, and neither of those wires does. ACP answers
 for itself.
 
+### ACP: one protocol, three agents
+
+This started as an opencode module and moved out, because it turned out not to
+be an opencode thing at all. Claude Code and Codex both speak ACP through Zed's
+adapters — `@zed-industries/claude-code-acp` and
+`@agentclientprotocol/codex-acp` — and the *same reader* maps all three
+captures without a change. That is the strongest evidence in this repository
+that the contract is real rather than aspirational.
+
+It also moves capability off the agent and onto the transport in a way that is
+easy to state: Claude Code asks for permission over ACP without the stdio flag
+its own stream needs, and Codex streams tokens over ACP where `exec --json`
+sends none. Neither is a property of the agent.
+
+Two practical notes. The Claude adapter refuses to start inside another Claude
+Code session unless `CLAUDECODE` is unset. And an agent may extend the protocol
+under `_meta` — Codex sends a `session_info_update` doing exactly that — so a
+reader has to tolerate an extension rather than treat it as an unknown frame.
+
 ### Which version each of these is true of
 
 None of these shapes is a published contract, and two of the three CLIs put no
@@ -658,10 +677,19 @@ description was read from, next to the command that produces it:
 | Provider | Transport | Build | Command |
 | --- | --- | --- | --- |
 | Claude Code | stream-json | 2.1.251 | `claude -p --output-format stream-json …` |
+| Claude Code | acp | adapter 0.16.2 | `npx @zed-industries/claude-code-acp` |
 | codex-cli | exec | 0.144.1 | `codex exec --json` |
+| codex-cli | app-server | 0.144.1 | `codex app-server` |
+| codex-cli | acp | adapter 1.7.0 | `npx @agentclientprotocol/codex-acp` |
 | opencode | run | 1.18.25 | `opencode run --format json` |
 | opencode | serve | 1.18.25, **API 1.0.0** | `opencode serve → GET /event` |
 | opencode | acp | 1.18.25, **protocol 1** | `opencode acp` |
+
+Nine transports over six wires, because two of them are the same wire twice:
+Claude's duplex mode is its own stream with stdin open, and ACP is one protocol
+shared by three agents. The modules follow that exactly — `claude/stream/`,
+`codex/exec/`, `codex/app-server/`, `opencode/run/`, `opencode/server/`, and
+`acp/` beside them rather than inside any one agent.
 
 Per *transport*, not per provider, because a provider can speak more than one
 protocol and they version independently — opencode's server declares its own

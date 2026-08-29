@@ -26,8 +26,16 @@ export interface TransportSupport {
   readonly namesModel: Supported
   /** Reports structured file edits rather than opaque file tool calls. */
   readonly fileEdits: Supported
-  /** Carries more than one session, so a reader must filter by session id. */
-  readonly multiSession: Supported
+  /**
+   * The connection is a bus: it carries every session on the server, not only
+   * the one being watched, so a reader has to filter by session id.
+   *
+   * Not "can this agent have several sessions" — every one of them can. It is
+   * about whether *this* stream mixes them, which changes how a consumer reads
+   * it. A one-process-per-session transport is `false` and none the worse for
+   * it.
+   */
+  readonly sharedBus: Supported
   /** Lets a client open, list, resume or fork a session rather than only starting one. */
   readonly sessionControl: Supported
   /** Reports the context window's size, not just how much of it was used. */
@@ -77,6 +85,13 @@ const CODEX_EXEC_PROVENANCE: WireProvenance = Object.freeze({
   capturedOn: "2026-08-29",
 })
 
+const CODEX_APP_SERVER: WireProvenance = Object.freeze({
+  cli: "codex-cli",
+  version: "0.144.1",
+  command: "codex app-server",
+  capturedOn: "2026-08-29",
+})
+
 const OPENCODE_RUN: WireProvenance = Object.freeze({
   cli: "opencode",
   version: "1.18.25",
@@ -95,6 +110,24 @@ const OPENCODE_ACP: WireProvenance = Object.freeze({
   cli: "opencode",
   version: "1.18.25",
   command: "opencode acp",
+  capturedOn: "2026-08-29",
+})
+
+/**
+ * Claude Code and Codex reach ACP through Zed's adapters rather than a
+ * subcommand of their own, so the build that matters is the adapter's.
+ */
+const CLAUDE_ACP: WireProvenance = Object.freeze({
+  cli: "@zed-industries/claude-code-acp",
+  version: "0.16.2",
+  command: "npx @zed-industries/claude-code-acp",
+  capturedOn: "2026-08-29",
+})
+
+const CODEX_ACP: WireProvenance = Object.freeze({
+  cli: "@agentclientprotocol/codex-acp",
+  version: "1.7.0",
+  command: "npx @agentclientprotocol/codex-acp",
   capturedOn: "2026-08-29",
 })
 
@@ -123,7 +156,7 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
           steering: false,
           namesModel: true,
           fileEdits: false,
-          multiSession: false,
+          sharedBus: false,
           sessionControl: false,
           contextWindow: false,
         }),
@@ -142,11 +175,30 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
           steering: true,
           namesModel: true,
           fileEdits: false,
-          multiSession: false,
+          sharedBus: false,
           sessionControl: false,
           contextWindow: false,
         }),
         note: "The same stream with stdin open: prompts and steering go in, and control requests answer approvals.",
+      }),
+      Object.freeze({
+        id: "acp",
+        label: "acp",
+        command: "npx @zed-industries/claude-code-acp",
+        interactive: true,
+        provenance: CLAUDE_ACP,
+        supports: Object.freeze({
+          streaming: true,
+          capabilities: true,
+          approvals: true,
+          steering: true,
+          namesModel: true,
+          fileEdits: true,
+          sharedBus: false,
+          sessionControl: true,
+          contextWindow: false,
+        }),
+        note: "Claude Code through Zed's ACP adapter. It asks for permission over the protocol without the stdio flag its own stream needs, and `session/new` advertises the models it can switch to. Refuses to start inside another Claude Code session unless CLAUDECODE is unset.",
       }),
     ]),
   }),
@@ -167,7 +219,7 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
           steering: false,
           namesModel: false,
           fileEdits: true,
-          multiSession: false,
+          sharedBus: false,
           sessionControl: false,
           contextWindow: false,
         }),
@@ -178,22 +230,42 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
         label: "app-server",
         command: "codex app-server",
         interactive: true,
-        provenance: CODEX_EXEC_PROVENANCE,
+        provenance: CODEX_APP_SERVER,
         supports: Object.freeze({
-          // Driven for its capability replies and its approval exchange, never
-          // for a long answer, so whether it streams is unrecorded rather than
-          // known to be false.
-          streaming: null,
+          // Recorded now: a driven session sent fifteen agentMessage deltas for
+          // one short answer, which `exec --json` never sends at all.
+          streaming: true,
           capabilities: true,
           approvals: true,
           steering: true,
           namesModel: true,
           fileEdits: true,
-          multiSession: null,
+          // A thread is opened explicitly and its notifications name it, but a
+          // single connection was only ever driven for one.
+          sharedBus: null,
           sessionControl: true,
-          contextWindow: null,
+          contextWindow: false,
         }),
-        note: "Interactive JSON-RPC. Answers model, skill, plugin and hook lists on request, and asks before running untrusted commands.",
+        note: "Interactive JSON-RPC. Answers model, skill, plugin and hook lists on request, streams the answer as agentMessage deltas, and asks before running untrusted commands.",
+      }),
+      Object.freeze({
+        id: "acp",
+        label: "acp",
+        command: "npx @agentclientprotocol/codex-acp",
+        interactive: true,
+        provenance: CODEX_ACP,
+        supports: Object.freeze({
+          streaming: true,
+          capabilities: true,
+          approvals: true,
+          steering: true,
+          namesModel: true,
+          fileEdits: true,
+          sharedBus: false,
+          sessionControl: true,
+          contextWindow: false,
+        }),
+        note: "Codex through the ACP adapter. Streams where `exec --json` does not, and `session/new` reports the sandbox modes — read-only, auto, full-access — that are its nearest thing to a permission mode.",
       }),
     ]),
   }),
@@ -214,7 +286,7 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
           steering: false,
           namesModel: false,
           fileEdits: true,
-          multiSession: false,
+          sharedBus: false,
           sessionControl: false,
           contextWindow: false,
         }),
@@ -233,7 +305,7 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
           steering: true,
           namesModel: true,
           fileEdits: true,
-          multiSession: true,
+          sharedBus: true,
           sessionControl: true,
           contextWindow: false,
         }),
@@ -256,7 +328,7 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
           fileEdits: true,
           // One connection, one conversation: sessions are opened explicitly
           // rather than multiplexed onto a shared bus.
-          multiSession: false,
+          sharedBus: false,
           sessionControl: true,
           contextWindow: true,
         }),

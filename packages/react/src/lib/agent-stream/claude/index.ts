@@ -10,9 +10,9 @@ export {
   claudeWireKind,
   type ClaudeMappingEntry,
   type ClaudeWireKind,
-} from "./mapping"
-export { ClaudeStreamMapper, mapClaudeStream } from "./mapper"
-export { groupTools as groupCapabilityTools, mcpServerOf, sessionCapabilities } from "./capabilities"
+} from "./stream/mapping"
+export { ClaudeStreamMapper, mapClaudeStream } from "./stream/mapper"
+export { groupTools as groupCapabilityTools, mcpServerOf, sessionCapabilities } from "./stream/capabilities"
 export {
   collectTranscriptRefs,
   parseSubagentMeta,
@@ -53,4 +53,4 @@ export {
   type WireParseResult,
   type WireStreamFrame,
   type WireUsage,
-} from "./wire"
+} from "./stream/wire"

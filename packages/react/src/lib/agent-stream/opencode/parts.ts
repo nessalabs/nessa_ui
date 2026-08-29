@@ -1,6 +1,7 @@
 /** @responsibility Describes the message parts both opencode transports carry, and turns one into normalized events. */
 
 import { PlanStepStatus, TaskKind } from "../events"
+import { EventSink } from "../emitter"
 import type {
   AgentEvent,
   AgentEventPayload,
@@ -282,152 +283,105 @@ export function bareSession(sessionId: string, initIndex: number): SessionInfo {
  * carried it. What differs between the two — how a session is announced, when a
  * turn ends, whether anything streams — stays in each transport's own mapper.
  */
-export class OpencodeEmitter {
-  private seq: number
-  /** The session a line belongs to, so every event is stamped with its own. */
-  current: string | null = null
-  /** The first session seen, which is what a single-session consumer means by "the" session. */
-  primary: string | null = null
-  /** Sessions already announced. The server's bus carries more than one. */
-  readonly openedSessions = new Set<string>()
-  /** Messages the server said were the user's, so their text parts read as the prompt. */
-  readonly userMessages = new Set<string>()
-  /** The model in force per session, so a change is reported as one rather than restated. */
-  readonly models = new Map<string, string>()
-  /**
-   * Which index each streamed part holds in its message.
-   *
-   * The server identifies a block by a part id; a `BlockRef` identifies one by
-   * position. Assigning positions in order of first appearance keeps a delta
-   * joinable to the part that supersedes it, without widening the shared
-   * contract for one provider's id scheme.
-   */
-  private readonly partIndex = new Map<string, number>()
 
-  constructor(startSeq = 0) {
-    this.seq = startSeq
-  }
+/**
+ * One settled call, as the pair of events a consumer's tool row expects.
+ *
+ * opencode publishes the call once, with input and result together. Emitting
+ * only a completion would leave a row that never opened; emitting both keeps
+ * every provider's tool rows built the same way, and the two simply share a
+ * line here.
+ */
+export function toolEvents(
+  emit: EventSink,
+  part: Record<string, JsonValue>,
+  raw: JsonValue,
+  ts: string | null,
+): readonly AgentEvent[] {
+  const tool = asString(part.tool) ?? "unknown"
+  const callId = asString(part.callID) ?? asString(part.id) ?? "unknown"
+  const state = asRecord(part.state)
+  const input = asRecord(state.input)
+  const status = asString(state.status)
+  const events: AgentEvent[] = [
+    emit.build(
+      {
+        type: "tool_call_started",
+        callId,
+        name: tool,
+        kind: opencodeToolKind(tool),
+        input: state.input ?? null,
+        title: toolTitle(tool, input, asString(state.title)),
+      },
+      raw,
+      ts,
+    ),
+  ]
 
-  build(payload: AgentEventPayload, raw: JsonValue, ts: string | null): AgentEvent {
-    const seq = this.seq
-    this.seq += 1
-    const sessionId = this.current ?? this.primary ?? "unknown"
-    return { id: `${sessionId}:${seq}`, sessionId, seq, ts, agentPath: [], payload, raw }
-  }
+  // A call still running has opened but not settled. The one-way stream
+  // publishes calls already settled; the server's bus does not, and this is
+  // what keeps it from reporting a result nobody produced.
+  if (status === OpencodeToolStatus.Pending || status === OpencodeToolStatus.Running) return events
 
-  /** A part's position in its message, assigned in order of first appearance. */
-  indexOf(messageId: string, partId: string): number {
-    const key = `${messageId}:${partId}`
-    const existing = this.partIndex.get(key)
-    if (existing !== undefined) return existing
-    let next = 0
-    for (const stored of this.partIndex.keys()) if (stored.startsWith(`${messageId}:`)) next += 1
-    this.partIndex.set(key, next)
-    return next
-  }
+  const metadata = asRecord(state.metadata)
 
-  /** The block a settled part occupies, so a preview can be superseded by it. */
-  blockOf(part: Record<string, JsonValue>): { messageId: string; index: number } | null {
-    const messageId = asString(part.messageID)
-    const partId = asString(part.id)
-    if (messageId === null || partId === null) return null
-    return { messageId, index: this.indexOf(messageId, partId) }
-  }
-
-  /**
-   * One settled call, as the pair of events a consumer's tool row expects.
-   *
-   * opencode publishes the call once, with input and result together. Emitting
-   * only a completion would leave a row that never opened; emitting both keeps
-   * every provider's tool rows built the same way, and the two simply share a
-   * line here.
-   */
-  tool(part: Record<string, JsonValue>, raw: JsonValue, ts: string | null): readonly AgentEvent[] {
-    const tool = asString(part.tool) ?? "unknown"
-    const callId = asString(part.callID) ?? asString(part.id) ?? "unknown"
-    const state = asRecord(part.state)
-    const input = asRecord(state.input)
-    const status = asString(state.status)
-    const events: AgentEvent[] = [
-      this.build(
+  if (tool === OpencodeToolName.Task) {
+    events.push(
+      emit.build(
         {
-          type: "tool_call_started",
+          type: "task_started",
+          taskId: callId,
           callId,
-          name: tool,
-          kind: opencodeToolKind(tool),
-          input: state.input ?? null,
-          title: toolTitle(tool, input, asString(state.title)),
+          taskKind: OPENCODE_TASK_KIND,
+          // The agent's own name, which opencode puts on the call's input —
+          // so a delegation can be labelled without waiting for its result.
+          label: asString(input.subagent_type) ?? tool,
+          description: asString(input.description) ?? asString(state.title) ?? "",
+          prompt: asString(input.prompt),
+          // Unlike the other two providers this names the child's own
+          // session, and `opencode export <id>` reads it. Delegated work here
+          // is readable, not merely watchable.
+          transcriptId: asString(metadata.sessionId),
         },
         raw,
         ts,
       ),
-    ]
-
-    // A call still running has opened but not settled. The one-way stream
-    // publishes calls already settled; the server's bus does not, and this is
-    // what keeps it from reporting a result nobody produced.
-    if (status === OpencodeToolStatus.Pending || status === OpencodeToolStatus.Running) return events
-
-    const metadata = asRecord(state.metadata)
-
-    if (tool === OpencodeToolName.Task) {
-      events.push(
-        this.build(
-          {
-            type: "task_started",
-            taskId: callId,
-            callId,
-            taskKind: OPENCODE_TASK_KIND,
-            // The agent's own name, which opencode puts on the call's input —
-            // so a delegation can be labelled without waiting for its result.
-            label: asString(input.subagent_type) ?? tool,
-            description: asString(input.description) ?? asString(state.title) ?? "",
-            prompt: asString(input.prompt),
-            // Unlike the other two providers this names the child's own
-            // session, and `opencode export <id>` reads it. Delegated work here
-            // is readable, not merely watchable.
-            transcriptId: asString(metadata.sessionId),
-          },
-          raw,
-          ts,
-        ),
-      )
-    }
-
-    const result = resultOf(state)
-    events.push(this.build({ type: "tool_call_completed", callId, result }, raw, ts))
-
-    if (tool === OpencodeToolName.TodoWrite) {
-      const steps = planOf(input)
-      if (steps.length > 0) events.push(this.build({ type: "plan_updated", steps }, raw, ts))
-    }
-
-    if (tool === OpencodeToolName.Write || tool === OpencodeToolName.Edit || tool === OpencodeToolName.Patch) {
-      // Only a call that actually ran changed anything: a refused write must
-      // not be reported as an edit that happened.
-      const edits = status === OpencodeToolStatus.Error ? [] : editsOf(tool, input)
-      if (edits.length > 0) events.push(this.build({ type: "file_edits", callId, edits }, raw, ts))
-    }
-
-    if (tool === OpencodeToolName.Task) {
-      events.push(
-        this.build(
-          {
-            type: "task_completed",
-            taskId: callId,
-            callId,
-            status: status ?? "completed",
-            summary: result.text === "" ? null : result.text,
-            usage: null,
-          },
-          raw,
-          ts,
-        ),
-      )
-    }
-
-    return events
+    )
   }
+
+  const result = resultOf(state)
+  events.push(emit.build({ type: "tool_call_completed", callId, result }, raw, ts))
+
+  if (tool === OpencodeToolName.TodoWrite) {
+    const steps = planOf(input)
+    if (steps.length > 0) events.push(emit.build({ type: "plan_updated", steps }, raw, ts))
+  }
+
+  if (tool === OpencodeToolName.Write || tool === OpencodeToolName.Edit || tool === OpencodeToolName.Patch) {
+    // Only a call that actually ran changed anything: a refused write must
+    // not be reported as an edit that happened.
+    const edits = status === OpencodeToolStatus.Error ? [] : editsOf(tool, input)
+    if (edits.length > 0) events.push(emit.build({ type: "file_edits", callId, edits }, raw, ts))
+  }
+
+  if (tool === OpencodeToolName.Task) {
+    events.push(
+      emit.build(
+        {
+          type: "task_completed",
+          taskId: callId,
+          callId,
+          status: status ?? "completed",
+          summary: result.text === "" ? null : result.text,
+          usage: null,
+        },
+        raw,
+        ts,
+      ),
+    )
+  }
+
+  return events
 }
 
 /**

@@ -3,7 +3,8 @@
 import type { AgentEvent, AgentStreamMapper, MapperOptions } from "../../events"
 import { asNumber, asRecord, asString } from "../../json"
 import type { JsonValue } from "../../json"
-import { OpencodeEmitter, OpencodeFinishReason, bareSession, usageOf } from "../parts"
+import { EventSink } from "../../emitter"
+import { OpencodeFinishReason, bareSession, usageOf, toolEvents } from "../parts"
 import { OpencodeRunType, parseOpencodeLine } from "./wire"
 import type { OpencodeRawLine } from "./wire"
 
@@ -15,10 +16,10 @@ import type { OpencodeRawLine } from "./wire"
  * its own sake rather than because the tool loop went round again.
  */
 export class OpencodeRunMapper implements AgentStreamMapper {
-  private readonly emit: OpencodeEmitter
+  private readonly emit: EventSink
 
   constructor(options: MapperOptions = {}) {
-    this.emit = new OpencodeEmitter(options.startSeq ?? 0)
+    this.emit = new EventSink(options.startSeq ?? 0)
   }
 
   /** Decodes and maps one line. An unreadable line becomes a single `error` event rather than nothing. */
@@ -105,7 +106,7 @@ export class OpencodeRunMapper implements AgentStreamMapper {
       }
 
       case OpencodeRunType.ToolUse:
-        return [...opened, ...this.emit.tool(part, raw, ts)]
+        return [...opened, ...toolEvents(this.emit, part, raw, ts)]
 
       default:
         return [...opened, this.emit.build({ type: "unknown", wireType: type, subtype: asString(part.type) }, raw, ts)]

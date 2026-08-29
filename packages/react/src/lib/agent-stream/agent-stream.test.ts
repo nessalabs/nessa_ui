@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url"
 import test from "node:test"
 
 import { AgentEventType, isEvent, type AgentEvent } from "./events"
-import { sessionCapabilities } from "./claude/capabilities"
+import { sessionCapabilities } from "./claude/stream/capabilities"
 import {
   collectTranscriptRefs,
   parseSubagentMeta,
@@ -17,9 +17,9 @@ import {
   workflowAgentTranscriptPath,
 } from "./claude/store"
 import { TranscriptBuilder } from "./builder"
-import { ClaudeStreamMapper, mapClaudeStream } from "./claude/mapper"
+import { ClaudeStreamMapper, mapClaudeStream } from "./claude/stream/mapper"
 import { applyDeltas, buildTranscript, isCompacting, isToolGroup, previewOf } from "./transcript"
-import { ClaudeSystemSubtype, ClaudeWireType, parseWireLines } from "./claude/wire"
+import { ClaudeSystemSubtype, ClaudeWireType, parseWireLines } from "./claude/stream/wire"
 import { asRecord } from "./json"
 
 const FIXTURES = fileURLToPath(new URL("../../../../../apps/storybook/stories/fixtures/agent-stream/", import.meta.url))

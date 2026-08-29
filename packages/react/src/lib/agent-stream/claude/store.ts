@@ -1,7 +1,7 @@
 /** @responsibility Locates the transcripts Claude Code writes to disk, which is where a delegated run's own conversation lives. */
 
 import { asNumber, asRecord, asString } from "../json"
-import type { JsonValue } from "./wire"
+import type { JsonValue } from "./stream/wire"
 
 /**
  * Where one session's files live.

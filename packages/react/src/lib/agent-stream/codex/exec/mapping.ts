@@ -1,8 +1,8 @@
 /** @responsibility States, as data, which Codex line kind becomes which normalized event. */
 
-import { AgentEventType, FileChange, PlanStepStatus, TaskKind, ToolKind } from "../events"
-import { asRecord, asString } from "../json"
-import type { JsonValue } from "../json"
+import { AgentEventType, FileChange, PlanStepStatus, TaskKind, ToolKind } from "../../events"
+import { asRecord, asString } from "../../json"
+import type { JsonValue } from "../../json"
 import { CodexFileChangeKind, CodexItemType, CodexWireType } from "./wire"
 import type { CodexRawLine } from "./wire"
 

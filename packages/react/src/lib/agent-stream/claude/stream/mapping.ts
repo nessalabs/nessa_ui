@@ -1,7 +1,7 @@
 /** @responsibility States, as data, which Claude Code line kind becomes which normalized event. */
 
-import { asRecord, asString } from "../json"
-import { AgentEventType, PlanStepStatus, TaskKind } from "../events"
+import { asRecord, asString } from "../../json"
+import { AgentEventType, PlanStepStatus, TaskKind } from "../../events"
 import {
   ClaudeTaskType,
   ClaudeContentBlockType,

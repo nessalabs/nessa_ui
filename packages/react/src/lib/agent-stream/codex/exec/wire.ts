@@ -1,17 +1,19 @@
 /** @responsibility Describes Codex's `exec --json` wire shapes and decodes one line into them without interpreting it. */
 
-import { parseJsonLine } from "../json"
-import type { JsonValue } from "../json"
-import type { WireProvenance } from "../events"
+import { parseJsonLine } from "../../json"
+import type { JsonValue } from "../../json"
+import type { WireProvenance } from "../../events"
 
 /**
  * The build these shapes were read from.
  *
- * Codex publishes no version on its stream, so this constant is the only
+ * Codex publishes no version on `exec --json`, so this constant is the only
  * record of which build the fixtures describe. `codex --version` is what a
- * maintainer compares it against.
+ * maintainer compares it against. The app-server is a different protocol with
+ * its own schema — see `app-server/` — which is why the two are described
+ * separately rather than as one provider's wire.
  */
-export const CODEX_WIRE_PROVENANCE: WireProvenance = Object.freeze({
+export const CODEX_EXEC_PROVENANCE: WireProvenance = Object.freeze({
   cli: "codex-cli",
   version: "0.144.1",
   command: "codex exec --json",

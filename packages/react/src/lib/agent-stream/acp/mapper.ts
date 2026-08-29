@@ -1,18 +1,14 @@
 /** @responsibility Turns `opencode acp` JSON-RPC frames into normalized agent events. */
 
-import type { AgentEvent, AgentStreamMapper, FileEdit, MapperOptions, PlanStep, SessionInfo } from "../../events"
-import { PlanStepStatus } from "../../events"
-import { asArray, asNumber, asRecord, asString } from "../../json"
-import type { JsonValue } from "../../json"
-import { OPENCODE_TASK_KIND, OpencodeEmitter, OpencodeToolName, opencodeToolKind, planOf } from "../parts"
-import type { OpencodeRawLine } from "../run/wire"
-import { opencodeAcpToolKind } from "./mapping"
-import {
-  OpencodeAcpMethod,
-  OpencodeAcpToolStatus,
-  OpencodeAcpUpdate,
-  parseOpencodeAcpLine,
-} from "./wire"
+import type { AgentEvent, AgentStreamMapper, FileEdit, MapperOptions, PlanStep, SessionInfo } from "../events"
+import { PlanStepStatus } from "../events"
+import { asArray, asNumber, asRecord, asString } from "../json"
+import type { JsonValue } from "../json"
+import { EventSink } from "../emitter"
+import { TaskKind } from "../events"
+import type { AcpRawFrame } from "./frame"
+import { acpToolKind, acpToolKindByName } from "./mapping"
+import { ACP_TOOL_NAME, AcpMethod, AcpToolStatus, AcpUpdate, parseAcpLine } from "./wire"
 
 /**
  * A call's kind, preferring opencode's own tool name over ACP's coarser one.
@@ -23,8 +19,26 @@ import {
  * name wins where it is recognised and the protocol's kind carries the rest.
  */
 function acpKind(title: string | null, kind: string | null) {
-  const byName = title === null ? "other" : opencodeToolKind(title)
-  return byName === "other" ? opencodeAcpToolKind(kind) : byName
+  const byName = acpToolKindByName(title)
+  return byName === null ? acpToolKind(kind) : byName
+}
+
+/**
+ * A `todowrite`-style call's list, read off the call's own input.
+ *
+ * ACP defines a `plan` update, and at least one agent does not use it: opencode
+ * sends its todo list as a tool call instead. Reading both is what makes a plan
+ * render whichever way an agent chose to report it.
+ */
+function acpPlanOf(input: Record<string, JsonValue>): readonly PlanStep[] {
+  const steps: PlanStep[] = []
+  for (const entry of asArray(input.todos)) {
+    const todo = asRecord(entry)
+    const content = asString(todo.content)
+    if (content === null) continue
+    steps.push({ id: asString(todo.id), content, status: planStatus(asString(todo.status)) })
+  }
+  return steps
 }
 
 /** ACP's plan statuses, mapped to ours. */
@@ -44,8 +58,8 @@ function planStatus(status: string | null): PlanStepStatus {
  * A client's own frames are mapped too. They are the only record of what was
  * asked, since ACP carries the prompt in the request rather than echoing it.
  */
-export class OpencodeAcpMapper implements AgentStreamMapper {
-  private readonly emit: OpencodeEmitter
+export class AcpMapper implements AgentStreamMapper {
+  private readonly emit: EventSink
   /** Which pending request id belongs to a prompt, so its reply can end the turn. */
   private readonly prompts = new Set<string>()
   /** Tool kinds by call id, so an update that omits the kind keeps the one the call opened with. */
@@ -60,12 +74,12 @@ export class OpencodeAcpMapper implements AgentStreamMapper {
   private readonly titles = new Map<string, string>()
 
   constructor(options: MapperOptions = {}) {
-    this.emit = new OpencodeEmitter(options.startSeq ?? 0)
+    this.emit = new EventSink(options.startSeq ?? 0)
   }
 
   /** Decodes and maps one frame. A blank line maps to nothing. */
   push(line: string): readonly AgentEvent[] {
-    const parsed = parseOpencodeAcpLine(line)
+    const parsed = parseAcpLine(line)
     if (parsed === null) return []
     if (!parsed.ok) {
       return [this.emit.build({ type: "error", message: `unreadable frame: ${parsed.reason}` }, { line: parsed.line }, null)]
@@ -74,7 +88,7 @@ export class OpencodeAcpMapper implements AgentStreamMapper {
   }
 
   /** Maps an already-decoded frame. */
-  map(event: OpencodeRawLine): readonly AgentEvent[] {
+  map(event: AcpRawFrame): readonly AgentEvent[] {
     const raw = event as JsonValue
     const frame = asRecord(raw)
     const method = asString(frame.method)
@@ -91,7 +105,7 @@ export class OpencodeAcpMapper implements AgentStreamMapper {
     }
 
     switch (method) {
-      case OpencodeAcpMethod.SessionPrompt: {
+      case AcpMethod.SessionPrompt: {
         // The request carries the prompt: this is the only one of opencode's
         // three wires where what was asked is on the wire at all.
         if (id !== null) this.prompts.add(id)
@@ -103,7 +117,7 @@ export class OpencodeAcpMapper implements AgentStreamMapper {
         return [this.emit.build({ type: "user_message", text, synthetic: false }, raw, null)]
       }
 
-      case OpencodeAcpMethod.SessionRequestPermission: {
+      case AcpMethod.SessionRequestPermission: {
         const call = asRecord(params.toolCall)
         return [
           this.emit.build(
@@ -130,7 +144,7 @@ export class OpencodeAcpMapper implements AgentStreamMapper {
         ]
       }
 
-      case OpencodeAcpMethod.SessionUpdate:
+      case AcpMethod.SessionUpdate:
         return this.update(asRecord(params.update), raw)
 
       default:
@@ -142,8 +156,8 @@ export class OpencodeAcpMapper implements AgentStreamMapper {
   private update(update: Record<string, JsonValue>, raw: JsonValue): readonly AgentEvent[] {
     const kind = asString(update.sessionUpdate)
     switch (kind) {
-      case OpencodeAcpUpdate.AgentMessageChunk:
-      case OpencodeAcpUpdate.AgentThoughtChunk: {
+      case AcpUpdate.AgentMessageChunk:
+      case AcpUpdate.AgentThoughtChunk: {
         const text = asString(asRecord(update.content).text)
         if (text === null || text === "") return []
         // ACP publishes no committed message: the chunks *are* the answer. They
@@ -152,18 +166,18 @@ export class OpencodeAcpMapper implements AgentStreamMapper {
         const messageId = asString(update.messageId) ?? "acp"
         const block = {
           messageId,
-          index: this.emit.indexOf(messageId, kind === OpencodeAcpUpdate.AgentThoughtChunk ? "thought" : "message"),
+          index: this.emit.indexOf(messageId, kind === AcpUpdate.AgentThoughtChunk ? "thought" : "message"),
         }
         return [this.emit.build({ type: "delta", delta: "text", block, text }, raw, null)]
       }
 
-      case OpencodeAcpUpdate.UserMessageChunk: {
+      case AcpUpdate.UserMessageChunk: {
         const text = asString(asRecord(update.content).text)
         if (text === null || text === "") return []
         return [this.emit.build({ type: "user_message", text, synthetic: false }, raw, null)]
       }
 
-      case OpencodeAcpUpdate.ToolCall: {
+      case AcpUpdate.ToolCall: {
         const callId = asString(update.toolCallId) ?? "unknown"
         const kindName = asString(update.kind)
         const title = asString(update.title)
@@ -186,14 +200,14 @@ export class OpencodeAcpMapper implements AgentStreamMapper {
         // A delegation opens here with nothing in it — ACP sends the agent's
         // prompt nowhere — so the run is opened on the name alone and filled in
         // when it settles.
-        if (title === OpencodeToolName.Task) {
+        if (title === ACP_TOOL_NAME.Task) {
           events.push(
             this.emit.build(
               {
                 type: "task_started",
                 taskId: callId,
                 callId,
-                taskKind: OPENCODE_TASK_KIND,
+                taskKind: TaskKind.Agent,
                 label: title,
                 description: "",
                 prompt: null,
@@ -209,7 +223,7 @@ export class OpencodeAcpMapper implements AgentStreamMapper {
         return events
       }
 
-      case OpencodeAcpUpdate.ToolCallUpdate: {
+      case AcpUpdate.ToolCallUpdate: {
         const callId = asString(update.toolCallId) ?? "unknown"
         const status = asString(update.status)
         const title = asString(update.title) ?? this.titles.get(callId) ?? null
@@ -217,14 +231,14 @@ export class OpencodeAcpMapper implements AgentStreamMapper {
         // opencode's plan rides on `todowrite`'s *input*, and arrives while the
         // call is still running rather than on its result. Waiting for a
         // terminal status would drop every plan update this wire sends.
-        if (this.titles.get(callId) === OpencodeToolName.TodoWrite) {
-          const steps = planOf(asRecord(update.rawInput))
+        if (this.titles.get(callId) === ACP_TOOL_NAME.TodoWrite) {
+          const steps = acpPlanOf(asRecord(update.rawInput))
           if (steps.length > 0) return [this.emit.build({ type: "plan_updated", steps }, raw, null)]
         }
         // Only a terminal status settles the call. `in_progress` is the one
         // state the other two transports never publish, and treating it as a
         // result would close a row that is still running.
-        if (status !== OpencodeAcpToolStatus.Completed && status !== OpencodeAcpToolStatus.Failed) return []
+        if (status !== AcpToolStatus.Completed && status !== AcpToolStatus.Failed) return []
         const events: AgentEvent[] = [
           this.emit.build(
             {
@@ -232,7 +246,7 @@ export class OpencodeAcpMapper implements AgentStreamMapper {
               callId,
               result: {
                 text: acpContent(update),
-                isError: status === OpencodeAcpToolStatus.Failed,
+                isError: status === AcpToolStatus.Failed,
                 structured: update.rawOutput ?? null,
                 images: [],
               },
@@ -244,7 +258,7 @@ export class OpencodeAcpMapper implements AgentStreamMapper {
         const edits = acpEdits(update, this.kinds.get(callId) ?? asString(update.kind))
         if (edits.length > 0) events.push(this.emit.build({ type: "file_edits", callId, edits }, raw, null))
 
-        if (this.titles.get(callId) === OpencodeToolName.Task) {
+        if (this.titles.get(callId) === ACP_TOOL_NAME.Task) {
           const text = acpContent(update)
           events.push(
             this.emit.build(
@@ -264,7 +278,7 @@ export class OpencodeAcpMapper implements AgentStreamMapper {
         return events
       }
 
-      case OpencodeAcpUpdate.Plan: {
+      case AcpUpdate.Plan: {
         const steps: PlanStep[] = []
         for (const entry of asArray(update.entries)) {
           const step = asRecord(entry)
@@ -276,7 +290,7 @@ export class OpencodeAcpMapper implements AgentStreamMapper {
         return [this.emit.build({ type: "plan_updated", steps }, raw, null)]
       }
 
-      case OpencodeAcpUpdate.CurrentModeUpdate:
+      case AcpUpdate.CurrentModeUpdate:
         return [
           this.emit.build(
             { type: "status_changed", status: asString(update.currentModeId), permissionMode: null },
@@ -382,8 +396,8 @@ function acpEdits(update: Record<string, JsonValue>, kind: string | null): reado
 }
 
 /** Maps a whole ACP capture in one pass. */
-export function mapOpencodeAcpStream(text: string, options?: MapperOptions): readonly AgentEvent[] {
-  const mapper = new OpencodeAcpMapper(options)
+export function mapAcpStream(text: string, options?: MapperOptions): readonly AgentEvent[] {
+  const mapper = new AcpMapper(options)
   const events: AgentEvent[] = []
   for (const line of text.split("\n")) events.push(...mapper.push(line))
   return events

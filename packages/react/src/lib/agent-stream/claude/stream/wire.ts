@@ -1,17 +1,19 @@
 /** @responsibility Describes Claude Code's `stream-json` wire shapes and decodes one line into them without interpreting it. */
 
-import { parseJsonLine } from "../json"
-import type { JsonValue } from "../json"
-import type { WireProvenance } from "../events"
+import { parseJsonLine } from "../../json"
+import type { JsonValue } from "../../json"
+import type { WireProvenance } from "../../events"
 
 /**
  * The build these shapes were read from.
  *
- * Claude Code is the one of the three that stamps its own version on the
- * stream — `system/init` carries it — so a consumer can compare what it is
- * reading against this and know when the two have drifted apart.
+ * Claude Code stamps its own version on this stream — `system/init` carries it
+ * — so a consumer can compare what it is reading against this and know when the
+ * two have drifted apart. Its other two transports are elsewhere: the duplex
+ * mode is this same wire with stdin open, and ACP is a different protocol
+ * entirely, read by `acp/`.
  */
-export const CLAUDE_WIRE_PROVENANCE: WireProvenance = Object.freeze({
+export const CLAUDE_STREAM_PROVENANCE: WireProvenance = Object.freeze({
   cli: "Claude Code",
   version: "2.1.251",
   command: "claude -p --output-format stream-json --include-partial-messages --verbose",

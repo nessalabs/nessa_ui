@@ -3,7 +3,8 @@
 import type { AgentEvent, AgentStreamMapper, MapperOptions, SessionInfo } from "../../events"
 import { asNumber, asRecord, asString } from "../../json"
 import type { JsonValue } from "../../json"
-import { OpencodeEmitter, OpencodeFinishReason, OpencodePartType, planOf, usageOf } from "../parts"
+import { EventSink } from "../../emitter"
+import { OpencodeFinishReason, OpencodePartType, planOf, usageOf, toolEvents } from "../parts"
 import type { OpencodeRawLine } from "../run/wire"
 import { OpencodeDeltaField, OpencodeServerEventType, parseOpencodeSseLine } from "./wire"
 
@@ -16,10 +17,10 @@ import { OpencodeDeltaField, OpencodeServerEventType, parseOpencodeSseLine } fro
  * when a step stops.
  */
 export class OpencodeServerMapper implements AgentStreamMapper {
-  private readonly emit: OpencodeEmitter
+  private readonly emit: EventSink
 
   constructor(options: MapperOptions = {}) {
-    this.emit = new OpencodeEmitter(options.startSeq ?? 0)
+    this.emit = new EventSink(options.startSeq ?? 0)
   }
 
   /** Decodes and maps one SSE frame. A frame carrying no payload maps to nothing. */
@@ -209,7 +210,7 @@ export class OpencodeServerMapper implements AgentStreamMapper {
         return [this.emit.build({ type: "reasoning", text: text ?? "", block: this.emit.blockOf(part) }, raw, ts)]
       }
       case OpencodePartType.Tool:
-        return this.emit.tool(part, raw, ts)
+        return toolEvents(this.emit, part, raw, ts)
       case OpencodePartType.StepFinish: {
         // A step ending mid-turn is the tool loop; `session.idle` is what ends
         // the turn here. Only a failed step is worth reporting on its own.

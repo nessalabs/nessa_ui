@@ -1,6 +1,6 @@
 /** @responsibility Turns Claude Code `stream-json` lines into normalized agent events, holding the little state that requires. */
 
-import { pathKey } from "../events"
+import { pathKey } from "../../events"
 import type {
   AgentEvent,
   AgentEventPayload,
@@ -14,10 +14,10 @@ import type {
   Usage,
   WorkflowAgentProgress,
   WorkflowPhaseProgress,
-} from "../events"
+} from "../../events"
 import { claudePlanStatus, claudeTaskKind } from "./mapping"
-import { asArray, asNumber, asObject, asOneOf, asRecord, asString, asStrings } from "../json"
-import { toolKind, toolTitle } from "./tools"
+import { asArray, asNumber, asObject, asOneOf, asRecord, asString, asStrings } from "../../json"
+import { toolKind, toolTitle } from "../tools"
 import type {
   JsonValue,
   WireLine,
