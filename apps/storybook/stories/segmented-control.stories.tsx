@@ -92,3 +92,35 @@ export const Controlled: Story = {
     )
   },
 }
+
+export const Bare: Story = {
+  parameters: storyDocumentation(
+    "The `bare` shell: the same options with no strip around them, for a row already framed by its container — the range tabs inside a chart's control bar are the case it was added for. Selection reads from the pressed option alone, so the control still tells a person what is chosen without a border to sit in.",
+  ),
+  render: () => (
+    <SegmentedControl
+      variant="bare"
+      aria-label="Chart range"
+      defaultValue="1M"
+    >
+      {["1D", "1W", "1M", "1Y"].map((range) => (
+        <SegmentedControlOption key={range} value={range} className="px-2.5">
+          {range}
+        </SegmentedControlOption>
+      ))}
+    </SegmentedControl>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const group = canvas.getByRole("group", { name: "Chart range" })
+    // No strip: the shell contributes no border of its own.
+    await expect(getComputedStyle(group).borderTopWidth).toBe("0px")
+    await expect(
+      canvas.getByRole("button", { name: "1M" }),
+    ).toHaveAttribute("aria-pressed", "true")
+    await userEvent.click(canvas.getByRole("button", { name: "1Y" }))
+    await expect(
+      canvas.getByRole("button", { name: "1Y" }),
+    ).toHaveAttribute("aria-pressed", "true")
+  },
+}

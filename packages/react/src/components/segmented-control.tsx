@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { cva } from "class-variance-authority"
+import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
@@ -28,11 +28,27 @@ const SegmentedControlContext =
  * @returns The composed class-name string for a segmented strip.
  */
 const segmentedShellVariants = cva(
-  "flex items-center gap-0.5 rounded-lg border border-border p-0.5",
+  "flex items-center gap-0.5 rounded-lg",
+  {
+    variants: {
+      variant: {
+        /** The default strip: a bordered pill holding its options. */
+        outlined: "border border-border p-0.5",
+        /**
+         * No strip at all — the options sit directly on the surface behind
+         * them. For a row of choices that is already framed by its container,
+         * such as a chart's own control bar.
+         */
+        bare: "",
+      },
+    },
+    defaultVariants: { variant: "outlined" },
+  },
 )
 
 export interface SegmentedControlProps
-  extends Omit<React.ComponentProps<"div">, "onChange"> {
+  extends Omit<React.ComponentProps<"div">, "onChange">,
+    VariantProps<typeof segmentedShellVariants> {
   /** Controlled selected option value. */
   value?: string
   /** Initial selected option when uncontrolled. */
@@ -42,14 +58,19 @@ export interface SegmentedControlProps
 }
 
 /**
- * A compact single-choice switcher: a bordered pill of pressed/unpressed
- * buttons, the pattern used for view and scale toggles across Nessa's
- * toolbars. One option is always selected; choosing another moves the
- * pressed state and fires `onValueChange`. Give the group an `aria-label`
- * naming the choice it controls.
+ * A compact single-choice switcher: a row of pressed/unpressed buttons, the
+ * pattern used for view and scale toggles across Nessa's toolbars. One option
+ * is always selected; choosing another moves the pressed state and fires
+ * `onValueChange`. Give the group an `aria-label` naming the choice it
+ * controls.
+ *
+ * The `outlined` default draws the bordered pill the toolbars use; `bare`
+ * drops the strip for a row already framed by its container, such as the
+ * range tabs inside a chart's own control bar.
  */
 function SegmentedControl({
   className,
+  variant,
   value: valueProp,
   defaultValue,
   onValueChange,
@@ -78,7 +99,7 @@ function SegmentedControl({
       <div
         role="group"
         data-slot="segmented-control"
-        className={cn(segmentedShellVariants(), className)}
+        className={cn(segmentedShellVariants({ variant }), className)}
         {...props}
       />
     </SegmentedControlContext.Provider>

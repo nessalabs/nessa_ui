@@ -152,6 +152,35 @@ export {
   type SegmentedControlProps,
 } from "./components/segmented-control"
 export {
+  PriceChart,
+  priceChartBarValue,
+  priceChartDefaultLabels,
+  priceChartHasCandles,
+  priceChartSelectionChange,
+  priceChartSeriesTone,
+  priceChartTone,
+  priceChartToneVariants,
+  type PriceChartBar,
+  type PriceChartChange,
+  type PriceChartLabels,
+  type PriceChartProps,
+  type PriceChartSelection,
+  type PriceChartSelectionContext,
+  type PriceChartTone,
+  type PriceChartView,
+} from "./components/price-chart"
+export {
+  StockQuote,
+  stockQuoteDefaultLabels,
+  stockQuoteDefaultRanges,
+  type StockQuoteExtendedHours,
+  type StockQuoteLabels,
+  type StockQuoteProps,
+  type StockQuoteRange,
+  type StockQuoteStat,
+  type StockQuoteStatus,
+} from "./components/stock-quote"
+export {
   PopoverSurface,
   popoverSurfaceVariants,
   type PopoverSurfaceProps,
