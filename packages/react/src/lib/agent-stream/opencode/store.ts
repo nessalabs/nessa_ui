@@ -3,8 +3,9 @@
 import type { AgentEvent } from "../events"
 import { asArray, asNumber, asRecord, asString } from "../json"
 import type { JsonValue } from "../json"
-import { OpencodeStreamMapper } from "./mapper"
-import { OpencodePartType, OpencodeWireType } from "./wire"
+import { OpencodePartType } from "./parts"
+import { OpencodeRunMapper } from "./run/mapper"
+import { OpencodeRunType } from "./run/wire"
 
 /**
  * What an exported session says about itself.
@@ -45,11 +46,11 @@ export interface OpencodeExport {
  * with.
  */
 const LINE_TYPE: Readonly<Record<string, string>> = Object.freeze({
-  [OpencodePartType.StepStart]: OpencodeWireType.StepStart,
-  [OpencodePartType.StepFinish]: OpencodeWireType.StepFinish,
-  [OpencodePartType.Text]: OpencodeWireType.Text,
-  [OpencodePartType.Reasoning]: OpencodeWireType.Reasoning,
-  [OpencodePartType.Tool]: OpencodeWireType.ToolUse,
+  [OpencodePartType.StepStart]: OpencodeRunType.StepStart,
+  [OpencodePartType.StepFinish]: OpencodeRunType.StepFinish,
+  [OpencodePartType.Text]: OpencodeRunType.Text,
+  [OpencodePartType.Reasoning]: OpencodeRunType.Reasoning,
+  [OpencodePartType.Tool]: OpencodeRunType.ToolUse,
 })
 
 /**
@@ -74,7 +75,7 @@ export function parseOpencodeExport(text: string): OpencodeExport | null {
   const sessionId = asString(info.id)
   if (sessionId === null) return null
 
-  const mapper = new OpencodeStreamMapper()
+  const mapper = new OpencodeRunMapper()
   const events: AgentEvent[] = []
   let totalTokens: number | null = null
   let totalCost: number | null = null

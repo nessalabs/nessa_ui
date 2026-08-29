@@ -74,7 +74,12 @@ memoize on the revision counter the snapshot carries, not on object identity.
   same commit as any recapture.
 - **One provider can have several wires.** opencode streams nothing on its
   one-way stream and a token at a time on its server bus, so "does this agent
-  stream" is a question about the transport, not the agent.
+  stream" is a question about the transport, not the agent. Ask
+  `transportOf(provider, transport)` rather than hardcoding it, and treat `null`
+  as "nobody captured this", which is not the same as "no".
+- **Separate protocols get separate modules.** A provider folder holds the
+  payload its transports share and one subfolder per wire; only what is
+  genuinely identical is shared.
 - **Compaction removes history from the model, not from the transcript.** Keep
   drawing what was already drawn; mark the boundary instead of trimming to it.
   A compacted run is not a failed one, and one provider does not announce it at

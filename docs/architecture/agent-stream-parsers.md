@@ -491,6 +491,42 @@ content does. Anything still being written to (a run's own events) *is* copied.
 opencode is the third provider, and the first with two wires of its own worth
 reading. Both are captured.
 
+### How the two are laid out in code
+
+They are separate protocols, so they are separate modules, and only what is
+genuinely shared sits between them:
+
+```
+opencode/
+  parts.ts       the payload BOTH wires carry — the part shapes, the tool
+                 vocabulary, and the emitter that turns a part into events
+  mapping.ts     the shape both tables are written in
+  run/           `run --format json`: envelope DTOs, its table, its mapper
+  server/        `serve` SSE: envelope DTOs, its table, its mapper
+  store.ts       an exported session, read through the run mapper
+  capabilities.ts  what the CLI's own listings answer
+```
+
+The payload really is shared — the server wraps the identical `part` object in
+`message.part.updated` — and reading it twice would be two sets of rules to
+disagree about one conversation. The envelopes share nothing: different names,
+different framing, different versions, different capabilities. A mapper that
+handled both would be the place those differences quietly blur.
+
+### What a transport can do is data
+
+`transports.ts` states, per transport, whether it streams, names the model,
+advertises capabilities, takes approvals, accepts steering, reports structured
+edits, and whether its stream carries more than one session. A surface reads
+that instead of knowing it, so a fourth provider is a new row rather than an
+edit to every badge and empty state.
+
+Each answer is **three-valued**. `false` is a fact — the wire was read and does
+not carry this. `null` means nobody has captured that transport for it yet, and
+must not be drawn as a no: Codex's app-server was driven for its capability
+replies and its approval exchange but never for a long answer, so whether it
+streams is unrecorded rather than absent.
+
 ### `opencode run --format json`
 
 Three lines for a whole turn. A step opens, parts carry the answer, a step
@@ -506,6 +542,19 @@ Four things this wire will mislead you about:
 | A tool call `completed` | The *call* worked. A shell command that exited non-zero is still `completed`, with the failure only in `metadata.exit`. |
 | A tool call `error` | The call never ran — it threw, or a permission rule refused it. |
 | A turn with no ending | Unattended, opencode auto-rejects anything its rules ask about and the run then **stops**: no closing message, no terminator, exit 0. |
+
+The two tool-status rows are the ones worth checking rather than believing, so
+they were checked against opencode's own source. Its shell tool returns
+normally whatever the command did — `return { title, metadata: { output, exit:
+code, truncated }, output }` — and never throws on a non-zero exit, so the call
+settles as `completed`. The `error` state is set by `failToolCall`, which runs
+when the tool threw, was refused, or was aborted. Reading failure from the
+status alone would call every failed build a success.
+
+The shell tool is also a live example of why a wire is pinned to a build: it is
+implemented as `shell.ts` but deliberately exposes the id `bash`, with its own
+source noting the rename is planned for opencode 2.0. Both names are in the
+vocabulary, mapped to the same kind.
 
 Its delegations are the best of the three: the spawning call names the child's
 own session id, and `opencode export <id>` returns that conversation with its
@@ -546,15 +595,18 @@ None of these shapes is a published contract, and two of the three CLIs put no
 version anywhere on the stream. Each provider therefore records the build its
 description was read from, next to the command that produces it:
 
-| Provider | Build | Command |
-| --- | --- | --- |
-| Claude Code | 2.1.251 | `claude -p --output-format stream-json --include-partial-messages --verbose` |
-| codex-cli | 0.144.1 | `codex exec --json` |
-| opencode | 1.18.25 | `opencode run --format json` |
+| Provider | Transport | Build | Command |
+| --- | --- | --- | --- |
+| Claude Code | stream-json | 2.1.251 | `claude -p --output-format stream-json …` |
+| codex-cli | exec | 0.144.1 | `codex exec --json` |
+| opencode | run | 1.18.25 | `opencode run --format json` |
+| opencode | serve | 1.18.25, **API 1.0.0** | `opencode serve → GET /event` |
 
-These live in code as `CLAUDE_WIRE_PROVENANCE`, `CODEX_WIRE_PROVENANCE` and
-`OPENCODE_WIRE_PROVENANCE`, so a consumer can compare what it is reading against
-what was modelled. **When a capture is retaken against a newer build, update the
+Per *transport*, not per provider, because a provider can speak more than one
+protocol and they version independently — opencode's server declares its own
+`info.version` at `GET /doc`, which is on 1.0.0 while the CLI carrying it is on
+1.18.x. Every transport's descriptor carries its provenance, so a consumer can
+compare what it is reading against what was modelled. **When a capture is retaken against a newer build, update the
 version and the date in the same commit as the fixtures.** If nothing changed,
 that is itself worth recording. Claude Code is the only one that stamps its own
 version on the wire (`system/init`), so it is the only one where the two can be

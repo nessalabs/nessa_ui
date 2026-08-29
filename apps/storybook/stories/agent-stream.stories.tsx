@@ -6,10 +6,12 @@ import {
   Button,
   ClaudeStreamMapper,
   CodexStreamMapper,
-  OpencodeStreamMapper,
+  OpencodeRunMapper,
+  OpencodeServerMapper,
   claude,
   codex,
   opencode,
+  transportsOf,
   mapClaudeStream,
   JsonTree,
   Message,
@@ -57,7 +59,9 @@ import {
   type WorkflowAgentProgress,
   type AgentCapabilities,
   type JsonValue,
+  type Supported,
   type Transcript,
+  type TransportDescriptor,
   type WorkItem,
 } from "@nessa-ui/react"
 
@@ -129,34 +133,19 @@ type ProviderId = "claude" | "codex" | "opencode"
  * provider report capabilities" is a question a third provider answers for
  * itself without this file learning its name.
  */
-interface Transport {
-  readonly id: string
-  readonly label: string
-  readonly command: string
-  readonly interactive: boolean
-  readonly supports: {
-    readonly capabilities: boolean
-    readonly approvals: boolean
-    readonly steering: boolean
-    /**
-     * Token-level previews.
-     *
-     * Per transport, not per provider: opencode streams nothing on its one-way
-     * stream and a token at a time on its server bus. `null` means nobody has
-     * captured this transport yet — which is not the same as knowing it does
-     * not stream, and must not be drawn as though it were.
-     */
-    readonly streaming: boolean | null
-  }
-  readonly note: string
-}
-
 interface Provider {
   readonly id: ProviderId
   readonly label: string
   readonly command: string
   /** The provider's own mapper, behind the shared interface. */
-  readonly createMapper: () => { push(line: string): readonly AgentEvent[] }
+  /**
+   * The provider's own mapper for one transport, behind the shared interface.
+   *
+   * Takes the transport because a provider can have more than one wire, and
+   * opencode's two are different protocols — reading a bus capture with the
+   * one-way mapper would decode every frame as unknown.
+   */
+  readonly createMapper: (transportId: string) => { push(line: string): readonly AgentEvent[] }
   /**
    * Why some of this provider's lines produce no event.
    *
@@ -166,20 +155,17 @@ interface Provider {
    */
   readonly silentLinesNote: string
   /**
-   * How you reach this agent. A provider can speak more than one, and they do
-   * not carry the same things — Codex's one-way stream and its interactive
-   * app-server differ enough that a reader comparing them should see which is
-   * which rather than a single blurred answer.
+   * How you reach this agent, read from the library rather than restated here.
+   *
+   * A provider is not one wire, and what a wire can do is a fact about the
+   * transport — so it lives with the parser that established it. A surface that
+   * kept its own copy would drift from what was actually captured.
    */
-  readonly transports: readonly Transport[]
+  readonly transports: readonly TransportDescriptor[]
   readonly supports: {
-    /** A session advertisement worth building composer pickers from. */
-    readonly capabilities: boolean
-    /** Structured file edits rather than opaque file tool calls. */
-    readonly fileEdits: boolean
-    /** A phase-and-agent board for a fan-out. */
+    /** A phase-and-agent board for a fan-out. Not a property of any one wire. */
     readonly workflowBoard: boolean
-    /** Delegated transcripts addressable on disk from ids the wire gave. */
+    /** Delegated transcripts a host can open, however it addresses them. */
     readonly transcriptsOnDisk: boolean
   }
 }
@@ -189,88 +175,37 @@ const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
     id: "claude",
     label: "Claude Code",
     command: "claude -p --output-format stream-json --include-partial-messages",
-    transports: [
-      {
-        id: "stream",
-        label: "stream-json",
-        command: "claude -p --output-format stream-json",
-        interactive: false,
-        supports: { capabilities: true, approvals: false, steering: false, streaming: true },
-        note: "One-way. The opening line advertises the whole session, so pickers can be built from the stream alone.",
-      },
-      {
-        id: "pipe",
-        label: "stream-json, both ways",
-        command: "claude -p --input-format stream-json --output-format stream-json",
-        interactive: true,
-        supports: { capabilities: true, approvals: true, steering: true, streaming: true },
-        note: "The same stream with stdin open: prompts and steering go in, control requests answer approvals and change model or permission mode mid-turn.",
-      },
-    ],
+    transports: transportsOf("claude")!.transports,
     createMapper: () => new ClaudeStreamMapper(),
     silentLinesNote:
       "message_start is the mapper's join key, message_stop and message_delta repeat what result carries, signature_delta signs a thinking block, and a steady-state rate limit has nothing to act on.",
-    supports: { capabilities: true, fileEdits: false, workflowBoard: true, transcriptsOnDisk: true },
+    supports: { workflowBoard: true, transcriptsOnDisk: true },
   },
   codex: {
     id: "codex",
     label: "Codex",
     command: "codex exec --json",
-    transports: [
-      {
-        id: "exec",
-        label: "exec --json",
-        command: "codex exec --json",
-        interactive: false,
-        supports: { capabilities: false, approvals: false, steering: false, streaming: false },
-        note: "One-way. The opening line carries a thread id and nothing else, so nothing here can populate a picker.",
-      },
-      {
-        id: "app-server",
-        label: "app-server",
-        command: "codex app-server",
-        interactive: true,
-        // Streaming is unrecorded here: the app-server was driven for its
-        // capability replies and its approval exchange, never for a long
-        // answer, so claiming either way would be a guess.
-        supports: { capabilities: true, approvals: true, steering: true, streaming: null },
-        note: "Interactive JSON-RPC. Answers model, skill, plugin and hook lists on request, asks for approval before running untrusted commands, and takes steer and interrupt mid-turn.",
-      },
-    ],
+    transports: transportsOf("codex")!.transports,
     createMapper: () => new CodexStreamMapper(),
     silentLinesNote:
       "turn.started is a bare marker, and an item that is reported whole on completion says nothing when it opens.",
-    supports: { capabilities: false, fileEdits: true, workflowBoard: false, transcriptsOnDisk: true },
+    supports: { workflowBoard: false, transcriptsOnDisk: true },
   },
   opencode: {
     id: "opencode",
     label: "opencode",
     command: "opencode run --format json",
-    transports: [
-      {
-        id: "run",
-        label: "run --format json",
-        command: "opencode run --format json",
-        interactive: false,
-        supports: { capabilities: false, approvals: false, steering: false, streaming: false },
-        note: "One-way, and it opens with nothing at all — no init line, no model, no working directory. Unattended, anything its permission rules ask about is auto-rejected and the run simply ends.",
-      },
-      {
-        id: "serve",
-        label: "serve / acp",
-        command: "opencode serve",
-        interactive: true,
-        supports: { capabilities: true, approvals: true, steering: true, streaming: true },
-        note: "The headless server and the ACP server share one bus, and it is where opencode streams: token deltas, the model, the working directory, and a permission ask held open instead of refused. `/event` is server-wide, so a reader has to filter by session. Capabilities still come from the CLI's own listings, which is the only channel that answers those.",
-      },
-    ],
-    createMapper: () => new OpencodeStreamMapper(),
+    transports: transportsOf("opencode")!.transports,
+    createMapper: (transportId: string) =>
+      // Two wires, two mappers: the bus is a different protocol, not the same
+      // one with more on it.
+      transportId === "serve" ? new OpencodeServerMapper() : new OpencodeRunMapper(),
     silentLinesNote:
       "a step opening says only that a model call began, and the steps that finish mid-turn are the tool loop rather than the end of the answer — only the one that stops for its own sake closes the turn.",
     // Its delegated runs are the readable ones: the child session id is on the
     // wire and `opencode export <id>` reads it, where Claude's must be derived
     // and Codex's cannot be read at all.
-    supports: { capabilities: false, fileEdits: true, workflowBoard: false, transcriptsOnDisk: true },
+    supports: { workflowBoard: false, transcriptsOnDisk: true },
   },
 }
 
@@ -369,17 +304,20 @@ interface LiveState {
  * and a reader comparing the two should be able to see that without opening
  * the raw pane.
  */
-function ProviderSupport({ provider, transport }: { provider: Provider; transport: Transport }) {
-  const features: readonly (readonly [string, boolean | null])[] = [
-    // What the wire carries, whichever transport is used…
-    ["structured file edits", provider.supports.fileEdits],
-    ["workflow board", provider.supports.workflowBoard],
-    ["transcripts on disk", provider.supports.transcriptsOnDisk],
-    // …and what this transport in particular can do.
+function ProviderSupport({ provider, transport }: { provider: Provider; transport: TransportDescriptor }) {
+  // Read from the transport descriptor rather than listed here: adding a
+  // provider adds a row in the library, and this row follows without an edit.
+  const features: readonly (readonly [string, Supported])[] = [
     ["streams tokens", transport.supports.streaming],
+    ["names the model", transport.supports.namesModel],
+    ["structured file edits", transport.supports.fileEdits],
     ["session capabilities", transport.supports.capabilities],
     ["approvals", transport.supports.approvals],
     ["steering", transport.supports.steering],
+    ["multi-session bus", transport.supports.multiSession],
+    // Still the provider's own, since neither is a property of the wire.
+    ["workflow board", provider.supports.workflowBoard],
+    ["transcripts on disk", provider.supports.transcriptsOnDisk],
   ]
 
   return (
@@ -401,6 +339,19 @@ function providerOf(captureId: string): ProviderId {
   return CAPTURES.find((entry) => entry.id === captureId)?.provider ?? "claude"
 }
 
+/**
+ * The mapper a capture has to be read with.
+ *
+ * Taken from the capture rather than from whatever the toggle is showing: a
+ * recording belongs to the wire it came from, and reading opencode's bus with
+ * its one-way mapper would decode every frame as unknown.
+ */
+function mapperFor(captureId: string): { push(line: string): readonly AgentEvent[] } {
+  const capture = CAPTURES.find((entry) => entry.id === captureId)
+  const provider = PROVIDERS[capture?.provider ?? "claude"]
+  return provider.createMapper(capture?.transport ?? provider.transports[0]!.id)
+}
+
 function useLiveTranscript(captureId: string, count: number, live: boolean): LiveState {
   const state = React.useRef<{
     captureId: string
@@ -418,7 +369,7 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
     current = {
       captureId,
       count: 0,
-      mapper: PROVIDERS[providerOf(captureId)].createMapper(),
+      mapper: mapperFor(captureId),
       builder: new TranscriptBuilder(),
       buffers: new Map(),
       events: [],
@@ -1404,7 +1355,7 @@ function InspectorView({
   count: number
   events: readonly AgentEvent[]
   produced: readonly number[]
-  transport: Transport
+  transport: TransportDescriptor
   opened: claude.TranscriptRef | null
   onCloseTranscript: () => void
 }) {

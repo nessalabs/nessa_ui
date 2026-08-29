@@ -77,6 +77,16 @@ export {
   type WorkItem,
 } from "./transcript"
 
+export {
+  AGENT_TRANSPORTS,
+  transportOf,
+  transportsOf,
+  type ProviderDescriptor,
+  type Supported,
+  type TransportDescriptor,
+  type TransportSupport,
+} from "./transports"
+
 // ---------- providers ----------
 /**
  * Namespaced, not flattened.
@@ -95,4 +105,4 @@ export * as opencode from "./opencode"
 // name is the common case and `claude.ClaudeStreamMapper` stutters.
 export { ClaudeStreamMapper, mapClaudeStream } from "./claude/mapper"
 export { CodexStreamMapper, mapCodexStream } from "./codex/mapper"
-export { OpencodeStreamMapper, mapOpencodeStream } from "./opencode/mapper"
+export { OpencodeRunMapper, OpencodeServerMapper, mapOpencodeServerStream, mapOpencodeStream } from "./opencode"

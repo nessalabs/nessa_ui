@@ -7,17 +7,15 @@ import test from "node:test"
 
 import { TranscriptBuilder } from "./builder"
 import { AgentEventType, isEvent } from "./events"
-import { OPENCODE_EVENT_MAPPING, opencodeMappingFor, opencodeWireKind } from "./opencode/mapping"
 import { OPENCODE_CAPABILITY_COMMANDS, opencodeCapabilities } from "./opencode/capabilities"
-import { OpencodeStreamMapper, mapOpencodeStream } from "./opencode/mapper"
-import {
-  OPENCODE_WIRE_PROVENANCE,
-  OpencodeToolName,
-  OpencodeWireType,
-  parseOpencodeLines,
-  parseOpencodeSse,
-  parseOpencodeSseLine,
-} from "./opencode/wire"
+import { OpencodeToolName, opencodeToolKind } from "./opencode/parts"
+import { OPENCODE_RUN_MAPPING, opencodeMappingFor, opencodeWireKind } from "./opencode/run/mapping"
+import { OpencodeRunMapper, mapOpencodeStream } from "./opencode/run/mapper"
+import { OPENCODE_RUN_PROVENANCE, OpencodeRunType, parseOpencodeLines } from "./opencode/run/wire"
+import { OPENCODE_SERVER_MAPPING } from "./opencode/server/mapping"
+import { OpencodeServerMapper, mapOpencodeServerStream } from "./opencode/server/mapper"
+import { OPENCODE_SERVER_PROVENANCE, parseOpencodeSse, parseOpencodeSseLine } from "./opencode/server/wire"
+import { AGENT_TRANSPORTS, transportOf } from "./transports"
 import { opencodeExportCommand, parseOpencodeExport } from "./opencode/store"
 import { applyDeltas, buildTranscript, isToolGroup, previewOf } from "./transcript"
 
@@ -73,7 +71,7 @@ test("every line kind the captures contain is declared in the mapping table", ()
 
 test("what the mapper emits is what the table promises", () => {
   for (const name of NAMES) {
-    const mapper = new OpencodeStreamMapper()
+    const mapper = new OpencodeRunMapper()
     for (const result of parseOpencodeLines(capture(name))) {
       if (!result.ok) continue
       const kind = opencodeWireKind(result.line)
@@ -90,7 +88,7 @@ test("an unlisted tool still renders as a call", () => {
   // Every opencode install loads its own plugins and MCP servers, so a tool
   // name this build has never seen is the normal case, not an oversight. It
   // must fall back to the bare tool row rather than falling off the table.
-  const entry = opencodeMappingFor(`${OpencodeWireType.ToolUse}/some_plugin_tool`)
+  const entry = opencodeMappingFor(`${OpencodeRunType.ToolUse}/some_plugin_tool`)
   assert.notEqual(entry, null)
   assert.deepEqual([...entry!.emits], [AgentEventType.ToolCallStarted, AgentEventType.ToolCallCompleted])
 })
@@ -143,7 +141,7 @@ test("a turn ends once, although a tool loop finishes a step per call", () => {
   // stops for its own sake. Treating each step as a turn would break one answer
   // into four.
   const steps = parseOpencodeLines(capture("tools")).filter(
-    (result) => result.ok && result.line.type === OpencodeWireType.StepFinish,
+    (result) => result.ok && result.line.type === OpencodeRunType.StepFinish,
   )
   assert.ok(steps.length > 1, "the capture really does finish several steps")
   assert.equal(finished.length, 1)
@@ -353,17 +351,17 @@ test("the wire description says which build it was read from", () => {
   // These shapes are not a published contract and opencode stamps no version on
   // its stream, so this constant is the only record of what the fixtures
   // describe. A capture retaken against a newer build updates it.
-  assert.equal(OPENCODE_WIRE_PROVENANCE.cli, "opencode")
-  assert.match(OPENCODE_WIRE_PROVENANCE.version, /^\d+\.\d+\.\d+$/)
-  assert.match(OPENCODE_WIRE_PROVENANCE.capturedOn, /^\d{4}-\d{2}-\d{2}$/)
-  assert.ok(OPENCODE_WIRE_PROVENANCE.command.includes("--format json"))
+  assert.equal(OPENCODE_RUN_PROVENANCE.cli, "opencode")
+  assert.match(OPENCODE_RUN_PROVENANCE.version, /^\d+\.\d+\.\d+$/)
+  assert.match(OPENCODE_RUN_PROVENANCE.capturedOn, /^\d{4}-\d{2}-\d{2}$/)
+  assert.ok(OPENCODE_RUN_PROVENANCE.command.includes("--format json"))
 })
 
 test("the tool vocabulary covers what the captures actually used", () => {
   const used = new Set<string>()
   for (const name of NAMES) {
     for (const result of parseOpencodeLines(capture(name))) {
-      if (!result.ok || result.line.type !== OpencodeWireType.ToolUse) continue
+      if (!result.ok || result.line.type !== OpencodeRunType.ToolUse) continue
       const part = result.line.part as { tool?: string } | undefined
       if (part?.tool !== undefined) used.add(part.tool)
     }
@@ -386,14 +384,9 @@ function sse(name: string): string {
   return readFileSync(`${FIXTURES}${name}.jsonl`, "utf8")
 }
 
-function mapSse(name: string): readonly ReturnType<OpencodeStreamMapper["map"]>[number][] {
-  const mapper = new OpencodeStreamMapper()
-  const events = []
-  for (const result of parseOpencodeSse(sse(name))) {
-    if (!result.ok) continue
-    events.push(...mapper.map(result.line))
-  }
-  return events
+function mapSse(name: string) {
+  // The bus has its own mapper: same contract out, entirely different envelope in.
+  return mapOpencodeServerStream(sse(name))
 }
 
 test("the server's stream decodes, and every kind of it is in the table", () => {
@@ -403,7 +396,8 @@ test("the server's stream decodes, and every kind of it is in the table", () => 
     for (const result of results) {
       assert.equal(result.ok, true, `${name}: ${result.ok ? "" : result.reason}`)
       if (!result.ok) continue
-      assert.notEqual(opencodeMappingFor(opencodeWireKind(result.line)), null, `${name}: ${result.line.type}`)
+      // The bus has its own table: separate protocol, separate version.
+      assert.notEqual(OPENCODE_SERVER_MAPPING[result.line.type], undefined, `${name}: ${result.line.type}`)
     }
   }
 })
@@ -550,4 +544,80 @@ test("an export is read by the same mapper the live stream uses", () => {
   assert.ok(exported.events.some((event) => event.ts !== null), "the parts that are timed keep their time")
   assert.equal(parseOpencodeExport("not json at all"), null)
   assert.equal(opencodeExportCommand("ses_x"), "opencode export ses_x")
+})
+
+/**
+ * What a transport can do is data, not something a surface knows.
+ *
+ * The point of this table is that a fourth provider adds a row and every
+ * badge, picker and empty state that reads it follows without being edited.
+ */
+test("every transport declares what it supports, and what nobody has established", () => {
+  const flat = AGENT_TRANSPORTS.flatMap((provider) =>
+    provider.transports.map((transport) => ({ provider: provider.id, transport })),
+  )
+  assert.ok(flat.length >= 6, "three providers, at least two transports each")
+
+  for (const { provider, transport } of flat) {
+    // Every transport names the build it was read from, so a consumer can tell
+    // whether its parser matches the process it is talking to.
+    assert.match(transport.provenance.version, /^\d+\.\d+\.\d+$/, `${provider}/${transport.id}`)
+    assert.ok(transport.provenance.command.length > 0)
+    assert.ok(transport.note.length > 0)
+    for (const [feature, value] of Object.entries(transport.supports)) {
+      // Tri-state on purpose: false is a fact, null is an admission.
+      assert.ok(
+        value === true || value === false || value === null,
+        `${provider}/${transport.id}.${feature} is ${String(value)}`,
+      )
+    }
+  }
+})
+
+test("the transport table says what the captures show, provider by provider", () => {
+  // opencode is the case that forced this to be per transport rather than per
+  // provider: the same agent streams on one wire and not on the other.
+  assert.equal(transportOf("opencode", "run")?.supports.streaming, false)
+  assert.equal(transportOf("opencode", "serve")?.supports.streaming, true)
+  assert.equal(transportOf("opencode", "run")?.supports.namesModel, false)
+  assert.equal(transportOf("opencode", "serve")?.supports.namesModel, true)
+  // And only that bus carries more than one session at a time.
+  assert.equal(transportOf("opencode", "serve")?.supports.multiSession, true)
+  assert.equal(transportOf("claude", "stream")?.supports.multiSession, false)
+
+  // Claude's stdin-open mode is the same wire with different powers.
+  assert.equal(transportOf("claude", "stream")?.supports.approvals, false)
+  assert.equal(transportOf("claude", "pipe")?.supports.approvals, true)
+
+  // Unrecorded stays unrecorded: the app-server was never driven for a long
+  // answer, so its streaming is null rather than a guessed no.
+  assert.equal(transportOf("codex", "app-server")?.supports.streaming, null)
+  assert.equal(transportOf("codex", "exec")?.supports.streaming, false)
+
+  assert.equal(transportOf("opencode", "nope"), null)
+  assert.equal(transportOf("nope", "run"), null)
+})
+
+test("the two opencode transports are described separately, with their own versions", () => {
+  // The whole reason they are separate modules: two protocols, and the server
+  // publishes an API version of its own that moves independently of the CLI.
+  assert.equal(OPENCODE_RUN_PROVENANCE.command, "opencode run --format json")
+  assert.equal(OPENCODE_SERVER_PROVENANCE.apiVersion, "1.0.0")
+  assert.equal(OPENCODE_RUN_PROVENANCE.version, OPENCODE_SERVER_PROVENANCE.version)
+  assert.notEqual(OPENCODE_RUN_PROVENANCE.command, OPENCODE_SERVER_PROVENANCE.command)
+
+  // Neither table knows the other's vocabulary.
+  assert.equal(OPENCODE_RUN_MAPPING["session.idle"], undefined)
+  assert.equal(OPENCODE_SERVER_MAPPING[OpencodeRunType.StepStart], undefined)
+})
+
+test("the shell tool is named for what the wire calls it, and for what it will be called", () => {
+  // opencode's own source implements this as `shell.ts` but exposes the id
+  // `bash`, deliberately, for compatibility with saved permissions — with the
+  // rename announced for 2.0. Both names map to the same kind so a capture
+  // from either build renders identically.
+  assert.equal(OpencodeToolName.Bash, "bash")
+  assert.equal(OpencodeToolName.Shell, "shell")
+  assert.equal(opencodeToolKind("bash"), "shell")
+  assert.equal(opencodeToolKind("shell"), "shell")
 })
