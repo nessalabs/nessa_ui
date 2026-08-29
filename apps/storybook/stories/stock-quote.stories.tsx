@@ -22,7 +22,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A brokerage-style quote panel: ticker, name and trading status, the price in large type with its change in the market's colour, a scrubbable and zoomable PriceChart with its price and time scales, the range and chart-type controls, an after-hours line, and a strip of key figures. Dragging or hovering the chart replaces the headline with the scrubbed bar and its change from the baseline, then restores the live price on release. The panel is a display surface — an agent or application feeds it prices as they arrive and reloads the series when the range changes — and it reflows from a phone-width card to a full-width desk layout on its own container's width.",
+          "A brokerage-style quote panel: ticker, name, the price in large type with its change in the market's colour, a scrubbable and zoomable PriceChart with its price and time scales, the range and chart-type controls, an after-hours line, and a strip of key figures. Hovering the chart replaces the headline with the bar under the cursor; dragging across it zooms into that window, and the headline reports the window until it is cleared. Trading state is announced rather than drawn — a live quote shows it by pulsing the newest point. The panel is a display surface — an agent or application feeds it prices as they arrive and reloads the series when the range changes — and it reflows from a phone-width card to a full-width desk layout on its own container's width.",
       },
     },
   },
@@ -352,7 +352,7 @@ export const Streaming: Story = {
     series: SESSION,
   },
   parameters: storyDocumentation(
-    "A quote arriving bar by bar, which is how an agent drives this panel: it holds the series it has fetched, appends each new print, and lets the panel redraw. The newest point keeps a pulsing marker while the feed is live, and the headline price, the change, and the market colour all follow the last bar. The play test waits for the series to grow and proves the chart's own extent grew with it.",
+    "A quote arriving bar by bar, which is how an agent drives this panel: it holds the series it has fetched, appends each new print, and lets the panel redraw. The headline price, the change, and the market colour all follow the last bar. The play test waits for the series to grow and proves the cursor's own reachable range grew with it.",
   ),
   render: () => (
     <div className="w-full max-w-2xl">

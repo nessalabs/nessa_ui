@@ -1,8 +1,10 @@
 /**
  * @responsibility Pure plotting geometry for PriceChart: the value extent, the
- * index-to-pixel mapping, and the path and candle layouts derived from them.
- * Every function here is deterministic and DOM-free so the drawing math can be
- * unit tested and reused by hosts that render their own overlays.
+ * index-to-pixel mapping, and the path, candle and tick layouts derived from
+ * them. Every function here is deterministic and DOM-free, so the drawing math
+ * is unit tested on its own. Most of it is the component's private render
+ * sequence; the kit re-exports only the handful a consumer reads a series
+ * with — bar values, direction, and a window's change.
  */
 
 /**
@@ -39,8 +41,12 @@ export type PriceChartTone = "gain" | "loss" | "neutral"
  * line path treats as a break in the series.
  */
 export function priceChartBarValue(bar: PriceChartBar): number | null {
-  const value = bar.value ?? bar.close ?? bar.open
-  return typeof value === "number" && Number.isFinite(value) ? value : null
+  for (const value of [bar.value, bar.close, bar.open]) {
+    // Each candidate is tested rather than coalesced: a NaN price is as
+    // absent as a missing one, and must fall through to the next.
+    if (typeof value === "number" && Number.isFinite(value)) return value
+  }
+  return null
 }
 
 /** Whether a bar carries the full open/high/low/close set a candle needs. */

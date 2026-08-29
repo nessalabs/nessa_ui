@@ -91,10 +91,10 @@
   --nessa-diff-dark-addition: oklch(0.6222 0.1661 146.22);
   /* Market direction — a second colour axis beside the categorical series
      ramp: a quote's rise and fall are one semantic pair, not two series
-     slots. The values start out alongside the diff pair because both encode
-     the same up/down reading at the same contrast floor; they are separate
-     tokens so a theme can move a trading surface's colour without touching
-     how a code review reads. */
+     slots. The values start out near the diff pair — loss is the same red,
+     gain a slightly different green — because both encode an up/down reading
+     at the same contrast floor; they are separate tokens so a theme can move
+     a trading surface's colour without touching how a code review reads. */
   --nessa-market-gain: oklch(0.5 0.135 148);
   --nessa-market-loss: oklch(0.55 0.19 27);
 }

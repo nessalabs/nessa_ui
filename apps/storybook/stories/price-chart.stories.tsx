@@ -129,6 +129,12 @@ export const Playground: Story = {
       await expect(["38", "39"]).toContain(cursor.getAttribute("aria-valuenow"))
     })
 
+    // The streaming marker sits on the newest bar, not merely somewhere.
+    const marker = canvasElement.querySelector(
+      '[data-slot="price-chart"] svg circle:not([class])',
+    ) as SVGCircleElement
+    await expect(Number(marker.getAttribute("cx"))).toBeGreaterThan(0)
+
     // Leaving the plot returns the cursor to the newest bar, which is where
     // the next arrow press starts.
     // React derives onPointerLeave from pointerout, so the pointer has to
@@ -180,8 +186,8 @@ export const Sparklines: Story = {
   parameters: storyDocumentation(
     "The same component at watchlist size. Each row hands the chart a small box, turns the scales off and turns scrubbing off, so the plot exposes itself as one labelled image instead of a control — the shape a dense list wants. The falling row takes the loss colour from its own data with no configuration.",
   ),
-  args: { series: INTRADAY },
-  render: () => (
+  args: { series: INTRADAY, scrubbable: false, axes: false },
+  render: (args) => (
     <ul className="m-0 grid max-w-md list-none gap-1 p-0">
       {[
         { symbol: "HOOD", last: "$132.19", change: "+7.4%", series: INTRADAY },
@@ -193,9 +199,8 @@ export const Sparklines: Story = {
         >
           <span className="nessa-text-4 font-semibold">{row.symbol}</span>
           <PriceChart
+            {...args}
             series={row.series}
-            scrubbable={false}
-            axes={false}
             aria-label={`${row.symbol} price history`}
             className="h-10 min-h-0"
           />
@@ -344,7 +349,6 @@ export const ZoomToSelection: Story = {
     await waitFor(async () => {
       await expect(cursor).toHaveAttribute("aria-valuemax", "6")
     })
-    // Shift+End extends a window in progress rather than discarding it.
     await fireEvent.keyDown(cursor, { key: "Escape" })
     await waitFor(async () => {
       await expect(cursor).toHaveAttribute(
@@ -352,17 +356,24 @@ export const ZoomToSelection: Story = {
         String(INTRADAY.length - 1),
       )
     })
+
+    // Shift+End extends the window in progress rather than discarding it:
+    // the anchor stays where the walk began, so the committed window starts
+    // there and not at the bar Home left the cursor on.
     await fireEvent.keyDown(cursor, { key: "Home" })
+    for (let step = 0; step < 10; step += 1) {
+      await fireEvent.keyDown(cursor, { key: "ArrowRight" })
+    }
     await fireEvent.keyDown(cursor, { key: "ArrowRight", shiftKey: true })
     await fireEvent.keyDown(cursor, { key: "End", shiftKey: true })
     await fireEvent.keyDown(cursor, { key: "Enter" })
     await waitFor(async () => {
-      await expect(cursor).toHaveAttribute("aria-valuemin", "0")
-      await expect(cursor).toHaveAttribute(
-        "aria-valuemax",
-        String(INTRADAY.length - 1),
-      )
+      await expect(cursor).toHaveAttribute("aria-valuemin", "10")
     })
+    await expect(cursor).toHaveAttribute(
+      "aria-valuemax",
+      String(INTRADAY.length - 1),
+    )
   },
 }
 

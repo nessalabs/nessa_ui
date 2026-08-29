@@ -45,7 +45,10 @@ export const stockQuoteDefaultRanges: readonly StockQuoteRange[] = Object.freeze
   ],
 )
 
-/** A quote's trading state, shown as a badge beside the symbol. */
+/**
+ * A quote's trading state. It is announced rather than drawn: `live` also
+ * pulses the newest point on the chart, which is the visible tell.
+ */
 export type StockQuoteStatus = "live" | "delayed" | "closed"
 
 /** A labelled figure in the strip under the chart. */
@@ -108,7 +111,6 @@ export const stockQuoteDefaultLabels: StockQuoteLabels = Object.freeze({
   down: "Down",
   selected: "Selected",
 })
-
 
 
 export interface StockQuoteProps
@@ -294,9 +296,19 @@ function StockQuote({
   // nothing once a different window is on screen. Dropping them here covers
   // the controlled host that changes `range` itself, which the control's own
   // handler never sees.
+  const notifySelection = React.useRef(onSelectionChange)
+  notifySelection.current = onSelectionChange
+  const notifyScrub = React.useRef(onScrubChange)
+  notifyScrub.current = onScrubChange
   React.useEffect(() => {
-    setSelection(null)
-    setScrubIndex(null)
+    setSelection((current) => {
+      if (current) notifySelection.current?.(null)
+      return null
+    })
+    setScrubIndex((current) => {
+      if (current !== null) notifyScrub.current?.(null)
+      return null
+    })
   }, [range])
 
   const currencyFormatter = React.useMemo(
@@ -469,9 +481,10 @@ function StockQuote({
           <div className="nessa-text-7">
             <span
               data-slot="stock-quote-price"
-              // The em size keeps the headline on the coordinated ramp: it
-              // multiplies the level its row already carries, so the Nessa
-              // scale presets still move it.
+              // A display size the seven levels do not reach. Expressed as a
+              // multiple of the level its row carries rather than a fixed
+              // rem, so the Nessa scale presets still move it and it stays
+              // tied to the ramp instead of standing beside it.
               className="text-[1.7em] font-medium tabular-nums text-foreground transition-colors duration-(--nessa-motion-duration-fast)"
             >
               {formatPrice(shownPrice)}
@@ -511,6 +524,26 @@ function StockQuote({
                 priceChartToneVariants({ tone: extendedTone }),
               )}
             >
+              {/* The same arrow and off-screen word the primary line carries:
+                  direction is never left to colour alone. */}
+              {extendedTone === "loss" ? (
+                <ArrowDownRight aria-hidden="true" className="size-3.5 shrink-0" />
+              ) : (
+                <ArrowUpRight
+                  aria-hidden="true"
+                  className={cn(
+                    "size-3.5 shrink-0",
+                    extendedTone === "neutral" && "invisible",
+                  )}
+                />
+              )}
+              <span className="sr-only">
+                {extendedTone === "gain"
+                  ? labels.up
+                  : extendedTone === "loss"
+                    ? labels.down
+                    : ""}
+              </span>
               <span>{formatPrice(extendedHours.price)}</span>
               <span>
                 {`${extendedChange < 0 ? "−" : "+"}${formatPrice(Math.abs(extendedChange))}`}
@@ -540,7 +573,7 @@ function StockQuote({
           // cursor is reading. Forcing the chart's colour from the cursor
           // would repaint the whole plot red every time a hover crossed
           // below the open on a day that closed up.
-          tone={selection || scrubbedBar ? undefined : tone}
+          tone={selectionWindow || scrubbedBar ? undefined : tone}
           live={status === "live"}
           fill
           scrubIndex={scrubIndex}
@@ -550,7 +583,9 @@ function StockQuote({
           }}
           selectable={selectable}
           selection={
-            selection ? { start: selection.start, end: selection.end } : null
+            selectionWindow
+              ? { start: selectionWindow.start, end: selectionWindow.end }
+              : null
           }
           onSelectionChange={(next) => {
             setSelection(next)

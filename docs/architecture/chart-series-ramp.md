@@ -58,16 +58,21 @@ export-the-mapping move `pieChartPalette` and `radarChartPalette` make, so a
 panel showing the same reading beside the chart (`StockQuote`'s headline
 change) matches it without naming a token twice.
 
-Both are text-contrast tokens rather than fill steps: they paint a hairline
-stroke, a change line, and candle bodies, all read as foreground. They are
-therefore on the `A11Y-001` matrix against `--card`, `--background`, and
-`--popover` — every surface they are actually painted on — rather than on the
-categorical separation gates, which govern *telling slots apart* and have
-nothing to say about a two-value semantic pair.
+The pair is a **single step**, not a fill/strong pair, because a direction is
+read as foreground wherever it appears: a hairline stroke, a change line, a
+candle body, the percentage on a selection summary. `PriceChart` dilutes that
+one colour for its area wash the way `RadarChart` dilutes its strong step,
+rather than carrying a second token for it.
 
-Direction is never carried by colour alone: `StockQuote`'s change line ships
-an arrow glyph and an off-screen "Up"/"Down", and a host embedding a bare
-`PriceChart` owes the same relief the ramp's contrast rule asks for.
+Both are therefore held to text contrast on the `A11Y-001` matrix against
+`--card`, `--background`, and `--popover` — every surface they are painted on
+as text — rather than to the categorical separation gates, which govern
+*telling slots apart* and have nothing to say about a two-value semantic pair.
+
+Direction is never carried by colour alone: every change line `StockQuote`
+renders — the session's and the extended-hours one — ships an arrow glyph and
+an off-screen "Up"/"Down", and a host embedding a bare `PriceChart` owes the
+same relief the ramp's contrast rule asks for.
 
 A future chart with its own semantic axis (pass/fail, over/under budget)
 should follow this shape — a named pair of tokens and an exported mapping —

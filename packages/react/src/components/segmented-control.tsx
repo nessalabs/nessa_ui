@@ -39,7 +39,7 @@ const segmentedShellVariants = cva(
          * them. For a row of choices that is already framed by its container,
          * such as a chart's own control bar.
          */
-        bare: "border-0 p-0",
+        bare: "",
       },
     },
     defaultVariants: { variant: "outlined" },
@@ -49,6 +49,11 @@ const segmentedShellVariants = cva(
 export interface SegmentedControlProps
   extends Omit<React.ComponentProps<"div">, "onChange">,
     VariantProps<typeof segmentedShellVariants> {
+  /**
+   * The strip the options sit in: `outlined` (default) draws a bordered
+   * pill, `bare` draws none.
+   */
+  variant?: "outlined" | "bare"
   /** Controlled selected option value. */
   value?: string
   /** Initial selected option when uncontrolled. */
@@ -58,11 +63,15 @@ export interface SegmentedControlProps
 }
 
 /**
- * A compact single-choice switcher: a bordered pill of pressed/unpressed
- * buttons, the pattern used for view and scale toggles across Nessa's
- * toolbars. One option is always selected; choosing another moves the
- * pressed state and fires `onValueChange`. Give the group an `aria-label`
- * naming the choice it controls.
+ * A compact single-choice switcher: a row of pressed/unpressed buttons, the
+ * pattern used for view and scale toggles across Nessa's toolbars. One option
+ * is always selected; choosing another moves the pressed state and fires
+ * `onValueChange`. Give the group an `aria-label` naming the choice it
+ * controls.
+ *
+ * The `outlined` default draws the bordered pill the toolbars use; `bare`
+ * drops the strip for a row already framed by its container, such as the
+ * range tabs inside a chart's own control bar.
  */
 function SegmentedControl({
   className,
