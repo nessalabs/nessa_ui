@@ -69,6 +69,10 @@ memoize on the revision counter the snapshot carries, not on object identity.
   path; each further element is the tool call that spawned the next level down.
 - **Never invent data to fill a field.** Usage counters are nullable precisely
   so a provider that reports only a total cannot claim zero input tokens.
+- **Compaction removes history from the model, not from the transcript.** Keep
+  drawing what was already drawn; mark the boundary instead of trimming to it.
+  A compacted run is not a failed one, and one provider does not announce it at
+  all — never infer "no boundary" from a silent stream.
 - **An approval is a conversation, not a broadcast.** One line asks and blocks;
   the answer goes back on the input stream. Record which way it was answered —
   a decision that says only "answered" cannot be drawn. A refused tool fails,
@@ -127,3 +131,7 @@ something, or nothing will ever ask. Run with `--input-format stream-json` and
 ```json
 { "permissions": { "ask": ["Bash(*)"], "defaultMode": "default" } }
 ```
+
+To capture a compaction, fill the window with generated files rather than
+authored text, and grow it in small steps — a read big enough to overshoot the
+threshold ends the run with "Prompt is too long" instead of compacting.

@@ -534,7 +534,14 @@ export class ClaudeStreamMapper implements AgentStreamMapper {
       case ClaudeSystemSubtype.CompactBoundary: {
         const meta = asRecord(line.compact_metadata)
         return this.wrap(
-          { type: "context_compacted", trigger: asString(meta.trigger), preTokens: asNumber(meta.pre_tokens), postTokens: asNumber(meta.post_tokens) },
+          {
+            type: "context_compacted",
+            trigger: asString(meta.trigger),
+            preTokens: asNumber(meta.pre_tokens),
+            postTokens: asNumber(meta.post_tokens),
+            droppedTokens: asNumber(meta.cumulative_dropped_tokens),
+            durationMs: asNumber(meta.duration_ms),
+          },
           sessionId,
           path,
           ts,

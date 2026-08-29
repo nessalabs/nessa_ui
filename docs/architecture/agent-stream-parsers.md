@@ -499,8 +499,74 @@ plan, a subagent, a workflow, a web search, and a resume with a different model.
 Those eight are what the checked-in fixtures cover, and each one broke something
 in the parser that the others did not.
 
-One shape remains uncaptured and is therefore unimplemented rather than
-guessed: `compact_boundary`. Capture before modelling.
+Every shape on this wire is now captured. Compaction was the last, and it is
+the one that cannot be produced by asking for it — the window has to actually
+fill.
+
+### Forcing a compaction
+
+A deterministic corpus (`generate-corpus.mjs`, seeded, from the system word
+list) is read file by file until the window overflows. Nothing is authored:
+
+```bash
+node generate-corpus.mjs ./corpus 15 24        # 15 files of ~24KB
+claude -p "Read each file in full, one at a time. Reply with only the filename." \
+  --output-format stream-json --include-partial-messages --verbose \
+  --model haiku --autocompact 100000 --allowed-tools Read
+```
+
+`--autocompact` sets the window and accepts nothing below 100k, so a capture of
+a real compaction is inherently large. Growth must also be *gradual*: a first
+attempt read the repo's own largest source files, jumped tens of thousands of
+tokens per read, and hit `"Prompt is too long"` without ever compacting. The
+smaller the individual read, the more reliably the threshold is met rather than
+overshot.
+
+Its own tool results are 765KB of dictionary words, so the fixture elides the
+generated bodies — in both places the CLI repeats them, the `tool_result`
+content and the `tool_use_result.file.content` sidecar — and keeps every line,
+field and count around them. The corpus is reproducible from the script above.
+
+### What a boundary says
+
+| Field | Meaning |
+| --- | --- |
+| `trigger` | `auto` when the window filled, `manual` when asked for |
+| `pre_tokens` / `post_tokens` | 71.5k down to 10k on the first boundary here |
+| `cumulative_dropped_tokens` | across the **session**, not the boundary — it keeps climbing |
+| `duration_ms` | 36s and 41s here: compaction is a slow model call of its own |
+| `preserved_messages` | the uuids that survived, reachable through `raw` |
+
+Two consequences. Compaction removes history from the *model*, not from the
+transcript — a consumer that trimmed its own view to match would delete what
+the user is still reading. And it is not a failure: the run completes normally.
+
+### Codex compacts too, and does not tell you
+
+Codex has the same mechanism — `model_auto_compact_token_limit`, and
+`PreCompact` / `PostCompact` hooks — but **`codex exec --json` publishes
+nothing about it**. Forced with a 15k limit, the on-disk rollout records
+`{"type":"context_compacted"}` and a `replacement_history` entry while the JSON
+stream shows only a normal turn.
+
+The consequence is visible in the transcript rather than announced: after
+compacting, the agent read one file of ten, answered with that filename, and
+ended the turn — the rest of the instruction had been summarised away. A
+consumer on `exec` sees an agent that simply stopped early, with no way to know
+why.
+
+The app-server transport does better. Its schema declares a
+`ContextCompaction` thread item and a deprecated `ContextCompacted`
+notification, plus a `thread/compact/start` request so a client can compact on
+demand. The item carries `{id, type}` and nothing else — no token counts, no
+duration. So on Codex the fact is available on one transport and absent on the
+other, and even where present it is a marker rather than a measurement.
+
+| | Claude (`stream-json`) | Codex (`exec --json`) | Codex (app-server) |
+| --- | --- | --- | --- |
+| Compaction announced | yes | **no** | yes |
+| Token counts | yes | — | no |
+| Client can trigger it | — | — | `thread/compact/start` |
 
 Approvals were the last of these, and are now captured twice — once answered
 allow, once answered deny. Getting them to happen at all took an explicit rule

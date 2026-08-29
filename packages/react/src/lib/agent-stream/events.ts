@@ -364,7 +364,22 @@ export type AgentEventPayload =
       readonly window: string | null
       readonly usingOverage: boolean
     }
-  | { readonly type: "context_compacted"; readonly trigger: string | null; readonly preTokens: number | null; readonly postTokens: number | null }
+  | {
+      readonly type: "context_compacted"
+      /** `auto` when the window filled on its own, `manual` when asked for. */
+      readonly trigger: string | null
+      readonly preTokens: number | null
+      readonly postTokens: number | null
+      /**
+       * What has been dropped across the whole session, not just this
+       * boundary — it keeps climbing as a long session compacts repeatedly,
+       * which is what makes it the honest measure of how much the agent can no
+       * longer see.
+       */
+      readonly droppedTokens: number | null
+      /** Compaction is a model call of its own, and a slow one. */
+      readonly durationMs: number | null
+    }
   | { readonly type: "background_tasks_changed"; readonly tasks: readonly { readonly taskId: string; readonly description: string }[] }
   // ---------- asks ----------
   | {

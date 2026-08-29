@@ -72,6 +72,7 @@ import { storyDocumentation } from "./story-documentation"
 // is authored transcript data.
 import failing from "./fixtures/agent-stream/failing.jsonl?raw"
 import approvalAllow from "./fixtures/agent-stream/approval_allow.jsonl?raw"
+import compaction from "./fixtures/agent-stream/compaction.jsonl?raw"
 import approvalDeny from "./fixtures/agent-stream/approval_deny.jsonl?raw"
 import printed from "./fixtures/agent-stream/printed.jsonl?raw"
 import resumeOne from "./fixtures/agent-stream/resume_turn1.jsonl?raw"
@@ -229,6 +230,7 @@ const CAPTURES: readonly Capture[] = [
   { provider: "claude", id: "websearch", label: "Web search", blurb: "Server-side tools, whose results arrive as structured blocks rather than text.", prompt: "Search the web for the current version of the TypeScript compiler and tell me in one line.", source: websearch },
   { provider: "claude", id: "approval-allow", label: "Approval — allowed", blurb: "The one place the wire is a conversation: the harness stops and asks, and nothing moves until an answer is written back. Recorded against a sandbox whose settings escalate the shell.", prompt: "Run the shell command `echo approved-and-ran` using the Bash tool, then tell me its output. (Answered: allow)", source: approvalAllow },
   { provider: "claude", id: "approval-deny", label: "Approval — refused", blurb: "The same ask, answered no. The refusal text becomes the tool's error, and the turn still completes — a declined tool is not a failed run.", prompt: "The same prompt, answered: deny.", source: approvalDeny },
+  { provider: "claude", id: "compaction", label: "Context compaction", blurb: "The window fills and history is summarised away — twice. The transcript keeps everything; only the model forgets. Forced by reading a generated corpus on Haiku with a 100k window.", prompt: "Read fifteen generated files in full, one at a time, answering with only each filename.", source: compaction },
   { provider: "claude", id: "resume", label: "Resume + model swap", blurb: "Two processes, one session id: a second init, and a model change derived from it.", prompt: "Remember the number 47. Create marker.txt containing it. Then, resumed on Haiku: what number did I ask you to remember?", source: `${resumeOne}\n${resumeTwo}` },
   // ---------- Codex ----------
   { provider: "codex", id: "codex-printed", label: "Plain text", blurb: "One committed message. Codex streams nothing in this mode, which is why live preview has to be optional rather than assumed.", prompt: "Reply with exactly: hello world. Do not run any commands.", source: codexPrinted },

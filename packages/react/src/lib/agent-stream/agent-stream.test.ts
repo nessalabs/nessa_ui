@@ -1186,3 +1186,48 @@ test("the allowed run reaches the same place by the other road", () => {
   const finished = events.flatMap((event) => (event.payload.type === "turn_completed" ? [event.payload] : []))[0]
   assert.equal(finished.permissionDenials.length, 0)
 })
+
+/**
+ * Compaction is the shape a long session cannot avoid, and the only one that
+ * silently removes what a consumer has already drawn. The capture is a Haiku
+ * run forced over the window by reading a generated corpus; the corpus bodies
+ * are elided in the fixture because they are machine filler with nothing to
+ * assert, and every line, field and count around them is untouched.
+ */
+test("a compaction boundary reports what the agent can no longer see", () => {
+  const events = mapClaudeStream(capture("compaction"))
+  const boundaries = events.flatMap((event) => (event.payload.type === "context_compacted" ? [event.payload] : []))
+  assert.equal(boundaries.length, 2, "a long enough session compacts more than once")
+
+  for (const boundary of boundaries) {
+    assert.equal(boundary.trigger, "auto")
+    // The window shrinks. A boundary that did not shrink it would be a summary
+    // that failed, and drawing it as a success would be wrong.
+    assert.ok((boundary.preTokens ?? 0) > (boundary.postTokens ?? 0))
+    // Compaction is itself a model call, and a slow one — tens of seconds here.
+    // A view that blocks on it without saying why looks hung.
+    assert.ok((boundary.durationMs ?? 0) > 1000)
+  }
+
+  // Dropped tokens accumulate across the session rather than resetting per
+  // boundary, which is what makes the figure meaningful in a long run.
+  const dropped = boundaries.map((boundary) => boundary.droppedTokens ?? 0)
+  assert.ok(dropped[0] > 0)
+  assert.ok(dropped[1] > dropped[0])
+})
+
+test("the transcript survives its own history being dropped", () => {
+  const events = mapClaudeStream(capture("compaction"))
+  // Compaction removes history from the *model*, not from the transcript. The
+  // work already drawn stays drawn — a consumer that trimmed its own view to
+  // match would delete what the user is reading.
+  const transcript = buildTranscript(events)
+  const calls = events.filter((event) => event.payload.type === "tool_call_completed")
+  assert.equal(calls.length, 15)
+  assert.equal(transcript.turns[transcript.turns.length - 1].toolCalls, calls.length)
+
+  // And the run still ends normally: a compacted session is not a failed one.
+  const finished = events.flatMap((event) => (event.payload.type === "turn_completed" ? [event.payload] : []))
+  assert.equal(finished.length, 1)
+  assert.equal(finished[0].status, "completed")
+})
