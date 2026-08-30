@@ -1008,7 +1008,7 @@ function DemoActivity({
         <AgentActivity status={message.activity.status}>
           <AgentActivityTrigger
             aria-expanded={activityOpen}
-            aria-controls={activitySheetId}
+            aria-controls={activityOpen ? activitySheetId : undefined}
             onClick={() =>
               onOpenActivity?.({
                 title: message.activity!.summary,
@@ -1033,7 +1033,7 @@ function DemoActivity({
           meta={message.card.subtitle}
           aria-haspopup="dialog"
           aria-expanded={detailsOpen}
-          aria-controls={detailsSheetId}
+          aria-controls={detailsOpen ? detailsSheetId : undefined}
           onClick={onOpenCard}
         />
       ) : null}
@@ -1605,6 +1605,13 @@ function PlaygroundExample({
   >(null)
   // The pending annotation the composer replies to while the list is open.
   const [selectedQuote, setSelectedQuote] = React.useState<number | null>(null)
+  const closeExtraDetails = () => {
+    setActivitySheet(null)
+    setQueueOpen(false)
+    setDetailsTabId(null)
+    setQuotesOpen(false)
+    setViewedQuotes(null)
+  }
   // The user message whose bubble is currently swapped for the editor.
   const [editingMessageId, setEditingMessageId] = React.useState<number | null>(
     null,
@@ -1683,6 +1690,7 @@ function PlaygroundExample({
           ],
     )
     setActiveTabId(tabId)
+    closeExtraDetails()
   }
   const openHistoryTab = () => {
     const parentId = activeTabId === historyTabId ? undefined : activeTabId
@@ -1707,13 +1715,9 @@ function PlaygroundExample({
     })
     setActiveTabId(historyTabId)
     setHistoryQuery("")
-    setQueueOpen(false)
-    setDetailsTabId(null)
-    setQuotesOpen(false)
-    setViewedQuotes(null)
+    closeExtraDetails()
     setModelCardOpen(false)
     setOverlay(null)
-    setActivitySheet(null)
   }
   const activeFileItem = fileTabs[activeTabId] ?? inlinePreview ?? undefined
   const isHistoryTab = activeTabId === historyTabId
@@ -1848,8 +1852,7 @@ function PlaygroundExample({
     setModelCardOpen(false)
     setInlinePreview(null)
     // Pending annotations survive navigation — only the views close.
-    setQuotesOpen(false)
-    setViewedQuotes(null)
+    closeExtraDetails()
     setSelectedQuote(null)
   }
 
@@ -2010,9 +2013,7 @@ function PlaygroundExample({
           setViewedQuotes(null)
           setFocusedThreadId(null)
           setEditingMessageId(null)
-          setActivitySheet(null)
-          setQueueOpen(false)
-          setDetailsTabId(null)
+          closeExtraDetails()
         }}
         onClose={(id) => {
           if (id === generatingTabId) {
@@ -2052,6 +2053,7 @@ function PlaygroundExample({
             const { [id]: _closed, ...rest } = current
             return rest
           })
+          closeExtraDetails()
         }}
         onNew={() => {
           // nextId starts at 1, and "chat-1" already exists — offset new
@@ -2066,9 +2068,7 @@ function PlaygroundExample({
           setMenuTargetId(null)
           setOverlay(null)
           setModelCardOpen(false)
-          setQueueOpen(false)
-          setDetailsTabId(null)
-          setActivitySheet(null)
+          closeExtraDetails()
           inputRef.current?.focus()
         }}
         wrapTab={(tab, node) => {
@@ -2200,6 +2200,7 @@ function PlaygroundExample({
             setActiveTabId(id)
             setHistoryQuery("")
             setInlinePreview(null)
+            closeExtraDetails()
           }}
           query={historyQuery}
           onQueryChange={setHistoryQuery}
@@ -2229,7 +2230,11 @@ function PlaygroundExample({
                 className="self-start"
                 discloses
                 aria-expanded={activitySheet?.title === entry.thought}
-                aria-controls={extraSheetId}
+                aria-controls={
+                  activitySheet?.title === entry.thought
+                    ? extraSheetId
+                    : undefined
+                }
                 onClick={() => {
                   setQuotesOpen(false)
                   setViewedQuotes(null)
@@ -2332,9 +2337,15 @@ function PlaygroundExample({
             activityOpen={
               activitySheet?.title === entry.activity?.summary
             }
-            activitySheetId={extraSheetId}
+            activitySheetId={
+              activitySheet?.title === entry.activity?.summary
+                ? extraSheetId
+                : undefined
+            }
             detailsOpen={detailsTabId === activeTabId}
-            detailsSheetId={detailsSheetId}
+            detailsSheetId={
+              detailsTabId === activeTabId ? detailsSheetId : undefined
+            }
             onOpenCard={() => {
               setQueueOpen(false)
               setActivitySheet(null)
@@ -2367,7 +2378,11 @@ function PlaygroundExample({
               <AgentActivityTrigger
                 icon={<Sparkles aria-hidden="true" />}
                 aria-expanded={activitySheet?.title === "Exploring…"}
-                aria-controls={extraSheetId}
+                aria-controls={
+                  activitySheet?.title === "Exploring…"
+                    ? extraSheetId
+                    : undefined
+                }
                 onClick={() => {
                   setQuotesOpen(false)
                   setViewedQuotes(null)
@@ -2570,10 +2585,12 @@ function PlaygroundExample({
           aria-label={`Queued ${queued.length}`}
           aria-haspopup="dialog"
           aria-expanded={queueOpen}
-          aria-controls={queueSheetId}
+          aria-controls={queueOpen ? queueSheetId : undefined}
           onClick={() => {
             setActivitySheet(null)
             setDetailsTabId(null)
+            setQuotesOpen(false)
+            setViewedQuotes(null)
             setQueueOpen(true)
           }}
         />

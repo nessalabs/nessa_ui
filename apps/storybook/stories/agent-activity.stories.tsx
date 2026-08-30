@@ -91,7 +91,7 @@ export const Playground: Story = {
             <AgentActivityCue
               discloses
               aria-expanded={open === "thought"}
-              aria-controls={sheetId}
+              aria-controls={open === "thought" ? sheetId : undefined}
               onClick={() => setOpen("thought")}
             >
               {thought}
@@ -99,7 +99,7 @@ export const Playground: Story = {
             <AgentActivity>
               <AgentActivityTrigger
                 aria-expanded={open === "explored"}
-                aria-controls={sheetId}
+                aria-controls={open === "explored" ? sheetId : undefined}
                 onClick={() => setOpen("explored")}
               >
                 {explored}
@@ -193,7 +193,7 @@ export const LiveAndCard: Story = {
               <AgentActivityTrigger
                 icon={<Sparkles />}
                 aria-expanded={open}
-                aria-controls={sheetId}
+                aria-controls={open ? sheetId : undefined}
                 onClick={() => setOpen(true)}
               >
                 {status === "running" ? "Exploring…" : explored}
