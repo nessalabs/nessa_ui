@@ -39,18 +39,34 @@ packages/agent-stream/src/
     index.ts       the fold's own entry                     ← "./transcript" export
     fold.ts        one-shot fold                            ← shared, optional
     builder.ts     incremental fold                         ← shared, optional
+  capabilities.ts  a session's reported commands, models,   ← shared
+                   skills and servers
+  emitter.ts       EventSink                                ← shared
+  mapping.ts       MappingEntry, WireKind                   ← shared
+  transports.ts    which provider streams on which wire     ← shared
   claude/
-    wire.ts        Claude Code's line shapes + vocabularies ← provider
-    mapping.ts     Claude's kinds → contract kinds, as data ← provider
-    mapper.ts      ClaudeStreamMapper                       ← provider
     tools.ts       Claude's tool names → ToolKind           ← provider
-    capabilities.ts  Claude's init → pickers                ← provider
     store.ts       Claude Code's on-disk layout             ← provider
+    stream/
+      wire.ts      Claude Code's line shapes + vocabularies ← provider wire
+      mapping.ts   Claude's kinds → contract kinds, as data ← provider wire
+      mapper.ts    ClaudeStreamMapper                       ← provider wire
+      capabilities.ts  Claude's init → pickers              ← provider wire
   codex/
-    wire.ts        Codex's line shapes + vocabularies       ← provider
-    mapping.ts     Codex's kinds → contract kinds, as data  ← provider
-    mapper.ts      CodexStreamMapper                        ← provider
+    exec/          codex exec --json                        ← provider wire
+    app-server/    codex's JSON-RPC app server              ← provider wire
+  opencode/
+    parts.ts       the payload its two transports share     ← provider
+    store.ts       opencode's on-disk layout                ← provider
+    run/           opencode run --format json               ← provider wire
+    server/        the SSE bus on opencode serve            ← provider wire
+  acp/             Agent Client Protocol, shared by all     ← provider wire
 ```
+
+A provider folder holds what its transports share; each wire gets its own
+subfolder. That is why a wire is `claude/stream/wire.ts` rather than
+`claude/wire.ts` — one provider can speak several protocols, and only what is
+genuinely identical is hoisted.
 
 Three providers now exist, which is what turns the layering from a claim into a
 measurement. Adding Codex cost **one** addition to the shared contract —
@@ -82,12 +98,12 @@ module, where a name *should* be provider-shaped:
 
 | layer | vocabulary | scope |
 | --- | --- | --- |
-| `claude/wire.ts` | `ClaudeWireType`, `ClaudeSystemSubtype`, `ClaudeStreamFrameType`, `ClaudeContentDeltaType`, `ClaudeContentBlockType`, `ClaudeTaskType` | **per provider** |
+| `claude/stream/wire.ts` | `ClaudeWireType`, `ClaudeSystemSubtype`, `ClaudeStreamFrameType`, `ClaudeContentDeltaType`, `ClaudeContentBlockType`, `ClaudeTaskType` | **per provider** |
 | `events.ts` | `AgentEventType`, `TaskKind`, `PlanStepStatus`, `ToolKind` | **shared by all providers** |
 
 The directory says which is which. A provider name may appear inside
 `claude/` as often as it likes — that is the folder's whole job — and must not
-appear in a shared module at all. `claude/mapping.ts` is where the two meet:
+appear in a shared module at all. `claude/stream/mapping.ts` is where the two meet:
 `CLAUDE_TASK_KIND`, `CLAUDE_PLAN_STATUS` and `CLAUDE_EVENT_MAPPING` are lookup
 tables from the provider's words to ours, written as **data rather than
 control flow**, so the translation can be read at a glance and checked by the

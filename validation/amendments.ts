@@ -144,4 +144,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-010",
+    kind: "correction",
+    contractId: "PKG-002",
+    baseRevision: "98b5604",
+    targets: [],
+    beforeFingerprint: "d738b3180ff85f50d0bbf8e63b44fd76aca89f6d1816c67d5c813eb58c3685c5",
+    afterFingerprint: "d738b3180ff85f50d0bbf8e63b44fd76aca89f6d1816c67d5c813eb58c3685c5",
+    rationale: "AMEND-009 recorded two things that are no longer true of the code, and the ledger is the wrong place to leave a false statement standing. It said a shadcn consumer loses seventeen fold symbols because the copied index.ts is now the contract entry: the contract entry moved to contract.ts and index.ts became a barrel re-exporting contract and transcript, so the registry consumer's surface is whole again and the published package still splits. It also said the wire.ts narrowing exemption matched exactly the one file it matched before: that exemption is deleted, because PARSE-001 and PARSE-003 pass without it and no wire has ever needed it. Correcting rather than rewriting, because AMEND-009 was accurate about its own transition and the history is append-only.",
+    compatibility: "No governed source changed, so the snapshot fingerprint is unmoved and this correction records a fact rather than a transition. The registry change restores API that AMEND-009's transition removed, which is additive for every consumer and reverts none of that transition's other effects. Deleting the narrowing exemption strengthens PARSE-003's enforced surface rather than weakening it: nothing was excepted before this and nothing is excepted after, and the contracts carry no exception ledger entry either way.",
+    migration: "A registry consumer that migrated an import from lib/agent-stream to lib/agent-stream/transcript on AMEND-009's advice may keep it — the deep path still resolves — or move it back to the barrel; both work. New parser wires narrow through the shared readers with no path-granted exemption available.",
+    supersedes: "AMEND-009",
+    pullRequest: null,
+  },
 ])
