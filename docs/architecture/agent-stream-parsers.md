@@ -29,8 +29,9 @@ product. A host builds its own transcript, its own sidebar, its own everything.
 
 ```
 packages/agent-stream/src/
-  index.ts         the contract entry, stopping at the      ← "." export
+  contract.ts      the contract entry, stopping at the      ← "." export
                    agent message
+  index.ts         contract + fold, for copied source       ← registry barrel only
   json.ts          JsonValue and the narrowing readers      ← shared
   events.ts        AgentEvent, AgentEventPayload, the       ← shared: THE CONTRACT
                    vocabularies every provider maps onto
@@ -131,6 +132,14 @@ contract:
 | --- | --- | --- |
 | `@nessa-ui/agent-stream` | wire + mapper | anything that wants the event log and draws its own shape |
 | `@nessa-ui/agent-stream/transcript` | the fold | hosts that want the default turns-and-groups shape |
+
+The shadcn registry is the exception, and deliberately so. It copies source, and
+copied source has no exports map, so a registry consumer has exactly one
+surface: `lib/agent-stream/index.ts`. That barrel re-exports both halves, which
+is why `src/index.ts` exists separately from `src/contract.ts` — the published
+package builds the contract, and the barrel is only ever copied. Splitting the
+npm surface is a layering decision; deleting half the API from projects that
+already installed the item would just be a break.
 
 Splitting it this way is what makes the rule above enforceable rather than
 advisory. While the parser lived inside `@nessa-ui/react`, reaching it meant

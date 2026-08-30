@@ -127,7 +127,26 @@ export function parserPackageDeclarationIssues(pkg: PackageJson): string[] {
  *
  * Walking the graph is what makes the layering a fact rather than a comment.
  */
-const CONTRACT_ENTRY = "packages/agent-stream/src/index.ts"
+/**
+ * The barrel a copied-source consumer imports, which must stay the whole API.
+ *
+ * The registry has no exports map, so `lib/agent-stream/index.ts` is the only
+ * surface a shadcn consumer has. Trimming it to the contract — the shape the
+ * published package deliberately has — deletes the fold from every project that
+ * installed this item, and does it silently, because the copied files still
+ * typecheck until a call site names a missing symbol. Requiring the two
+ * star-exports verbatim keeps the barrel equal to contract-plus-fold by
+ * construction rather than by upkeep.
+ */
+const REGISTRY_BARREL = "packages/agent-stream/src/index.ts"
+const REQUIRED_BARREL_EXPORTS = ["./contract", "./transcript"] as const
+
+export function registryBarrelIssues(source: string): string[] {
+  const specifiers = moduleSpecifiers(source, REGISTRY_BARREL)
+  return REQUIRED_BARREL_EXPORTS.filter((required) => !specifiers.includes(required))
+}
+
+const CONTRACT_ENTRY = "packages/agent-stream/src/contract.ts"
 const FOLD_ROOT = "packages/agent-stream/src/transcript/"
 
 export async function foldReachableFromContract(context: {
@@ -215,6 +234,15 @@ export const packageArtifactsCheck = defineCheck({
       }
       if (moduleSpecifiers(source, filePath).some(isReactSpecifier)) {
         findings.push(context.fail("The parser must not import React.", { contractId: "PKG-001", path: filePath }))
+      }
+    }
+
+    if (context.files.has(REGISTRY_BARREL)) {
+      for (const missing of registryBarrelIssues(await context.readText(REGISTRY_BARREL))) {
+        findings.push(context.fail(
+          `The registry barrel must re-export ${missing}: copied source has no exports map, so trimming this file silently deletes that half of the API from every shadcn consumer.`,
+          { contractId: "PKG-002", path: REGISTRY_BARREL },
+        ))
       }
     }
 

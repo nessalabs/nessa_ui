@@ -8,6 +8,7 @@ import {
   moduleSpecifiers,
   packageDeclarationIssues,
   parserPackageDeclarationIssues,
+  registryBarrelIssues,
 } from "../nessa/checks/package-artifacts.ts"
 
 const validPackage = {
@@ -114,8 +115,10 @@ test("React is recognized through every entry point that drags the framework in"
 })
 
 test("the contract entry is held away from the fold, transitively", () => {
+  // `contract.ts` is the entry, not `index.ts`: index.ts is the registry barrel
+  // and reaches the fold on purpose.
   const files = new Map([
-    ["packages/agent-stream/src/index.ts", 'export * from "./events"'],
+    ["packages/agent-stream/src/contract.ts", 'export * from "./events"'],
     ["packages/agent-stream/src/events.ts", "export const a = 1"],
     ["packages/agent-stream/src/transcript/index.ts", 'export * from "./fold"'],
     ["packages/agent-stream/src/transcript/fold.ts", "export const b = 2"],
@@ -128,13 +131,25 @@ test("the contract entry is held away from the fold, transitively", () => {
     assert.deepEqual(clean, [], "a contract entry that stops at the agent message reaches no fold module")
 
     // A direct re-export is the obvious violation.
-    files.set("packages/agent-stream/src/index.ts", 'export * from "./events"\nexport * from "./transcript"')
+    files.set("packages/agent-stream/src/contract.ts", 'export * from "./events"\nexport * from "./transcript"')
     assert.deepEqual(await foldReachableFromContract(context), ["packages/agent-stream/src/transcript/index.ts"])
 
     // An indirect one is the violation that would otherwise ship: nothing in
     // the entry names the fold, but the graph still reaches it.
-    files.set("packages/agent-stream/src/index.ts", 'export * from "./events"')
+    files.set("packages/agent-stream/src/contract.ts", 'export * from "./events"')
     files.set("packages/agent-stream/src/events.ts", 'import { b } from "./transcript/fold"\nexport const a = b')
     assert.deepEqual(await foldReachableFromContract(context), ["packages/agent-stream/src/transcript/fold.ts"])
   })
+})
+
+test("the registry barrel keeps both halves of the API for copied source", () => {
+  const barrel = 'export * from "./contract"\nexport * from "./transcript"'
+  assert.deepEqual(registryBarrelIssues(barrel), [])
+  // Comments and ordering are not the contract; the two re-exports are.
+  assert.deepEqual(registryBarrelIssues('/** doc */\nexport * from "./transcript"\nexport * from "./contract"'), [])
+  // Trimming the barrel to the published package's shape is the regression
+  // this guards: a shadcn consumer has no exports map to reach the fold with.
+  assert.deepEqual(registryBarrelIssues('export * from "./contract"'), ["./transcript"])
+  assert.deepEqual(registryBarrelIssues('export * from "./transcript"'), ["./contract"])
+  assert.deepEqual(registryBarrelIssues("export const nothing = 1").sort(), ["./contract", "./transcript"])
 })

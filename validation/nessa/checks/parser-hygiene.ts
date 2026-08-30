@@ -4,16 +4,27 @@ import { defineCheck } from "../../framework/define-check.ts"
 import { checkMetadata } from "../check-metadata.ts"
 
 /**
- * The files allowed to narrow raw JSON by hand.
+ * The file allowed to narrow raw JSON by hand.
  *
- * `json.ts` is where the narrowing lives on purpose. Each provider's `wire.ts`
- * sits upstream of it, deciding whether a decoded line is an object at all, and
- * cannot use a reader that already assumes one — so the exemption is stated as
- * a rule about that boundary rather than a list of paths a second provider
- * would have to be added to.
+ * `json.ts` is where the narrowing lives on purpose, so it cannot route through
+ * itself. Nothing else qualifies.
+ *
+ * A `wire.ts` exemption used to sit here on the theory that a provider's wire
+ * decides whether a decoded line is an object at all and so cannot use a reader
+ * that already assumes one. No wire has ever needed it: every one of the six
+ * reaches object-ness through `parseJsonObjectLine` and the shared readers, and
+ * the rule passes with the clause removed. Worse, the clause matched only a
+ * one-level-deep `wire.ts`, so it never covered `claude/stream/wire.ts` and its
+ * peers — the comment claimed a generality the pattern did not have, and
+ * widening it to match would have granted four more files a licence none of
+ * them asked for.
+ *
+ * A future wire that genuinely must hand-roll goes through the exception
+ * ledger, where the decision is explicit and reviewed, rather than being
+ * granted silently by living at the right path.
  */
 function ownsNarrowing(filePath: string): boolean {
-  return filePath === "packages/agent-stream/src/json.ts" || /\/agent-stream\/src\/[^/]+\/wire\.ts$/.test(filePath)
+  return filePath === "packages/agent-stream/src/json.ts"
 }
 
 const NARROWED_PRIMITIVES = new Set(["string", "number", "boolean", "object"])

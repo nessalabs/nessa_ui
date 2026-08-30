@@ -804,6 +804,11 @@
           "target": "lib/agent-stream/events.ts"
         },
         {
+          "path": "packages/agent-stream/src/contract.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/contract.ts"
+        },
+        {
           "path": "packages/agent-stream/src/index.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/index.ts"
