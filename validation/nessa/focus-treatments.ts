@@ -15,8 +15,8 @@ const composerFocusComponents = Object.freeze([
   // clamped bubble that opens its full text.
   { component: "chat-bubbles", count: 7 },
   { component: "chat-composer", count: 3 },
-  // Only the back link: the overlay traps focus, and its content is the
-  // host's own.
+  // Only the back link. ChatOverlay does not trap focus; surrounding
+  // chrome stays in the tab order. Its content is the host's own.
   { component: "chat-overlay", count: 1 },
   // The chip, the collapsed-count control, and the discard-all button.
   { component: "chat-tray", count: 3 },

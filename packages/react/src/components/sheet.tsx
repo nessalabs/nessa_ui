@@ -102,6 +102,12 @@ export interface SheetProps extends React.ComponentProps<"div"> {
  * keystroke. Pass `modal={false}` for a contained extra-details surface that
  * still covers its siblings but leaves surrounding chrome in the tab order.
  *
+ * Mount it as a child of the ancestor it should fill. Queue and agent
+ * details sit on the chat frame so Expand covers the window; thinking,
+ * tools, and annotations sit in the tabpanel so the tab strip and composer
+ * stay. Prefer one modal sheet per ancestor — two stacked modal sheets
+ * both trap Tab.
+ *
  * Compose the panel from SheetHandle, SheetHeader, SheetTitle, SheetClose,
  * SheetExpand, SheetAction, and SheetBody. SheetExpand toggles the drawer
  * into a filled extra-details surface over the same ancestor — the host

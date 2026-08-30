@@ -83,21 +83,36 @@ export const Playground: Story = {
       const [open, setOpen] = React.useState<"thought" | "explored" | null>(
         null,
       )
+      const sheetId = React.useId()
       const title = open === "thought" ? thought : explored
       return (
         <div className="relative h-96 w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-[2rem] bg-background p-4">
           <div className="flex flex-col gap-3">
-            <AgentActivityCue discloses onClick={() => setOpen("thought")}>
+            <AgentActivityCue
+              discloses
+              aria-expanded={open === "thought"}
+              aria-controls={sheetId}
+              onClick={() => setOpen("thought")}
+            >
               {thought}
             </AgentActivityCue>
             <AgentActivity>
-              <AgentActivityTrigger onClick={() => setOpen("explored")}>
+              <AgentActivityTrigger
+                aria-expanded={open === "explored"}
+                aria-controls={sheetId}
+                onClick={() => setOpen("explored")}
+              >
                 {explored}
               </AgentActivityTrigger>
             </AgentActivity>
           </div>
           {open ? (
-            <Sheet label={title} modal={false} onClose={() => setOpen(null)}>
+            <Sheet
+              id={sheetId}
+              label={title}
+              modal={false}
+              onClose={() => setOpen(null)}
+            >
               <SheetHandle />
               <SheetHeader>
                 <SheetExpand />
@@ -132,10 +147,13 @@ export const Playground: Story = {
     await expect(canvas.getByText(thought)).toBeVisible()
     const trigger = canvas.getByRole("button", { name: explored })
     await expect(trigger).toHaveAttribute("aria-haspopup", "dialog")
+    await expect(trigger).toHaveAttribute("aria-expanded", "false")
     await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
     await userEvent.click(trigger)
     const dialog = canvas.getByRole("dialog", { name: explored })
     await waitFor(() => expect(dialog).toBeVisible())
+    await expect(dialog).not.toHaveAttribute("aria-modal")
+    await expect(trigger).toHaveAttribute("aria-expanded", "true")
     await waitFor(() =>
       expect(canvas.getByRole("button", { name: /read/i })).toBeVisible(),
     )
@@ -167,12 +185,15 @@ export const LiveAndCard: Story = {
       const [status, setStatus] = React.useState<"running" | "complete">(
         "running",
       )
+      const sheetId = React.useId()
       return (
         <div className="relative h-80 w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-[2rem] bg-background p-4">
           <div className="flex flex-col gap-3">
             <AgentActivity status={status}>
               <AgentActivityTrigger
                 icon={<Sparkles />}
+                aria-expanded={open}
+                aria-controls={sheetId}
                 onClick={() => setOpen(true)}
               >
                 {status === "running" ? "Exploring…" : explored}
@@ -186,6 +207,7 @@ export const LiveAndCard: Story = {
           </div>
           {open ? (
             <Sheet
+              id={sheetId}
               label="Exploring…"
               modal={false}
               onClose={() => {

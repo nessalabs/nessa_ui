@@ -189,6 +189,7 @@ export type AgentActivityCueProps = {
  * 1s", "Explored 3 files, 2 searches", "Exploring…". Renders as text so a
  * thought beat does not invite a click. Pass `discloses` when the line
  * opens that beat's thinking and tool calls in the extra-details sheet.
+ * Pass `aria-expanded` and `aria-controls` when the host owns the sheet.
  */
 function AgentActivityCue(props: AgentActivityCueProps) {
   const groupStatus = React.useContext(AgentActivityStatusContext)
@@ -215,7 +216,7 @@ function AgentActivityCue(props: AgentActivityCueProps) {
     cueClassName,
     status === "error" && "text-destructive",
     props.discloses &&
-      "cursor-pointer hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+      "min-h-6 cursor-pointer hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
     props.className,
   )
   if (props.discloses) {
@@ -271,9 +272,10 @@ export interface AgentActivityTriggerProps
 /**
  * The always-visible cue for a run of tools: icon, label, and a chevron
  * that marks it as a control. Clicking opens the extra-details sheet for
- * that beat — it does not expand in the transcript. While the group is
- * `running` the label shimmers; when it `error`ed the label tints
- * destructive.
+ * that beat — it does not expand in the transcript. The host owns the
+ * sheet; pass `aria-expanded` and `aria-controls` so the cue names it.
+ * While the group is `running` the label shimmers; when it `error`ed the
+ * label tints destructive.
  */
 function AgentActivityTrigger({
   icon,
@@ -289,7 +291,7 @@ function AgentActivityTrigger({
       aria-haspopup="dialog"
       className={cn(
         cueClassName,
-        "cursor-pointer hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        "min-h-6 cursor-pointer hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         "group-data-[status=error]/agent-activity:text-destructive",
         className,
       )}

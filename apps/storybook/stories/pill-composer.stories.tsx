@@ -986,10 +986,18 @@ function DemoActivity({
   message,
   onOpenCard,
   onOpenActivity,
+  activityOpen,
+  activitySheetId,
+  detailsOpen,
+  detailsSheetId,
 }: {
   message: DemoMessage
   onOpenCard?: () => void
   onOpenActivity?: (sheet: DemoActivitySheet) => void
+  activityOpen?: boolean
+  activitySheetId?: string
+  detailsOpen?: boolean
+  detailsSheetId?: string
 }) {
   if (!message.activity && !message.card && !message.todos) {
     return null
@@ -999,6 +1007,8 @@ function DemoActivity({
       {message.activity ? (
         <AgentActivity status={message.activity.status}>
           <AgentActivityTrigger
+            aria-expanded={activityOpen}
+            aria-controls={activitySheetId}
             onClick={() =>
               onOpenActivity?.({
                 title: message.activity!.summary,
@@ -1021,6 +1031,9 @@ function DemoActivity({
           icon={<Sparkles aria-hidden="true" />}
           title={message.card.title}
           meta={message.card.subtitle}
+          aria-haspopup="dialog"
+          aria-expanded={detailsOpen}
+          aria-controls={detailsSheetId}
           onClick={onOpenCard}
         />
       ) : null}
@@ -1560,6 +1573,9 @@ function PlaygroundExample({
   const [queueOpen, setQueueOpen] = React.useState(false)
   const [activitySheet, setActivitySheet] =
     React.useState<DemoActivitySheet | null>(null)
+  const extraSheetId = React.useId()
+  const queueSheetId = React.useId()
+  const detailsSheetId = React.useId()
   const [queuedByTab, setQueuedByTab] = React.useState<
     Record<string, { id: string; text: string }[]>
   >({
@@ -1995,6 +2011,8 @@ function PlaygroundExample({
           setFocusedThreadId(null)
           setEditingMessageId(null)
           setActivitySheet(null)
+          setQueueOpen(false)
+          setDetailsTabId(null)
         }}
         onClose={(id) => {
           if (id === generatingTabId) {
@@ -2050,6 +2068,7 @@ function PlaygroundExample({
           setModelCardOpen(false)
           setQueueOpen(false)
           setDetailsTabId(null)
+          setActivitySheet(null)
           inputRef.current?.focus()
         }}
         wrapTab={(tab, node) => {
@@ -2063,7 +2082,11 @@ function PlaygroundExample({
                 collisionPadding={8}
               >
                 <ContextMenuItem
-                  onSelect={() => setDetailsTabId(tab.id)}
+                  onSelect={() => {
+                    setQueueOpen(false)
+                    setActivitySheet(null)
+                    setDetailsTabId(tab.id)
+                  }}
                 >
                   <Info aria-hidden="true" />
                   View Details
@@ -2205,10 +2228,13 @@ function PlaygroundExample({
               <AgentActivityCue
                 className="self-start"
                 discloses
+                aria-expanded={activitySheet?.title === entry.thought}
+                aria-controls={extraSheetId}
                 onClick={() => {
                   setQuotesOpen(false)
                   setViewedQuotes(null)
                   setQueueOpen(false)
+                  setDetailsTabId(null)
                   setActivitySheet({
                     title: entry.thought!,
                     thought: {
@@ -2303,11 +2329,22 @@ function PlaygroundExample({
           />
           <DemoActivity
             message={entry}
-            onOpenCard={() => setDetailsTabId(activeTabId)}
+            activityOpen={
+              activitySheet?.title === entry.activity?.summary
+            }
+            activitySheetId={extraSheetId}
+            detailsOpen={detailsTabId === activeTabId}
+            detailsSheetId={detailsSheetId}
+            onOpenCard={() => {
+              setQueueOpen(false)
+              setActivitySheet(null)
+              setDetailsTabId(activeTabId)
+            }}
             onOpenActivity={(sheet) => {
               setQuotesOpen(false)
               setViewedQuotes(null)
               setQueueOpen(false)
+              setDetailsTabId(null)
               setActivitySheet(sheet)
             }}
           />
@@ -2329,10 +2366,13 @@ function PlaygroundExample({
             <AgentActivity status="running" className="me-8 self-start">
               <AgentActivityTrigger
                 icon={<Sparkles aria-hidden="true" />}
+                aria-expanded={activitySheet?.title === "Exploring…"}
+                aria-controls={extraSheetId}
                 onClick={() => {
                   setQuotesOpen(false)
                   setViewedQuotes(null)
                   setQueueOpen(false)
+                  setDetailsTabId(null)
                   setActivitySheet({
                     title: "Exploring…",
                     tools: [
@@ -2366,6 +2406,7 @@ function PlaygroundExample({
         // sheet so the transcript stays a conversation. The sheet fills
         // this tabpanel (tabs and composer stay).
         <Sheet
+          id={extraSheetId}
           label={activitySheet.title}
           modal={false}
           onReturnFocus={() => inputRef.current?.focus()}
@@ -2403,6 +2444,7 @@ function PlaygroundExample({
         // Minimize restores a drawer over the transcript. Not modal, so
         // Tab can still reach the strip and the pill.
         <Sheet
+          id={extraSheetId}
           label="Annotations"
           modal={false}
           defaultExpanded
@@ -2526,8 +2568,12 @@ function PlaygroundExample({
           className="self-start"
           count={queued.length}
           aria-label={`Queued ${queued.length}`}
+          aria-haspopup="dialog"
+          aria-expanded={queueOpen}
+          aria-controls={queueSheetId}
           onClick={() => {
             setActivitySheet(null)
+            setDetailsTabId(null)
             setQueueOpen(true)
           }}
         />
@@ -2840,6 +2886,7 @@ function PlaygroundExample({
       )}
       {detailsTabId ? (
         <Sheet
+          id={detailsSheetId}
           label="Agent details"
           onClose={() => setDetailsTabId(null)}
           onReturnFocus={() => inputRef.current?.focus()}
@@ -2904,6 +2951,7 @@ function PlaygroundExample({
       ) : null}
       {queueOpen ? (
         <Sheet
+          id={queueSheetId}
           label="Queued"
           onClose={() => setQueueOpen(false)}
           onReturnFocus={() => inputRef.current?.focus()}
@@ -3573,9 +3621,12 @@ export const AgentSurfaces: Story = {
     ).not.toBeInTheDocument()
     const cue = canvas.getByRole("button", { name: agentExplored })
     await expect(cue).toHaveAttribute("aria-haspopup", "dialog")
+    await expect(cue).toHaveAttribute("aria-expanded", "false")
     await userEvent.click(cue)
     const activityDialog = canvas.getByRole("dialog", { name: agentExplored })
     await waitFor(() => expect(activityDialog).toBeVisible())
+    await expect(activityDialog).not.toHaveAttribute("aria-modal")
+    await expect(cue).toHaveAttribute("aria-expanded", "true")
     await waitFor(() =>
       expect(canvas.getByRole("button", { name: /read/i })).toBeVisible(),
     )
