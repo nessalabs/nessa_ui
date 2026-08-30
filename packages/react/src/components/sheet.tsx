@@ -411,18 +411,15 @@ function Sheet({
   )
 }
 
-/** The grab bar that marks the panel as a drawer. Recedes while expanded. */
+/** The grab bar that marks the panel as a drawer. Hidden while expanded. */
 function SheetHandle({ className, ...props }: React.ComponentProps<"div">) {
   const { expanded } = useSheet()
+  if (expanded) return null
   return (
     <div
       aria-hidden="true"
       data-slot="sheet-handle"
-      className={cn(
-        "flex shrink-0 justify-center overflow-hidden pt-2 transition-[max-height,padding,opacity] [transition-duration:var(--nessa-motion-duration-slow)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
-        expanded ? "max-h-0 pt-0 opacity-0" : "max-h-6 opacity-100",
-        className,
-      )}
+      className={cn("flex shrink-0 justify-center pt-2", className)}
       {...props}
     >
       <span className="h-1 w-10 rounded-full bg-muted-foreground/50" />
