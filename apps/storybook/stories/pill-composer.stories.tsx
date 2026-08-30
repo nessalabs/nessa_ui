@@ -56,7 +56,7 @@ import {
   type ModelPickerGroup,
   type ModelPickerValue,
 } from "@nessa-ui/react"
-import { Braces, Check, ChevronLeft, ChevronRight, FileText, Folder, Image as ImageIcon, Paperclip, Pencil, Plus, SlidersHorizontal, Sparkles, Puzzle, Square, X } from "lucide-react"
+import { Braces, Check, ChevronLeft, ChevronRight, Copy, FileText, Folder, GitFork, Image as ImageIcon, Paperclip, Pencil, Plus, RefreshCw, SlidersHorizontal, Sparkles, Puzzle, Square, X } from "lucide-react"
 
 import { ChatAddIcon, CommentIcon } from "./icons/nucleo"
 import { storyDocumentation } from "./story-documentation"
@@ -740,8 +740,12 @@ function SubagentChip({
   )
 }
 
-/** The inline editor a user bubble swaps into from the context menu's Edit. */
-function EditMessageRow({
+/**
+ * Editing happens inside the bubble itself: the bubble keeps its shape and
+ * tone, its text becomes an editable field, and small save and cancel
+ * controls sit beside it. Enter saves, Escape cancels.
+ */
+function InlineBubbleEditor({
   text,
   onSave,
   onCancel,
@@ -756,35 +760,73 @@ function EditMessageRow({
     else onCancel()
   }
   return (
-    <span className="flex w-full items-center gap-1">
-      <Input
-        autoFocus
-        aria-label="Edit message"
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault()
-            commit()
-          }
-          if (event.key === "Escape") {
-            event.preventDefault()
-            onCancel()
-          }
-        }}
-        className="h-8 flex-1 rounded-2xl"
-      />
-      <ChatComposerAction aria-label="Save message" title="Save" onClick={commit} className="size-7">
+    <span className="flex w-full max-w-full items-center gap-1">
+      <ChatBubble className="min-w-0 flex-1">
+        <input
+          autoFocus
+          aria-label="Edit message"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault()
+              commit()
+            }
+            if (event.key === "Escape") {
+              event.preventDefault()
+              onCancel()
+            }
+          }}
+          className="w-full min-w-24 border-0 bg-transparent p-0 font-sans nessa-text-4 leading-5 text-inherit outline-none"
+        />
+      </ChatBubble>
+      <button
+        type="button"
+        aria-label="Save message"
+        title="Save"
+        onClick={commit}
+        className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3.5"
+      >
         <Check aria-hidden="true" />
-      </ChatComposerAction>
-      <ChatComposerAction aria-label="Cancel edit" title="Cancel" onClick={onCancel} className="size-7">
+      </button>
+      <button
+        type="button"
+        aria-label="Cancel edit"
+        title="Cancel"
+        onClick={onCancel}
+        className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3.5"
+      >
         <X aria-hidden="true" />
-      </ChatComposerAction>
+      </button>
     </span>
   )
 }
 
+/** A hover-revealed, presentation-only icon action for a message row. */
+function HoverAction({
+  label,
+  onClick,
+  children,
+}: {
+  label: string
+  onClick?: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3.5"
+    >
+      {children}
+    </button>
+  )
+}
+
 /**
+ * Maps one demo message onto the ChatBubbles kit/**
  * Maps one demo message onto the ChatBubbles kit: attachments (single tile
  * or fanned stack), reply quote, the bubble itself as the reply control,
  * and the delivery receipt.
@@ -872,6 +914,7 @@ function DemoBubble({
       tone={message.role === "user" ? "sent" : "received"}
       dimmed={dimmed}
       threadFocused={threadFocused}
+      className="group/message relative"
     >
       {attachments.length === 1
         ? tile(attachments[0]!, "mb-1 size-28")
@@ -928,7 +971,7 @@ function DemoBubble({
         </ChatMessageQuote>
       ) : null}
       {editing ? (
-        <EditMessageRow
+        <InlineBubbleEditor
           text={message.text}
           onSave={(text) => onEditSave?.(text)}
           onCancel={() => onEditCancel?.()}
@@ -937,6 +980,8 @@ function DemoBubble({
         /* Right-click / long-press raises the ContextMenu with the tapback
            row and a Reply action. Opening it never frosts the transcript —
            the frosted thread view belongs to reply mode, entered via Reply. */
+        <>
+        <span className="relative flex max-w-full items-center">
         <ContextMenu onOpenChange={onMenuOpenChange}>
           <ContextMenuTrigger asChild>
             <ChatBubble
@@ -1023,6 +1068,38 @@ function DemoBubble({
             ) : null}
           </ContextMenuContent>
         </ContextMenu>
+        {message.role === "assistant" ? (
+          // Presentation-only affordances riding the agent bubble's right
+          // edge on hover — fork, retry, copy — the shapes, not the
+          // features yet.
+          <span className="pointer-events-none absolute left-full top-1/2 ml-1 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity focus-within:pointer-events-auto focus-within:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100">
+            <HoverAction label="Fork the conversation from here">
+              <GitFork aria-hidden="true" />
+            </HoverAction>
+            <HoverAction label="Retry this reply">
+              <RefreshCw aria-hidden="true" />
+            </HoverAction>
+            <HoverAction label="Copy">
+              <Copy aria-hidden="true" />
+            </HoverAction>
+          </span>
+        ) : null}
+        </span>
+        {message.role === "user" && !editing ? (
+          // The user side reveals its actions where the receipt lives —
+          // copy, and edit as a hover alternative to the context menu.
+          <span className="pointer-events-none absolute right-0 top-full mt-0.5 flex items-center gap-0.5 opacity-0 transition-opacity focus-within:pointer-events-auto focus-within:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100">
+            <HoverAction label="Copy">
+              <Copy aria-hidden="true" />
+            </HoverAction>
+            {onEditStart ? (
+              <HoverAction label="Edit message" onClick={onEditStart}>
+                <Pencil aria-hidden="true" />
+              </HoverAction>
+            ) : null}
+          </span>
+        ) : null}
+        </>
       ) : null}
       {delivered ? <ChatMessageReceipt>Delivered</ChatMessageReceipt> : null}
     </ChatMessage>
@@ -1167,7 +1244,7 @@ const seededAnnotations: PendingQuote[] = [
 ]
 
 
-/** A sent-style comment bubble that can swap into an inline editor. */
+/** A sent-style comment bubble whose text edits in place, inside the bubble. */
 function EditableCommentBubble({
   text,
   onSave,
@@ -1177,47 +1254,16 @@ function EditableCommentBubble({
   onSave?: (text: string) => void
 }) {
   const [editing, setEditing] = React.useState(false)
-  const [draft, setDraft] = React.useState(text)
   if (editing && onSave) {
-    const commit = () => {
-      if (draft.trim()) onSave(draft.trim())
-      setEditing(false)
-    }
     return (
-      <span className="flex w-full items-center justify-end gap-1">
-        <Input
-          autoFocus
-          aria-label="Edit comment"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault()
-              commit()
-            }
-            if (event.key === "Escape") {
-              event.preventDefault()
-              setDraft(text)
-              setEditing(false)
-            }
-          }}
-          className="h-8 flex-1 rounded-2xl"
-        />
-        <ChatComposerAction aria-label="Save edit" title="Save" onClick={commit} className="size-7">
-          <Check aria-hidden="true" />
-        </ChatComposerAction>
-        <ChatComposerAction
-          aria-label="Cancel edit"
-          title="Cancel"
-          onClick={() => {
-            setDraft(text)
-            setEditing(false)
-          }}
-          className="size-7"
-        >
-          <X aria-hidden="true" />
-        </ChatComposerAction>
-      </span>
+      <InlineBubbleEditor
+        text={text}
+        onSave={(next) => {
+          onSave(next)
+          setEditing(false)
+        }}
+        onCancel={() => setEditing(false)}
+      />
     )
   }
   return (
@@ -1227,10 +1273,7 @@ function EditableCommentBubble({
           type="button"
           aria-label="Edit comment"
           title="Edit comment"
-          onClick={() => {
-            setDraft(text)
-            setEditing(true)
-          }}
+          onClick={() => setEditing(true)}
           className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground opacity-0 outline-none transition-opacity hover:text-foreground focus-visible:opacity-100 focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring group-hover/comment:opacity-100 [&_svg]:size-3"
         >
           <Pencil aria-hidden="true" />
