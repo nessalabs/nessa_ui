@@ -230,6 +230,34 @@ export const packageArtifactsCheck = defineCheck({
   },
 })
 
+/** The parser entries the built artifacts phase must produce, matching the exports map. */
+export const PARSER_BUILT_ENTRIES = [
+  "packages/agent-stream/dist/index.js",
+  "packages/agent-stream/dist/index.d.ts",
+  "packages/agent-stream/dist/transcript.js",
+  "packages/agent-stream/dist/transcript.d.ts",
+] as const
+
+/**
+ * Whether a module specifier is the fold entry, in any spelling tsup or a
+ * handwritten barrel would emit.
+ */
+function isFoldSpecifier(specifier: string): boolean {
+  return specifier === "./transcript" || specifier.startsWith("./transcript/") || specifier.startsWith("./transcript.")
+}
+
+/**
+ * Whether the built contract entry names the fold.
+ *
+ * The source walk (`foldReachableFromContract`) is the real gate; this is the
+ * same question asked of the artifact a consumer actually installs. Read off
+ * the AST the same way React imports are: a comment that mentions
+ * `from "./transcript"` is not a reach, and `./transcript/index.js` is.
+ */
+export function builtContractReachesFold(indexDts: string): boolean {
+  return moduleSpecifiers(indexDts, "index.d.ts").some(isFoldSpecifier)
+}
+
 export const packageArtifactsBuiltCheck = defineCheck({
   id: "package-artifacts-built",
   ...checkMetadata["package-artifacts-built"],
@@ -241,6 +269,7 @@ export const packageArtifactsBuiltCheck = defineCheck({
       "packages/react/dist/theme.css",
       "packages/react/dist/styles.css",
       "packages/react/dist/app.css",
+      ...PARSER_BUILT_ENTRIES,
     ]) {
       if (!context.files.has(filePath)) findings.push(context.fail(`Fresh package build omitted ${filePath}.`, { contractId: "PKG-003", path: filePath }))
     }
@@ -270,7 +299,25 @@ export const packageArtifactsBuiltCheck = defineCheck({
         findings.push(context.fail("Built app.css does not contain Preflight and body baseline.", { contractId: "CSS-003" }))
       }
     }
-    if (!findings.length) findings.push(context.pass("Fresh package artifacts contain the required JS, declarations, and CSS ownership split.", { contractId: "PKG-003" }))
+    for (const modulePath of context.files.match(["packages/agent-stream/dist/**/*.js"])) {
+      const source = await context.readText(modulePath)
+      if (hasUseClientDirective(source)) {
+        findings.push(context.fail("The parser's built module must not carry a React client boundary.", { contractId: "PKG-001", path: modulePath }))
+      }
+      if (moduleSpecifiers(source, modulePath).some(isReactSpecifier)) {
+        findings.push(context.fail("The parser's built module must not import React.", { contractId: "PKG-001", path: modulePath }))
+      }
+    }
+    if (context.files.has("packages/agent-stream/dist/index.d.ts")) {
+      const indexDts = await context.readText("packages/agent-stream/dist/index.d.ts")
+      if (builtContractReachesFold(indexDts)) {
+        findings.push(context.fail(
+          "The built contract entry must not reach the fold: the two-entry split is the layering a consumer installs.",
+          { contractId: "PKG-002", path: "packages/agent-stream/dist/index.d.ts" },
+        ))
+      }
+    }
+    if (!findings.length) findings.push(context.pass("Fresh package artifacts contain the required JS, declarations, CSS ownership split, and a framework-free parser.", { contractId: "PKG-003" }))
     return findings
   },
 })

@@ -6,14 +6,17 @@ import { checkMetadata } from "../check-metadata.ts"
 /**
  * The files allowed to narrow raw JSON by hand.
  *
- * `json.ts` is where the narrowing lives on purpose. Each provider's `wire.ts`
+ * `json.ts` is where the narrowing lives on purpose. Each transport's decoder
  * sits upstream of it, deciding whether a decoded line is an object at all, and
- * cannot use a reader that already assumes one — so the exemption is stated as
- * a rule about that boundary rather than a list of paths a second provider
- * would have to be added to.
+ * cannot use a reader that already assumes one. The exemption is the decoder
+ * *name*, at any depth: `wire.ts` for a type-tagged stream, `frame.ts` for a
+ * JSON-RPC conversation. A one-segment path would miss every nested transport
+ * (`claude/stream/wire.ts`, `codex/exec/wire.ts`, …) and ACP's frame decoder.
  */
-function ownsNarrowing(filePath: string): boolean {
-  return filePath === "packages/agent-stream/src/json.ts" || /\/agent-stream\/src\/[^/]+\/wire\.ts$/.test(filePath)
+export function ownsNarrowing(filePath: string): boolean {
+  if (filePath === "packages/agent-stream/src/json.ts") return true
+  if (!filePath.startsWith("packages/agent-stream/src/")) return false
+  return filePath.endsWith("/wire.ts") || filePath.endsWith("/frame.ts")
 }
 
 const NARROWED_PRIMITIVES = new Set(["string", "number", "boolean", "object"])

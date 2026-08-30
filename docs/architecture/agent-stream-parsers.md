@@ -34,29 +34,37 @@ packages/agent-stream/src/
   json.ts          JsonValue and the narrowing readers      ← shared
   events.ts        AgentEvent, AgentEventPayload, the       ← shared: THE CONTRACT
                    vocabularies every provider maps onto
+  transports.ts    what each transport was observed to do   ← shared
   transcript/
     index.ts       the fold's own entry                     ← "./transcript" export
     fold.ts        one-shot fold                            ← shared, optional
     builder.ts     incremental fold                         ← shared, optional
+  acp/             one protocol, three agents               ← protocol
+    frame.ts       JSON-RPC line decoder (no `type` field)
+    wire.ts        methods, updates, tool kinds
+    mapping.ts / mapper.ts
   claude/
-    wire.ts        Claude Code's line shapes + vocabularies ← provider
-    mapping.ts     Claude's kinds → contract kinds, as data ← provider
-    mapper.ts      ClaudeStreamMapper                       ← provider
-    tools.ts       Claude's tool names → ToolKind           ← provider
-    capabilities.ts  Claude's init → pickers                ← provider
-    store.ts       Claude Code's on-disk layout             ← provider
+    stream/        `claude -p --output-format stream-json`  ← transport
+      wire.ts      Claude Code's line shapes + vocabularies
+      mapping.ts   Claude's kinds → contract kinds, as data
+      mapper.ts    ClaudeStreamMapper
+      capabilities.ts
+    tools.ts / store.ts
   codex/
-    wire.ts        Codex's line shapes + vocabularies       ← provider
-    mapping.ts     Codex's kinds → contract kinds, as data  ← provider
-    mapper.ts      CodexStreamMapper                        ← provider
+    exec/          `codex exec --json`
+    app-server/    `codex app-server`
+  opencode/
+    run/           `opencode run --format json`
+    server/        `opencode serve` SSE bus
+    parts.ts       payload run and serve both carry
 ```
 
-Three providers now exist, which is what turns the layering from a claim into a
-measurement. Adding Codex cost **one** addition to the shared contract —
-`file_edits`, for a capability Claude Code does not have — and nothing else
-moved: the fold, the grouping, the delta machinery and every component are
-reused untouched, and a test asserts the shared fold accepts Codex events with
-no provider knowledge at all.
+Three providers plus one shared protocol now exist, which is what turns the
+layering from a claim into a measurement. Adding Codex cost **one** addition to
+the shared contract — `file_edits`, for a capability Claude Code does not have
+— and nothing else moved: the fold, the grouping, the delta machinery and every
+component are reused untouched, and a test asserts the shared fold accepts
+Codex events with no provider knowledge at all.
 
 The Storybook story is a demo, not a shipped component.
 
@@ -81,7 +89,7 @@ module, where a name *should* be provider-shaped:
 
 | layer | vocabulary | scope |
 | --- | --- | --- |
-| `claude/wire.ts` | `ClaudeWireType`, `ClaudeSystemSubtype`, `ClaudeStreamFrameType`, `ClaudeContentDeltaType`, `ClaudeContentBlockType`, `ClaudeTaskType` | **per provider** |
+| `claude/stream/wire.ts` | `ClaudeWireType`, `ClaudeSystemSubtype`, `ClaudeStreamFrameType`, `ClaudeContentDeltaType`, `ClaudeContentBlockType`, `ClaudeTaskType` | **per transport** |
 | `events.ts` | `AgentEventType`, `TaskKind`, `PlanStepStatus`, `ToolKind` | **shared by all providers** |
 
 The directory says which is which. A provider name may appear inside
@@ -524,7 +532,7 @@ opencode is the third provider, and it has **three** wires of its own, not one.
 All three are captured, and they disagree enough that treating them as one
 would misdescribe every session read through the wrong one.
 
-### How the two are laid out in code
+### How the transports are laid out in code
 
 They are separate protocols, so they are separate modules, and only what is
 genuinely shared sits between them:
@@ -536,9 +544,14 @@ opencode/
   mapping.ts     the shape every table is written in
   run/           `run --format json`: envelope DTOs, its table, its mapper
   server/        `serve` SSE bus: envelope DTOs, its table, its mapper
-  acp/           `acp` JSON-RPC: envelope DTOs, its table, its mapper
   store.ts       an exported session, read through the run mapper
   capabilities.ts  what the CLI's own listings answer
+
+acp/             beside every agent, not inside one — Claude Code, Codex and
+                 opencode all speak this protocol
+  frame.ts       JSON-RPC line decoder (no `type` field)
+  wire.ts        methods, updates, tool kinds
+  mapping.ts / mapper.ts
 ```
 
 `run` and `serve` genuinely share a payload — the server wraps the identical
@@ -547,9 +560,9 @@ of rules to disagree about one conversation. Their envelopes share nothing:
 different names, different framing, different versions, different capabilities.
 
 ACP shares neither. It is a different protocol with its own object model, so it
-sits beside them rather than inside either, and it needed a weaker line decoder:
-the shared one insists on a `type` field, which every stream wire has and no
-JSON-RPC frame does.
+sits beside the agents rather than inside any one of them, and it needed a
+weaker line decoder: the shared one insists on a `type` field, which every
+stream wire has and no JSON-RPC frame does.
 
 ### What a transport can do is data
 
