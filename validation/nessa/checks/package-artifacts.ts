@@ -239,14 +239,23 @@ export const PARSER_BUILT_ENTRIES = [
 ] as const
 
 /**
+ * Whether a module specifier is the fold entry, in any spelling tsup or a
+ * handwritten barrel would emit.
+ */
+function isFoldSpecifier(specifier: string): boolean {
+  return specifier === "./transcript" || specifier.startsWith("./transcript/") || specifier.startsWith("./transcript.")
+}
+
+/**
  * Whether the built contract entry names the fold.
  *
  * The source walk (`foldReachableFromContract`) is the real gate; this is the
- * same question asked of the artifact a consumer actually installs. tsup emits
- * `export * from './transcript'` if the contract entry re-exported the fold.
+ * same question asked of the artifact a consumer actually installs. Read off
+ * the AST the same way React imports are: a comment that mentions
+ * `from "./transcript"` is not a reach, and `./transcript/index.js` is.
  */
 export function builtContractReachesFold(indexDts: string): boolean {
-  return /from\s+["']\.\/transcript(?:\.js)?["']/.test(indexDts)
+  return moduleSpecifiers(indexDts, "index.d.ts").some(isFoldSpecifier)
 }
 
 export const packageArtifactsBuiltCheck = defineCheck({

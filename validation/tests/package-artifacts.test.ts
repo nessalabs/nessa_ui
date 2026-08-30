@@ -154,5 +154,9 @@ test("the built contract entry is refused when it names the fold", () => {
   assert.equal(builtContractReachesFold('export * from "./events"\n'), false)
   assert.equal(builtContractReachesFold('export * from "./transcript"\n'), true)
   assert.equal(builtContractReachesFold('export * from "./transcript.js"\n'), true)
+  assert.equal(builtContractReachesFold('export * from "./transcript/index.js"\n'), true)
   assert.equal(builtContractReachesFold("export declare const TranscriptBuilder: unknown\n"), false)
+  // A mention in a comment is not a reach — the same reason React imports
+  // are read off the AST rather than matched in text.
+  assert.equal(builtContractReachesFold('/** routes via from "./transcript" */\nexport * from "./events"\n'), false)
 })
