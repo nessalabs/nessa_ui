@@ -755,15 +755,27 @@ function InlineBubbleEditor({
   onCancel: () => void
 }) {
   const [draft, setDraft] = React.useState(text)
+  // The caret opens at the end of the text, ready to append.
+  const placeCaretAtEnd = React.useCallback(
+    (node: HTMLTextAreaElement | null) => {
+      if (!node) return
+      node.focus()
+      node.setSelectionRange(node.value.length, node.value.length)
+    },
+    [],
+  )
   return (
     <ChatBubble className="max-w-full">
-      <input
-        autoFocus
+      {/* field-sizing lets the textarea take exactly its content's shape,
+          so the editing bubble wraps and measures like the resting one. */}
+      <textarea
+        ref={placeCaretAtEnd}
         aria-label="Edit message"
+        rows={1}
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === "Enter") {
+          if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault()
             if (draft.trim()) onSave(draft.trim())
             else onCancel()
@@ -774,8 +786,7 @@ function InlineBubbleEditor({
           }
         }}
         onBlur={() => onCancel()}
-        style={{ width: `${Math.min(Math.max(draft.length + 1, 6), 64)}ch` }}
-        className="max-w-full border-0 bg-transparent p-0 font-sans nessa-text-4 leading-5 text-inherit outline-none"
+        className="block max-w-full resize-none overflow-hidden whitespace-pre-wrap break-words border-0 bg-transparent p-0 font-sans nessa-text-4 leading-5 text-inherit outline-none [field-sizing:content]"
       />
     </ChatBubble>
   )
@@ -1833,7 +1844,7 @@ function PlaygroundExample({
         ref={logRef}
         aria-label="Conversation"
         role="log"
-        className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pb-7 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {/* Bottom-anchors a short transcript without justify-end, which
             would trap overflowing messages above an unscrollable top. */}
@@ -1912,7 +1923,7 @@ function PlaygroundExample({
 
           />
           {entry.spawned ? (
-            <div className="me-8 flex max-w-[85%] flex-col gap-1.5 self-start">
+            <div className="me-8 mt-1.5 flex max-w-[85%] flex-col gap-1.5 self-start">
               {entry.spawned.map((id) => (
                 <SubagentChip
                   key={id}
