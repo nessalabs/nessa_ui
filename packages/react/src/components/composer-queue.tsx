@@ -69,9 +69,20 @@ function ComposerDeliveryMode({
   )
 }
 
+export type ComposerQueueAppearance = "card" | "plain"
+
+const ComposerQueueAppearanceContext =
+  React.createContext<ComposerQueueAppearance>("card")
+
 export interface ComposerQueueProps extends React.ComponentProps<"ol"> {
   itemIds: string[]
   onReorder: (itemIds: string[]) => void
+  /**
+   * `card` is the boxed list that sits above the composer during a run.
+   * `plain` is the unboxed sheet list: wrapping rows with no chrome, so the
+   * panel behind them is the surface.
+   */
+  appearance?: ComposerQueueAppearance
 }
 
 function dragItemLabel(item: {
@@ -100,6 +111,7 @@ const composerQueueAnnouncements: Announcements = {
 function ComposerQueue({
   itemIds,
   onReorder,
+  appearance = "card",
   className,
   ...props
 }: ComposerQueueProps) {
@@ -122,24 +134,30 @@ function ComposerQueue({
   )
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      accessibility={{ announcements: composerQueueAnnouncements }}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
-        <ol
-          data-slot="composer-queue"
-          aria-label="Pending messages"
-          className={cn(
-            "m-0 grid list-none overflow-hidden rounded-2xl border border-border bg-card p-0 text-card-foreground shadow-sm",
-            className,
-          )}
-          {...props}
-        />
-      </SortableContext>
-    </DndContext>
+    <ComposerQueueAppearanceContext.Provider value={appearance}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        accessibility={{ announcements: composerQueueAnnouncements }}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
+          <ol
+            data-slot="composer-queue"
+            data-appearance={appearance}
+            aria-label="Pending messages"
+            className={cn(
+              "m-0 grid list-none p-0",
+              appearance === "card"
+                ? "overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-sm"
+                : "overflow-visible bg-transparent text-foreground",
+              className,
+            )}
+            {...props}
+          />
+        </SortableContext>
+      </DndContext>
+    </ComposerQueueAppearanceContext.Provider>
   )
 }
 
@@ -165,7 +183,7 @@ function ComposerQueueBadge({
       type="button"
       data-slot="composer-queue-badge"
       className={cn(
-        "inline-flex h-7 items-center rounded-full border border-border bg-muted/70 px-2.5 font-sans nessa-text-2 font-medium text-foreground outline-none transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        "inline-flex h-7 items-center rounded-full bg-muted px-2.5 font-sans nessa-text-2 font-medium text-foreground outline-none transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         className,
       )}
       {...props}
@@ -194,6 +212,9 @@ export interface ComposerQueueItemProps extends React.ComponentProps<"li"> {
   showHandle?: boolean
 }
 
+const queueItemActionClassName =
+  "inline-flex size-8 shrink-0 items-center justify-center rounded-full border-0 bg-transparent text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+
 function ComposerQueueItem({
   id,
   itemLabel,
@@ -208,6 +229,7 @@ function ComposerQueueItem({
   style,
   ...props
 }: ComposerQueueItemProps) {
+  const appearance = React.useContext(ComposerQueueAppearanceContext)
   const {
     attributes,
     listeners,
@@ -216,11 +238,13 @@ function ComposerQueueItem({
     transition,
     isDragging,
   } = useSortable({ id, data: { itemLabel }, disabled: !showHandle })
+  const plain = appearance === "plain"
 
   return (
     <li
       ref={setNodeRef}
       data-slot="composer-queue-item"
+      data-appearance={appearance}
       data-dragging={isDragging ? "true" : "false"}
       style={{
         ...style,
@@ -231,10 +255,13 @@ function ComposerQueueItem({
       // an idle item leaves consumer transition utilities untouched instead of
       // pinning `transition` to an unset custom property.
       className={cn(
-        "group relative z-0 grid min-h-11 items-center gap-2 border-b border-border bg-card px-2 py-1.5 font-sans last:border-b-0 data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg",
+        "group relative z-0 grid min-h-11 gap-2 border-b border-border font-sans last:border-b-0 data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg",
         showHandle
           ? "grid-cols-[1.75rem_minmax(0,1fr)_auto]"
           : "grid-cols-[minmax(0,1fr)_auto]",
+        plain
+          ? "items-start bg-transparent px-5 py-3.5"
+          : "items-center bg-card px-2 py-1.5",
         Boolean(transition) && "[transition:var(--composer-queue-sort-transition)]",
         className,
       )}
@@ -253,8 +280,17 @@ function ComposerQueueItem({
           <GripVertical aria-hidden="true" className="size-3.5" />
         </button>
       ) : null}
-      <div className="min-w-0 truncate nessa-text-4 text-foreground">{children}</div>
-      <div className="flex items-center gap-0.5">
+      <div
+        className={cn(
+          "min-w-0 text-foreground",
+          plain
+            ? "whitespace-normal nessa-text-3 leading-snug"
+            : "truncate nessa-text-4",
+        )}
+      >
+        {children}
+      </div>
+      <div className={cn("flex items-center gap-0.5", plain && "-mt-0.5")}>
         {onPromote ? (
           <button
             type="button"
@@ -262,9 +298,9 @@ function ComposerQueueItem({
             aria-label={`Promote ${itemLabel}`}
             title={`Promote ${itemLabel}`}
             onClick={onPromote}
-            className="inline-flex size-7 items-center justify-center rounded-full border-0 bg-transparent text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className={queueItemActionClassName}
           >
-            <ArrowUp aria-hidden="true" className="size-3.5" />
+            <ArrowUp aria-hidden="true" className="size-4" />
           </button>
         ) : null}
         {onSteer ? (
@@ -281,12 +317,13 @@ function ComposerQueueItem({
         {onRemove ? (
           <button
             type="button"
+            data-slot="composer-queue-remove"
             aria-label={`Remove ${itemLabel}`}
             title={`Remove ${itemLabel}`}
             onClick={onRemove}
-            className="inline-flex size-7 items-center justify-center rounded-full border-0 bg-transparent text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className={queueItemActionClassName}
           >
-            <Trash2 aria-hidden="true" className="size-3.5" />
+            <Trash2 aria-hidden="true" className="size-4" />
           </button>
         ) : null}
         {onMore ? (
@@ -295,9 +332,9 @@ function ComposerQueueItem({
             aria-label={`More actions for ${itemLabel}`}
             title={`More actions for ${itemLabel}`}
             onClick={onMore}
-            className="inline-flex size-7 items-center justify-center rounded-full border-0 bg-transparent text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className={queueItemActionClassName}
           >
-            <Ellipsis aria-hidden="true" className="size-3.5" />
+            <Ellipsis aria-hidden="true" className="size-4" />
           </button>
         ) : null}
       </div>

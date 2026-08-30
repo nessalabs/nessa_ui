@@ -2774,6 +2774,7 @@ function PlaygroundExample({
           </SheetHeader>
           <SheetBody className="px-0">
             <ComposerQueue
+              appearance="plain"
               itemIds={queued.map((item) => item.id)}
               onReorder={(nextIds) => {
                 const itemsById = new Map(queued.map((item) => [item.id, item]))
@@ -2782,7 +2783,6 @@ function PlaygroundExample({
                   [activeTabId]: nextIds.flatMap((id) => itemsById.get(id) ?? []),
                 }))
               }}
-              className="rounded-none border-x-0 shadow-none"
             >
               {queued.map((item) => (
                 <ComposerQueueItem
@@ -3414,6 +3414,16 @@ export const AgentSurfaces: Story = {
     await expect(canvas.getByRole("button", { name: /read/i })).toBeVisible()
     await userEvent.click(canvas.getByRole("button", { name: "Queued 2" }))
     await expect(canvas.getByRole("dialog", { name: "Queued" })).toBeVisible()
+    await expect(
+      canvas.getByText(
+        "We also need this all conversations view for that which will be triggered with / history",
+      ),
+    ).toBeVisible()
+    await expect(
+      canvas.getByText(
+        "So add components for that and then show in demo video of what you built for each",
+      ),
+    ).toBeVisible()
     await userEvent.click(canvas.getByRole("button", { name: "Done" }))
     const agentTab = canvas.getByRole("tab", { name: "Agent message" })
     await userEvent.pointer({ keys: "[MouseRight]", target: agentTab })

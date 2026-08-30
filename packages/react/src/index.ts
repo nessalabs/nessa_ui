@@ -493,6 +493,7 @@ export {
   ComposerQueueItem,
   type ComposerDeliveryModeProps,
   type ComposerDeliveryModeValue,
+  type ComposerQueueAppearance,
   type ComposerQueueBadgeProps,
   type ComposerQueueProps,
   type ComposerQueueItemProps,

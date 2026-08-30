@@ -94,7 +94,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Pending-message rows for active agent runs, plus a delivery-mode control for choosing whether the next follow-up queues behind the run or steers it immediately. A compact Queued N badge opens a sheet of those rows; promote moves one to the front. The host owns ordering and delivery semantics.",
+          "Pending-message rows for active agent runs, plus a delivery-mode control for choosing whether the next follow-up queues behind the run or steers it immediately. A compact Queued N badge opens a plain sheet of wrapping rows; promote moves one to the front. The host owns ordering and delivery semantics.",
       },
     },
   },
@@ -248,7 +248,7 @@ function QueuedSheetExample() {
     },
   ])
   return (
-    <div className="relative h-80 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-[2rem] bg-background p-4">
+    <div className="relative h-[28rem] w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-[2rem] bg-background p-4">
       <ComposerQueueBadge
         count={items.length}
         onClick={() => setOpen(true)}
@@ -263,12 +263,12 @@ function QueuedSheetExample() {
           </SheetHeader>
           <SheetBody className="px-0">
             <ComposerQueue
+              appearance="plain"
               itemIds={items.map((item) => item.id)}
               onReorder={(nextIds) => {
                 const itemsById = new Map(items.map((item) => [item.id, item]))
                 setItems(nextIds.flatMap((id) => itemsById.get(id) ?? []))
               }}
-              className="rounded-none border-x-0 shadow-none"
             >
               {items.map((item) => (
                 <ComposerQueueItem
@@ -306,7 +306,7 @@ function QueuedSheetExample() {
 
 export const QueuedSheet: Story = {
   parameters: storyDocumentation(
-    "The compact Queued N pill opens a sheet of pending follow-ups. Each row can promote to the front or be removed; the drag handle stays off so the sheet matches the mobile queue.",
+    "The compact Queued N pill opens a sheet of wrapping follow-ups. Each row can promote to the front or be removed; the list is unboxed so the sheet is the surface.",
   ),
   render: () => <QueuedSheetExample />,
   play: async ({ canvasElement }) => {
@@ -314,6 +314,14 @@ export const QueuedSheet: Story = {
     const canvas = within(canvasElement)
     await userEvent.click(canvas.getByRole("button", { name: "Queued 2" }))
     await expect(canvas.getByRole("dialog", { name: "Queued" })).toBeVisible()
+    await expect(
+      canvas.getByText(
+        "We also need this all conversations view for that which will be triggered with / history",
+      ),
+    ).toBeVisible()
+    await expect(
+      canvas.getByRole("list", { name: "Pending messages" }),
+    ).toHaveAttribute("data-appearance", "plain")
     await userEvent.click(
       canvas.getAllByRole("button", { name: /^promote /i })[1]!,
     )

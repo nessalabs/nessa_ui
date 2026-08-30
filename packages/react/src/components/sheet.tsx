@@ -173,7 +173,7 @@ function Sheet({
         <div
           ref={panelRef}
           data-slot="sheet-panel"
-          className="relative z-10 flex max-h-[85%] w-full flex-col overflow-y-auto rounded-t-3xl bg-background shadow-[0_-8px_32px] shadow-black/20"
+          className="relative z-10 flex max-h-[85%] w-full flex-col overflow-y-auto rounded-t-3xl bg-card text-card-foreground shadow-[0_-8px_32px] shadow-black/20"
         >
           {children}
         </div>
@@ -208,7 +208,7 @@ function SheetHeader({ className, ...props }: SheetHeaderProps) {
     <div
       data-slot="sheet-header"
       className={cn(
-        "grid shrink-0 grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center gap-2 px-3 pb-1 pt-1",
+        "grid shrink-0 grid-cols-[minmax(3.25rem,auto)_minmax(0,1fr)_minmax(3.25rem,auto)] items-center gap-2 px-3 pb-1 pt-1",
         className,
       )}
       {...props}
@@ -284,7 +284,7 @@ function SheetAction({
         if (!event.defaultPrevented) close()
       }}
       className={cn(
-        "col-start-3 inline-flex h-8 min-w-8 cursor-pointer items-center justify-center justify-self-end rounded-full border-0 bg-transparent px-1.5 font-sans nessa-text-3 font-semibold text-(--nessa-chat-accent) outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        "col-start-3 inline-flex h-8 min-w-8 cursor-pointer items-center justify-center justify-self-end rounded-full border-0 bg-muted px-2.5 font-sans nessa-text-3 font-semibold text-foreground outline-none hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         className,
       )}
       {...props}
