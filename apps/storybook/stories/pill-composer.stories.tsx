@@ -11,7 +11,18 @@ import {
   ChatComposerAction,
   ChatComposerAttachments,
   ChatComposerInput,
+  ChatComposerAttachmentIcon,
+  Input,
+  FilePreviewJson,
+  FilePreviewMarkdown,
+  SelectionTooltip,
+  SelectionTooltipAction,
+  SelectionTooltipLabel,
+  SelectionTooltipSeparator,
+  ChatComposerEditor,
   ChatComposerTrigger,
+  type ChatComposerContentPart,
+  type ChatComposerEditorHandle,
   ChatMessage,
   ChatMessageQuote,
   ChatMessageReceipt,
@@ -41,14 +52,17 @@ import {
   SegmentedControlOption,
   type PillComposerRimVariant,
   SectionedListbox,
+  RandomAvatar,
   type ModelPickerGroup,
   type ModelPickerValue,
 } from "@nessa-ui/react"
-import { Folder, Image as ImageIcon, Paperclip, Plus, SlidersHorizontal, Sparkles, Puzzle, Square, X } from "lucide-react"
+import { Braces, Check, ChevronLeft, ChevronRight, Copy, FileText, Folder, GitFork, Image as ImageIcon, Paperclip, Pencil, Plus, RefreshCw, SlidersHorizontal, Sparkles, Puzzle, Square, X } from "lucide-react"
 
+import { ChatAddIcon, CommentIcon } from "./icons/nucleo"
 import { storyDocumentation } from "./story-documentation"
 import {
   filterSlashSections,
+  slashSections,
   matchesQuery,
   renderSlashItem,
   type SlashItem,
@@ -161,6 +175,234 @@ const modelCommand: SlashItem = {
   label: "/model",
   description: "Choose a model",
   icon: <SlidersHorizontal aria-hidden="true" />,
+}
+
+/** The mocked file behind a chip: skills carry a SKILL.md, plugins a manifest. */
+function chipFileMock(item: SlashItem): {
+  name: string
+  mimeType: string
+  content: string
+} {
+  const slug = item.label.toLowerCase().replace(/\s+/g, "-")
+  if (item.kind === "plugin") {
+    return {
+      name: "manifest.json",
+      mimeType: "application/json",
+      content: JSON.stringify(
+        {
+          name: slug,
+          kind: "plugin",
+          description: item.description,
+          permissions: ["read", "search"],
+          entry: "index.ts",
+        },
+        null,
+        2,
+      ),
+    }
+  }
+  return {
+    name: "SKILL.md",
+    mimeType: "text/markdown",
+    content: [
+      `# ${item.label}`,
+      "",
+      item.description + ".",
+      "",
+      "## When to use",
+      `Invoke with \`/${slug}\` from any conversation.`,
+      "",
+      "## Steps",
+      "1. Gather the relevant context from the current chat.",
+      "2. Apply the checklist this skill carries.",
+      "3. Report the result back into the thread.",
+    ].join("\n"),
+  }
+}
+
+/**
+ * A previewed file on the chat surface: the bare renderer, plus a selection
+ * tooltip — select any passage and add it to the chat to talk to the agent
+ * about it.
+ */
+function DocumentSurface({
+  item,
+  onAttach,
+  onComment,
+}: {
+  item: SlashItem
+  /** Attaches the selection to the pending quotes; the document stays open. */
+  onAttach: (text: string) => void
+  /** Posts a comment message that carries the selection as its quote. */
+  onComment: (text: string, comment: string) => void
+}) {
+  // Rebuilding the data URI re-encodes the whole document; the file only
+  // changes with the item.
+  const previewFile = React.useMemo(() => {
+    const file = chipFileMock(item)
+    return {
+      src: `data:${file.mimeType};charset=utf-8,${encodeURIComponent(file.content)}`,
+      name: file.name,
+      mimeType: file.mimeType,
+    }
+  }, [item])
+  const containerRef = React.useRef<HTMLDivElement>(null)
+  const [selection, setSelection] = React.useState<{
+    text: string
+    left: number
+    top: number
+  } | null>(null)
+  const [mode, setMode] = React.useState<"actions" | "comment">("actions")
+  const [draft, setDraft] = React.useState("")
+  /** Saves the tooltip comment and puts the surface back to rest. */
+  const commitComment = () => {
+    if (!selection || !draft.trim()) return
+    onComment(selection.text, draft.trim())
+    setDraft("")
+    setMode("actions")
+    containerRef.current?.ownerDocument.getSelection()?.removeAllRanges()
+    setSelection(null)
+  }
+  const captureSelection = () => {
+    if (mode === "comment") return
+    const container = containerRef.current
+    const live = container?.ownerDocument.getSelection()
+    if (!container || !live || live.isCollapsed) {
+      setSelection(null)
+      return
+    }
+    const text = live.toString().trim()
+    if (!text || !container.contains(live.anchorNode)) {
+      setSelection(null)
+      return
+    }
+    const rect = live.getRangeAt(0).getBoundingClientRect()
+    const host = container.getBoundingClientRect()
+    setSelection({
+      text,
+      left: rect.left - host.left + rect.width / 2,
+      top: rect.top - host.top + container.scrollTop,
+    })
+  }
+  return (
+    <div
+      ref={containerRef}
+      className="relative min-h-0 flex-1 overflow-y-auto text-left [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      onMouseUp={captureSelection}
+      onKeyUp={captureSelection}
+    >
+      {item.kind === "plugin" ? (
+        <FilePreviewJson file={previewFile} kind="json" />
+      ) : (
+        <FilePreviewMarkdown file={previewFile} kind="markdown" />
+      )}
+      {selection ? (
+        <SelectionTooltip
+          className={cn(
+            "absolute z-10 -translate-x-1/2",
+            // Near the top edge the pill flips below the selection —
+            // -translate-y-full there would push it out of the scroll
+            // container where it clips unclickable.
+            selection.top >= 48 && "-translate-y-full",
+          )}
+          style={{
+            // The comment composer is wider than the action pill, so it
+            // centers on the surface; the action pill hugs the selection,
+            // clamped so neither ever clips at the panel's edges.
+            left:
+              mode === "comment"
+                ? "50%"
+                : Math.min(
+                    Math.max(selection.left, 120),
+                    (containerRef.current?.clientWidth ?? 480) - 120,
+                  ),
+            top:
+              selection.top >= 48
+                ? selection.top - 8
+                : selection.top + 28,
+          }}
+        >
+          {mode === "actions" ? (
+            <>
+              <SelectionTooltipAction
+                aria-label="Add to chat"
+                tooltip="Add to chat"
+                onClick={() => {
+                  onAttach(selection.text)
+                  containerRef.current?.ownerDocument.getSelection()?.removeAllRanges()
+                  setSelection(null)
+                }}
+              >
+                <ChatAddIcon aria-hidden="true" />
+                <SelectionTooltipLabel>Add to chat</SelectionTooltipLabel>
+              </SelectionTooltipAction>
+              <SelectionTooltipSeparator />
+              <SelectionTooltipAction
+                aria-label="Comment"
+                tooltip="Comment on the selection"
+                onClick={() => setMode("comment")}
+              >
+                <CommentIcon aria-hidden="true" />
+                <SelectionTooltipLabel>Comment</SelectionTooltipLabel>
+              </SelectionTooltipAction>
+            </>
+          ) : (
+            // The pill swaps its actions for a comment composer in place —
+            // saving posts the note with the selected passage attached, and
+            // the document never leaves the screen.
+            <>
+              <Input
+                autoFocus
+                aria-label="Comment"
+                placeholder="Comment on the selection"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" || !draft.trim()) return
+                  event.preventDefault()
+                  commitComment()
+                }}
+                className="h-8 w-52 border-0 bg-transparent shadow-none dark:bg-transparent"
+              />
+              <SelectionTooltipAction
+                aria-label="Save comment"
+                tooltip="Save comment"
+                onClick={commitComment}
+              >
+                <Check aria-hidden="true" />
+              </SelectionTooltipAction>
+              <SelectionTooltipAction
+                aria-label="Cancel comment"
+                tooltip="Cancel"
+                onClick={() => {
+                  setDraft("")
+                  setMode("actions")
+                }}
+              >
+                <X aria-hidden="true" />
+              </SelectionTooltipAction>
+            </>
+          )}
+        </SelectionTooltip>
+      ) : null}
+    </div>
+  )
+}
+
+// One flattened catalog, indexed once — the sections are static, and chips
+// reference items by label (editor chips) or id (lifted passages).
+const slashItems = slashSections.flatMap((section) => section.items)
+const slashItemsByLabel = new Map(slashItems.map((item) => [item.label, item]))
+const slashItemsById = new Map(slashItems.map((item) => [item.id, item]))
+
+/** Finds the catalog entry behind an inserted chip, for the read view. */
+function slashItemForLabel(label: string): SlashItem | undefined {
+  return slashItemsByLabel.get(label)
+}
+
+/** Finds the catalog entry a lifted passage came from. */
+function slashItemForId(id: string): SlashItem | undefined {
+  return slashItemsById.get(id)
 }
 
 /** The pill's slash sections: a Commands section ahead of the shared skills and plugins. */
@@ -287,12 +529,27 @@ function StopAction({
   )
 }
 
+interface PendingQuote {
+  /** A stable identity for list rendering; display data otherwise. */
+  id?: string
+  /** The passage lifted from the document. */
+  text: string
+  /** The user's comments on it — the first from the selection tooltip, the rest added later from the annotation view. */
+  comments?: string[]
+  /** The slash item whose document the passage came from. */
+  sourceId?: string
+}
+
 interface DemoMessage {
   id: number
   role: "user" | "assistant"
   text: string
   /** The quoted text of the message this one replies to, iMessage-style. */
   replyTo?: string
+  /** Passages lifted from previewed documents, quoted above the bubble. */
+  quotes?: PendingQuote[]
+  /** Full text behind each pasted-text chip in this message, by chip id. */
+  pasted?: Record<string, string>
   /** The id of the message this one replies to, linking it into a thread. */
   replyToId?: number
   /** Photos, files, and folders sent with the message. */
@@ -301,9 +558,295 @@ interface DemoMessage {
   reaction?: string
   /** True while this assistant reply is still streaming in. */
   streaming?: boolean
+  /** Subagent ids this assistant turn spawned, rendered as drill-in chips. */
+  spawned?: string[]
+  /**
+   * The editor's content parts when the message carried inline chips, so the
+   * bubble re-renders each chip the way the composer showed it.
+   */
+  parts?: ChatComposerContentPart[]
 }
 
 /**
+ * Renders editor content parts inside a bubble: chips keep their icon on the
+ * text baseline and press open the same read view as in the composer.
+ */
+function BubbleParts({
+  parts,
+  onChipPress,
+}: {
+  parts: ChatComposerContentPart[]
+  /** Receives the pressed chip and whether the press asked for a new tab. */
+  onChipPress?: (
+    chip: { id: string; label: string; kind?: string },
+    newTab: boolean,
+  ) => void
+}) {
+  return (
+    <>
+      {parts.map((part, index) =>
+        part.type === "chip" ? (
+          <span
+            key={index}
+            data-slot="bubble-chip"
+            role={onChipPress ? "button" : undefined}
+            tabIndex={onChipPress ? 0 : undefined}
+            title={slashItemForLabel(part.chip.label)?.description}
+            onClick={
+              onChipPress
+                ? (event) => {
+                    event.stopPropagation()
+                    onChipPress(
+                      part.chip,
+                      event.metaKey || event.ctrlKey,
+                    )
+                  }
+                : undefined
+            }
+            onKeyDown={
+              onChipPress
+                ? (event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return
+                    event.preventDefault()
+                    event.stopPropagation()
+                    onChipPress(
+                      part.chip,
+                      event.metaKey || event.ctrlKey,
+                    )
+                  }
+                : undefined
+            }
+            className={cn(
+              "whitespace-nowrap font-medium underline-offset-2",
+              onChipPress && "cursor-pointer hover:underline",
+            )}
+          >
+            <ChatComposerAttachmentIcon
+              kind={part.chip.kind}
+              icon={slashItemForLabel(part.chip.label)?.icon}
+              className="mr-1 align-[-0.125em]"
+            />
+            {part.chip.label}
+          </span>
+        ) : (
+          <React.Fragment key={index}>{part.text}</React.Fragment>
+        ),
+      )}
+    </>
+  )
+}
+
+interface DemoSubagent {
+  id: string
+  name: string
+  task: string
+  status: "running" | "done"
+}
+
+/** One "big text stays compact" policy: pastes at or past the chip
+ * threshold land as pasted-text chips, and typed messages past the clamp
+ * threshold render clamped with the full text behind the list view. */
+const PASTE_CHIP_MIN_CHARS = 120
+const LONG_MESSAGE_CHARS = 280
+
+/** The tab id a subagent's own conversation lives under. */
+const subagentTabId = (id: string) => `sub:${id}`
+
+const demoSubagents: Record<string, DemoSubagent> = {
+  explorer: {
+    id: "explorer",
+    name: "Explorer",
+    task: "Map the composer call sites",
+    status: "done",
+  },
+  reviewer: {
+    id: "reviewer",
+    name: "Reviewer",
+    task: "Review the transcript diff",
+    status: "running",
+  },
+}
+
+// The seeded "Repo audit" conversation: an agent turn that split its work
+// across two subagents, each with its own transcript under a sub: tab. Ids
+// sit far above the live counter so canned replies never collide.
+const auditTabId = "audit"
+const seededMessagesByTab: Record<string, DemoMessage[]> = {
+  [auditTabId]: [
+    {
+      id: 901,
+      role: "user",
+      text: "Where do we compose the chat composer today, and is the transcript diff safe to land?",
+    },
+    {
+      id: 902,
+      role: "assistant",
+      text: "I'll split that: one agent maps the composer call sites while another reviews the diff.",
+      spawned: ["explorer", "reviewer"],
+    },
+    {
+      id: 903,
+      role: "assistant",
+      text: "Explorer is back — nine call sites, one of them re-implements the footer. Reviewer has two findings so far and is still going.",
+    },
+    {
+      id: 904,
+      role: "user",
+      text: "Show me the reviewer's findings as they land.",
+    },
+  ],
+  [subagentTabId("explorer")]: [
+    {
+      id: 911,
+      role: "user",
+      text: "Find every place the ChatComposer primitives are composed into a full surface, and note which slots each one uses.",
+    },
+    {
+      id: 912,
+      role: "assistant",
+      text: "Nine call sites. The app shell panes and the message edit-in-place both use the compact size; only the catalog stories use attachment rows. Full table in the report.",
+    },
+    {
+      id: 913,
+      role: "assistant",
+      text: "One surprise: composer-queue re-implements the footer row instead of using ChatComposerFooter — worth folding back.",
+    },
+  ],
+  [subagentTabId("reviewer")]: [
+    {
+      id: 921,
+      role: "user",
+      text: "Review the transcript virtualization diff for correctness and accessibility regressions.",
+    },
+    {
+      id: 922,
+      role: "assistant",
+      text: "Two findings so far: the log role moved off the scrolling element, and the pinned-state check reads layout in a loop. Still reading the resize path…",
+    },
+  ],
+}
+
+/**
+ * A drill-in chip for a subagent an assistant turn spawned: watercolor
+ * avatar, name, status line, and a chevron; clicking opens that subagent's
+ * own conversation as a tab.
+ */
+function SubagentChip({
+  sub,
+  onOpen,
+}: {
+  sub: DemoSubagent
+  onOpen: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full items-center gap-2 rounded-xl border border-border bg-card px-2.5 py-2 text-start font-sans shadow-xs outline-none transition-colors hover:bg-accent focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+    >
+      <RandomAvatar
+        seed={sub.id}
+        busy={sub.status === "running"}
+        className="size-7"
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate nessa-text-2 font-medium">
+          {sub.name}
+        </span>
+        <span className="block truncate nessa-text-1 text-muted-foreground">
+          {sub.status === "running" ? "Running · " : "Done · "}
+          {sub.task}
+        </span>
+      </span>
+      <ChevronRight
+        aria-hidden="true"
+        className="size-3.5 shrink-0 text-muted-foreground"
+      />
+    </button>
+  )
+}
+
+/**
+ * Editing happens inside the bubble itself: the bubble keeps its shape and
+ * tone, its text becomes an editable field, and small save and cancel
+ * controls sit beside it. Enter saves, Escape cancels.
+ */
+function InlineBubbleEditor({
+  text,
+  onSave,
+  onCancel,
+}: {
+  text: string
+  onSave: (text: string) => void
+  onCancel: () => void
+}) {
+  const [draft, setDraft] = React.useState(text)
+  // The caret opens at the end of the text, ready to append.
+  const placeCaretAtEnd = React.useCallback(
+    (node: HTMLTextAreaElement | null) => {
+      if (!node) return
+      node.focus()
+      node.setSelectionRange(node.value.length, node.value.length)
+    },
+    [],
+  )
+  return (
+    <ChatBubble className="max-w-full">
+      {/* field-sizing lets the textarea take exactly its content's shape,
+          so the editing bubble wraps and measures like the resting one. */}
+      <textarea
+        ref={placeCaretAtEnd}
+        aria-label="Edit message"
+        rows={1}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault()
+            event.stopPropagation()
+            if (draft.trim()) onSave(draft.trim())
+            else onCancel()
+          }
+          if (event.key === "Escape") {
+            // Cancels only this edit — the window-level Escape handler
+            // would otherwise also collapse reply or thread focus.
+            event.preventDefault()
+            event.stopPropagation()
+            onCancel()
+          }
+        }}
+        onBlur={() => onCancel()}
+        className="block max-w-full resize-none overflow-hidden whitespace-pre-wrap break-words border-0 bg-transparent p-0 font-sans nessa-text-4 leading-5 text-inherit outline-none [field-sizing:content]"
+      />
+    </ChatBubble>
+  )
+}
+
+/** A hover-revealed, presentation-only icon action for a message row. */
+function HoverAction({
+  label,
+  onClick,
+  children,
+}: {
+  label: string
+  onClick?: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3"
+    >
+      {children}
+    </button>
+  )
+}
+
+/**
+ * Maps one demo message onto the ChatBubbles kit/**
  * Maps one demo message onto the ChatBubbles kit: attachments (single tile
  * or fanned stack), reply quote, the bubble itself as the reply control,
  * and the delivery receipt.
@@ -317,6 +860,16 @@ function DemoBubble({
   onReact,
   onReplyCommit,
   onMenuOpenChange,
+  onChipOpen,
+  onPastedOpen,
+  onLongOpen,
+  onQuotePress,
+  onQuoteSourceOpen,
+  onQuotesOpen,
+  editing = false,
+  onEditStart,
+  onEditSave,
+  onEditCancel,
   menuBoundary,
 }: {
   message: DemoMessage
@@ -334,12 +887,33 @@ function DemoBubble({
   onReplyCommit?: () => void
   /** Reports the tapback menu opening and closing. */
   onMenuOpenChange?: (open: boolean) => void
+  /** Opens a chip's file from a chip inside this bubble; true asks for a new tab. */
+  onChipOpen?: (label: string, newTab: boolean) => void
+  /** Opens a pasted-text chip's full content in the list view. */
+  onPastedOpen?: (chipId: string) => void
+  /** Opens a long message's full text in the list view. */
+  onLongOpen?: (text: string) => void
+  /** Focuses the thread this message replies into (its quote chip's tap). */
+  onQuotePress?: () => void
+  /** Opens the document a lifted passage came from. */
+  onQuoteSourceOpen?: (sourceId: string) => void
+  /** Opens the read-only list of this message's annotations. */
+  onQuotesOpen?: (quotes: PendingQuote[]) => void
+  /** True while this user message's bubble is swapped for the editor. */
+  editing?: boolean
+  /** Enters edit mode for this user message (context-menu Edit). */
+  onEditStart?: () => void
+  /** Commits the edited text. */
+  onEditSave?: (text: string) => void
+  /** Leaves edit mode without changes. */
+  onEditCancel?: () => void
   /** Flips the tapback menu above the press point at this element's edges. */
   menuBoundary?: Element | null
 }) {
   // Reply commits after the menu closes: Radix's close-autofocus would
   // otherwise return focus to the bubble and undo the composer focus.
   const replyChosenRef = React.useRef(false)
+  const editChosenRef = React.useRef(false)
   const attachments = message.attachments ?? []
   // Tiles inside the stack must be non-interactive: the stack's own button
   // is the control, and a button cannot nest buttons.
@@ -366,6 +940,7 @@ function DemoBubble({
       tone={message.role === "user" ? "sent" : "received"}
       dimmed={dimmed}
       threadFocused={threadFocused}
+      className="group/message relative"
     >
       {attachments.length === 1
         ? tile(attachments[0]!, "mb-1 size-28")
@@ -377,15 +952,66 @@ function DemoBubble({
               {attachments.map((attachment) => tile(attachment, "size-28", false))}
             </ChatAttachmentStack>
           ) : null}
-      {message.replyTo ? <ChatMessageQuote>{message.replyTo}</ChatMessageQuote> : null}
-      {message.text ? (
+      {message.replyTo ? (
+        <ChatMessageQuote
+          role={onQuotePress ? "button" : undefined}
+          tabIndex={onQuotePress ? 0 : undefined}
+          title={onQuotePress ? "Show this thread" : undefined}
+          onClick={onQuotePress}
+          onKeyDown={
+            onQuotePress
+              ? (event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return
+                  event.preventDefault()
+                  onQuotePress()
+                }
+              : undefined
+          }
+          className={onQuotePress ? "cursor-pointer hover:bg-accent" : undefined}
+        >
+          {message.replyTo}
+        </ChatMessageQuote>
+      ) : null}
+      {message.quotes && message.quotes.length > 0 ? (
+        // The annotations travel as one compact pill — the chat stays
+        // clean, and tapping it opens the same list view they were
+        // reviewed in before sending.
+        <ChatMessageQuote
+          role="button"
+          tabIndex={0}
+          title="Show the annotations"
+          onClick={(event) => {
+            event.stopPropagation()
+            onQuotesOpen?.(message.quotes!)
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" && event.key !== " ") return
+            event.preventDefault()
+            onQuotesOpen?.(message.quotes!)
+          }}
+          className="cursor-pointer hover:bg-accent"
+        >
+          {message.quotes.length === 1
+            ? "1 annotation"
+            : `${message.quotes.length} annotations`}
+        </ChatMessageQuote>
+      ) : null}
+      {editing ? (
+        <InlineBubbleEditor
+          text={message.text}
+          onSave={(text) => onEditSave?.(text)}
+          onCancel={() => onEditCancel?.()}
+        />
+      ) : message.text || (message.parts && message.parts.length > 0) ? (
         /* Right-click / long-press raises the ContextMenu with the tapback
            row and a Reply action. Opening it never frosts the transcript —
            the frosted thread view belongs to reply mode, entered via Reply. */
+        <>
+        <span className="relative flex max-w-full items-center">
         <ContextMenu onOpenChange={onMenuOpenChange}>
           <ContextMenuTrigger asChild>
             <ChatBubble
-              aria-label={`Reply to: ${message.text}`}
+              aria-label={`Reply to: ${message.text || "attachment message"}`}
               title="Right-click to reply or react"
               tabIndex={0}
               reaction={message.reaction}
@@ -400,6 +1026,45 @@ function DemoBubble({
                 >
                   {message.text}
                 </MessageMarkdown>
+              ) : message.role === "user" &&
+                message.text.length > LONG_MESSAGE_CHARS &&
+                onLongOpen ? (
+                // A huge typed message stays compact in the transcript —
+                // four lines and a chevron; the full text lives in the
+                // list view, like the pasted-text chips.
+                <span
+                  role="button"
+                  tabIndex={0}
+                  title="Show the whole message"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onLongOpen(message.text)
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return
+                    event.preventDefault()
+                    event.stopPropagation()
+                    onLongOpen(message.text)
+                  }}
+                  className="flex cursor-pointer items-end gap-1"
+                >
+                  <span className="line-clamp-4">{message.text}</span>
+                  <ChevronRight
+                    aria-hidden="true"
+                    className="mb-0.5 size-3.5 shrink-0 opacity-80"
+                  />
+                </span>
+              ) : message.parts ? (
+                <BubbleParts
+                  parts={message.parts}
+                  onChipPress={(chip, newTab) => {
+                    if (chip.kind === "pasted-text") {
+                      onPastedOpen?.(chip.id)
+                      return
+                    }
+                    onChipOpen?.(chip.label, newTab)
+                  }}
+                />
               ) : (
                 message.text
               )}
@@ -411,6 +1076,12 @@ function DemoBubble({
             collisionBoundary={menuBoundary ?? undefined}
             collisionPadding={8}
             onCloseAutoFocus={(event) => {
+              if (editChosenRef.current) {
+                editChosenRef.current = false
+                event.preventDefault()
+                onEditStart?.()
+                return
+              }
               if (!replyChosenRef.current) return
               replyChosenRef.current = false
               event.preventDefault()
@@ -449,10 +1120,60 @@ function DemoBubble({
             >
               Reply
             </ContextMenuItem>
+            {message.role === "user" && onEditStart ? (
+              <ContextMenuItem
+                onSelect={() => {
+                  editChosenRef.current = true
+                }}
+              >
+                Edit
+              </ContextMenuItem>
+            ) : null}
           </ContextMenuContent>
         </ContextMenu>
+        </span>
+        {/* One pattern for both sides: a hover-revealed footer row under
+            the bubble — the receipt lives here too, so the transcript
+            carries no standing chrome. Padding, not margin, bridges the
+            gap so the pointer can reach the actions without losing hover. */}
+        <span
+          className={cn(
+            "pointer-events-none absolute top-full z-10 flex items-center gap-0.5 pt-0.5 opacity-0 transition-opacity focus-within:pointer-events-auto focus-within:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100",
+            message.role === "user" ? "right-0" : "left-0",
+          )}
+        >
+          {message.role === "user" ? (
+            <>
+              {delivered ? (
+                <ChatMessageReceipt className="mt-0 pe-1">
+                  Delivered
+                </ChatMessageReceipt>
+              ) : null}
+              <HoverAction label="Copy">
+                <Copy aria-hidden="true" />
+              </HoverAction>
+              {onEditStart ? (
+                <HoverAction label="Edit message" onClick={onEditStart}>
+                  <Pencil aria-hidden="true" />
+                </HoverAction>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <HoverAction label="Fork the conversation from here">
+                <GitFork aria-hidden="true" />
+              </HoverAction>
+              <HoverAction label="Retry this reply">
+                <RefreshCw aria-hidden="true" />
+              </HoverAction>
+              <HoverAction label="Copy">
+                <Copy aria-hidden="true" />
+              </HoverAction>
+            </>
+          )}
+        </span>
+        </>
       ) : null}
-      {delivered ? <ChatMessageReceipt>Delivered</ChatMessageReceipt> : null}
     </ChatMessage>
   )
 }
@@ -556,6 +1277,190 @@ function attachmentSummary(attachments: DemoAttachment[]) {
     .join(", ")
 }
 
+// A pile of pending annotations in every shape — one-liners, paragraphs,
+// commented and bare — for exercising the pending row and the list view.
+const seededAnnotations: PendingQuote[] = [
+  {
+    id: "seed-1",
+    text: "Gather the relevant context from the current chat.",
+    comments: ["This should spell out how much history counts as relevant."],
+    sourceId: "skill-creator",
+  },
+  {
+    id: "seed-2",
+    text: "Apply the checklist this skill carries.",
+    sourceId: "skill-creator",
+  },
+  {
+    id: "seed-3",
+    text: "Report the result back into the thread. The report should stay short enough to read in the transcript, with the full detail behind a link, so the conversation keeps moving while the evidence stays reachable for whoever wants to dig in later.",
+    comments: [
+      "Way too long for one step — split the summary rule and the linking rule into separate steps, and give each a concrete length budget so agents stop guessing.",
+      "Also decide who owns the link target.",
+    ],
+    sourceId: "skill-creator",
+  },
+  {
+    id: "seed-4",
+    text: "Invoke with /skill-creator from any conversation.",
+    comments: ["Mention the trigger menu too."],
+    sourceId: "skill-creator",
+  },
+  {
+    id: "seed-5",
+    text: "Draft a reusable skill from this conversation.",
+    sourceId: "skill-creator",
+  },
+  {
+    id: "seed-6",
+    text: "The checklist this skill carries should include accessibility, performance, and error handling, each with at least one concrete check the reviewer can run without leaving the editor.",
+    comments: ["a11y first."],
+    sourceId: "code-review",
+  },
+  { id: "seed-7", text: "When to use", sourceId: "skill-creator" },
+  {
+    id: "seed-8",
+    text: "Steps",
+    comments: [
+      "The whole Steps section reads as written for humans; add a machine-readable variant so the runner can verify each step actually happened.",
+    ],
+    sourceId: "skill-creator",
+  },
+]
+
+
+/** A sent-style comment bubble whose text edits in place, inside the bubble. */
+function EditableCommentBubble({
+  text,
+  onSave,
+}: {
+  text: string
+  /** Omitted in read-only views; present, it enables the hover edit control. */
+  onSave?: (text: string) => void
+}) {
+  const [editing, setEditing] = React.useState(false)
+  if (editing && onSave) {
+    return (
+      <InlineBubbleEditor
+        text={text}
+        onSave={(next) => {
+          onSave(next)
+          setEditing(false)
+        }}
+        onCancel={() => setEditing(false)}
+      />
+    )
+  }
+  return (
+    <span className="group/comment flex max-w-full items-center gap-1 self-end">
+      {onSave ? (
+        <button
+          type="button"
+          aria-label="Edit comment"
+          title="Edit comment"
+          onClick={() => setEditing(true)}
+          className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground opacity-0 outline-none transition-opacity hover:text-foreground focus-visible:opacity-100 focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring group-hover/comment:opacity-100 [&_svg]:size-3"
+        >
+          <Pencil aria-hidden="true" />
+        </button>
+      ) : null}
+      <ChatBubble>{text}</ChatBubble>
+    </span>
+  )
+}
+
+/**
+ * One annotation in the full-list view, read as a tiny thread: the lifted
+ * passage is the document's message, the user's comments are their replies.
+ * In the pending view the passage selects for follow-up comments, comments
+ * edit in place, and the row removes; the sent view is read-only.
+ */
+function AnnotationThread({
+  quote,
+  selected = false,
+  onSelect,
+  onRemove,
+  onOpenSource,
+  onEditComment,
+}: {
+  quote: PendingQuote
+  /** Marks this annotation as the one the composer replies to. */
+  selected?: boolean
+  /** Selects (or deselects) this annotation for follow-up comments. */
+  onSelect?: () => void
+  /** Omitted in the read-only view of a sent message's annotations. */
+  onRemove?: () => void
+  /** Opens the document this passage was lifted from. */
+  onOpenSource?: () => void
+  /** Replaces one comment's text; omitted in the read-only view. */
+  onEditComment?: (index: number, text: string) => void
+}) {
+  const sourceName = quote.sourceId
+    ? slashItemForId(quote.sourceId)
+    : undefined
+  return (
+    <div className="flex items-start gap-2">
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 flex-col gap-1 rounded-2xl p-1 transition-colors",
+          selected && "bg-(--nessa-chat-accent)/10",
+        )}
+      >
+        <ChatMessage tone="received" className="max-w-full">
+          <ChatBubble
+            role={onSelect ? "button" : undefined}
+            tabIndex={onSelect ? 0 : undefined}
+            title={onSelect ? "Reply to this annotation" : undefined}
+            onClick={onSelect}
+            onKeyDown={
+              onSelect
+                ? (event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return
+                    event.preventDefault()
+                    onSelect()
+                  }
+                : undefined
+            }
+            className={onSelect ? "cursor-pointer px-4 py-2.5" : "px-4 py-2.5"}
+          >
+            {/* The kit's markdown renderer — pasted markdown, long typed
+                text, and lifted passages all read formatted here. */}
+            <MessageMarkdown className="leading-5">{quote.text}</MessageMarkdown>
+          </ChatBubble>
+          {sourceName && onOpenSource ? (
+            <button
+              type="button"
+              onClick={onOpenSource}
+              className="self-start rounded-full border-0 bg-transparent p-0 px-1 font-sans nessa-text-1 text-(--nessa-chat-accent) outline-none hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              {chipFileMock(sourceName).name}
+            </button>
+          ) : null}
+        </ChatMessage>
+        {quote.comments?.map((comment, index) => (
+          <ChatMessage key={index} tone="sent" className="max-w-full self-end">
+            <EditableCommentBubble
+              text={comment}
+              onSave={
+                onEditComment
+                  ? (next) => onEditComment(index, next)
+                  : undefined
+              }
+            />
+          </ChatMessage>
+        ))}
+      </div>
+      {onRemove ? (
+        <span className="mt-1.5 shrink-0">
+          <HoverAction label="Discard quoted selection" onClick={onRemove}>
+            <X aria-hidden="true" />
+          </HoverAction>
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
 /**
  * A small-surface host: an iMessage-style transcript over the pill
  * composer. Enter is the only send affordance; tapping a bubble starts a
@@ -564,16 +1469,26 @@ function attachmentSummary(attachments: DemoAttachment[]) {
  * space on a standing picker. The rim lights while the "agent" works and a
  * canned reply lands.
  */
-function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
-  const [message, setMessage] = React.useState("")
+const EMPTY_MESSAGES: DemoMessage[] = []
+
+function PlaygroundExample({
+  replyDelay = 900,
+  initialTabId = "chat-1",
+  initialQuotes = [],
+}: {
+  replyDelay?: number
+  initialTabId?: string
+  initialQuotes?: PendingQuote[]
+}) {
   const [tabs, setTabs] = React.useState([
     { id: "chat-1", title: "Release notes" },
+    { id: auditTabId, title: "Repo audit" },
   ] as { id: string; title: string; closeable?: boolean }[])
-  const [activeTabId, setActiveTabId] = React.useState("chat-1")
+  const [activeTabId, setActiveTabId] = React.useState(initialTabId)
   const [messagesByTab, setMessagesByTab] = React.useState<
     Record<string, DemoMessage[]>
-  >({})
-  const messages = messagesByTab[activeTabId] ?? []
+  >(seededMessagesByTab)
+  const messages = messagesByTab[activeTabId] ?? EMPTY_MESSAGES
   const updateMessages = React.useCallback(
     (tabId: string, updater: (current: DemoMessage[]) => DemoMessage[]) =>
       setMessagesByTab((current) => ({
@@ -588,6 +1503,34 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
   const generating = generatingTabId !== null && generatingTabId === activeTabId
   const [model, setModel] = React.useState<ModelPickerValue>(defaultModel)
   const [modelCardOpen, setModelCardOpen] = React.useState(false)
+  // Passages lifted out of previewed documents — with any comments made on
+  // them — attached to the next send.
+  const [quotes, setQuotes] = React.useState<PendingQuote[]>(initialQuotes)
+  // The full-list view of pending quotes, rendered live so removals and
+  // expands reflect immediately.
+  const [quotesOpen, setQuotesOpen] = React.useState(false)
+  // A sent message's annotations opened read-only from its pill.
+  const [viewedQuotes, setViewedQuotes] = React.useState<
+    PendingQuote[] | null
+  >(null)
+  // The pending annotation the composer replies to while the list is open.
+  const [selectedQuote, setSelectedQuote] = React.useState<number | null>(null)
+  // The user message whose bubble is currently swapped for the editor.
+  const [editingMessageId, setEditingMessageId] = React.useState<number | null>(
+    null,
+  )
+  // Full text behind each pasted-text chip, keyed by chip id.
+  const pastedTexts = React.useRef<Record<string, string>>({})
+  /** Shows a full text in the list view — the transcript stays compact. */
+  const openFullText = (text: string) => setViewedQuotes([{ text }])
+  // Chips open their file directly: plain press previews in the current
+  // tab, a modified press (Cmd/Ctrl) parks the file as its own tab.
+  const openChipFromLabel = (label: string, newTab: boolean) => {
+    const item = slashItemForLabel(label)
+    if (!item) return
+    setModelCardOpen(false)
+    openChipPreview(item, newTab)
+  }
   const [replyTarget, setReplyTarget] = React.useState<DemoMessage | null>(null)
   const [attachments, setAttachments] = React.useState<DemoAttachment[]>([])
   const [listening, setListening] = React.useState(false)
@@ -595,11 +1538,60 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
   const [holdToRecord, setHoldToRecord] = React.useState(true)
   const [micMenuOpen, setMicMenuOpen] = React.useState(false)
   const holdingToRecord = React.useRef(false)
-  const [viewerAttachments, setViewerAttachments] =
-    React.useState<DemoAttachment[] | null>(null)
+  // One overlay surface over the chat for anything full-screen — the
+  // attachment grid, a file preview, whatever comes next. Whoever opens it
+  // supplies the summary line and the content.
+  const [overlay, setOverlay] = React.useState<{
+    summary: string
+    body: React.ReactNode
+  } | null>(null)
+  const openAttachmentsOverlay = (attachments: DemoAttachment[]) =>
+    setOverlay({
+      summary: attachmentSummary(attachments),
+      body: attachments.map((attachment) => (
+        <ChatAttachmentTile
+          key={attachment.id}
+          label={attachment.label}
+          imageSrc={attachment.src}
+          icon={
+            attachment.kind === "photo" ? undefined : (
+              <AttachmentKindIcon kind={attachment.kind} />
+            )
+          }
+          className="size-28"
+        />
+      )),
+    })
+  // Files previewed from chips live in the tab strip like subagents do:
+  // one tab per file, the file-type glyph as the icon, closeable.
+  const [fileTabs, setFileTabs] = React.useState<Record<string, SlashItem>>({})
+  // A plain click previews in the current tab, replacing the transcript;
+  // Cmd/Ctrl-click parks the file as its own tab instead.
+  const [inlinePreview, setInlinePreview] = React.useState<SlashItem | null>(
+    null,
+  )
+  const openChipPreview = (item: SlashItem, newTab: boolean) => {
+    if (!newTab) {
+      setInlinePreview(item)
+      return
+    }
+    const tabId = `file:${item.id}`
+    setFileTabs((current) => ({ ...current, [tabId]: item }))
+    setTabs((current) =>
+      current.some((tab) => tab.id === tabId)
+        ? current
+        : [
+            ...current,
+            { id: tabId, title: chipFileMock(item).name, closeable: true },
+          ],
+    )
+    setActiveTabId(tabId)
+  }
+  const activeFileItem = fileTabs[activeTabId] ?? inlinePreview ?? undefined
   const [menuTargetId, setMenuTargetId] = React.useState<number | null>(null)
   const attachmentCounters = React.useRef<Record<DemoAttachmentKind, number>>({ photo: 0, file: 0, folder: 0, skill: 0, plugin: 0 })
-  const inputRef = React.useRef<HTMLTextAreaElement>(null)
+  const inputRef = React.useRef<ChatComposerEditorHandle>(null)
+  const logRef = React.useRef<HTMLDivElement>(null)
   const [frameElement, setFrameElement] = React.useState<HTMLDivElement | null>(
     null,
   )
@@ -660,7 +1652,57 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
     }, thinkDelay)
   }
 
-  const lastUserId = [...messages].reverse().find((entry) => entry.role === "user")?.id
+  let lastUserId: number | undefined
+  for (let at = messages.length - 1; at >= 0; at -= 1) {
+    if (messages[at]!.role === "user") {
+      lastUserId = messages[at]!.id
+      break
+    }
+  }
+
+  // An overflowing transcript keeps its newest message in view: switching
+  // tabs jumps to the end, and appended or streaming messages follow —
+  // reacting to or editing an older message must not yank the scroll.
+  const lastMessage = messages[messages.length - 1]
+  React.useEffect(() => {
+    const log = logRef.current
+    if (log) log.scrollTop = log.scrollHeight
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTabId, messages.length, lastMessage?.text])
+
+  // The subagent whose conversation is on screen, when a sub: tab is active.
+  const activeSubagent = activeTabId.startsWith("sub:")
+    ? demoSubagents[activeTabId.slice("sub:".length)]
+    : undefined
+
+  // Where each subagent tab was opened from, for the back gesture.
+  const subagentParents = React.useRef<Record<string, string>>({})
+  /** Opens (or re-fronts) a subagent's conversation as its own tab. */
+  const openSubagent = (id: string) => {
+    const tabId = subagentTabId(id)
+    subagentParents.current[tabId] ??=
+      activeTabId.startsWith("sub:") || fileTabs[activeTabId]
+        ? auditTabId
+        : activeTabId
+    setTabs((current) =>
+      current.some((tab) => tab.id === tabId)
+        ? current
+        : [
+            ...current,
+            { id: tabId, title: demoSubagents[id]!.name, closeable: true },
+          ],
+    )
+    setActiveTabId(tabId)
+    setReplyTarget(null)
+    setMenuTargetId(null)
+    setOverlay(null)
+    setModelCardOpen(false)
+    setInlinePreview(null)
+    // Pending annotations survive navigation — only the views close.
+    setQuotesOpen(false)
+    setViewedQuotes(null)
+    setSelectedQuote(null)
+  }
 
   const addAttachment = (kind: DemoAttachmentKind) => {
     const samples = attachmentSamples[kind]
@@ -693,7 +1735,9 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
         inputRef.current?.focus()
         return
       }
-      setMessage((current) => (current ? `${current} ${word}` : word))
+      // The transcription streams into the real editor at the caret, each
+      // word separated the way the spoken stream would be typed.
+      inputRef.current?.insertText(index === 1 ? word : ` ${word}`)
     }, 280)
     return () => clearInterval(interval)
   }, [listening])
@@ -702,10 +1746,19 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
   // itself, everything it transitively replies to, and every reply chained
   // onto it — and the rest of the transcript recedes, matching iMessage's
   // "just this thread" view.
+  // Tapping a reply's quote chip focuses that thread without composing.
+  const [focusedThreadId, setFocusedThreadId] = React.useState<number | null>(
+    null,
+  )
   const threadIds = React.useMemo(() => {
-    if (!replyTarget) return null
+    const focusTarget =
+      replyTarget ??
+      (focusedThreadId !== null
+        ? messages.find((entry) => entry.id === focusedThreadId)
+        : undefined)
+    if (!focusTarget) return null
     const ids = new Set<number>()
-    let ancestor: DemoMessage | undefined = replyTarget
+    let ancestor: DemoMessage | undefined = focusTarget
     while (ancestor && !ids.has(ancestor.id)) {
       ids.add(ancestor.id)
       const parentId: number | undefined = ancestor.replyToId
@@ -726,19 +1779,20 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
       }
     }
     return ids
-  }, [messages, replyTarget])
+  }, [messages, replyTarget, focusedThreadId])
 
-  // Escape leaves the reply view from anywhere, not just the input.
+  // Escape leaves the reply view — or a focused thread — from anywhere.
   React.useEffect(() => {
-    if (!replyTarget) return
+    if (!replyTarget && focusedThreadId === null) return
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return
       event.preventDefault()
       setReplyTarget(null)
+      setFocusedThreadId(null)
     }
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [replyTarget])
+  }, [replyTarget, focusedThreadId])
 
   return (
     <div
@@ -753,17 +1807,75 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
           the busy dot follows wherever a reply streams. */}
       <ChatTabs
         className="px-1"
-        tabs={tabs.map((tab) => ({
-          ...tab,
-          loading: generatingTabId === tab.id,
-        }))}
+        tabs={tabs.map((tab) => {
+          // A subagent tab carries its watercolor avatar as the glyph; a
+          // running subagent's avatar animates (busy), which already says
+          // "working" — so the tab's own busy dot stays off for them.
+          const sub = tab.id.startsWith("sub:")
+            ? demoSubagents[tab.id.slice("sub:".length)]
+            : undefined
+          const fileItem = fileTabs[tab.id]
+          return {
+            ...tab,
+            icon: fileItem ? (
+              // The file-type glyph names the tab's content at a glance.
+              fileItem.kind === "plugin" ? (
+                <Braces aria-hidden="true" />
+              ) : (
+                <FileText aria-hidden="true" />
+              )
+            ) : sub ? (
+              // On the tab you are already inside, hovering swaps the
+              // avatar for a back glyph: clicking the active subagent tab
+              // returns to the conversation that spawned it (handled in
+              // onValueChange, since re-selecting it is otherwise a no-op).
+              <span className="relative flex size-4 items-center justify-center">
+                <RandomAvatar
+                  seed={sub.id}
+                  busy={sub.status === "running"}
+                  className={cn(
+                    "size-4",
+                    tab.id === activeTabId &&
+                      "[[data-slot=chat-tab]:hover_&]:opacity-0",
+                  )}
+                />
+                {tab.id === activeTabId ? (
+                  <ChevronLeft
+                    aria-hidden="true"
+                    className="absolute inset-0 m-auto hidden size-3.5 text-foreground [[data-slot=chat-tab]:hover_&]:block"
+                  />
+                ) : null}
+              </span>
+            ) : (
+              // Every conversation is an agent: each chat tab carries its
+              // own watercolor avatar, seeded by the conversation id.
+              <RandomAvatar seed={tab.id} className="size-4" />
+            ),
+            loading: sub ? false : generatingTabId === tab.id,
+          }
+        })}
         value={activeTabId}
         onValueChange={(id) => {
-          setActiveTabId(id)
+          // Any tab click leaves an in-place file preview first.
+          if (inlinePreview) {
+            setInlinePreview(null)
+            if (id === activeTabId) return
+          }
+          // Re-selecting the subagent tab you are inside goes back to the
+          // conversation that spawned it — the hover back glyph's action.
+          const target =
+            id === activeTabId && id.startsWith("sub:")
+              ? subagentParents.current[id] ?? auditTabId
+              : id
+          setActiveTabId(target)
           setReplyTarget(null)
           setMenuTargetId(null)
-          setViewerAttachments(null)
+          setOverlay(null)
           setModelCardOpen(false)
+          setQuotesOpen(false)
+          setViewedQuotes(null)
+          setFocusedThreadId(null)
+          setEditingMessageId(null)
         }}
         onClose={(id) => {
           if (id === generatingTabId) {
@@ -782,9 +1894,15 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
             const { [id]: _closed, ...rest } = current
             return rest
           })
+          setFileTabs((current) => {
+            const { [id]: _closed, ...rest } = current
+            return rest
+          })
         }}
         onNew={() => {
-          const id = `chat-${nextId.current++}`
+          // nextId starts at 1, and "chat-1" already exists — offset new
+          // tab ids so the first + click can never mint a duplicate key.
+          const id = `chat-${1 + nextId.current++}`
           setTabs((current) => [
             ...current,
             { id, title: "New chat", closeable: true },
@@ -792,7 +1910,7 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
           setActiveTabId(id)
           setReplyTarget(null)
           setMenuTargetId(null)
-          setViewerAttachments(null)
+          setOverlay(null)
           setModelCardOpen(false)
           inputRef.current?.focus()
         }}
@@ -803,19 +1921,65 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
         id={`chat-tab-panel-${activeTabId}`}
         aria-labelledby={`chat-tab-${activeTabId}`}
         role="tabpanel"
-        className="flex min-h-0 flex-1 flex-col"
+        // Positioned, so the overlay replaces only the transcript surface —
+        // the tab strip and the pill stay visible and usable around it.
+        className="relative flex min-h-0 flex-1 flex-col"
       >
+      {activeFileItem ? (
+        // A file replaces the transcript only — the tab strip stays, and in
+        // the current tab the composer stays too, so a selected passage can
+        // be added to the chat and discussed in place.
+        <DocumentSurface
+          item={activeFileItem}
+          // Both actions leave the document open for further selections;
+          // Comment additionally hands focus to the composer (jumping back
+          // to the conversation from a file tab, which has no composer).
+          onAttach={(text) =>
+            setQuotes((current) => [
+              ...current,
+              {
+                id: `quote-${nextId.current++}`,
+                text,
+                sourceId: activeFileItem.id,
+              },
+            ])
+          }
+          // A comment attaches too — nothing sends until the user sends.
+          onComment={(text, comment) =>
+            setQuotes((current) => [
+              ...current,
+              {
+                id: `quote-${nextId.current++}`,
+                text,
+                comments: [comment],
+                sourceId: activeFileItem.id,
+              },
+            ])
+          }
+        />
+      ) : (
       <div
+        ref={logRef}
         aria-label="Conversation"
         role="log"
-        className="flex min-h-0 flex-1 flex-col justify-end gap-2 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pb-7 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
+        {/* Bottom-anchors a short transcript without justify-end, which
+            would trap overflowing messages above an unscrollable top. */}
+        <div aria-hidden="true" className="mt-auto shrink-0" />
+        {activeSubagent ? (
+          // A plain provenance caption — the way back lives on the tab:
+          // hovering the active subagent tab reveals the back glyph.
+          <p className="m-0 self-center px-2.5 py-1 text-center font-sans nessa-text-1 text-muted-foreground">
+            Subagent · {activeSubagent.task}
+          </p>
+        ) : null}
         {messages.map((entry) => (
+          <React.Fragment key={entry.id}>
           <DemoBubble
-            key={entry.id}
             message={entry}
             delivered={entry.id === lastUserId}
-            onOpenAttachments={setViewerAttachments}
+            onOpenAttachments={openAttachmentsOverlay}
             dimmed={
               threadIds !== null
                 ? !threadIds.has(entry.id)
@@ -832,6 +1996,46 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
               setMenuTargetId(open ? entry.id : null)
             }
             menuBoundary={frameElement}
+            onChipOpen={openChipFromLabel}
+            onQuotePress={
+              entry.replyToId !== undefined
+                ? () =>
+                    setFocusedThreadId((current) =>
+                      current === entry.replyToId ? null : entry.replyToId!,
+                    )
+                : undefined
+            }
+            onQuoteSourceOpen={(sourceId) => {
+              const item = slashItemForId(sourceId)
+              if (item) openChipPreview(item, false)
+            }}
+            onQuotesOpen={setViewedQuotes}
+            onPastedOpen={(chipId) => {
+              const full =
+                entry.pasted?.[chipId] ?? pastedTexts.current[chipId]
+              if (full) openFullText(full)
+            }}
+            onLongOpen={openFullText}
+            editing={editingMessageId === entry.id}
+            onEditStart={
+              entry.role === "user"
+                ? () => setEditingMessageId(entry.id)
+                : undefined
+            }
+            onEditSave={(text) => {
+              // The editor edits the flattened text, so the saved message
+              // is that text — stale parts would otherwise keep rendering
+              // the pre-edit chips over the new words.
+              updateMessages(activeTabId, (current) =>
+                current.map((message) =>
+                  message.id === entry.id
+                    ? { ...message, text, parts: undefined }
+                    : message,
+                ),
+              )
+              setEditingMessageId(null)
+            }}
+            onEditCancel={() => setEditingMessageId(null)}
             onReact={(emoji) => {
               updateMessages(activeTabId, (current) =>
                 current.map((message) =>
@@ -847,32 +2051,108 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
             }}
 
           />
+          {entry.spawned ? (
+            <div className="me-8 mt-1.5 flex max-w-[85%] flex-col gap-1.5 self-start">
+              {entry.spawned.map((id) => (
+                <SubagentChip
+                  key={id}
+                  sub={demoSubagents[id]!}
+                  onOpen={() => openSubagent(id)}
+                />
+              ))}
+            </div>
+          ) : null}
+          </React.Fragment>
         ))}
         {generating && !messages.some((message) => message.streaming) ? (
           <ChatTypingIndicator label="Assistant is typing" />
         ) : null}
       </div>
-      </div>
-      {viewerAttachments ? (
+      )}
+      {overlay ? (
         <ChatAttachmentViewer
-          summary={attachmentSummary(viewerAttachments)}
-          onClose={() => setViewerAttachments(null)}
+          summary={overlay.summary}
+          onClose={() => setOverlay(null)}
         >
-          {viewerAttachments.map((attachment) => (
-            <ChatAttachmentTile
-              key={attachment.id}
-              label={attachment.label}
-              imageSrc={attachment.src}
-              icon={
-                attachment.kind === "photo" ? undefined : (
-                  <AttachmentKindIcon kind={attachment.kind} />
-                )
-              }
-              className="size-28"
-            />
-          ))}
+          {overlay.body}
         </ChatAttachmentViewer>
       ) : null}
+      {quotesOpen || viewedQuotes ? (
+        // The annotations read as messages over the transcript — pending
+        // ones removable, a sent message's read-only — and the way back is
+        // spelled out where the summary line used to be.
+        <div className="absolute inset-0 z-10 flex flex-col bg-background">
+          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto py-2 text-left [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {(viewedQuotes ?? quotes).map((entry, at) => (
+              <AnnotationThread
+                key={entry.id ?? at}
+                quote={entry}
+                selected={!viewedQuotes && selectedQuote === at}
+                onSelect={
+                  viewedQuotes
+                    ? undefined
+                    : () =>
+                        setSelectedQuote((current) =>
+                          current === at ? null : at,
+                        )
+                }
+                onRemove={
+                  viewedQuotes
+                    ? undefined
+                    : () => {
+                        const next = quotes.filter(
+                          (_, index2) => index2 !== at,
+                        )
+                        setQuotes(next)
+                        setSelectedQuote(null)
+                        if (next.length === 0) setQuotesOpen(false)
+                      }
+                }
+                onOpenSource={
+                  entry.sourceId && slashItemForId(entry.sourceId)
+                    ? () => {
+                        setQuotesOpen(false)
+                        setViewedQuotes(null)
+                        setSelectedQuote(null)
+                        openChipPreview(slashItemForId(entry.sourceId!)!, false)
+                      }
+                    : undefined
+                }
+                onEditComment={
+                  viewedQuotes
+                    ? undefined
+                    : (index, text) =>
+                        setQuotes((current) =>
+                          current.map((quote, index2) =>
+                            index2 === at
+                              ? {
+                                  ...quote,
+                                  comments: quote.comments?.map(
+                                    (comment, index3) =>
+                                      index3 === index ? text : comment,
+                                  ),
+                                }
+                              : quote,
+                          ),
+                        )
+                }
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setQuotesOpen(false)
+              setViewedQuotes(null)
+              setSelectedQuote(null)
+            }}
+            className="mx-auto shrink-0 cursor-pointer rounded-full border-0 bg-transparent px-3 py-1.5 font-sans nessa-text-2 font-medium text-(--nessa-chat-accent) outline-none hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            Back to chat
+          </button>
+        </div>
+      ) : null}
+      </div>
       {modelCardOpen ? (
         <ModelCard
           value={model}
@@ -884,12 +2164,86 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
           onClose={() => setModelCardOpen(false)}
         />
       ) : null}
+      {quotes.length > 0 && !quotesOpen && !viewedQuotes && !overlay ? (
+        // One quote pill stands for the whole set — it, or "+ N other",
+        // opens the full list over the transcript.
+        <div className="flex max-w-full items-center gap-1.5 self-start">
+          <button
+            type="button"
+            title={
+              quotes[0]!.comments?.length
+                ? `${quotes[0]!.comments[0]} — “${quotes[0]!.text}”`
+                : quotes[0]!.text
+            }
+            aria-label={`Quoted selection: ${quotes[0]!.text}`}
+            onClick={() => setQuotesOpen(true)}
+            className="inline-flex min-w-0 cursor-pointer items-center rounded-full border-0 bg-transparent p-0 text-start font-sans outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            <ChatMessageQuote className="m-0 inline-block max-w-52 truncate whitespace-nowrap">
+              {quotes[0]!.comments?.[0] ?? quotes[0]!.text}
+            </ChatMessageQuote>
+          </button>
+          {quotes.length > 1 ? (
+            <button
+              type="button"
+              onClick={() => setQuotesOpen(true)}
+              className="shrink-0 cursor-pointer whitespace-nowrap rounded-full border-0 bg-transparent p-0 font-sans nessa-text-1 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              + {quotes.length - 1} other{quotes.length > 2 ? "s" : ""}
+            </button>
+          ) : null}
+          <HoverAction
+            label="Discard quoted selections"
+            onClick={() => setQuotes([])}
+          >
+            <X aria-hidden="true" />
+          </HoverAction>
+        </div>
+      ) : null}
+      {fileTabs[activeTabId] ? null : (
       <PillComposer
         generating={generating}
         onSubmit={(event) => {
           event.preventDefault()
-          const text = message.trim()
-          if ((!text && attachments.length === 0) || generatingTabId !== null)
+          const content = inputRef.current?.getContent()
+          const text = (content?.text ?? "").trim()
+          // Chips travel with the message: the bubble re-renders them with
+          // their icons instead of flattening to plain text — and a chip
+          // alone is a sendable message.
+          const hasChips = Boolean(
+            content?.parts.some((part) => part.type === "chip"),
+          )
+          // Pasted-text payloads ride the message itself, so the chips keep
+          // working even if the composer-side store resets.
+          const pastedForMessage = Object.fromEntries(
+            (content?.parts ?? [])
+              .filter(
+                (part): part is Extract<ChatComposerContentPart, { type: "chip" }> =>
+                  part.type === "chip" && part.chip.kind === "pasted-text",
+              )
+              .map((part) => [part.chip.id, pastedTexts.current[part.chip.id]])
+              .filter(([, full]) => full !== undefined),
+          ) as Record<string, string>
+          // With the annotation list open and one selected, the send is a
+          // follow-up comment attaching to that annotation, not a message.
+          if (quotesOpen && selectedQuote !== null) {
+            if (!text) return
+            setQuotes((current) =>
+              current.map((quote, index) =>
+                index === selectedQuote
+                  ? { ...quote, comments: [...(quote.comments ?? []), text] }
+                  : quote,
+              ),
+            )
+            inputRef.current?.clear()
+            return
+          }
+          if (
+            (!text && attachments.length === 0 && quotes.length === 0 && !hasChips) ||
+            generatingTabId !== null ||
+            // A dedicated file tab has no conversation to send into.
+            fileTabs[activeTabId] !== undefined
+          )
             return
           updateMessages(activeTabId, (current) => [
             ...current,
@@ -897,14 +2251,24 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
               id: nextId.current++,
               role: "user",
               text,
-              replyTo: replyTarget?.text,
+              parts: hasChips ? content?.parts : undefined,
+              pasted:
+                Object.keys(pastedForMessage).length > 0
+                  ? pastedForMessage
+                  : undefined,
+              quotes: quotes.length > 0 ? quotes : undefined,
+              replyTo: replyTarget
+                ? replyTarget.text || "Attachment"
+                : undefined,
               replyToId: replyTarget?.id,
               attachments: attachments.length > 0 ? attachments : undefined,
             },
           ])
-          setMessage("")
+          inputRef.current?.clear()
           setAttachments([])
           setReplyTarget(null)
+          setQuotes([])
+          setQuotesOpen(false)
           setGeneratingTabId(activeTabId)
           startReply(activeTabId, replyDelay)
         }}
@@ -924,7 +2288,7 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
                     <AttachmentKindIcon kind={attachment.kind} />
                   )
                 }
-                onOpen={() => setViewerAttachments([attachment])}
+                onOpen={() => openAttachmentsOverlay([attachment])}
               />
               <button
                 type="button"
@@ -961,11 +2325,41 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <ChatComposerInput
+          {/* The rich editor in place of the plain textarea: skills and
+              plugins land as inline chips on the text baseline, exactly as
+              in the ChatComposerEditor catalog story; only files, photos,
+              and folders use the tile row above. */}
+          <ChatComposerEditor
             ref={inputRef}
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            placeholder={replyTarget ? "Reply" : "Ask me anything"}
+            onChipPress={(chip) => {
+              if (chip.kind === "pasted-text") {
+                const full = pastedTexts.current[chip.id]
+                if (full) openFullText(full)
+                return
+              }
+              openChipFromLabel(chip.label, false)
+            }}
+            pasteAttachmentMinLength={PASTE_CHIP_MIN_CHARS}
+            onPasteAttachment={(pasted) => {
+              const id = `pasted-${nextId.current++}`
+              pastedTexts.current[id] = pasted
+              inputRef.current?.insertChip({
+                id,
+                kind: "pasted-text",
+                label: `Pasted text (${pasted.length} chars)`,
+                textValue: "",
+                className: "font-medium text-(--nessa-chat-accent)",
+              })
+            }}
+            placeholder={
+              quotesOpen && selectedQuote !== null
+                ? "Reply to the annotation…"
+                : replyTarget
+                  ? "Reply"
+                  : activeSubagent
+                    ? `Message ${activeSubagent.name}…`
+                    : "Ask me anything"
+            }
             className={cn("self-center", listening && "text-muted-foreground")}
           />
           {generating ? (
@@ -1074,10 +2468,16 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
                   setModelCardOpen(true)
                   return
                 }
-                setAttachments((current) => [
-                  ...current,
-                  { id: nextId.current++, kind: item.kind, label: item.label },
-                ])
+                // Skills and plugins are inline chips on the text baseline,
+                // like the main composer; only files, photos, and folders
+                // use the tile row above the input.
+                inputRef.current?.insertChip({
+                  id: `chip-${nextId.current++}`,
+                  kind: item.kind,
+                  label: item.label,
+                  icon: item.icon,
+                  className: "font-medium text-(--nessa-chat-accent)",
+                })
               }}
               listLabel="Commands, skills, and plugins"
               emptyMessage="No matching commands"
@@ -1085,6 +2485,7 @@ function PlaygroundExample({ replyDelay = 900 }: { replyDelay?: number }) {
           )}
         </ChatComposerTrigger>
       </PillComposer>
+      )}
     </div>
   )
 }
@@ -1410,11 +2811,22 @@ function prefersReducedMotion(canvasElement: HTMLElement) {
 }
 
 /** Waits for every entrance/rim animation under the frame to finish. */
-async function waitForSettledAnimations(canvasElement: HTMLElement) {
+async function waitForSettledAnimations(
+  canvasElement: HTMLElement,
+  { finiteOnly = false }: { finiteOnly?: boolean } = {},
+) {
   await waitFor(() => {
     const running = canvasElement
       .getAnimations({ subtree: true })
-      .filter((animation) => animation.playState === "running")
+      .filter(
+        (animation) =>
+          animation.playState === "running" &&
+          // Surfaces with perpetually busy avatars can never fully settle;
+          // finiteOnly waits out only the transitions the a11y color pass
+          // would otherwise sample mid-flight.
+          (!finiteOnly ||
+            animation.effect?.getTiming().iterations !== Infinity),
+      )
     expect(running).toHaveLength(0)
   }, { timeout: 4000 })
 }
@@ -1461,7 +2873,7 @@ export const Playground: Story = {
     await expect(
       canvas.getByText("Ship the release notes"),
     ).toBeInTheDocument()
-    await expect(input).toHaveValue("")
+    await waitFor(() => expect(input.textContent ?? "").toBe(""))
     const composer = canvasElement.querySelector<HTMLElement>(
       '[data-slot="pill-composer"]',
     )!
@@ -1512,9 +2924,9 @@ export const Playground: Story = {
       ),
     })
     // Opening the tapback menu alone must not frost the transcript.
-    await expect(input).toHaveAttribute("placeholder", "Ask me anything")
+    await expect(input).toHaveAttribute("data-placeholder", "Ask me anything")
     await userEvent.click(await body.findByRole("menuitem", { name: "Reply" }))
-    await expect(input).toHaveAttribute("placeholder", "Reply")
+    await expect(input).toHaveAttribute("data-placeholder", "Reply")
     const firstMessage = canvasElement.querySelector<HTMLElement>(
       '[data-slot="chat-message"]',
     )!
@@ -1522,7 +2934,7 @@ export const Playground: Story = {
       expect(getComputedStyle(firstMessage).filter).toContain("blur")
     })
     await userEvent.keyboard("{Escape}")
-    await expect(input).toHaveAttribute("placeholder", "Ask me anything")
+    await expect(input).toHaveAttribute("data-placeholder", "Ask me anything")
     await waitFor(() => {
       expect(getComputedStyle(firstMessage).filter).toBe("none")
     })
@@ -1533,7 +2945,7 @@ export const Playground: Story = {
       ),
     })
     await userEvent.click(await body.findByRole("menuitem", { name: "Reply" }))
-    await expect(input).toHaveAttribute("placeholder", "Reply")
+    await expect(input).toHaveAttribute("data-placeholder", "Reply")
     await waitFor(() => {
       expect(input).toHaveFocus()
     })
@@ -1541,7 +2953,7 @@ export const Playground: Story = {
     await expect(
       canvas.getByLabelText("Reply to: thanks"),
     ).toBeInTheDocument()
-    await expect(input).toHaveAttribute("placeholder", "Ask me anything")
+    await expect(input).toHaveAttribute("data-placeholder", "Ask me anything")
     await waitFor(() => {
       expect(getComputedStyle(firstMessage).filter).toBe("none")
     })
@@ -1567,7 +2979,7 @@ export const Playground: Story = {
     })
     await userEvent.type(input, "/mod")
     await userEvent.click(await body.findByRole("option", { name: /model/ }))
-    await expect(input).toHaveValue("")
+    await waitFor(() => expect(input.textContent ?? "").toBe(""))
     const modelList = canvas.getByRole("listbox", { name: "Models" })
     await userEvent.click(
       within(modelList).getByRole("option", { name: /Sonnet 5/ }),
@@ -1609,7 +3021,7 @@ export const Playground: Story = {
       canvas.queryByRole("button", { name: "Stop listening" }),
     ).not.toBeInTheDocument()
     await waitFor(() => {
-      expect((input as HTMLTextAreaElement).value).toContain("Draft")
+      expect(input.textContent ?? "").toContain("Draft")
     })
     canvasElement.ownerDocument.defaultView!.dispatchEvent(
       new PointerEvent("pointerup", { bubbles: true, button: 0, pointerId: 1 }),
@@ -1645,10 +3057,108 @@ export const Playground: Story = {
       '[data-slot="chat-reaction"]',
     )!
     await expect(reactionBadge).toHaveTextContent("❤️")
-    await expect(input).toHaveAttribute("placeholder", "Ask me anything")
+    await expect(input).toHaveAttribute("data-placeholder", "Ask me anything")
     await userEvent.type(input, " tomorrow")
-    await expect((input as HTMLTextAreaElement).value).toMatch(/ tomorrow$/)
+    await expect(input.textContent ?? "").toMatch(/ tomorrow$/)
     await waitForSettledAnimations(canvasElement)
+  },
+}
+
+export const Subagents: Story = {
+  tags: ["reduced-motion"],
+  parameters: storyDocumentation(
+    "The playground opened on the seeded Repo audit tab, where an agent turn split its work across two subagents. Each subagent renders as a drill-in chip under the spawning bubble — watercolor avatar, name, and status, the avatar animating while it runs — and clicking one opens that subagent's own conversation as a closeable tab whose glyph is the same animating avatar, so no busy dot is needed. Inside, hovering the active subagent tab swaps its avatar for a back glyph, and clicking it returns to the parent conversation; the caption above the transcript names the subagent's task, the composer retargets to the subagent, and every chat capability — tapbacks, replies, dictation — works unchanged.",
+  ),
+  render: () => <PlaygroundExample initialTabId={auditTabId} />,
+  play: async ({ canvasElement }) => {
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
+    const canvas = within(canvasElement)
+    // The seeded audit conversation surfaces both subagent chips.
+    const reviewerChip = await canvas.findByRole("button", {
+      name: /Reviewer.*Running/,
+    })
+    await expect(
+      canvas.getByRole("button", { name: /Explorer.*Done/ }),
+    ).toBeInTheDocument()
+    // Drilling in opens the subagent as a closeable tab and swaps the
+    // transcript to its conversation; a running subagent's tab shows no
+    // busy dot — its animating avatar already carries that meaning.
+    await userEvent.click(reviewerChip)
+    const reviewerTab = await canvas.findByRole("tab", { name: /Reviewer/ })
+    await expect(reviewerTab).toHaveAttribute("aria-selected", "true")
+    await expect(
+      reviewerTab.querySelector('[data-slot="chat-tab-loading"]'),
+    ).toBeNull()
+    await expect(
+      canvas.getByText(/Two findings so far/),
+    ).toBeInTheDocument()
+    await expect(
+      canvas.getByRole("textbox", { name: "Message" }),
+    ).toHaveAttribute("data-placeholder", "Message Reviewer…")
+    // The provenance caption names the task; the way back is the tab
+    // itself — re-selecting the subagent tab you are inside (the hover
+    // back glyph's action) returns to the spawning conversation.
+    await expect(
+      canvas.getByText(/Subagent · Review the transcript diff/),
+    ).toBeInTheDocument()
+    await userEvent.click(reviewerTab)
+    await expect(
+      canvas.getByText(/Explorer is back — nine call sites/),
+    ).toBeInTheDocument()
+    // The Reviewer tab stays parked in the strip for hopping back.
+    await expect(
+      canvas.getByRole("tab", { name: /Reviewer/ }),
+    ).toHaveAttribute("aria-selected", "false")
+    // The messages pop in on a transition; the a11y pass that follows the
+    // play reads computed colors, so the finite animations must settle
+    // first. The busy subagent avatars animate forever by design, so only
+    // finite animations count here.
+    await waitForSettledAnimations(canvasElement, { finiteOnly: true })
+  },
+}
+
+export const Annotations: Story = {
+  tags: ["reduced-motion"],
+  parameters: storyDocumentation(
+    "The pending-annotation surfaces under load: the playground opens on the Repo audit conversation with eight selections already lifted from documents — one-liners, full paragraphs, comments of very different lengths, some bare. The row above the pill stays one truncated pill plus '+ 7 others'; opening it shows each annotation as a tiny thread — the passage as the document's message with its source file linked beneath, the user's comments as their replies. Tapping a passage selects it and the pill composer replies to it, attaching follow-up comments; hovering a comment reveals its edit control and the comment edits in place. Sending delivers the whole set as one compact 'N annotations' pill on the message, and user messages in the transcript edit in place too, from the context menu's Edit. Big text stays compact everywhere: a paste over 120 characters lands as a Pasted text chip in the composer and travels as the same chip on the sent bubble, and a long typed message clamps to four lines with a chevron — either opens its full text in the list view over the transcript.",
+  ),
+  render: () => (
+    <PlaygroundExample
+      initialTabId={auditTabId}
+      initialQuotes={seededAnnotations}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
+    const canvas = within(canvasElement)
+    // The row compresses the whole set into one pill plus a count.
+    const more = await canvas.findByRole("button", { name: "+ 7 others" })
+    await userEvent.click(more)
+    // Every annotation reads as a bubble; comments sit beneath their quotes.
+    await expect(
+      canvas.getByText(/Way too long for one step/),
+    ).toBeInTheDocument()
+    await expect(
+      canvas.getByText(/machine-readable variant/),
+    ).toBeInTheDocument()
+    await expect(
+      canvas.getAllByRole("button", { name: "Discard quoted selection" }),
+    ).toHaveLength(8)
+    // Removing one keeps the list live.
+    await userEvent.click(
+      canvas.getAllByRole("button", { name: "Discard quoted selection" })[1]!,
+    )
+    await expect(
+      canvas.getAllByRole("button", { name: "Discard quoted selection" }),
+    ).toHaveLength(7)
+    await userEvent.click(canvas.getByRole("button", { name: "Back to chat" }))
+    await expect(
+      canvas.getByRole("button", { name: "+ 6 others" }),
+    ).toBeInTheDocument()
+    // The a11y pass that follows reads computed colors, so the finite
+    // animations must settle first; the busy subagent avatars animate
+    // forever by design, so only finite animations count here.
+    await waitForSettledAnimations(canvasElement, { finiteOnly: true })
   },
 }
 
@@ -1739,7 +3249,7 @@ export const Voice: Story = {
       expect(voice).toHaveAttribute("aria-pressed", "true")
     })
     await waitFor(() => {
-      expect((input as HTMLTextAreaElement).value).toContain("Draft")
+      expect(input.textContent ?? "").toContain("Draft")
     })
     canvasElement.ownerDocument.defaultView!.dispatchEvent(
       new PointerEvent("pointerup", { bubbles: true, button: 0, pointerId: 1 }),
@@ -1786,7 +3296,7 @@ export const ModelCommand: Story = {
     const input = canvas.getByRole("textbox", { name: "Message" })
     await userEvent.type(input, "/mod")
     await userEvent.click(await body.findByRole("option", { name: /model/ }))
-    await expect(input).toHaveValue("")
+    await waitFor(() => expect(input.textContent ?? "").toBe(""))
     const search = canvas.getByRole("textbox", { name: "Search models" })
     await userEvent.type(search, "kimi")
     await userEvent.click(canvas.getByRole("option", { name: /Kimi K3/ }))

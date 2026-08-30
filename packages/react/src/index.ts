@@ -372,6 +372,7 @@ export {
   ChatComposerAction,
   ChatComposerActions,
   ChatComposerAttachment,
+  ChatComposerAttachmentIcon,
   ChatComposerAttachments,
   ChatComposerFooter,
   ChatComposerInput,

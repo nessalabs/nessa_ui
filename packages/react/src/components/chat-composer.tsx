@@ -339,6 +339,8 @@ export interface ChatComposerInputProps
   extends React.ComponentPropsWithRef<"textarea"> {
   /** Caps the textarea's own autosized height before it begins scrolling. */
   maxHeight?: number
+  /** Shows the native scrollbar when the input overflows. Hidden by default — the content still scrolls, chat-surface style. */
+  scrollbar?: boolean
   /**
    * Receives pasted plain text at least `pasteAttachmentMinLength` characters
    * long instead of inserting it into the textarea, so the host can present
@@ -354,6 +356,7 @@ export interface ChatComposerInputProps
 function ChatComposerInput({
   className,
   maxHeight = 240,
+  scrollbar = false,
   onChange,
   onKeyDown,
   onPaste,
@@ -431,6 +434,8 @@ function ChatComposerInput({
         // outline here reads as a permanent inner border. The caret indicates
         // focus; the composer's borderMode owns any surface treatment.
         "min-w-0 w-full resize-none border-0 bg-transparent px-1 py-1 font-sans nessa-text-5 text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+        // Chat surfaces scroll without chrome; opt back in via scrollbar.
+        !scrollbar && "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         constrained ? "min-h-0 max-h-full" : "min-h-14",
         size === "compact" && !constrained && "min-h-10 nessa-text-4",
         size === "compact" && constrained && "nessa-text-4",

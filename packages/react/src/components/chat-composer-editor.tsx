@@ -261,6 +261,8 @@ export interface ChatComposerEditorProps
   disabled?: boolean
   /** Caps the editor's height in CSS pixels before it scrolls; the composer's own maxHeight takes over when set. Defaults to 240. */
   maxHeight?: number
+  /** Shows the native scrollbar when the editor overflows. Hidden by default — the content still scrolls, chat-surface style. */
+  scrollbar?: boolean
   /** Reports the serialized content after every edit, chip insertion, or chip removal. */
   onContentChange?: (content: ChatComposerContent) => void
   /**
@@ -317,6 +319,7 @@ function ChatComposerEditor({
   placeholder,
   disabled = false,
   maxHeight = 240,
+  scrollbar = false,
   onContentChange,
   onChipPress,
   onChipHoverChange,
@@ -615,6 +618,11 @@ function ChatComposerEditor({
           // outline: the caret indicates focus and the composer's borderMode
           // owns any surface treatment.
           "min-w-0 w-full overflow-y-auto whitespace-pre-wrap break-words border-0 bg-transparent px-1 py-1 font-sans nessa-text-5 text-foreground outline-none",
+          // Chat surfaces scroll without chrome; opt back in via scrollbar.
+          // (Kept as a literal per SRC-002: governed class surfaces stay in
+          // their consuming module.)
+          !scrollbar &&
+            "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           "empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)]",
           constrained ? "min-h-0 max-h-full" : "min-h-14",
           size === "compact" && !constrained && "min-h-10 nessa-text-4",
