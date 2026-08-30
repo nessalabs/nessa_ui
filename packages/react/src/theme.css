@@ -89,6 +89,15 @@
   --nessa-diff-deletion: oklch(0.55 0.19 27);
   --nessa-invalid-ring: color-mix(in oklab, var(--destructive) 20%, transparent);
   --nessa-diff-dark-addition: oklch(0.6222 0.1661 146.22);
+  /* Categorical chart-series slots, colorblind-validated as an ordered
+     palette: series i wears slot i for good — filter a series by zeroing
+     its values, never by dropping its slot. */
+  --nessa-chart-1: #2a78d6;
+  --nessa-chart-2: #eb6834;
+  --nessa-chart-3: #1baf7a;
+  --nessa-chart-4: #eda100;
+  --nessa-chart-5: #e87ba4;
+  --nessa-chart-6: #4a3aa7;
 }
 
 .dark {
@@ -149,6 +158,13 @@
   --nessa-diff-deletion: oklch(0.7 0.19 25);
   --nessa-invalid-ring: color-mix(in oklab, var(--destructive) 40%, transparent);
   --nessa-diff-dark-addition: oklch(0.6222 0.1661 146.22);
+  /* The same six hues stepped for the dark surface. */
+  --nessa-chart-1: #3987e5;
+  --nessa-chart-2: #d95926;
+  --nessa-chart-3: #199e70;
+  --nessa-chart-4: #c98500;
+  --nessa-chart-5: #d55181;
+  --nessa-chart-6: #9085e9;
 }
 
 /* Constrained UI scale. The private factor keeps nested scopes and consumer

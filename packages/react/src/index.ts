@@ -900,3 +900,9 @@ export {
 } from "./components/accordion"
 export { Switch } from "./components/switch"
 export { Textarea } from "./components/textarea"
+export {
+  StackedBarChart,
+  type StackedBarChartProps,
+  type StackedBarChartSample,
+  type StackedBarChartSeries,
+} from "./components/stacked-bar-chart"

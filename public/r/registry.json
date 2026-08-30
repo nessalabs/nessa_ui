@@ -122,7 +122,13 @@
           "nessa-chat-rim-2": "rgba(236, 72, 153, 0.42)",
           "nessa-chat-rim-3": "rgba(168, 85, 247, 0.62)",
           "nessa-chat-rim-4": "rgba(56, 189, 248, 0.85)",
-          "nessa-chat-rim-head": "#ffffff"
+          "nessa-chat-rim-head": "#ffffff",
+          "nessa-chart-1": "#2a78d6",
+          "nessa-chart-2": "#eb6834",
+          "nessa-chart-3": "#1baf7a",
+          "nessa-chart-4": "#eda100",
+          "nessa-chart-5": "#e87ba4",
+          "nessa-chart-6": "#4a3aa7"
         },
         "dark": {
           "background": "oklch(0.145 0 0)",
@@ -180,7 +186,13 @@
           "nessa-chat-rim-2": "rgba(236, 72, 153, 0.42)",
           "nessa-chat-rim-3": "rgba(168, 85, 247, 0.62)",
           "nessa-chat-rim-4": "rgba(56, 189, 248, 0.85)",
-          "nessa-chat-rim-head": "#ffffff"
+          "nessa-chat-rim-head": "#ffffff",
+          "nessa-chart-1": "#3987e5",
+          "nessa-chart-2": "#d95926",
+          "nessa-chart-3": "#199e70",
+          "nessa-chart-4": "#c98500",
+          "nessa-chart-5": "#d55181",
+          "nessa-chart-6": "#9085e9"
         }
       },
       "css": {
@@ -1898,6 +1910,23 @@
           "path": "packages/react/src/components/status-dot.tsx",
           "type": "registry:ui",
           "target": "components/ui/status-dot.tsx"
+        }
+      ]
+    },
+    {
+      "name": "stacked-bar-chart",
+      "type": "registry:ui",
+      "title": "Stacked bar chart",
+      "description": "A categorical stacked-bar history chart: thin columns over ordered samples, fixed-slot series colors from the nessa-chart tokens, recessive gridlines, a hover and keyboard breakdown tooltip, and a required legend.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/stacked-bar-chart.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/stacked-bar-chart.tsx"
         }
       ]
     },

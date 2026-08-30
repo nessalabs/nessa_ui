@@ -51,6 +51,7 @@ type FocusComponent =
   | "accordion"
   | "checkbox"
   | "dialog"
+  | "stacked-bar-chart"
   | "switch"
   | "textarea"
   | "dropdown-menu"
@@ -378,6 +379,18 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
+  // Every chart column shares one recipe, so the outline is declared — and
+  // counted — once; the columns float in the open plot area and keep the
+  // standard outset offset, which reads as a halo around the thin bar.
+  {
+    component: "stacked-bar-chart",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
   // The switch is a free-standing toggle at Checkbox's scale; it takes the
   // standard full-strength outline with the outset offset.
   {
@@ -595,6 +608,9 @@ export const focusGeometryClasses = Object.freeze([
   { component: "table/table-toolbar", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "checkbox", className: "focus-visible:outline-2", count: 1 },
   { component: "checkbox", className: "focus-visible:outline-offset-2", count: 1 },
+  // Chart columns float in the open plot area and keep the outset offset.
+  { component: "stacked-bar-chart", className: "focus-visible:outline-2", count: 1 },
+  { component: "stacked-bar-chart", className: "focus-visible:outline-offset-2", count: 1 },
   // The switch floats free like the checkbox and keeps the outset offset.
   { component: "switch", className: "focus-visible:outline-2", count: 1 },
   { component: "switch", className: "focus-visible:outline-offset-2", count: 1 },
