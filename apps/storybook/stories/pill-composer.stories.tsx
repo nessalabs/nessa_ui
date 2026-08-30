@@ -27,25 +27,55 @@ import {
   ChatComposerTrigger,
   type ChatComposerContentPart,
   type ChatComposerEditorHandle,
+  AgentActivity,
+  AgentActivityCard,
+  AgentActivityContent,
+  AgentActivityCue,
+  AgentActivityTrigger,
+  AgentDetails,
+  AgentDetailsAction,
+  AgentDetailsActions,
+  AgentDetailsField,
+  AgentDetailsProject,
+  AgentDetailsSection,
   ChatMessage,
   ChatMessageAction,
   ChatMessageActions,
   ChatMessageQuote,
   ChatMessageReceipt,
   chatReactionOptions,
-  ChatOverlay,
-  ChatOverlayBack,
-  ChatOverlayBody,
   ChatTabs,
   ChatTray,
   ChatTypingIndicator,
   cn,
+  ComposerQueue,
+  ComposerQueueBadge,
+  ComposerQueueItem,
+  ConversationHistory,
+  type ConversationHistoryEntry,
+  formatAgentActivitySummary,
+  formatAgentThoughtSummary,
   MessageMarkdown,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
+  Sheet,
+  SheetAction,
+  SheetBody,
+  SheetClose,
+  SheetExpand,
+  SheetHandle,
+  SheetHeader,
+  SheetTitle,
+  TaskList,
+  TaskListItem,
+  type TaskListItemStatus,
+  ToolCall,
+  ToolCallContent,
+  ToolCallTabs,
+  ToolCallTrigger,
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -69,7 +99,7 @@ import {
   type ModelPickerGroup,
   type ModelPickerValue,
 } from "@nessa-ui/react"
-import { Braces, Check, ChevronLeft, ChevronRight, Copy, FileText, Folder, GitFork, Image as ImageIcon, Paperclip, Pencil, Plus, RefreshCw, SlidersHorizontal, Sparkles, Puzzle, Square, X } from "lucide-react"
+import { Archive, Bell, Braces, Check, ChevronLeft, ChevronRight, Copy, FileSearch, FileText, Folder, GitFork, History, Image as ImageIcon, Info, Paperclip, Pencil, Pin, Plus, RefreshCw, Share, SlidersHorizontal, Sparkles, Puzzle, Square, X } from "lucide-react"
 
 import { ChatAddIcon, CommentIcon } from "./icons/nucleo"
 import { storyDocumentation } from "./story-documentation"
@@ -188,6 +218,14 @@ const modelCommand: SlashItem = {
   label: "/model",
   description: "Choose a model",
   icon: <SlidersHorizontal aria-hidden="true" />,
+}
+
+const historyCommand: SlashItem = {
+  id: "command-history",
+  kind: "skill",
+  label: "/history",
+  description: "All conversations",
+  icon: <History aria-hidden="true" />,
 }
 
 /** The mocked file behind a chip: skills carry a SKILL.md, plugins a manifest. */
@@ -424,7 +462,7 @@ function pillSlashSections(query: string) {
     {
       id: "commands",
       label: "Commands",
-      items: [modelCommand].filter((item) =>
+      items: [modelCommand, historyCommand].filter((item) =>
         matchesQuery(query, [item.label, item.description]),
       ),
     },
@@ -567,6 +605,36 @@ interface DemoMessage {
    * bubble re-renders each chip the way the composer showed it.
    */
   parts?: ChatComposerContentPart[]
+  /** A thinking beat shown as a quiet cue above the reply, e.g. "Thought 1s". */
+  thought?: string
+  /** The thinking text shown in the extra-details sheet for that cue. */
+  thoughtDetail?: string
+  /**
+   * A collapsed run of tool work. The transcript shows the summary; the
+   * calls open in the extra-details sheet, not under the cue.
+   */
+  activity?: {
+    summary: string
+    status?: "running" | "complete"
+    tools?: Array<{
+      name: string
+      meta?: string
+      input?: string
+      output?: string
+      status?: "running" | "complete"
+    }>
+  }
+  /** A named unit of work, rendered as an AgentActivityCard. */
+  card?: {
+    title: string
+    subtitle: string
+    /** RandomAvatar seed; defaults to the conversation agent. */
+    seed?: string
+    /** Floods the avatar while this named agent is working. */
+    busy?: boolean
+  }
+  /** An in-transcript plan, rendered with TaskList. */
+  todos?: Array<{ label: string; status: TaskListItemStatus }>
 }
 
 /**
@@ -673,7 +741,122 @@ const demoSubagents: Record<string, DemoSubagent> = {
 // across two subagents, each with its own transcript under a sub: tab. Ids
 // sit far above the live counter so canned replies never collide.
 const auditTabId = "audit"
+const agentTabId = "agent-message"
+const historyTabId = "history"
+
+const agentExplored = formatAgentActivitySummary({ files: 3, searches: 2 })
+
+const demoAgentInfo: Record<
+  string,
+  {
+    title: string
+    path: string
+    branch: string
+    source: string
+    runtime: string
+    model: string
+    created: string
+    updated: string
+  }
+> = {
+  "chat-1": {
+    title: "Release notes",
+    path: "nessalabs/nessa_ui",
+    branch: "main",
+    source: "Playground",
+    runtime: "Storybook",
+    model: "Fable 5",
+    created: "12m",
+    updated: "1m",
+  },
+  [agentTabId]: {
+    title: "Agent message package implementation",
+    path: "nessalabs/nessa_ui",
+    branch: "main",
+    source: "Mobile",
+    runtime: "Cursor Cloud",
+    model: "Fable 5",
+    created: "1m",
+    updated: "1m",
+  },
+  [auditTabId]: {
+    title: "Repo audit",
+    path: "nessalabs/nessa_ui",
+    branch: "main",
+    source: "Playground",
+    runtime: "Storybook",
+    model: "Fable 5",
+    created: "40m",
+    updated: "12m",
+  },
+}
 const seededMessagesByTab: Record<string, DemoMessage[]> = {
+  [agentTabId]: [
+    {
+      id: 801,
+      role: "user",
+      text: "Show exploring cues for tool work instead of dumping every call into the transcript, and let a tab's details name the project, model, and env.",
+    },
+    {
+      id: 802,
+      role: "assistant",
+      text: "I'll start by reading the repo workflow and mapping the existing chat surface so the cues sit on top of ToolCall rather than replacing it.",
+      thought: formatAgentThoughtSummary(1),
+      thoughtDetail:
+        "The playground already has ToolCall rows. Collapse them behind a cue so the transcript stays a conversation — the extra-details sheet is where the calls live.",
+      activity: {
+        summary: agentExplored,
+        tools: [
+          {
+            name: "Read",
+            meta: "CONTRIBUTING.md",
+            input: `{ "path": "CONTRIBUTING.md" }`,
+            output: "Protected main, pnpm workspaces, Storybook workshop.",
+          },
+          {
+            name: "Search",
+            meta: "pill-composer playground",
+            input: `{ "pattern": "PlaygroundExample" }`,
+            output: "The iMessage chat surface lives in the pill composer playground.",
+          },
+        ],
+      },
+    },
+    {
+      id: 803,
+      role: "assistant",
+      text: "Next I'll map the existing chat surface — tabs already exist, tool calls already exist — and add the missing cues, details sheet, history roster, and queue pill.",
+      activity: {
+        summary: formatAgentActivitySummary({ files: 3, searches: 3 }),
+        tools: [
+          {
+            name: "Read",
+            meta: "chat-tabs.tsx",
+            input: `{ "path": "packages/react/src/components/chat-tabs.tsx" }`,
+            output: "Pill tabs with wrapTab for host chrome.",
+          },
+          {
+            name: "Read",
+            meta: "tool-call.tsx",
+            input: `{ "path": "packages/react/src/components/tool-call.tsx" }`,
+            output: "Disclosure rows for a single invocation.",
+          },
+        ],
+      },
+      card: {
+        title: "Explore chat UI components",
+        subtitle: "Working · Explorer",
+        seed: "explorer",
+        busy: true,
+      },
+      todos: [
+        { label: "Add exploring cues over ToolCall", status: "active" },
+        { label: "Sheet + agent details from the tab menu", status: "todo" },
+        { label: "All conversations via /history", status: "todo" },
+        { label: "Queued follow-ups above the pill", status: "todo" },
+      ],
+    },
+  ],
   [auditTabId]: [
     {
       id: 901,
@@ -769,12 +952,144 @@ function SubagentChip({
 }
 
 /**
+ * The collapsed tool work, named-task card, and plan that ride an
+ * assistant turn — kept out of the bubble so the transcript stays a
+ * conversation.
+ */
+type DemoActivitySheet = {
+  title: string
+  thought?: { summary: string; detail?: string }
+  tools?: NonNullable<DemoMessage["activity"]>["tools"]
+}
+
+function ActivityToolRows({
+  tools,
+}: {
+  tools: NonNullable<DemoActivitySheet["tools"]>
+}) {
+  return (
+    <AgentActivityContent>
+      {tools.map((tool) => (
+        <ToolCall
+          key={`${tool.name}-${tool.meta ?? ""}`}
+          status={tool.status}
+        >
+          <ToolCallTrigger
+            icon={<FileSearch aria-hidden="true" />}
+            meta={tool.meta}
+          >
+            {tool.name}
+          </ToolCallTrigger>
+          {tool.input || tool.output ? (
+            <ToolCallContent>
+              <ToolCallTabs input={tool.input} output={tool.output} />
+            </ToolCallContent>
+          ) : null}
+        </ToolCall>
+      ))}
+    </AgentActivityContent>
+  )
+}
+
+function DemoActivity({
+  message,
+  agentSeed,
+  onOpenCard,
+  onOpenActivity,
+  activityOpen,
+  activitySheetId,
+  detailsOpen,
+  detailsSheetId,
+}: {
+  message: DemoMessage
+  /** Conversation identity; still while tools are done, busy while running. */
+  agentSeed: string
+  onOpenCard?: () => void
+  onOpenActivity?: (sheet: DemoActivitySheet) => void
+  activityOpen?: boolean
+  activitySheetId?: string
+  detailsOpen?: boolean
+  detailsSheetId?: string
+}) {
+  if (!message.activity && !message.card && !message.todos) {
+    return null
+  }
+  return (
+    <div className="me-8 flex max-w-[92%] flex-col items-start gap-2 self-start">
+      {message.activity ? (
+        <AgentActivity status={message.activity.status}>
+          <AgentActivityTrigger
+            icon={
+              <RandomAvatar
+                seed={agentSeed}
+                busy={message.activity.status === "running"}
+                className="size-4"
+              />
+            }
+            aria-expanded={activityOpen}
+            aria-controls={activityOpen ? activitySheetId : undefined}
+            onClick={() =>
+              onOpenActivity?.({
+                title: message.activity!.summary,
+                thought: message.thought
+                  ? {
+                      summary: message.thought,
+                      detail: message.thoughtDetail,
+                    }
+                  : undefined,
+                tools: message.activity!.tools,
+              })
+            }
+          >
+            {message.activity.summary}
+          </AgentActivityTrigger>
+        </AgentActivity>
+      ) : null}
+      {message.card ? (
+        <AgentActivityCard
+          icon={
+            <RandomAvatar
+              seed={message.card.seed ?? agentSeed}
+              busy={message.card.busy}
+              className="size-7"
+            />
+          }
+          title={message.card.title}
+          meta={message.card.subtitle}
+          aria-haspopup="dialog"
+          aria-expanded={detailsOpen}
+          aria-controls={detailsOpen ? detailsSheetId : undefined}
+          onClick={onOpenCard}
+        />
+      ) : null}
+      {message.todos ? (
+        <div className="w-full rounded-xl border border-border bg-card px-3 py-2.5">
+          <p className="m-0 mb-2 flex items-center justify-between font-sans nessa-text-2 font-medium text-muted-foreground">
+            <span>To-dos</span>
+            <span>
+              {message.todos.filter((item) => item.status === "done").length}/
+              {message.todos.length}
+            </span>
+          </p>
+          <TaskList aria-label="To-dos">
+            {message.todos.map((item) => (
+              <TaskListItem key={item.label} status={item.status}>
+                {item.label}
+              </TaskListItem>
+            ))}
+          </TaskList>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/**
  * Editing happens inside the bubble itself: the bubble keeps its shape and
  * tone, its text becomes an editable field, and small save and cancel
  * controls sit beside it. Enter saves, Escape cancels.
  */
 /**
- * Maps one demo message onto the ChatBubbles kit/**
  * Maps one demo message onto the ChatBubbles kit: attachments (single tile
  * or fanned stack), reply quote, the bubble itself as the reply control,
  * and the delivery receipt.
@@ -1256,6 +1571,7 @@ function PlaygroundExample({
   // drilled-into tab its way back.
   const [tabs, setTabs] = React.useState<ChatTabItem[]>([
     { id: "chat-1", title: "Release notes" },
+    { id: agentTabId, title: "Agent message" },
     { id: auditTabId, title: "Repo audit" },
   ])
   const [activeTabId, setActiveTabId] = React.useState(initialTabId)
@@ -1277,6 +1593,31 @@ function PlaygroundExample({
   const generating = generatingTabId !== null && generatingTabId === activeTabId
   const [model, setModel] = React.useState<ModelPickerValue>(defaultModel)
   const [modelCardOpen, setModelCardOpen] = React.useState(false)
+  const [historyQuery, setHistoryQuery] = React.useState("")
+  const [detailsTabId, setDetailsTabId] = React.useState<string | null>(null)
+  const [queueOpen, setQueueOpen] = React.useState(false)
+  const [activitySheet, setActivitySheet] =
+    React.useState<DemoActivitySheet | null>(null)
+  const extraSheetId = React.useId()
+  const queueSheetId = React.useId()
+  const detailsSheetId = React.useId()
+  const [queuedByTab, setQueuedByTab] = React.useState<
+    Record<string, { id: string; text: string }[]>
+  >({
+    [agentTabId]: [
+      {
+        id: "q1",
+        text: "We also need this all conversations view for that which will be triggered with / history",
+      },
+      {
+        id: "q2",
+        text: "So add components for that and then show in demo video of what you built for each",
+      },
+    ],
+  })
+  const queued = queuedByTab[activeTabId] ?? []
+  const queuedRef = React.useRef(queuedByTab)
+  queuedRef.current = queuedByTab
   // Passages lifted out of previewed documents — with any comments made on
   // them — attached to the next send.
   const [quotes, setQuotes] = React.useState<ChatAnnotation[]>(initialQuotes)
@@ -1289,6 +1630,13 @@ function PlaygroundExample({
   >(null)
   // The pending annotation the composer replies to while the list is open.
   const [selectedQuote, setSelectedQuote] = React.useState<number | null>(null)
+  const closeExtraDetails = () => {
+    setActivitySheet(null)
+    setQueueOpen(false)
+    setDetailsTabId(null)
+    setQuotesOpen(false)
+    setViewedQuotes(null)
+  }
   // The user message whose bubble is currently swapped for the editor.
   const [editingMessageId, setEditingMessageId] = React.useState<number | null>(
     null,
@@ -1296,8 +1644,12 @@ function PlaygroundExample({
   // Full text behind each pasted-text chip, keyed by chip id.
   const pastedTexts = React.useRef<Record<string, string>>({})
   /** Shows a full text in the list view — the transcript stays compact. */
-  const openFullText = (text: string) =>
+  const openFullText = (text: string) => {
+    setActivitySheet(null)
+    setQueueOpen(false)
+    setDetailsTabId(null)
     setViewedQuotes([{ id: `full-${nextId.current++}`, text }])
+  }
   // Chips open their file directly: plain press previews in the current
   // tab, a modified press (Cmd/Ctrl) parks the file as its own tab.
   const openChipFromLabel = (label: string, newTab: boolean) => {
@@ -1367,8 +1719,37 @@ function PlaygroundExample({
           ],
     )
     setActiveTabId(tabId)
+    closeExtraDetails()
+  }
+  const openHistoryTab = () => {
+    const parentId = activeTabId === historyTabId ? undefined : activeTabId
+    setTabs((current) => {
+      if (current.some((tab) => tab.id === historyTabId)) {
+        return current.map((tab) =>
+          tab.id === historyTabId && parentId
+            ? { ...tab, parentId }
+            : tab,
+        )
+      }
+      return [
+        ...current,
+        {
+          id: historyTabId,
+          kind: "history" as const,
+          title: "History",
+          closeable: true,
+          parentId,
+        },
+      ]
+    })
+    setActiveTabId(historyTabId)
+    setHistoryQuery("")
+    closeExtraDetails()
+    setModelCardOpen(false)
+    setOverlay(null)
   }
   const activeFileItem = fileTabs[activeTabId] ?? inlinePreview ?? undefined
+  const isHistoryTab = activeTabId === historyTabId
   const [menuTargetId, setMenuTargetId] = React.useState<number | null>(null)
   const attachmentCounters = React.useRef<Record<DemoAttachmentKind, number>>({ photo: 0, file: 0, folder: 0, skill: 0, plugin: 0 })
   const inputRef = React.useRef<ChatComposerEditorHandle>(null)
@@ -1419,6 +1800,20 @@ function PlaygroundExample({
           clearInterval(interval)
           streamCleanup.current = null
           setGeneratingTabId(null)
+          const nextQueued = queuedRef.current[tabId] ?? []
+          const next = nextQueued[0]
+          if (next) {
+            setQueuedByTab((current) => ({
+              ...current,
+              [tabId]: (current[tabId] ?? []).slice(1),
+            }))
+            updateMessages(tabId, (current) => [
+              ...current,
+              { id: nextId.current++, role: "user", text: next.text },
+            ])
+            setGeneratingTabId(tabId)
+            startReply(tabId, thinkDelay)
+          }
         }
       }, 70)
       streamCleanup.current = () => {
@@ -1486,8 +1881,7 @@ function PlaygroundExample({
     setModelCardOpen(false)
     setInlinePreview(null)
     // Pending annotations survive navigation — only the views close.
-    setQuotesOpen(false)
-    setViewedQuotes(null)
+    closeExtraDetails()
     setSelectedQuote(null)
   }
 
@@ -1611,6 +2005,8 @@ function PlaygroundExample({
               ) : (
                 <FileText aria-hidden="true" />
               )
+            ) : tab.kind === "history" ? (
+              <History aria-hidden="true" className="size-4" />
             ) : sub ? (
               // The tab's own parentId gives it the back gesture: ChatTabs
               // swaps this avatar for a back chevron while the pointer is on
@@ -1646,6 +2042,7 @@ function PlaygroundExample({
           setViewedQuotes(null)
           setFocusedThreadId(null)
           setEditingMessageId(null)
+          closeExtraDetails()
         }}
         onClose={(id) => {
           if (id === generatingTabId) {
@@ -1665,7 +2062,15 @@ function PlaygroundExample({
                   : tab,
               )
             if (id === activeTabId && next.length > 0) {
-              setActiveTabId(next[0]!.id)
+              // History, file, and subagent tabs point at the conversation
+              // they were opened from; closing one should land there, not
+              // always on the first pill in the strip.
+              const parentId = closed?.parentId
+              setActiveTabId(
+                parentId && next.some((tab) => tab.id === parentId)
+                  ? parentId
+                  : next[0]!.id,
+              )
             }
             return next
           })
@@ -1677,6 +2082,7 @@ function PlaygroundExample({
             const { [id]: _closed, ...rest } = current
             return rest
           })
+          closeExtraDetails()
         }}
         onNew={() => {
           // nextId starts at 1, and "chat-1" already exists — offset new
@@ -1691,7 +2097,63 @@ function PlaygroundExample({
           setMenuTargetId(null)
           setOverlay(null)
           setModelCardOpen(false)
+          closeExtraDetails()
           inputRef.current?.focus()
+        }}
+        wrapTab={(tab, node) => {
+          if ((tab.kind ?? "conversation") !== "conversation") return node
+          return (
+            <ContextMenu>
+              <ContextMenuTrigger asChild>{node}</ContextMenuTrigger>
+              <ContextMenuContent
+                aria-label={`${tab.title} actions`}
+                collisionBoundary={frameElement ?? undefined}
+                collisionPadding={8}
+              >
+                <ContextMenuItem
+                  onSelect={() => {
+                    setQueueOpen(false)
+                    setActivitySheet(null)
+                    setQuotesOpen(false)
+                    setViewedQuotes(null)
+                    setDetailsTabId(tab.id)
+                  }}
+                >
+                  <Info aria-hidden="true" />
+                  View Details
+                </ContextMenuItem>
+                <ContextMenuItem>
+                  <Pencil aria-hidden="true" />
+                  Rename
+                </ContextMenuItem>
+                <ContextMenuItem>
+                  <Pin aria-hidden="true" />
+                  Pin
+                </ContextMenuItem>
+                <ContextMenuItem>
+                  <GitFork aria-hidden="true" />
+                  Fork Chat
+                </ContextMenuItem>
+                <ContextMenuItem>
+                  <Bell aria-hidden="true" />
+                  Mark Unread
+                </ContextMenuItem>
+                <ContextMenuItem>
+                  <Copy aria-hidden="true" />
+                  Copy
+                </ContextMenuItem>
+                <ContextMenuItem>
+                  <Share aria-hidden="true" />
+                  Share
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem>
+                  <Archive aria-hidden="true" />
+                  Archive
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
+          )
         }}
       />
       {/* The tabpanel wrapper honors ChatTabs' aria-controls contract; the
@@ -1700,7 +2162,7 @@ function PlaygroundExample({
         id={`chat-tab-panel-${activeTabId}`}
         aria-labelledby={`chat-tab-${activeTabId}`}
         role="tabpanel"
-        // Positioned, so the overlay replaces only the transcript surface —
+        // Positioned, so an extra-details sheet fills only the transcript —
         // the tab strip and the pill stay visible and usable around it.
         className="relative flex min-h-0 flex-1 flex-col"
       >
@@ -1738,6 +2200,42 @@ function PlaygroundExample({
             ])
           }
         />
+      ) : isHistoryTab ? (
+        <ConversationHistory
+          className="min-h-0 flex-1 px-1"
+          conversations={tabs
+            .filter((tab) => (tab.kind ?? "conversation") === "conversation")
+            .map((tab): ConversationHistoryEntry => {
+              const info = demoAgentInfo[tab.id]
+              const last = (messagesByTab[tab.id] ?? []).at(-1)
+              return {
+                id: tab.id,
+                title: info?.title ?? tab.title,
+                preview: last?.text ?? "New conversation",
+                updated: info?.updated ?? "Just now",
+                project: info?.path,
+                pinned: tab.id === agentTabId,
+              }
+            })
+            .filter((entry) => {
+              const haystack =
+                `${entry.title} ${entry.preview ?? ""} ${entry.project ?? ""}`
+              return haystack
+                .toLocaleLowerCase()
+                .includes(historyQuery.trim().toLocaleLowerCase())
+            })}
+          value={
+            tabs.find((tab) => tab.id === historyTabId)?.parentId ?? null
+          }
+          onValueChange={(id) => {
+            setActiveTabId(id)
+            setHistoryQuery("")
+            setInlinePreview(null)
+            closeExtraDetails()
+          }}
+          query={historyQuery}
+          onQueryChange={setHistoryQuery}
+        />
       ) : (
       <div
         ref={logRef}
@@ -1757,6 +2255,39 @@ function PlaygroundExample({
         ) : null}
         {messages.map((entry) => (
           <React.Fragment key={entry.id}>
+          {entry.thought ? (
+            entry.thoughtDetail ? (
+              <AgentActivityCue
+                className="self-start"
+                discloses
+                aria-expanded={activitySheet?.title === entry.thought}
+                aria-controls={
+                  activitySheet?.title === entry.thought
+                    ? extraSheetId
+                    : undefined
+                }
+                onClick={() => {
+                  setQuotesOpen(false)
+                  setViewedQuotes(null)
+                  setQueueOpen(false)
+                  setDetailsTabId(null)
+                  setActivitySheet({
+                    title: entry.thought!,
+                    thought: {
+                      summary: entry.thought!,
+                      detail: entry.thoughtDetail,
+                    },
+                  })
+                }}
+              >
+                {entry.thought}
+              </AgentActivityCue>
+            ) : (
+              <AgentActivityCue className="self-start">
+                {entry.thought}
+              </AgentActivityCue>
+            )
+          ) : null}
           <DemoBubble
             message={entry}
             delivered={entry.id === lastUserId}
@@ -1790,7 +2321,12 @@ function PlaygroundExample({
               const item = slashItemForId(sourceId)
               if (item) openChipPreview(item, false)
             }}
-            onQuotesOpen={setViewedQuotes}
+            onQuotesOpen={(next) => {
+              setActivitySheet(null)
+              setQueueOpen(false)
+              setDetailsTabId(null)
+              setViewedQuotes(next)
+            }}
             onPastedOpen={(chipId) => {
               const full =
                 entry.pasted?.[chipId] ?? pastedTexts.current[chipId]
@@ -1832,6 +2368,34 @@ function PlaygroundExample({
             }}
 
           />
+          <DemoActivity
+            message={entry}
+            agentSeed={activeTabId}
+            activityOpen={
+              activitySheet?.title === entry.activity?.summary
+            }
+            activitySheetId={
+              activitySheet?.title === entry.activity?.summary
+                ? extraSheetId
+                : undefined
+            }
+            detailsOpen={detailsTabId === activeTabId}
+            detailsSheetId={
+              detailsTabId === activeTabId ? detailsSheetId : undefined
+            }
+            onOpenCard={() => {
+              setQueueOpen(false)
+              setActivitySheet(null)
+              setDetailsTabId(activeTabId)
+            }}
+            onOpenActivity={(sheet) => {
+              setQuotesOpen(false)
+              setViewedQuotes(null)
+              setQueueOpen(false)
+              setDetailsTabId(null)
+              setActivitySheet(sheet)
+            }}
+          />
           {entry.spawned ? (
             <div className="me-8 mt-1.5 flex max-w-[85%] flex-col gap-1.5 self-start">
               {entry.spawned.map((id) => (
@@ -1846,7 +2410,38 @@ function PlaygroundExample({
           </React.Fragment>
         ))}
         {generating && !messages.some((message) => message.streaming) ? (
-          <ChatTypingIndicator label="Assistant is typing" />
+          activeTabId === agentTabId ? (
+            <AgentActivity status="running" className="me-8 self-start">
+              <AgentActivityTrigger
+                icon={<RandomAvatar seed={activeTabId} busy className="size-4" />}
+                aria-expanded={activitySheet?.title === "Exploring…"}
+                aria-controls={
+                  activitySheet?.title === "Exploring…"
+                    ? extraSheetId
+                    : undefined
+                }
+                onClick={() => {
+                  setQuotesOpen(false)
+                  setViewedQuotes(null)
+                  setQueueOpen(false)
+                  setDetailsTabId(null)
+                  setActivitySheet({
+                    title: "Exploring…",
+                    tools: [
+                      {
+                        name: "Searching the playground surface",
+                        status: "running",
+                      },
+                    ],
+                  })
+                }}
+              >
+                Exploring…
+              </AgentActivityTrigger>
+            </AgentActivity>
+          ) : (
+            <ChatTypingIndicator label="Assistant is typing" />
+          )
         ) : null}
       </div>
       )}
@@ -1859,13 +2454,15 @@ function PlaygroundExample({
         </ChatAttachmentViewer>
       ) : null}
       {quotesOpen || viewedQuotes ? (
-        // The annotations read as messages over the transcript — pending
-        // ones removable, a sent message's read-only — while the tab strip
-        // and the pill stay live around the reading view.
-        <ChatOverlay
+        // Annotations use the expandable sheet as the extra-details
+        // surface: it fills this tabpanel (tabs and composer stay) and
+        // Minimize restores a drawer over the transcript. Not modal, so
+        // Tab can still reach the strip and the pill.
+        <Sheet
+          id={extraSheetId}
           label="Annotations"
-          // The tray chip that opened this view hides while it is open, so
-          // closing hands focus to the composer instead of the document.
+          modal={false}
+          defaultExpanded
           onReturnFocus={() => inputRef.current?.focus()}
           onClose={() => {
             setQuotesOpen(false)
@@ -1873,7 +2470,13 @@ function PlaygroundExample({
             setSelectedQuote(null)
           }}
         >
-          <ChatOverlayBody>
+          <SheetHandle />
+          <SheetHeader>
+            <SheetExpand />
+            <SheetTitle>Annotations</SheetTitle>
+            <SheetAction>Done</SheetAction>
+          </SheetHeader>
+          <SheetBody>
             <ChatAnnotationList>
               {(viewedQuotes ?? quotes).map((entry, at) => (
                 <ChatAnnotationThread
@@ -1932,17 +2535,14 @@ function PlaygroundExample({
                           )
                   }
                 >
-                  {/* The kit's markdown renderer in the passage bubble:
-                      pasted markdown and lifted prose both read formatted. */}
                   <MessageMarkdown className="leading-5">
                     {entry.text}
                   </MessageMarkdown>
                 </ChatAnnotationThread>
               ))}
             </ChatAnnotationList>
-          </ChatOverlayBody>
-          <ChatOverlayBack />
-        </ChatOverlay>
+          </SheetBody>
+        </Sheet>
       ) : null}
       </div>
       {modelCardOpen ? (
@@ -1956,7 +2556,9 @@ function PlaygroundExample({
           onClose={() => setModelCardOpen(false)}
         />
       ) : null}
-      {quotesOpen || viewedQuotes || overlay ? null : (
+      {quotesOpen || viewedQuotes || overlay || isHistoryTab || activitySheet
+        ? null
+        : (
         // Everything waiting to travel with the next message rides one row:
         // one chip stands for the set and the rest collapse into a count
         // that opens the full list over the transcript.
@@ -1971,12 +2573,39 @@ function PlaygroundExample({
               ? `${quote.comments[0]} — “${quote.text}”`
               : quote.text,
           }))}
-          onOpenItem={() => setQuotesOpen(true)}
-          onOpenAll={() => setQuotesOpen(true)}
+          onOpenItem={() => {
+            setActivitySheet(null)
+            setQueueOpen(false)
+            setDetailsTabId(null)
+            setQuotesOpen(true)
+          }}
+          onOpenAll={() => {
+            setActivitySheet(null)
+            setQueueOpen(false)
+            setDetailsTabId(null)
+            setQuotesOpen(true)
+          }}
           onClear={() => setQuotes([])}
         />
       )}
-      {fileTabs[activeTabId] ? null : (
+      {queued.length > 0 && !fileTabs[activeTabId] && !isHistoryTab ? (
+        <ComposerQueueBadge
+          className="self-start"
+          count={queued.length}
+          aria-label={`Queued ${queued.length}`}
+          aria-haspopup="dialog"
+          aria-expanded={queueOpen}
+          aria-controls={queueOpen ? queueSheetId : undefined}
+          onClick={() => {
+            setActivitySheet(null)
+            setDetailsTabId(null)
+            setQuotesOpen(false)
+            setViewedQuotes(null)
+            setQueueOpen(true)
+          }}
+        />
+      ) : null}
+      {fileTabs[activeTabId] || isHistoryTab ? null : (
       <PillComposer
         generating={generating}
         onSubmit={(event) => {
@@ -2016,11 +2645,27 @@ function PlaygroundExample({
           }
           if (
             (!text && attachments.length === 0 && quotes.length === 0 && !hasChips) ||
-            generatingTabId !== null ||
             // A dedicated file tab has no conversation to send into.
             fileTabs[activeTabId] !== undefined
           )
             return
+          if (generatingTabId !== null) {
+            // The agent is still working: park the follow-up instead of
+            // dropping it. The queued pill is the way back to the list.
+            setQueuedByTab((current) => ({
+              ...current,
+              [activeTabId]: [
+                ...(current[activeTabId] ?? []),
+                { id: `q-${nextId.current++}`, text: text || "Attachment" },
+              ],
+            }))
+            inputRef.current?.clear()
+            setAttachments([])
+            setReplyTarget(null)
+            setQuotes([])
+            setQuotesOpen(false)
+            return
+          }
           updateMessages(activeTabId, (current) => [
             ...current,
             {
@@ -2244,6 +2889,10 @@ function PlaygroundExample({
                   setModelCardOpen(true)
                   return
                 }
+                if (item.id === historyCommand.id) {
+                  openHistoryTab()
+                  return
+                }
                 // Skills and plugins are inline chips on the text baseline,
                 // like the main composer; only files, photos, and folders
                 // use the tile row above the input.
@@ -2262,6 +2911,166 @@ function PlaygroundExample({
         </ChatComposerTrigger>
       </PillComposer>
       )}
+      {activitySheet ? (
+        // Thinking and tool calls for one cue open as a frame-level sheet
+        // so Expand and a drag-up on the grab bar fill the chat window,
+        // the same extra-details surface as the queue.
+        <Sheet
+          id={extraSheetId}
+          label={activitySheet.title}
+          onReturnFocus={() => inputRef.current?.focus()}
+          onClose={() => setActivitySheet(null)}
+        >
+          <SheetHandle />
+          <SheetHeader>
+            <SheetExpand />
+            <SheetTitle>{activitySheet.title}</SheetTitle>
+            <SheetAction>Done</SheetAction>
+          </SheetHeader>
+          <SheetBody>
+            {activitySheet.thought ? (
+              <>
+                {activitySheet.thought.summary !== activitySheet.title ? (
+                  <AgentActivityCue>
+                    {activitySheet.thought.summary}
+                  </AgentActivityCue>
+                ) : null}
+                {activitySheet.thought.detail ? (
+                  <p className="m-0 font-sans nessa-text-4 text-foreground">
+                    {activitySheet.thought.detail}
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+            {activitySheet.tools && activitySheet.tools.length > 0 ? (
+              <ActivityToolRows tools={activitySheet.tools} />
+            ) : null}
+          </SheetBody>
+        </Sheet>
+      ) : null}
+      {detailsTabId ? (
+        <Sheet
+          id={detailsSheetId}
+          label="Agent details"
+          onClose={() => setDetailsTabId(null)}
+          onReturnFocus={() => inputRef.current?.focus()}
+        >
+          <SheetHandle />
+          <SheetHeader>
+            <SheetExpand />
+            <SheetClose className="col-start-3 justify-self-end" />
+          </SheetHeader>
+          <SheetBody>
+            <AgentDetails
+              title={
+                demoAgentInfo[detailsTabId]?.title ??
+                tabs.find((tab) => tab.id === detailsTabId)?.title ??
+                "Conversation"
+              }
+            >
+              <AgentDetailsActions>
+                <AgentDetailsAction label="Edit">
+                  <Pencil aria-hidden="true" />
+                </AgentDetailsAction>
+                <AgentDetailsAction label="Pin">
+                  <Pin aria-hidden="true" />
+                </AgentDetailsAction>
+                <AgentDetailsAction label="Share">
+                  <Share aria-hidden="true" />
+                </AgentDetailsAction>
+              </AgentDetailsActions>
+              <AgentDetailsSection title="Info">
+                <AgentDetailsProject
+                  path={demoAgentInfo[detailsTabId]?.path ?? "nessalabs/nessa_ui"}
+                  branch={demoAgentInfo[detailsTabId]?.branch ?? "main"}
+                />
+                <AgentDetailsField
+                  label="Source"
+                  value={demoAgentInfo[detailsTabId]?.source ?? "Playground"}
+                />
+                <AgentDetailsField
+                  label="Runtime"
+                  value={demoAgentInfo[detailsTabId]?.runtime ?? "Storybook"}
+                />
+                <AgentDetailsField
+                  label="Model"
+                  value={
+                    groups
+                      .find((group) => group.id === model.providerId)
+                      ?.models.find((entry) => entry.id === model.modelId)
+                      ?.label ?? demoAgentInfo[detailsTabId]?.model ?? "Fable 5"
+                  }
+                />
+                <AgentDetailsField
+                  label="Created"
+                  value={demoAgentInfo[detailsTabId]?.created ?? "1m"}
+                />
+                <AgentDetailsField
+                  label="Last Updated"
+                  value={demoAgentInfo[detailsTabId]?.updated ?? "1m"}
+                />
+              </AgentDetailsSection>
+            </AgentDetails>
+          </SheetBody>
+        </Sheet>
+      ) : null}
+      {queueOpen ? (
+        <Sheet
+          id={queueSheetId}
+          label="Queued"
+          onClose={() => setQueueOpen(false)}
+          onReturnFocus={() => inputRef.current?.focus()}
+        >
+          <SheetHandle />
+          <SheetHeader>
+            <SheetExpand />
+            <SheetTitle>Queued</SheetTitle>
+            <SheetAction>Done</SheetAction>
+          </SheetHeader>
+          <SheetBody className="px-0">
+            <ComposerQueue
+              appearance="plain"
+              itemIds={queued.map((item) => item.id)}
+              onReorder={(nextIds) => {
+                const itemsById = new Map(queued.map((item) => [item.id, item]))
+                setQueuedByTab((current) => ({
+                  ...current,
+                  [activeTabId]: nextIds.flatMap((id) => itemsById.get(id) ?? []),
+                }))
+              }}
+            >
+              {queued.map((item) => (
+                <ComposerQueueItem
+                  key={item.id}
+                  id={item.id}
+                  itemLabel={item.text}
+                  onPromote={() =>
+                    setQueuedByTab((current) => {
+                      const list = current[activeTabId] ?? []
+                      const next = list.filter((candidate) => candidate.id !== item.id)
+                      const moved = list.find((candidate) => candidate.id === item.id)
+                      return {
+                        ...current,
+                        [activeTabId]: moved ? [moved, ...next] : next,
+                      }
+                    })
+                  }
+                  onRemove={() =>
+                    setQueuedByTab((current) => ({
+                      ...current,
+                      [activeTabId]: (current[activeTabId] ?? []).filter(
+                        (candidate) => candidate.id !== item.id,
+                      ),
+                    }))
+                  }
+                >
+                  {item.text}
+                </ComposerQueueItem>
+              ))}
+            </ComposerQueue>
+          </SheetBody>
+        </Sheet>
+      ) : null}
     </div>
   )
 }
@@ -2493,6 +3302,7 @@ function ModelCommandExample() {
               onValueChange={(_, item) => {
                 clearTrigger()
                 if (item.id === modelCommand.id) setModelCardOpen(true)
+                if (item.id === historyCommand.id) return
               }}
               listLabel="Commands, skills, and plugins"
               emptyMessage="No matching commands"
@@ -2628,7 +3438,7 @@ type Story = StoryObj<typeof meta>
 export const Playground: Story = {
   tags: ["reduced-motion"],
   parameters: storyDocumentation(
-    "The intended small-surface composition — the floating chat window: pill tabs across the top (each tab an independent conversation, with the busy dot on whichever tab is streaming), + and voice actions inside the pill, Enter as the only send affordance, and no standing model control — typing /model raises a closable model card in the chat, the voice action streams a ghost transcription into the editable input — with Hold to record on (the default) it records only while held, the waveform bars pulsing as a live meter, and with it off a click toggles listening with a red stop control; right-click it for a microphone options menu above the pill. Agent replies think first (typing dots), then stream in word by word through MessageMarkdown's streaming mode — rich markdown renders as it arrives and the rim stays lit until the stream completes, and + opens a menu that attaches photos, files, and folders as uniform square tiles — thumbnail previews for photos, icon tiles for the rest — each with a corner delete button and an Open action the host wires to its full view. Bubbles are iMessage-style with tails and a Delivered receipt; right-clicking (or long-pressing) one shows the tapback reaction row and a Reply action — reacting never frosts the transcript; choosing Reply enters the frosted thread view — the rest of the transcript recedes behind a blur while the composer switches to Reply, iMessage-style (Escape from anywhere, or tapping the bubble again, leaves the reply view; a threaded message keeps its whole thread in focus), and while the agent works the rim lights and the mic hands over to a stop control.",
+    "The intended small-surface composition — the floating chat window: pill tabs across the top (each tab an independent conversation, with the busy dot on whichever tab is streaming), + and voice actions inside the pill, Enter as the only send affordance, and no standing model control — typing /model raises a closable model card in the chat, typing /history opens a History tab of the all-conversations roster, and right-clicking a conversation tab offers View Details (project, model, runtime) plus pin, share, and archive. Tool work stays behind exploring cues — “Thought 1s”, “Explored 3 files, 2 searches” — that open the extra-details sheet with that beat’s thinking and tool calls instead of expanding in the transcript; a Queued N pill above the composer opens a sheet of pending follow-ups. The voice action streams a ghost transcription into the editable input — with Hold to record on (the default) it records only while held, the waveform bars pulsing as a live meter, and with it off a click toggles listening with a red stop control; right-click it for a microphone options menu above the pill. Agent replies think first (typing dots), then stream in word by word through MessageMarkdown's streaming mode — rich markdown renders as it arrives and the rim stays lit until the stream completes, and + opens a menu that attaches photos, files, and folders as uniform square tiles — thumbnail previews for photos, icon tiles for the rest — each with a corner delete button and an Open action the host wires to its full view. Bubbles are iMessage-style with tails and a Delivered receipt; right-clicking (or long-pressing) one shows the tapback reaction row and a Reply action — reacting never frosts the transcript; choosing Reply enters the frosted thread view — the rest of the transcript recedes behind a blur while the composer switches to Reply, iMessage-style (Escape from anywhere, or tapping the bubble again, leaves the reply view; a threaded message keeps its whole thread in focus), and while the agent works the rim lights and the mic hands over to a stop control.",
   ),
   render: () => <PlaygroundExample />,
   play: async ({ canvasElement }) => {
@@ -2747,8 +3557,16 @@ export const Playground: Story = {
       },
       { timeout: 4000 },
     )
-    // Same ordering as above: the fade has to finish before its landing
-    // value can be asserted, or a slow runner reads a mid-fade frame.
+    // The second reply is in the transcript as soon as its first word
+    // streams; the rim stays lit until generating ends. Wait for that
+    // end state — under reduced motion waitForSettledAnimations is a
+    // no-op and must not stand in for it.
+    await waitFor(
+      () => {
+        expect(composer).not.toHaveAttribute("data-generating")
+      },
+      { timeout: 4000 },
+    )
     await waitForSettledAnimations(canvasElement)
     await waitFor(() => {
       expect(getComputedStyle(rim).opacity).toBe("0")
@@ -2840,6 +3658,155 @@ export const Playground: Story = {
   },
 }
 
+export const AgentSurfaces: Story = {
+  tags: ["reduced-motion"],
+  parameters: storyDocumentation(
+    "The playground opened on the Agent message tab: exploring cues collapse tool work and carry the conversation agent’s RandomAvatar (still when the run is done; busy while Exploring…), clicking a cue opens that beat’s thinking and tool calls in a frame-level extra-details sheet (Expand and drag-up fill the chat window), a named-task card uses the explorer’s busy avatar, Queued 2 opens the follow-up sheet where rows drag to reorder, right-clicking the tab offers View Details (project, model, runtime), and /history opens a History tab whose roster leads with project-seeded avatars so conversations in the same project share a painting.",
+  ),
+  render: () => <PlaygroundExample initialTabId={agentTabId} />,
+  play: async ({ canvasElement }) => {
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
+    const canvas = within(canvasElement)
+    const body = within(canvasElement.ownerDocument.body)
+    await expect(canvas.getByText("Thought 1s")).toBeVisible()
+    await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
+    const exploredCue = canvas.getByRole("button", { name: agentExplored })
+    await expect(
+      exploredCue.querySelector("[data-slot=random-avatar]"),
+    ).not.toHaveAttribute("aria-busy")
+    const explorerCard = canvas.getByRole("button", {
+      name: /explore chat ui components/i,
+    })
+    await expect(
+      explorerCard.querySelector("[data-slot=random-avatar]"),
+    ).toHaveAttribute("aria-busy", "true")
+    await userEvent.click(canvas.getByRole("button", { name: "Thought 1s" }))
+    const thoughtDialog = canvas.getByRole("dialog", { name: "Thought 1s" })
+    await waitFor(() => expect(thoughtDialog).toBeVisible())
+    await waitFor(() =>
+      expect(
+        canvas.getByText(/the playground already has toolcall rows/i),
+      ).toBeVisible(),
+    )
+    await expect(thoughtDialog).toHaveAttribute("aria-modal", "true")
+    await userEvent.click(canvas.getByRole("button", { name: "Expand" }))
+    await expect(thoughtDialog).toHaveAttribute("data-expanded", "true")
+    await userEvent.click(canvas.getByRole("button", { name: "Minimize" }))
+    await expect(thoughtDialog).toHaveAttribute("data-expanded", "false")
+    await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
+    await userEvent.click(canvas.getByRole("button", { name: "Done" }))
+    await expect(
+      canvas.queryByRole("dialog", { name: "Thought 1s" }),
+    ).not.toBeInTheDocument()
+    const cue = canvas.getByRole("button", { name: agentExplored })
+    await expect(cue).toHaveAttribute("aria-haspopup", "dialog")
+    await expect(cue).toHaveAttribute("aria-expanded", "false")
+    await userEvent.click(cue)
+    const activityDialog = canvas.getByRole("dialog", { name: agentExplored })
+    await waitFor(() => expect(activityDialog).toBeVisible())
+    await expect(activityDialog).toHaveAttribute("aria-modal", "true")
+    await expect(cue).toHaveAttribute("aria-expanded", "true")
+    await waitFor(() =>
+      expect(canvas.getByRole("button", { name: /read/i })).toBeVisible(),
+    )
+    await userEvent.click(canvas.getByRole("button", { name: "Expand" }))
+    await expect(activityDialog).toHaveAttribute("data-expanded", "true")
+    await userEvent.click(canvas.getByRole("button", { name: "Minimize" }))
+    await expect(activityDialog).toHaveAttribute("data-expanded", "false")
+    await userEvent.click(canvas.getByRole("button", { name: "Done" }))
+    await expect(
+      canvas.queryByRole("dialog", { name: agentExplored }),
+    ).not.toBeInTheDocument()
+    await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
+    await userEvent.click(canvas.getByRole("button", { name: "Queued 2" }))
+    await expect(canvas.getByRole("dialog", { name: "Queued" })).toBeVisible()
+    await waitFor(() =>
+      expect(
+        canvas.getByText(
+          "We also need this all conversations view for that which will be triggered with / history",
+        ),
+      ).toBeVisible(),
+    )
+    await expect(
+      canvas.getByText(
+        "So add components for that and then show in demo video of what you built for each",
+      ),
+    ).toBeVisible()
+    const queueList = canvas.getByRole("list", { name: "Pending messages" })
+    const firstHandle = canvas.getByRole("button", {
+      name: /reorder we also need this all conversations/i,
+    })
+    firstHandle.focus()
+    await userEvent.keyboard("{Enter}{ArrowDown}{Enter}")
+    await expect(within(queueList).getAllByRole("listitem")[0]).toHaveTextContent(
+      "So add components for that",
+    )
+    const queued = canvas.getByRole("dialog", { name: "Queued" })
+    await expect(queued).toHaveAttribute("aria-modal", "true")
+    await userEvent.click(canvas.getByRole("button", { name: "Expand" }))
+    await expect(queued).toHaveAttribute("data-expanded", "true")
+    await userEvent.click(canvas.getByRole("button", { name: "Minimize" }))
+    await expect(queued).toHaveAttribute("data-expanded", "false")
+    await userEvent.click(canvas.getByRole("button", { name: "Done" }))
+    const agentTab = canvas.getByRole("tab", { name: "Agent message" })
+    await userEvent.pointer({ keys: "[MouseRight]", target: agentTab })
+    await userEvent.click(
+      await body.findByRole("menuitem", { name: "View Details" }),
+    )
+    await expect(
+      canvas.getByRole("dialog", { name: "Agent details" }),
+    ).toBeVisible()
+    await waitFor(() =>
+      expect(
+        canvas.getByRole("heading", {
+          name: /agent message package implementation/i,
+        }),
+      ).toBeVisible(),
+    )
+    const project = canvas.getByText("nessalabs/nessa_ui")
+    project.scrollIntoView()
+    await expect(project).toBeVisible()
+    await expect(canvas.getByText("Cursor Cloud")).toBeVisible()
+    await userEvent.click(canvas.getByRole("button", { name: "Close" }))
+    const input = canvas.getByRole("textbox", { name: "Message" })
+    await userEvent.click(input)
+    await userEvent.type(input, "/hist")
+    await userEvent.click(await body.findByRole("option", { name: /history/ }))
+    await waitFor(() =>
+      expect(
+        canvas.getByRole("tab", { name: "Back to Agent message" }),
+      ).toHaveAttribute("aria-selected", "true"),
+    )
+    const historyTab = canvas.getByRole("tab", { name: "Back to Agent message" })
+    await expect(historyTab.closest("[data-slot='chat-tab']")).toHaveAttribute(
+      "data-kind",
+      "history",
+    )
+    await expect(
+      canvas.getByRole("button", { name: /repo audit/i }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByRole("button", { name: /agent message package implementation/i }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByRole("list", { name: "Conversations" }),
+    ).toBeVisible()
+    const historyList = canvas.getByRole("list", { name: "Conversations" })
+    const historyAvatars = [
+      ...historyList.querySelectorAll("[data-slot=random-avatar]"),
+    ]
+    await expect(historyAvatars).toHaveLength(3)
+    const figures = historyAvatars.map((avatar) =>
+      avatar.getAttribute("data-figure"),
+    )
+    await expect(new Set(figures).size).toBe(1)
+    await expect(
+      canvas.queryByRole("textbox", { name: "Message" }),
+    ).not.toBeInTheDocument()
+    await waitForSettledAnimations(canvasElement)
+  },
+}
+
 export const Subagents: Story = {
   tags: ["reduced-motion"],
   parameters: storyDocumentation(
@@ -2902,7 +3869,7 @@ export const Subagents: Story = {
 export const Annotations: Story = {
   tags: ["reduced-motion"],
   parameters: storyDocumentation(
-    "The pending-annotation surfaces under load: the playground opens on the Repo audit conversation with eight selections already lifted from documents — one-liners, full paragraphs, comments of very different lengths, some bare. The row above the pill stays one truncated pill plus '+ 7 others'; opening it shows each annotation as a tiny thread — the passage as the document's message with its source file linked beneath, the user's comments as their replies. Tapping a passage selects it and the pill composer replies to it, attaching follow-up comments; hovering a comment reveals its edit control and the comment edits in place. Sending delivers the whole set as one compact 'N annotations' pill on the message, and user messages in the transcript edit in place too, from the context menu's Edit. Big text stays compact everywhere: a paste over 120 characters lands as a Pasted text chip in the composer and travels as the same chip on the sent bubble, and a long typed message clamps to four lines with a chevron — either opens its full text in the list view over the transcript.",
+    "The pending-annotation surfaces under load: the playground opens on the Repo audit conversation with eight selections already lifted from documents — one-liners, full paragraphs, comments of very different lengths, some bare. The row above the pill stays one truncated pill plus '+ 7 others'; opening it shows each annotation as a tiny thread in an expandable sheet — the passage as the document's message with its source file linked beneath, the user's comments as their replies. Tapping a passage selects it and the pill composer replies to it, attaching follow-up comments; hovering a comment reveals its edit control and the comment edits in place. Sending delivers the whole set as one compact 'N annotations' pill on the message, and user messages in the transcript edit in place too, from the context menu's Edit. Big text stays compact everywhere: a paste over 120 characters lands as a Pasted text chip in the composer and travels as the same chip on the sent bubble, and a long typed message clamps to four lines with a chevron — either opens its full text in the list view over the transcript.",
   ),
   render: () => (
     <PlaygroundExample
@@ -2933,7 +3900,14 @@ export const Annotations: Story = {
     await expect(
       canvas.getAllByRole("button", { name: "Discard annotation" }),
     ).toHaveLength(7)
-    await userEvent.click(canvas.getByRole("button", { name: "Back to chat" }))
+    const annotations = canvas.getByRole("dialog", { name: "Annotations" })
+    await expect(annotations).toHaveAttribute("data-expanded", "true")
+    await expect(annotations).not.toHaveAttribute("aria-modal")
+    await userEvent.click(canvas.getByRole("button", { name: "Minimize" }))
+    await expect(annotations).toHaveAttribute("data-expanded", "false")
+    await userEvent.click(canvas.getByRole("button", { name: "Expand" }))
+    await expect(annotations).toHaveAttribute("data-expanded", "true")
+    await userEvent.click(canvas.getByRole("button", { name: "Done" }))
     await expect(
       canvas.getByRole("button", { name: "+ 6 others" }),
     ).toBeInTheDocument()

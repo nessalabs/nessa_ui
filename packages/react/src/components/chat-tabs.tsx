@@ -8,16 +8,16 @@ import { cn } from "@/lib/utils"
 const chatTabsFocusClassName =
   "outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
 
-export type ChatTabKind = "conversation" | "subagent" | "file"
+export type ChatTabKind = "conversation" | "subagent" | "file" | "history"
 
 export interface ChatTabItem {
   id: string
   title: string
   /**
    * What the tab holds. A chat window's tabs are not all conversations —
-   * a subagent's own transcript and an opened document sit in the same
-   * strip — and hosts style and test against the exposed `data-kind`.
-   * Defaults to `conversation`.
+   * a subagent's own transcript, an opened document, and the conversation
+   * history roster sit in the same strip — and hosts style and test against
+   * the exposed `data-kind`. Defaults to `conversation`.
    */
   kind?: ChatTabKind
   /**
@@ -68,6 +68,13 @@ export interface ChatTabsProps
   backLabel?: (parentTitle: string) => string
   /** Pinned after the new-tab control, outside the scrolling track. */
   trailing?: React.ReactNode
+  /**
+   * Wraps each rendered tab pill. Use it to hang a context menu on a
+   * conversation tab without ChatTabs owning the menu: the node is the
+   * pill (title, close, badge), and the wrapper must keep it as a single
+   * element so `asChild` triggers still receive a ref.
+   */
+  wrapTab?: (tab: ChatTabItem, node: React.ReactElement) => React.ReactNode
 }
 
 /**
@@ -75,10 +82,17 @@ export interface ChatTabsProps
  * scrolling tablist, the active tab washed and outlined in the chat
  * accent, a glowing dot for busy tabs, an attention badge for tabs that
  * need the user, a close control on closeable tabs, and a
- * trailing new-tab button. Arrow keys, Home, and End rove the tablist and
+ * trailing new-tab button. A history tab holds the conversation roster
+ * opened from `/history`. The selected tab is scrolled into the track so a
+ * newly opened file, subagent, or history tab is not stranded off-screen
+ * — only the overflow track moves, so a docs page or transcript around
+ * the strip does not scroll.
+ * Arrow keys, Home, and End rove the tablist and
  * Delete closes a closeable tab (the ✕ is a pointer-only affordance, since
  * a tablist may own nothing but tabs); a panel host labels itself with
- * `chat-tab-panel-<id>` to pair with a tab's `aria-controls`.
+ * `chat-tab-panel-<id>` to pair with a tab's `aria-controls`. `wrapTab`
+ * hangs host chrome — a context menu of agent details — on each pill
+ * without the strip owning that menu.
  */
 function ChatTabs({
   tabs,
@@ -90,6 +104,7 @@ function ChatTabs({
   label = "Chat tabs",
   backLabel = (parentTitle: string) => `Back to ${parentTitle}`,
   trailing,
+  wrapTab,
   className,
   ...props
 }: ChatTabsProps) {
@@ -98,6 +113,25 @@ function ChatTabs({
   // tab (the type allows null, and hosts may close the active tab without
   // reselecting) — the first tab takes it as a fallback.
   const hasActiveTab = tabs.some((tab) => tab.id === value)
+
+  React.useEffect(() => {
+    if (value == null) return
+    const tab = tabRefs.current
+      .get(value)
+      ?.closest<HTMLElement>("[data-slot=chat-tab]")
+    const track = tab?.closest<HTMLElement>("[data-slot=chat-tabs-track]")
+    if (!tab || !track) return
+    // Scroll only the overflow track. Element.scrollIntoView walks every
+    // ancestor and, on a Storybook docs page, pulls the story canvas into
+    // the iframe — sending the documentation heading above the viewport.
+    const tabRect = tab.getBoundingClientRect()
+    const trackRect = track.getBoundingClientRect()
+    if (tabRect.left < trackRect.left) {
+      track.scrollLeft -= trackRect.left - tabRect.left
+    } else if (tabRect.right > trackRect.right) {
+      track.scrollLeft += tabRect.right - trackRect.right
+    }
+  }, [value, tabs])
 
   const selectRelativeTab = (index: number, key: string) => {
     if (tabs.length === 0) return
@@ -137,9 +171,8 @@ function ChatTabs({
               ? undefined
               : tabs.find((candidate) => candidate.id === tab.parentId)
           const goesBack = active && parent !== undefined
-          return (
+          const tabNode = (
             <span
-              key={tab.id}
               role="presentation"
               data-slot="chat-tab"
               data-kind={tab.kind ?? "conversation"}
@@ -275,6 +308,11 @@ function ChatTabs({
                 </button>
               ) : null}
             </span>
+          )
+          return (
+            <React.Fragment key={tab.id}>
+              {wrapTab ? wrapTab(tab, tabNode) : tabNode}
+            </React.Fragment>
           )
         })}
       </div>

@@ -631,6 +631,28 @@
       ]
     },
     {
+      "name": "conversation-history",
+      "type": "registry:ui",
+      "title": "Conversation History",
+      "description": "A searchable roster of conversations: host-owned rows with a project-seeded RandomAvatar (same project, same painting), title, preview, project, pin, and relative time. Selecting a row reports its id.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/input",
+        "nessalabs/nessa_ui/random-avatar",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/conversation-history.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/conversation-history.tsx"
+        }
+      ]
+    },
+    {
       "name": "split-view",
       "type": "registry:ui",
       "title": "SplitView",
@@ -1086,7 +1108,7 @@
       "name": "chat-tabs",
       "type": "registry:ui",
       "title": "Chat Tabs",
-      "description": "The floating chat window's tab strip: pill tabs on a scrolling tablist with chat-accent-tinted active state, busy dots, attention badges, per-tab close controls, a new-tab button, and roving arrow-key navigation.",
+      "description": "The floating chat window's tab strip: pill tabs on a scrolling tablist with chat-accent-tinted active state, busy dots, attention badges, per-tab close controls, a new-tab button, roving arrow-key navigation, a wrapTab slot for hanging a context menu on each pill, and the selected tab scrolled into the track.",
       "dependencies": [
         "lucide-react"
       ],
@@ -1226,7 +1248,7 @@
       "name": "composer-queue",
       "type": "registry:ui",
       "title": "Composer Queue",
-      "description": "Pending-message rows and queue-or-steer delivery controls for active agent runs.",
+      "description": "Pending-message rows and queue-or-steer delivery controls for active agent runs, plus a compact Queued N badge. Rows drag to reorder; a sheet of follow-ups can also promote one to the front.",
       "dependencies": [
         "@dnd-kit/core",
         "@dnd-kit/sortable",
@@ -1302,6 +1324,63 @@
           "path": "packages/react/src/components/file-drop-zone.tsx",
           "type": "registry:ui",
           "target": "components/ui/file-drop-zone.tsx"
+        }
+      ]
+    },
+    {
+      "name": "sheet",
+      "type": "registry:ui",
+      "title": "Sheet",
+      "description": "A bottom sheet that rises over its nearest positioned ancestor: a modal dialog with a backdrop, a grab bar, a header of close or expand plus a centered title and optional Done, and a scrolling body. The drawer lifts a short way from the bottom on open; dragging the grab bar up or SheetExpand interpolates height into a filled extra-details surface over the same ancestor. Pass modal={false} for a contained extra-details surface that leaves surrounding chrome reachable.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/sheet.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/sheet.tsx"
+        }
+      ]
+    },
+    {
+      "name": "agent-activity",
+      "type": "registry:ui",
+      "title": "Agent Activity",
+      "description": "Collapsed agent work in a transcript: a quiet cue that opens the extra-details sheet with that beat’s thinking and tool calls, a named-task card for a delegated run, and a standalone thought or live Exploring line. Hosts pass a RandomAvatar on exploring cues and named cards — busy while that agent is working, still once it is not. The cue does not expand inline — hosts own the Sheet (open/defaultOpen/onOpenChange are gone). Put AgentActivityContent in the sheet body, not under the trigger.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/agent-activity.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/agent-activity.tsx"
+        }
+      ]
+    },
+    {
+      "name": "agent-details",
+      "type": "registry:ui",
+      "title": "Agent Details",
+      "description": "The identity of an agent conversation: a title, a row of compact actions, and an Info section for the project path, model, runtime, and timestamps.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/agent-details.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/agent-details.tsx"
         }
       ]
     },

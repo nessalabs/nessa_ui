@@ -1,7 +1,15 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, userEvent, within } from "storybook/test"
-import { ChatTabs, type ChatTabItem } from "@nessa-ui/react"
+import {
+  ChatTabs,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+  type ChatTabItem,
+} from "@nessa-ui/react"
 
 import { storyDocumentation } from "./story-documentation"
 
@@ -21,6 +29,22 @@ function TabsExample() {
         tabs={tabs}
         value={activeId}
         onValueChange={setActiveId}
+        wrapTab={(tab, node) =>
+          tab.id === "release" ? (
+            <ContextMenu>
+              <ContextMenuTrigger asChild>{node}</ContextMenuTrigger>
+              <ContextMenuContent aria-label="Conversation actions">
+                <ContextMenuItem>View Details</ContextMenuItem>
+                <ContextMenuItem>Rename</ContextMenuItem>
+                <ContextMenuItem>Pin</ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem>Archive</ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
+          ) : (
+            node
+          )
+        }
         onClose={(id) => {
           setTabs((current) => {
             const next = current.filter((tab) => tab.id !== id)
@@ -60,7 +84,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "The floating chat window's tab strip: pill tabs on a horizontally scrolling tablist — the active tab washed and outlined in the chat accent — with a glowing dot for tabs whose agent is working, an attention badge for tabs that need the user, close controls on closeable tabs, and a trailing new-tab button. Arrow keys, Home, and End rove the tablist, and every focus outline draws inset so the scrolling track never clips it. Pair each tab with a `chat-tab-panel-<id>` panel; PillComposer's Playground shows it as the chat window's conversation switcher.",
+          "The floating chat window's tab strip: pill tabs on a horizontally scrolling tablist — the active tab washed and outlined in the chat accent — with a glowing dot for tabs whose agent is working, an attention badge for tabs that need the user, close controls on closeable tabs, and a trailing new-tab button. The selected tab is scrolled into the track. Arrow keys, Home, and End rove the tablist, and every focus outline draws inset so the scrolling track never clips it. Pair each tab with a `chat-tab-panel-<id>` panel; PillComposer's Playground shows it as the chat window's conversation switcher.",
       },
     },
   },
@@ -110,10 +134,19 @@ export const Tabs: Story = {
       canvas.queryByRole("tab", { name: "Scratchpad" }),
     ).not.toBeInTheDocument()
     await userEvent.click(canvas.getByRole("button", { name: "New tab" }))
-    await expect(canvas.getByRole("tab", { name: "New chat" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    )
+    const newChat = canvas.getByRole("tab", { name: "New chat" })
+    await expect(newChat).toHaveAttribute("aria-selected", "true")
     await expect(canvas.getByRole("tabpanel")).toHaveTextContent("New chat")
+    const track = canvasElement.querySelector<HTMLElement>(
+      "[data-slot=chat-tabs-track]",
+    )!
+    const pill = newChat.closest<HTMLElement>("[data-slot=chat-tab]")!
+    const trackRect = track.getBoundingClientRect()
+    const pillRect = pill.getBoundingClientRect()
+    await expect(pillRect.left).toBeGreaterThanOrEqual(trackRect.left - 1)
+    await expect(pillRect.right).toBeLessThanOrEqual(trackRect.right + 1)
+    await expect(
+      canvasElement.ownerDocument.scrollingElement?.scrollTop ?? 0,
+    ).toBe(0)
   },
 }

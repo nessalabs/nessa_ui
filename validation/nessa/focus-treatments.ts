@@ -15,14 +15,14 @@ const composerFocusComponents = Object.freeze([
   // clamped bubble that opens its full text.
   { component: "chat-bubbles", count: 7 },
   { component: "chat-composer", count: 3 },
-  // Only the back link: the overlay traps focus, and its content is the
-  // host's own.
+  // Only the back link. ChatOverlay does not trap focus; surrounding
+  // chrome stays in the tab order. Its content is the host's own.
   { component: "chat-overlay", count: 1 },
   // The chip, the collapsed-count control, and the discard-all button.
   { component: "chat-tray", count: 3 },
   { component: "code-block", count: 1 },
   { component: "composer-access-mode", count: 2 },
-  { component: "composer-queue", count: 5 },
+  { component: "composer-queue", count: 7 },
   { component: "mermaid-diagram", count: 6 },
   { component: "message", count: 5 },
   { component: "message-scroller", count: 2 },
@@ -36,6 +36,14 @@ const composerFocusComponents = Object.freeze([
   { component: "tool-call", count: 3 },
   // The label is the only target; the rules either side are decoration.
   { component: "transcript-divider", count: 1 },
+  // Close and Expand share the circular recipe; Done is the trailing pill.
+  { component: "sheet", count: 3 },
+  // The disclosing cue, the details trigger, and the named-task card.
+  { component: "agent-activity", count: 3 },
+  // Each circular action is one target; the title and rows are not controls.
+  { component: "agent-details", count: 1 },
+  // The conversation row. The search field is an Input and draws its own ring.
+  { component: "conversation-history", count: 1 },
 ] as const)
 
 type FocusComponent =

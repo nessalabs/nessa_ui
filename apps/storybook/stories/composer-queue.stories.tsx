@@ -10,7 +10,15 @@ import {
   ChatComposerSubmit,
   ComposerDeliveryMode,
   ComposerQueue,
+  ComposerQueueBadge,
   ComposerQueueItem,
+  Sheet,
+  SheetAction,
+  SheetBody,
+  SheetExpand,
+  SheetHandle,
+  SheetHeader,
+  SheetTitle,
   type ComposerDeliveryModeValue,
 } from "@nessa-ui/react"
 import { Mic, Plus } from "lucide-react"
@@ -87,7 +95,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Pending-message rows for active agent runs, plus a delivery-mode control for choosing whether the next follow-up queues behind the run or steers it immediately. The host owns ordering and delivery semantics.",
+          "Pending-message rows for active agent runs, plus a delivery-mode control for choosing whether the next follow-up queues behind the run or steers it immediately. A compact Queued N badge opens a plain sheet of wrapping rows; drag a row onto another to reorder, or promote one to the front. The host owns ordering and delivery semantics.",
       },
     },
   },
@@ -224,4 +232,121 @@ export const ActiveRunComposition: Story = {
   ),
   render: () => <QueueExample withComposer />,
   globals: { theme: "dark" },
+}
+
+function QueuedSheetExample() {
+  const [open, setOpen] = React.useState(false)
+  const [items, setItems] = React.useState([
+    {
+      id: "one",
+      content:
+        "We also need this all conversations view for that which will be triggered with / history",
+    },
+    {
+      id: "two",
+      content:
+        "So add components for that and then show in demo video of what you built for each",
+    },
+  ])
+  return (
+    <div className="relative h-[28rem] w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-[2rem] bg-background p-4">
+      <ComposerQueueBadge
+        count={items.length}
+        onClick={() => setOpen(true)}
+        aria-label={`Queued ${items.length}`}
+      />
+      {open ? (
+        <Sheet label="Queued" onClose={() => setOpen(false)}>
+          <SheetHandle />
+          <SheetHeader>
+            <SheetExpand />
+            <SheetTitle>Queued</SheetTitle>
+            <SheetAction>Done</SheetAction>
+          </SheetHeader>
+          <SheetBody className="px-0">
+            <ComposerQueue
+              appearance="plain"
+              itemIds={items.map((item) => item.id)}
+              onReorder={(nextIds) => {
+                const itemsById = new Map(items.map((item) => [item.id, item]))
+                setItems(nextIds.flatMap((id) => itemsById.get(id) ?? []))
+              }}
+            >
+              {items.map((item) => (
+                <ComposerQueueItem
+                  key={item.id}
+                  id={item.id}
+                  itemLabel={item.content}
+                  onPromote={() =>
+                    setItems((current) => {
+                      const next = current.filter(
+                        (candidate) => candidate.id !== item.id,
+                      )
+                      const moved = current.find(
+                        (candidate) => candidate.id === item.id,
+                      )
+                      return moved ? [moved, ...next] : next
+                    })
+                  }
+                  onRemove={() =>
+                    setItems((current) =>
+                      current.filter((candidate) => candidate.id !== item.id),
+                    )
+                  }
+                >
+                  {item.content}
+                </ComposerQueueItem>
+              ))}
+            </ComposerQueue>
+          </SheetBody>
+        </Sheet>
+      ) : null}
+    </div>
+  )
+}
+
+export const QueuedSheet: Story = {
+  parameters: storyDocumentation(
+    "The compact Queued N pill opens a sheet of wrapping follow-ups. Drag one row onto another to reorder; each row can also promote to the front or be removed. Expand fills the ancestor and Minimize restores the drawer.",
+  ),
+  render: () => <QueuedSheetExample />,
+  play: async ({ canvasElement }) => {
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByRole("button", { name: "Queued 2" }))
+    await expect(canvas.getByRole("dialog", { name: "Queued" })).toBeVisible()
+    await waitFor(() =>
+      expect(
+        canvas.getByText(
+          "We also need this all conversations view for that which will be triggered with / history",
+        ),
+      ).toBeVisible(),
+    )
+    await expect(
+      canvas.getByRole("list", { name: "Pending messages" }),
+    ).toHaveAttribute("data-appearance", "plain")
+    const queue = canvas.getByRole("list", { name: "Pending messages" })
+    const firstHandle = canvas.getByRole("button", {
+      name: /reorder we also need this all conversations/i,
+    })
+    firstHandle.focus()
+    await userEvent.keyboard("{Enter}{ArrowDown}{Enter}")
+    await expect(within(queue).getAllByRole("listitem")[0]).toHaveTextContent(
+      "So add components for that",
+    )
+    const dialog = canvas.getByRole("dialog", { name: "Queued" })
+    await userEvent.click(canvas.getByRole("button", { name: "Expand" }))
+    await expect(dialog).toHaveAttribute("data-expanded", "true")
+    await userEvent.click(canvas.getByRole("button", { name: "Minimize" }))
+    await expect(dialog).toHaveAttribute("data-expanded", "false")
+    await userEvent.click(
+      canvas.getAllByRole("button", { name: /^promote /i })[1]!,
+    )
+    await expect(within(queue).getAllByRole("listitem")[0]).toHaveTextContent(
+      "We also need this all conversations",
+    )
+    await userEvent.click(canvas.getAllByRole("button", { name: /^remove /i })[0]!)
+    await userEvent.click(canvas.getByRole("button", { name: "Done" }))
+    await expect(canvas.getByRole("button", { name: "Queued 1" })).toBeVisible()
+  },
 }
