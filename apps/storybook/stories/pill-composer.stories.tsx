@@ -2085,6 +2085,8 @@ function PlaygroundExample({
                   onSelect={() => {
                     setQueueOpen(false)
                     setActivitySheet(null)
+                    setQuotesOpen(false)
+                    setViewedQuotes(null)
                     setDetailsTabId(tab.id)
                   }}
                 >
