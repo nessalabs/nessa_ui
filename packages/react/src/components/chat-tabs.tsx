@@ -68,6 +68,13 @@ export interface ChatTabsProps
   backLabel?: (parentTitle: string) => string
   /** Pinned after the new-tab control, outside the scrolling track. */
   trailing?: React.ReactNode
+  /**
+   * Wraps each rendered tab pill. Use it to hang a context menu on a
+   * conversation tab without ChatTabs owning the menu: the node is the
+   * pill (title, close, badge), and the wrapper must keep it as a single
+   * element so `asChild` triggers still receive a ref.
+   */
+  wrapTab?: (tab: ChatTabItem, node: React.ReactElement) => React.ReactNode
 }
 
 /**
@@ -78,7 +85,9 @@ export interface ChatTabsProps
  * trailing new-tab button. Arrow keys, Home, and End rove the tablist and
  * Delete closes a closeable tab (the ✕ is a pointer-only affordance, since
  * a tablist may own nothing but tabs); a panel host labels itself with
- * `chat-tab-panel-<id>` to pair with a tab's `aria-controls`.
+ * `chat-tab-panel-<id>` to pair with a tab's `aria-controls`. `wrapTab`
+ * hangs host chrome — a context menu of agent details — on each pill
+ * without the strip owning that menu.
  */
 function ChatTabs({
   tabs,
@@ -90,6 +99,7 @@ function ChatTabs({
   label = "Chat tabs",
   backLabel = (parentTitle: string) => `Back to ${parentTitle}`,
   trailing,
+  wrapTab,
   className,
   ...props
 }: ChatTabsProps) {
@@ -137,9 +147,8 @@ function ChatTabs({
               ? undefined
               : tabs.find((candidate) => candidate.id === tab.parentId)
           const goesBack = active && parent !== undefined
-          return (
+          const tabNode = (
             <span
-              key={tab.id}
               role="presentation"
               data-slot="chat-tab"
               data-kind={tab.kind ?? "conversation"}
@@ -275,6 +284,11 @@ function ChatTabs({
                 </button>
               ) : null}
             </span>
+          )
+          return (
+            <React.Fragment key={tab.id}>
+              {wrapTab ? wrapTab(tab, tabNode) : tabNode}
+            </React.Fragment>
           )
         })}
       </div>

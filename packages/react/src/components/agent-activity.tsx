@@ -1,0 +1,374 @@
+"use client"
+
+import * as React from "react"
+import { ChevronRight } from "lucide-react"
+import { Collapsible } from "radix-ui"
+
+import { cn } from "@/lib/utils"
+
+/**
+ * The lifecycle of a collapsed activity cue: `running` while the agent is
+ * still working (the label shimmers), `complete` once the run of tools
+ * finished, and `error` when it failed (the label tints destructive).
+ */
+export type AgentActivityStatus = "running" | "complete" | "error"
+
+const AgentActivityStatusContext =
+  React.createContext<AgentActivityStatus>("complete")
+
+export interface AgentActivityCounts {
+  /** How many files the run read, searched, or edited. */
+  files?: number
+  /** How many search or grep calls the run made. */
+  searches?: number
+  /** How many other tool calls do not fit the files or searches buckets. */
+  other?: number
+}
+
+/**
+ * Collapses a run of tool work into one transcript line: "Explored 3 files,
+ * 2 searches". Empty counts return "Explored" so a host that has not yet
+ * classified the calls still has a label.
+ */
+function formatAgentActivitySummary(counts: AgentActivityCounts): string {
+  const bits: string[] = []
+  if (counts.files) {
+    bits.push(`${counts.files} file${counts.files === 1 ? "" : "s"}`)
+  }
+  if (counts.searches) {
+    bits.push(`${counts.searches} search${counts.searches === 1 ? "" : "es"}`)
+  }
+  if (counts.other) {
+    bits.push(`${counts.other} other tool${counts.other === 1 ? "" : "s"}`)
+  }
+  return bits.length === 0 ? "Explored" : `Explored ${bits.join(", ")}`
+}
+
+/**
+ * Formats a thinking beat as "Thought 1s". Seconds are rounded to the
+ * nearest whole number so a sub-second beat still reads as "Thought 0s"
+ * rather than a fraction.
+ */
+function formatAgentThoughtSummary(seconds: number): string {
+  const rounded = Math.max(0, Math.round(seconds))
+  return `Thought ${rounded}s`
+}
+
+export interface AgentActivityProps extends React.ComponentProps<"div"> {
+  /** Controlled expanded state; pair with `onOpenChange`. */
+  open?: boolean
+  /** Initial expanded state when uncontrolled. Collapsed by default. */
+  defaultOpen?: boolean
+  /** Called when the trigger toggles the expanded state. */
+  onOpenChange?: (open: boolean) => void
+  /**
+   * The run's lifecycle state, exposed as `data-status`. While `running`
+   * the group is `aria-busy` and the trigger label shimmers; `error` tints
+   * the label destructive. Defaults to `complete`.
+   */
+  status?: AgentActivityStatus
+}
+
+/**
+ * A collapsed run of tool work in an agent transcript: one quiet cue that
+ * expands into the individual calls. The transcript stays a conversation;
+ * the tools stay behind the cue until a reader asks for them.
+ *
+ * Compose AgentActivityTrigger for the cue and AgentActivityContent for the
+ * revealed ToolCall rows. A cue with nothing behind it should be
+ * AgentActivityCue instead — a disclosure with no content is a lie.
+ */
+function AgentActivity({
+  open,
+  defaultOpen,
+  onOpenChange,
+  status = "complete",
+  className,
+  ...props
+}: AgentActivityProps) {
+  return (
+    <AgentActivityStatusContext.Provider value={status}>
+      <Collapsible.Root
+        data-slot="agent-activity"
+        data-status={status}
+        aria-busy={status === "running" || undefined}
+        open={open}
+        defaultOpen={defaultOpen}
+        onOpenChange={onOpenChange}
+        className={cn(
+          "group/agent-activity flex w-full min-w-0 flex-col font-sans",
+          className,
+        )}
+        {...props}
+      />
+    </AgentActivityStatusContext.Provider>
+  )
+}
+
+const reducedMotionQuery = "(prefers-reduced-motion: reduce)"
+
+function subscribeToReducedMotion(callback: () => void) {
+  const query = window.matchMedia(reducedMotionQuery)
+  query.addEventListener("change", callback)
+  return () => query.removeEventListener("change", callback)
+}
+
+function useReducedMotion() {
+  return React.useSyncExternalStore(
+    subscribeToReducedMotion,
+    () => window.matchMedia(reducedMotionQuery).matches,
+    () => false,
+  )
+}
+
+function cssDurationInMilliseconds(value: string, fallback: number) {
+  const parsed = Number.parseFloat(value)
+  if (!Number.isFinite(parsed)) return fallback
+  return value.trim().endsWith("ms") ? parsed : parsed * 1000
+}
+
+const activityShimmerClasses =
+  "data-[shimmer=true]:[background-image:linear-gradient(90deg,var(--muted-foreground)_0%,var(--muted-foreground)_38%,var(--foreground)_50%,var(--muted-foreground)_62%,var(--muted-foreground)_100%)] data-[shimmer=true]:bg-[length:200%_100%] data-[shimmer=true]:bg-[position:150%_0] data-[shimmer=true]:bg-clip-text data-[shimmer=true]:[-webkit-background-clip:text] data-[shimmer=true]:text-transparent"
+
+function ActivityShimmer({
+  active,
+  children,
+}: {
+  active: boolean
+  children: React.ReactNode
+}) {
+  const reducedMotion = useReducedMotion()
+  const shimmering = active && !reducedMotion
+  const ref = React.useRef<HTMLSpanElement>(null)
+  React.useEffect(() => {
+    const node = ref.current
+    if (!node || !shimmering) return
+    const duration = cssDurationInMilliseconds(
+      getComputedStyle(node).getPropertyValue("--nessa-motion-duration-ambient"),
+      3200,
+    )
+    if (duration === 0) return
+    const animation = node.animate(
+      [{ backgroundPosition: "150% 0" }, { backgroundPosition: "-50% 0" }],
+      { duration, easing: "linear", iterations: Infinity },
+    )
+    return () => animation.cancel()
+  }, [shimmering])
+  return (
+    <span
+      ref={ref}
+      data-slot="agent-activity-shimmer"
+      data-shimmer={shimmering ? "true" : undefined}
+      className={cn("min-w-0 truncate text-left", activityShimmerClasses)}
+    >
+      {children}
+    </span>
+  )
+}
+
+const cueClassName =
+  "flex w-fit min-w-0 max-w-full items-center gap-1.5 rounded-md px-1 py-0.5 font-sans nessa-text-2 text-muted-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none"
+
+export interface AgentActivityCueProps extends React.ComponentProps<"span"> {
+  /**
+   * The cue's lifecycle. While `running` the label shimmers. Defaults to
+   * `complete`. A standalone cue that is not inside AgentActivity reads this
+   * prop; a trigger inside one inherits the group's status.
+   */
+  status?: AgentActivityStatus
+  /**
+   * The leading glyph — a sparkle for a live "Exploring…" beat. The cue
+   * owns sizing and color, so pass the bare icon element.
+   */
+  icon?: React.ReactNode
+  /**
+   * Shows the trailing chevron that marks the cue as a control. Standalone
+   * cues that open a sheet or the current run's details pass this; a
+   * thought beat does not.
+   */
+  discloses?: boolean
+}
+
+/**
+ * A quiet transcript line for agent work that is not a message: "Thought
+ * 1s", "Explored 3 files, 2 searches", "Exploring…". Renders as text so a
+ * thought beat does not invite a click. Pair it with `discloses` and wrap
+ * it in a button (or use AgentActivityTrigger) when the line opens details.
+ */
+function AgentActivityCue({
+  status: statusProp,
+  icon,
+  discloses = false,
+  className,
+  children,
+  ...props
+}: AgentActivityCueProps) {
+  const groupStatus = React.useContext(AgentActivityStatusContext)
+  const status = statusProp ?? groupStatus
+  return (
+    <span
+      data-slot="agent-activity-cue"
+      data-status={status}
+      className={cn(
+        cueClassName,
+        status === "error" && "text-destructive",
+        className,
+      )}
+      {...props}
+    >
+      {icon != null ? (
+        <span
+          aria-hidden="true"
+          className="flex shrink-0 items-center justify-center text-(--nessa-chat-accent) [&_svg]:size-3.5"
+        >
+          {icon}
+        </span>
+      ) : null}
+      <ActivityShimmer active={status === "running"}>{children}</ActivityShimmer>
+      {discloses ? (
+        <ChevronRight
+          aria-hidden="true"
+          className="size-3.5 shrink-0"
+        />
+      ) : null}
+    </span>
+  )
+}
+
+export interface AgentActivityTriggerProps
+  extends Omit<React.ComponentProps<"button">, "children"> {
+  /** The leading glyph, rendered ahead of the label. */
+  icon?: React.ReactNode
+  /** The activity text, e.g. "Explored 3 files, 2 searches". */
+  children?: React.ReactNode
+}
+
+/**
+ * The always-visible cue for a disclosure: icon, label, and a chevron that
+ * tracks the expanded state. While the group is `running` the label
+ * shimmers; when it `error`ed the label tints destructive.
+ */
+function AgentActivityTrigger({
+  icon,
+  className,
+  children,
+  ...props
+}: AgentActivityTriggerProps) {
+  const status = React.useContext(AgentActivityStatusContext)
+  return (
+    <Collapsible.Trigger
+      data-slot="agent-activity-trigger"
+      className={cn(
+        cueClassName,
+        "cursor-pointer hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        "group-data-[status=error]/agent-activity:text-destructive",
+        className,
+      )}
+      {...props}
+    >
+      {icon != null ? (
+        <span
+          aria-hidden="true"
+          className="flex shrink-0 items-center justify-center text-(--nessa-chat-accent) [&_svg]:size-3.5"
+        >
+          {icon}
+        </span>
+      ) : null}
+      <ActivityShimmer active={status === "running"}>{children}</ActivityShimmer>
+      <ChevronRight
+        aria-hidden="true"
+        className="size-3.5 shrink-0 transition-transform [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] group-data-[state=open]/agent-activity:rotate-90 motion-reduce:transition-none"
+      />
+    </Collapsible.Trigger>
+  )
+}
+
+export interface AgentActivityContentProps extends React.ComponentProps<"div"> {}
+
+/**
+ * The revealed tool-call list, indented under the cue so the expanded
+ * details read as part of the same beat rather than as new messages.
+ */
+function AgentActivityContent({
+  className,
+  ...props
+}: AgentActivityContentProps) {
+  return (
+    <Collapsible.Content
+      data-slot="agent-activity-content"
+      className={cn(
+        "mt-1.5 flex min-w-0 flex-col items-start gap-1 pl-1",
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
+export interface AgentActivityCardProps
+  extends Omit<React.ComponentProps<"button">, "children" | "title"> {
+  /** The named task, e.g. "Explore chat UI components". */
+  title: React.ReactNode
+  /** The status line under the title, e.g. "Working · Explorer". */
+  meta?: React.ReactNode
+  /** The leading glyph. The card owns sizing and color. */
+  icon?: React.ReactNode
+}
+
+/**
+ * A named unit of agent work as a compact card: icon, title, status line,
+ * and a chevron. Use it when a beat has a name of its own — a spawned
+ * explorer, a delegated run — rather than a counted summary of tools.
+ */
+function AgentActivityCard({
+  title,
+  meta,
+  icon,
+  className,
+  ...props
+}: AgentActivityCardProps) {
+  return (
+    <button
+      type="button"
+      data-slot="agent-activity-card"
+      className={cn(
+        "flex w-full min-w-0 items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2 text-start font-sans shadow-xs outline-none transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        className,
+      )}
+      {...props}
+    >
+      {icon != null ? (
+        <span
+          aria-hidden="true"
+          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-(--nessa-chat-accent)/15 text-(--nessa-chat-accent) [&_svg]:size-3.5"
+        >
+          {icon}
+        </span>
+      ) : null}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate nessa-text-3 font-semibold text-foreground">
+          {title}
+        </span>
+        {meta != null ? (
+          <span className="block truncate nessa-text-1 text-muted-foreground">
+            {meta}
+          </span>
+        ) : null}
+      </span>
+      <ChevronRight
+        aria-hidden="true"
+        className="size-3.5 shrink-0 text-muted-foreground"
+      />
+    </button>
+  )
+}
+
+export {
+  AgentActivity,
+  AgentActivityCard,
+  AgentActivityContent,
+  AgentActivityCue,
+  AgentActivityTrigger,
+  formatAgentActivitySummary,
+  formatAgentThoughtSummary,
+}

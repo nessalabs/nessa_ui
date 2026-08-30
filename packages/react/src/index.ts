@@ -489,9 +489,11 @@ export {
 export {
   ComposerDeliveryMode,
   ComposerQueue,
+  ComposerQueueBadge,
   ComposerQueueItem,
   type ComposerDeliveryModeProps,
   type ComposerDeliveryModeValue,
+  type ComposerQueueBadgeProps,
   type ComposerQueueProps,
   type ComposerQueueItemProps,
 } from "./components/composer-queue"
@@ -503,6 +505,53 @@ export {
   type ComposerAccessModeProps,
   type ComposerAccessModeValue,
 } from "./components/composer-access-mode"
+export {
+  Sheet,
+  SheetAction,
+  SheetBody,
+  SheetClose,
+  SheetHandle,
+  SheetHeader,
+  SheetTitle,
+  useSheet,
+  type SheetHeaderProps,
+  type SheetProps,
+  type SheetTitleProps,
+} from "./components/sheet"
+export {
+  AgentActivity,
+  AgentActivityCard,
+  AgentActivityContent,
+  AgentActivityCue,
+  AgentActivityTrigger,
+  formatAgentActivitySummary,
+  formatAgentThoughtSummary,
+  type AgentActivityCardProps,
+  type AgentActivityContentProps,
+  type AgentActivityCounts,
+  type AgentActivityCueProps,
+  type AgentActivityProps,
+  type AgentActivityStatus,
+  type AgentActivityTriggerProps,
+} from "./components/agent-activity"
+export {
+  AgentDetails,
+  AgentDetailsAction,
+  AgentDetailsActions,
+  AgentDetailsField,
+  AgentDetailsProject,
+  AgentDetailsSection,
+  type AgentDetailsActionProps,
+  type AgentDetailsFieldProps,
+  type AgentDetailsProjectProps,
+  type AgentDetailsProps,
+  type AgentDetailsSectionProps,
+} from "./components/agent-details"
+export {
+  ConversationHistory,
+  type ConversationHistoryEntry,
+  type ConversationHistoryProps,
+} from "./components/conversation-history"
 export {
   ToolCall,
   ToolCallContent,

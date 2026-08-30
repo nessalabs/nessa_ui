@@ -1,7 +1,15 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, userEvent, within } from "storybook/test"
-import { ChatTabs, type ChatTabItem } from "@nessa-ui/react"
+import {
+  ChatTabs,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+  type ChatTabItem,
+} from "@nessa-ui/react"
 
 import { storyDocumentation } from "./story-documentation"
 
@@ -21,6 +29,22 @@ function TabsExample() {
         tabs={tabs}
         value={activeId}
         onValueChange={setActiveId}
+        wrapTab={(tab, node) =>
+          tab.id === "release" ? (
+            <ContextMenu>
+              <ContextMenuTrigger asChild>{node}</ContextMenuTrigger>
+              <ContextMenuContent aria-label="Conversation actions">
+                <ContextMenuItem>View Details</ContextMenuItem>
+                <ContextMenuItem>Rename</ContextMenuItem>
+                <ContextMenuItem>Pin</ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem>Archive</ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
+          ) : (
+            node
+          )
+        }
         onClose={(id) => {
           setTabs((current) => {
             const next = current.filter((tab) => tab.id !== id)

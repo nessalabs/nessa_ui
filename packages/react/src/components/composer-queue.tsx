@@ -19,7 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { CornerDownRight, Ellipsis, GripVertical, Trash2 } from "lucide-react"
+import { ArrowUp, CornerDownRight, Ellipsis, GripVertical, Trash2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -143,22 +143,66 @@ function ComposerQueue({
   )
 }
 
+export interface ComposerQueueBadgeProps
+  extends Omit<React.ComponentProps<"button">, "children"> {
+  /** How many messages are waiting. Shown after the "Queued" label. */
+  count: number
+}
+
+/**
+ * The compact pill that stands in for a pending-message list: "Queued 2".
+ * Pressing it is the host's job — typically opening a sheet of the rows.
+ * Hidden when `count` is 0 so an empty queue leaves no chrome.
+ */
+function ComposerQueueBadge({
+  count,
+  className,
+  ...props
+}: ComposerQueueBadgeProps) {
+  if (count <= 0) return null
+  return (
+    <button
+      type="button"
+      data-slot="composer-queue-badge"
+      className={cn(
+        "inline-flex h-7 items-center rounded-full border border-border bg-muted/70 px-2.5 font-sans nessa-text-2 font-medium text-foreground outline-none transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        className,
+      )}
+      {...props}
+    >
+      Queued {count}
+    </button>
+  )
+}
+
 export interface ComposerQueueItemProps extends React.ComponentProps<"li"> {
   id: string
   itemLabel: string
   onSteer?: () => void
+  /**
+   * Moves this row to the front of the queue. Distinct from steer: promote
+   * reorders, steer interrupts the current run with this message.
+   */
+  onPromote?: () => void
   onRemove?: () => void
   onMore?: () => void
   steerLabel?: string
+  /**
+   * Hides the drag handle. Use it when the host offers promote instead of
+   * pointer sorting — a sheet of pending follow-ups, for example.
+   */
+  showHandle?: boolean
 }
 
 function ComposerQueueItem({
   id,
   itemLabel,
   onSteer,
+  onPromote,
   onRemove,
   onMore,
   steerLabel = "Steer",
+  showHandle = true,
   className,
   children,
   style,
@@ -171,7 +215,7 @@ function ComposerQueueItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id, data: { itemLabel } })
+  } = useSortable({ id, data: { itemLabel }, disabled: !showHandle })
 
   return (
     <li
@@ -187,25 +231,42 @@ function ComposerQueueItem({
       // an idle item leaves consumer transition utilities untouched instead of
       // pinning `transition` to an unset custom property.
       className={cn(
-        "group relative z-0 grid min-h-11 grid-cols-[1.75rem_minmax(0,1fr)_auto] items-center gap-2 border-b border-border bg-card px-2 py-1.5 font-sans last:border-b-0 data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg",
+        "group relative z-0 grid min-h-11 items-center gap-2 border-b border-border bg-card px-2 py-1.5 font-sans last:border-b-0 data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg",
+        showHandle
+          ? "grid-cols-[1.75rem_minmax(0,1fr)_auto]"
+          : "grid-cols-[minmax(0,1fr)_auto]",
         Boolean(transition) && "[transition:var(--composer-queue-sort-transition)]",
         className,
       )}
       {...props}
     >
-      <button
-        type="button"
-        data-slot="composer-queue-handle"
-        aria-label={`Reorder ${itemLabel}`}
-        title={`Reorder ${itemLabel}`}
-        className="flex size-7 touch-none cursor-grab items-center justify-center rounded-full text-muted-foreground/60 outline-none transition-colors hover:bg-accent hover:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:cursor-grabbing"
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical aria-hidden="true" className="size-3.5" />
-      </button>
+      {showHandle ? (
+        <button
+          type="button"
+          data-slot="composer-queue-handle"
+          aria-label={`Reorder ${itemLabel}`}
+          title={`Reorder ${itemLabel}`}
+          className="flex size-7 touch-none cursor-grab items-center justify-center rounded-full text-muted-foreground/60 outline-none transition-colors hover:bg-accent hover:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical aria-hidden="true" className="size-3.5" />
+        </button>
+      ) : null}
       <div className="min-w-0 truncate nessa-text-4 text-foreground">{children}</div>
       <div className="flex items-center gap-0.5">
+        {onPromote ? (
+          <button
+            type="button"
+            data-slot="composer-queue-promote"
+            aria-label={`Promote ${itemLabel}`}
+            title={`Promote ${itemLabel}`}
+            onClick={onPromote}
+            className="inline-flex size-7 items-center justify-center rounded-full border-0 bg-transparent text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            <ArrowUp aria-hidden="true" className="size-3.5" />
+          </button>
+        ) : null}
         {onSteer ? (
           <button
             type="button"
@@ -247,5 +308,6 @@ function ComposerQueueItem({
 export {
   ComposerDeliveryMode,
   ComposerQueue,
+  ComposerQueueBadge,
   ComposerQueueItem,
 }

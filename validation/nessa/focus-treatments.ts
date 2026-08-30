@@ -22,7 +22,7 @@ const composerFocusComponents = Object.freeze([
   { component: "chat-tray", count: 3 },
   { component: "code-block", count: 1 },
   { component: "composer-access-mode", count: 2 },
-  { component: "composer-queue", count: 5 },
+  { component: "composer-queue", count: 7 },
   { component: "mermaid-diagram", count: 6 },
   { component: "message", count: 5 },
   { component: "message-scroller", count: 2 },
@@ -36,6 +36,14 @@ const composerFocusComponents = Object.freeze([
   { component: "tool-call", count: 3 },
   // The label is the only target; the rules either side are decoration.
   { component: "transcript-divider", count: 1 },
+  // Close and Done share the sheet; the backdrop is pointer-only.
+  { component: "sheet", count: 2 },
+  // The disclosure trigger and the named-task card; a standalone cue is text.
+  { component: "agent-activity", count: 2 },
+  // Each circular action is one target; the title and rows are not controls.
+  { component: "agent-details", count: 1 },
+  // The conversation row. The search field is an Input and draws its own ring.
+  { component: "conversation-history", count: 1 },
 ] as const)
 
 type FocusComponent =
