@@ -1381,9 +1381,11 @@ function AnnotationThread({
                   }
                 : undefined
             }
-            className={onSelect ? "cursor-pointer" : undefined}
+            className={onSelect ? "cursor-pointer px-4 py-2.5" : "px-4 py-2.5"}
           >
-            {quote.text}
+            {/* The kit's markdown renderer — pasted markdown, long typed
+                text, and lifted passages all read formatted here. */}
+            <MessageMarkdown className="leading-5">{quote.text}</MessageMarkdown>
           </ChatBubble>
           {sourceName && onOpenSource ? (
             <button
@@ -2136,6 +2138,12 @@ function PlaygroundExample({
           event.preventDefault()
           const content = inputRef.current?.getContent()
           const text = (content?.text ?? message).trim()
+          // Chips travel with the message: the bubble re-renders them with
+          // their icons instead of flattening to plain text — and a chip
+          // alone is a sendable message.
+          const hasChips = Boolean(
+            content?.parts.some((part) => part.type === "chip"),
+          )
           // With the annotation list open and one selected, the send is a
           // follow-up comment attaching to that annotation, not a message.
           if (quotesOpen && selectedQuote !== null) {
@@ -2152,15 +2160,12 @@ function PlaygroundExample({
             return
           }
           if (
-            (!text && attachments.length === 0 && quotes.length === 0) ||
+            (!text && attachments.length === 0 && quotes.length === 0 && !hasChips) ||
             generatingTabId !== null ||
             // A dedicated file tab has no conversation to send into.
             fileTabs[activeTabId] !== undefined
           )
             return
-          // Chips travel with the message: the bubble re-renders them with
-          // their icons instead of flattening to plain text.
-          const hasChips = content?.parts.some((part) => part.type === "chip")
           updateMessages(activeTabId, (current) => [
             ...current,
             {
