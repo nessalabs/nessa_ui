@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ArrowLeft, LayoutGrid } from "lucide-react"
+import { ArrowLeft, ChevronRight, LayoutGrid } from "lucide-react"
 
 import { Button } from "./button"
 import { cn } from "@/lib/utils"
@@ -125,7 +125,10 @@ function ChatMessage({
         }
         data-thread-focused={threadFocused || undefined}
         className={cn(
-          "flex max-w-[85%] flex-col font-sans",
+          // The row is the hover group and the positioning context for
+          // ChatMessageActions, which hangs under the bubble without taking
+          // layout space.
+          "group/message relative flex max-w-[85%] flex-col font-sans",
           tone === "sent"
             ? "origin-bottom-right items-end self-end"
             : "origin-bottom-left items-start self-start",
@@ -173,7 +176,31 @@ export interface ChatBubbleProps
   onSelect?: () => void
   /** A tapback reaction badge pinned to the bubble's top corner, e.g. "❤️". */
   reaction?: React.ReactNode
+  /**
+   * Caps a long message at this many lines so one paste cannot flood the
+   * transcript. Pair it with `onExpand` to offer the whole text elsewhere —
+   * a ChatOverlay reading view — which adds a trailing chevron and makes the
+   * clamped text activatable.
+   */
+  clampLines?: 2 | 3 | 4 | 5 | 6
+  /**
+   * Opens the full text of a clamped bubble, through a trailing chevron.
+   * Ignored without `clampLines`, and ignored alongside `onSelect`: a bubble
+   * that is itself a control cannot nest one. A selectable bubble still
+   * clamps, but its host owes readers an expand control of its own — in the
+   * message's ChatMessageActions row, for instance.
+   */
+  onExpand?: () => void
 }
+
+// Static class names, so Tailwind's scanner sees every clamp the API allows.
+const clampLineClasses = {
+  2: "line-clamp-2",
+  3: "line-clamp-3",
+  4: "line-clamp-4",
+  5: "line-clamp-5",
+  6: "line-clamp-6",
+} as const
 
 /**
  * The message bubble itself: iMessage blue for sent, the theme's accent for
@@ -184,6 +211,8 @@ export interface ChatBubbleProps
 function ChatBubble({
   onSelect,
   reaction,
+  clampLines,
+  onExpand,
   className,
   children,
   ...props
@@ -267,6 +296,52 @@ function ChatBubble({
       {reaction}
     </span>
   ) : null
+  // A clamped bubble reads as a preview of itself: the text truncates at the
+  // line cap and a chevron points at the reading view the host opens.
+  // Nesting a control inside the bubble-as-button would be invalid content
+  // and a second tab stop for one visual control.
+  const expand =
+    clampLines === undefined || onSelect !== undefined ? undefined : onExpand
+  const content =
+    clampLines === undefined ? (
+      children
+    ) : (
+      <span
+        data-slot="chat-bubble-clamp"
+        role={expand ? "button" : undefined}
+        tabIndex={expand ? 0 : undefined}
+        onClick={
+          expand
+            ? (event) => {
+                event.stopPropagation()
+                expand()
+              }
+            : undefined
+        }
+        onKeyDown={
+          expand
+            ? (event) => {
+                if (event.key !== "Enter" && event.key !== " ") return
+                event.preventDefault()
+                event.stopPropagation()
+                expand()
+              }
+            : undefined
+        }
+        className={cn(
+          "flex items-end gap-1",
+          expand && cn("cursor-pointer", chatBubblesFocusClassName),
+        )}
+      >
+        <span className={clampLineClasses[clampLines]}>{children}</span>
+        {expand ? (
+          <ChevronRight
+            aria-hidden="true"
+            className="mb-0.5 size-3.5 shrink-0 opacity-80"
+          />
+        ) : null}
+      </span>
+    )
   const bubbleClassName = cn(
     "relative max-w-full rounded-[1.125rem] px-3 py-1.5 text-left font-sans nessa-text-4 leading-5",
     // The badge protrudes 12px above the bubble; reserve that room so it
@@ -295,7 +370,7 @@ function ChatBubble({
         }
         {...longPressHandlers}
       >
-        {children}
+        {content}
         {reactionBadge}
       </span>
     )
@@ -333,7 +408,7 @@ function ChatBubble({
       )}
       {...rest}
     >
-      {children}
+      {content}
       {reactionBadge}
     </button>
   )
@@ -350,6 +425,153 @@ function ChatMessageReceipt({ className, ...props }: React.ComponentProps<"span"
       )}
       {...props}
     />
+  )
+}
+
+/**
+ * The row of per-message affordances — copy, edit, retry, fork — that hangs
+ * under a bubble and reveals itself on hover or keyboard focus. It is
+ * absolutely positioned, so the transcript's rhythm never shifts as the row
+ * appears, and it aligns to its message's side on its own. The delivery
+ * receipt belongs in here too: a transcript that shows "Delivered" only while
+ * the pointer is on the message carries no standing chrome. On touch, where
+ * there is no hover, the row stays visible.
+ *
+ * The row's top padding is deliberate rather than a margin: it bridges the
+ * gap between bubble and actions with the row's own hit area, so the pointer
+ * can travel down to a control without leaving the hover group.
+ */
+function ChatMessageActions({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  const { tone } = React.useContext(ChatMessageContext)
+  return (
+    <div
+      data-slot="chat-message-actions"
+      className={cn(
+        // With a fine pointer the row hangs under the bubble so the
+        // transcript's rhythm never shifts as it appears. On touch, where it
+        // is always visible, it takes real space instead — overlaying there
+        // would put its controls on top of the next message.
+        "flex items-center gap-0.5 pt-0.5 transition-opacity",
+        "[@media(hover:hover)_and_(pointer:fine)]:absolute [@media(hover:hover)_and_(pointer:fine)]:top-full [@media(hover:hover)_and_(pointer:fine)]:z-10",
+        tone === "sent"
+          ? "self-end [@media(hover:hover)_and_(pointer:fine)]:right-0"
+          : "self-start [@media(hover:hover)_and_(pointer:fine)]:left-0",
+        // A receipt dropped in this row sheds the standing spacing it needs
+        // when it sits directly under a bubble.
+        "[&>[data-slot=chat-message-receipt]]:mt-0 [&>[data-slot=chat-message-receipt]]:pe-1",
+        "[@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:opacity-0 [@media(hover:hover)_and_(pointer:fine)]:focus-within:pointer-events-auto [@media(hover:hover)_and_(pointer:fine)]:focus-within:opacity-100 [@media(hover:hover)_and_(pointer:fine)]:group-hover/message:pointer-events-auto [@media(hover:hover)_and_(pointer:fine)]:group-hover/message:opacity-100",
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
+/** One icon control inside ChatMessageActions; `aria-label` names it. */
+function ChatMessageAction({
+  className,
+  type = "button",
+  ...props
+}: React.ComponentProps<"button">) {
+  return (
+    <button
+      type={type}
+      data-slot="chat-message-action"
+      className={cn(
+        "inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground [&_svg]:size-3",
+        chatBubblesFocusClassName,
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
+export interface ChatBubbleEditorProps
+  extends Omit<
+    React.ComponentProps<"textarea">,
+    "value" | "defaultValue" | "onChange" | "rows" | "ref"
+  > {
+  /** The message text to edit; the caret opens after its last character. */
+  defaultValue: string
+  /** Commits the trimmed draft. Empty drafts cancel instead. */
+  onSave: (text: string) => void
+  /**
+   * Leaves edit mode unchanged. Escape, an empty save, and losing focus all
+   * call it — clicking away discards the draft rather than keeping a half-
+   * edited message alive, so a host that needs a confirmation step should
+   * own its own editing surface.
+   */
+  onCancel: () => void
+}
+
+/**
+ * Editing a message in place, without the bubble changing shape: the bubble
+ * keeps its tone, padding, and wrapping while its text becomes an editable
+ * field that sizes itself to the content, so a two-line message stays two
+ * lines under the caret. There are no save and cancel buttons — Enter
+ * commits, Shift+Enter breaks the line, and Escape or clicking away cancels.
+ */
+function ChatBubbleEditor({
+  defaultValue,
+  onSave,
+  onCancel,
+  className,
+  onKeyDown,
+  onBlur,
+  "aria-label": ariaLabel = "Edit message",
+  ...props
+}: ChatBubbleEditorProps) {
+  const [draft, setDraft] = React.useState(defaultValue)
+  // Callback ref rather than autoFocus: the caret belongs after the text, so
+  // typing continues the message instead of prefixing it.
+  const focusAtEnd = React.useCallback((node: HTMLTextAreaElement | null) => {
+    if (!node) return
+    node.focus()
+    node.setSelectionRange(node.value.length, node.value.length)
+  }, [])
+  return (
+    <ChatBubble className="max-w-full">
+      <textarea
+        ref={focusAtEnd}
+        aria-label={ariaLabel}
+        rows={1}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          onKeyDown?.(event)
+          if (event.defaultPrevented) return
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault()
+            // The transcript's own Enter and Escape handlers must not also
+            // fire: this edit is the only thing the keystroke addresses.
+            event.stopPropagation()
+            const trimmed = draft.trim()
+            if (trimmed) onSave(trimmed)
+            else onCancel()
+          }
+          if (event.key === "Escape") {
+            event.preventDefault()
+            event.stopPropagation()
+            onCancel()
+          }
+        }}
+        onBlur={(event) => {
+          onBlur?.(event)
+          if (!event.defaultPrevented) onCancel()
+        }}
+        className={cn(
+          // field-sizing lets the textarea take exactly its content's shape,
+          // so the editing bubble wraps and measures like the resting one.
+          "block max-w-full resize-none overflow-hidden whitespace-pre-wrap break-words border-0 bg-transparent p-0 font-sans nessa-text-4 leading-5 text-inherit outline-none [field-sizing:content]",
+          className,
+        )}
+        {...props}
+      />
+    </ChatBubble>
   )
 }
 
@@ -821,6 +1043,9 @@ export {
   ChatReactionPicker,
   ChatAttachmentTile,
   ChatAttachmentViewer,
+  ChatBubbleEditor,
+  ChatMessageAction,
+  ChatMessageActions,
   ChatBubble,
   ChatMessage,
   ChatMessageQuote,
