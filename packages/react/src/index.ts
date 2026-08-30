@@ -906,3 +906,24 @@ export {
   type StackedBarChartSample,
   type StackedBarChartSeries,
 } from "./components/stacked-bar-chart"
+export {
+  StatTile,
+  type StatTileProps,
+  type StatTileTone,
+} from "./components/stat-tile"
+export {
+  Meter,
+  type MeterProps,
+  type MeterSlot,
+  type MeterVariant,
+} from "./components/meter"
+export { FramedBox, type FramedBoxProps } from "./components/framed-box"
+export {
+  DiffView,
+  parsePatchFiles,
+  type DiffLineAnnotation,
+  type DiffViewMode,
+  type DiffViewProps,
+  type FileDiffMetadata,
+  type SelectedLineRange,
+} from "./components/diff-view"

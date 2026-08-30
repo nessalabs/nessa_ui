@@ -1,0 +1,19 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "stat-tile",
+  "title": "Stat tile",
+  "description": "A hairline-boxed data cell: an uppercase micro-label over a mono value with an optional hint line and an ok/warn semantic tone on the value, built for dense fact grids.",
+  "registryDependencies": [
+    "nessalabs/nessa_ui/nessa-base",
+    "nessalabs/nessa_ui/utils"
+  ],
+  "files": [
+    {
+      "path": "packages/react/src/components/stat-tile.tsx",
+      "content": "import * as React from \"react\"\n\nimport { cn } from \"@/lib/utils\"\n\n/** @responsibility Renders a hairline-boxed data cell: an uppercase micro-label over a mono value with an optional hint line and semantic tone. */\n\nexport interface StatTileProps\n  extends Omit<React.ComponentProps<\"div\">, \"children\"> {\n  /**\n   * The micro-label above the value. Rendered uppercase with wide tracking;\n   * pass it in natural casing (\"Databases\", not \"DATABASES\") so assistive\n   * technology is not read a shouted acronym.\n   */\n  label: React.ReactNode\n  /**\n   * The fact itself, set in mono with tabular numerals. Text truncates with\n   * an ellipsis rather than wrapping, so the tile keeps one fixed height in\n   * a grid of tiles.\n   */\n  value: React.ReactNode\n  /** Optional fine-print line under the value (\"from prod-replica\"). */\n  hint?: React.ReactNode\n  /**\n   * Semantic ink for the value: `\"ok\"` paints it in the diff-addition\n   * green, `\"warn\"` in the destructive red. Omit it for the default\n   * foreground ink — most tiles are neutral facts, and a wall of colored\n   * values stops reading as signal.\n   */\n  tone?: StatTileTone\n}\n\n/** Semantic ink for a StatTile's value: healthy green or destructive red. */\nexport type StatTileTone = \"ok\" | \"warn\"\n\n/**\n * The console's signature data cell: an uppercase micro-label over a mono\n * value inside a hairline box, with an optional hint line and an optional\n * semantic tone on the value. Built for dense fact grids — fleet totals on\n * a command center, per-database facts on a dashboard.\n *\n * Purely presentational: the tile renders its content as plain text in\n * document order (label, value, hint), so it needs no ARIA wiring.\n *\n * @param props - Tile content plus host `div` props.\n * @returns A bordered tile displaying the labelled value.\n */\nfunction StatTile({ className, label, value, hint, tone, ...props }: StatTileProps) {\n  return (\n    <div\n      data-slot=\"stat-tile\"\n      data-tone={tone}\n      className={cn(\n        \"flex min-w-0 flex-col gap-0.5 rounded-lg border border-border bg-muted/30 px-3 py-2\",\n        className,\n      )}\n      {...props}\n    >\n      <span\n        data-slot=\"stat-tile-label\"\n        className=\"truncate nessa-text-1 font-medium tracking-[0.12em] text-muted-foreground uppercase\"\n      >\n        {label}\n      </span>\n      <span\n        data-slot=\"stat-tile-value\"\n        className={cn(\n          \"truncate font-mono nessa-text-4 font-medium tabular-nums\",\n          tone === \"ok\" && \"text-(--nessa-diff-addition)\",\n          tone === \"warn\" && \"text-destructive\",\n        )}\n      >\n        {value}\n      </span>\n      {hint != null ? (\n        <span\n          data-slot=\"stat-tile-hint\"\n          className=\"truncate nessa-text-1 text-muted-foreground\"\n        >\n          {hint}\n        </span>\n      ) : null}\n    </div>\n  )\n}\n\nexport { StatTile }\n",
+      "type": "registry:ui",
+      "target": "components/ui/stat-tile.tsx"
+    }
+  ],
+  "type": "registry:ui"
+}

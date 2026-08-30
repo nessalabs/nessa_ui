@@ -52,6 +52,7 @@ type FocusComponent =
   | "checkbox"
   | "dialog"
   | "stacked-bar-chart"
+  | "diff-view"
   | "switch"
   | "textarea"
   | "dropdown-menu"
@@ -391,6 +392,18 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
+  // The diff's default gutter-utility button (the hover-revealed "comment
+  // on this line" affordance) floats over the gutter and takes the
+  // standard full-strength outline with the outset offset.
+  {
+    component: "diff-view",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
   // The switch is a free-standing toggle at Checkbox's scale; it takes the
   // standard full-strength outline with the outset offset.
   {
@@ -611,6 +624,10 @@ export const focusGeometryClasses = Object.freeze([
   // Chart columns float in the open plot area and keep the outset offset.
   { component: "stacked-bar-chart", className: "focus-visible:outline-2", count: 1 },
   { component: "stacked-bar-chart", className: "focus-visible:outline-offset-2", count: 1 },
+  // The gutter-utility button floats over the gutter and keeps the
+  // standard outset offset.
+  { component: "diff-view", className: "focus-visible:outline-2", count: 1 },
+  { component: "diff-view", className: "focus-visible:outline-offset-2", count: 1 },
   // The switch floats free like the checkbox and keeps the outset offset.
   { component: "switch", className: "focus-visible:outline-2", count: 1 },
   { component: "switch", className: "focus-visible:outline-offset-2", count: 1 },

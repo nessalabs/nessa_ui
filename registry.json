@@ -1931,6 +1931,78 @@
       ]
     },
     {
+      "name": "stat-tile",
+      "type": "registry:ui",
+      "title": "Stat tile",
+      "description": "A hairline-boxed data cell: an uppercase micro-label over a mono value with an optional hint line and an ok/warn semantic tone on the value, built for dense fact grids.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/stat-tile.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/stat-tile.tsx"
+        }
+      ]
+    },
+    {
+      "name": "meter",
+      "type": "registry:ui",
+      "title": "Meter",
+      "description": "A compact decorative horizontal fraction meter with btop-style dotted and solid variants; the filled share wears a fixed nessa-chart color slot or the neutral foreground, and values ride in adjacent text.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/meter.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/meter.tsx"
+        }
+      ]
+    },
+    {
+      "name": "framed-box",
+      "type": "registry:ui",
+      "title": "Framed box",
+      "description": "A btop-style console panel: a hairline border with the lowercase mono title sitting in the border line and an optional right-side annotation cut into the same line.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/framed-box.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/framed-box.tsx"
+        }
+      ]
+    },
+    {
+      "name": "diff-view",
+      "type": "registry:ui",
+      "title": "Diff view",
+      "description": "A single-file code-diff renderer on Pierre's engine: syntax-highlighted unified and split layouts with Nessa's code theming, plus typed passthroughs for line annotations, the gutter comment utility, and header metadata.",
+      "dependencies": [
+        "@pierre/diffs"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/code-block"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/diff-view.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/diff-view.tsx"
+        }
+      ]
+    },
+    {
       "name": "dialog",
       "type": "registry:ui",
       "title": "Dialog",
