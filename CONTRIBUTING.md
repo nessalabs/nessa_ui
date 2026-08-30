@@ -121,6 +121,53 @@ do not retain the feature branch's commit ancestry, so ordinary `git branch -d`
 may reject an otherwise verified cleanup. Never reuse a merged branch for
 unrelated work.
 
+## Consumer impact in every pull request
+
+Every pull request states what the change means for a consumer, before it
+states anything about contracts, checks, or internals. The pull request
+template opens with that section; it is not optional, and "no change" is an
+answer that must be written down rather than left implied.
+
+Name each surface separately, because they are not the same surface and a
+change that is invisible on one can be breaking on another:
+
+| Surface | What a consumer holds |
+| --- | --- |
+| `@nessa-ui/react` (npm) | the package's exports map and its public exports |
+| `@nessa-ui/agent-stream` (npm) | its two entries, `.` and `./transcript` |
+| shadcn registry | **copied source**, so the barrel a file lands at *is* the API |
+
+The registry is the one that catches people out. A registry consumer has no
+exports map to route around a move, so the file layout the item installs is the
+whole contract: renaming a copied file, or trimming the barrel that re-exports
+it, deletes API from projects that already ran `shadcn add`. It does so
+silently, because the copied files still typecheck until a call site names a
+symbol that is no longer there. This is not hypothetical — it shipped once, in
+the pull request that extracted the parser package, and was described in that
+pull request as a layering improvement because nobody had written the consumer
+line down.
+
+Stable install paths are not a stable API. Say which one you kept.
+
+### The before-and-after diagram
+
+Include a Mermaid diagram, before beside after, whenever anything a consumer
+can reach changes shape: a public export, an exports map, a registry item's
+files or targets, an import path, or the layout of copied source.
+
+Draw what the consumer touches, not what the repository contains. The useful
+diagram shows the import a project writes and where it lands, on each side; a
+diagram of internal modules that no consumer names is decoration. When a change
+adds a surface rather than moving one, the "before" side is the absence — draw
+it anyway, because that is what tells a reader whether they must migrate.
+
+Omit the diagram only when nothing consumer-reachable changed shape, and say so
+in that section instead of leaving it blank.
+
+Nothing enforces this in CI: a check runs against the repository, not against a
+pull request body. It holds because the template puts the question first and
+review asks for it.
+
 ## Agent authorization boundary
 
 Agents must work in the user's current checkout and current branch by default.
