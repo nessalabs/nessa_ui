@@ -559,8 +559,11 @@ function BubbleParts({
   onChipPress,
 }: {
   parts: ChatComposerContentPart[]
-  /** Receives the chip label and whether the press asked for a new tab. */
-  onChipPress?: (label: string, newTab: boolean) => void
+  /** Receives the pressed chip and whether the press asked for a new tab. */
+  onChipPress?: (
+    chip: { id: string; label: string; kind?: string },
+    newTab: boolean,
+  ) => void
 }) {
   return (
     <>
@@ -577,7 +580,7 @@ function BubbleParts({
                 ? (event) => {
                     event.stopPropagation()
                     onChipPress(
-                      part.chip.label,
+                      part.chip,
                       event.metaKey || event.ctrlKey,
                     )
                   }
@@ -590,7 +593,7 @@ function BubbleParts({
                     event.preventDefault()
                     event.stopPropagation()
                     onChipPress(
-                      part.chip.label,
+                      part.chip,
                       event.metaKey || event.ctrlKey,
                     )
                   }
@@ -831,6 +834,8 @@ function DemoBubble({
   onReplyCommit,
   onMenuOpenChange,
   onChipOpen,
+  onPastedOpen,
+  onLongOpen,
   onQuotePress,
   onQuoteSourceOpen,
   onQuotesOpen,
@@ -857,6 +862,10 @@ function DemoBubble({
   onMenuOpenChange?: (open: boolean) => void
   /** Opens a chip's file from a chip inside this bubble; true asks for a new tab. */
   onChipOpen?: (label: string, newTab: boolean) => void
+  /** Opens a pasted-text chip's full content in the list view. */
+  onPastedOpen?: (chipId: string) => void
+  /** Opens a long message's full text in the list view. */
+  onLongOpen?: (text: string) => void
   /** Focuses the thread this message replies into (its quote chip's tap). */
   onQuotePress?: () => void
   /** Opens the document a lifted passage came from. */
@@ -966,7 +975,7 @@ function DemoBubble({
           onSave={(text) => onEditSave?.(text)}
           onCancel={() => onEditCancel?.()}
         />
-      ) : message.text ? (
+      ) : message.text || (message.parts && message.parts.length > 0) ? (
         /* Right-click / long-press raises the ContextMenu with the tapback
            row and a Reply action. Opening it never frosts the transcript —
            the frosted thread view belongs to reply mode, entered via Reply. */
@@ -990,8 +999,45 @@ function DemoBubble({
                 >
                   {message.text}
                 </MessageMarkdown>
+              ) : message.role === "user" &&
+                message.text.length > 280 &&
+                onLongOpen ? (
+                // A huge typed message stays compact in the transcript —
+                // four lines and a chevron; the full text lives in the
+                // list view, like the pasted-text chips.
+                <span
+                  role="button"
+                  tabIndex={0}
+                  title="Show the whole message"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onLongOpen(message.text)
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return
+                    event.preventDefault()
+                    event.stopPropagation()
+                    onLongOpen(message.text)
+                  }}
+                  className="flex cursor-pointer items-end gap-1"
+                >
+                  <span className="line-clamp-4">{message.text}</span>
+                  <ChevronRight
+                    aria-hidden="true"
+                    className="mb-0.5 size-3.5 shrink-0 opacity-80"
+                  />
+                </span>
               ) : message.parts ? (
-                <BubbleParts parts={message.parts} onChipPress={onChipOpen} />
+                <BubbleParts
+                  parts={message.parts}
+                  onChipPress={(chip, newTab) => {
+                    if (chip.kind === "pasted-text") {
+                      onPastedOpen?.(chip.id)
+                      return
+                    }
+                    onChipOpen?.(chip.label, newTab)
+                  }}
+                />
               ) : (
                 message.text
               )}
@@ -1433,6 +1479,10 @@ function PlaygroundExample({
   const [editingMessageId, setEditingMessageId] = React.useState<number | null>(
     null,
   )
+  // Full text behind each pasted-text chip, keyed by chip id.
+  const pastedTexts = React.useRef<Record<string, string>>({})
+  /** Shows a full text in the list view — the transcript stays compact. */
+  const openFullText = (text: string) => setViewedQuotes([{ text }])
   // Chips open their file directly: plain press previews in the current
   // tab, a modified press (Cmd/Ctrl) parks the file as its own tab.
   const openChipFromLabel = (label: string, newTab: boolean) => {
@@ -1892,6 +1942,11 @@ function PlaygroundExample({
               if (item) openChipPreview(item, false)
             }}
             onQuotesOpen={setViewedQuotes}
+            onPastedOpen={(chipId) => {
+              const full = pastedTexts.current[chipId]
+              if (full) openFullText(full)
+            }}
+            onLongOpen={openFullText}
             editing={editingMessageId === entry.id}
             onEditStart={
               entry.role === "user"
@@ -2188,7 +2243,26 @@ function PlaygroundExample({
           <ChatComposerEditor
             ref={inputRef}
             onContentChange={(content) => setMessage(content.text)}
-            onChipPress={(chip) => openChipFromLabel(chip.label, false)}
+            onChipPress={(chip) => {
+              if (chip.kind === "pasted-text") {
+                const full = pastedTexts.current[chip.id]
+                if (full) openFullText(full)
+                return
+              }
+              openChipFromLabel(chip.label, false)
+            }}
+            pasteAttachmentMinLength={120}
+            onPasteAttachment={(pasted) => {
+              const id = `pasted-${nextId.current++}`
+              pastedTexts.current[id] = pasted
+              inputRef.current?.insertChip({
+                id,
+                kind: "pasted-text",
+                label: `Pasted text (${pasted.length} chars)`,
+                textValue: "",
+                className: "font-medium text-(--nessa-chat-accent)",
+              })
+            }}
             placeholder={
               quotesOpen && selectedQuote !== null
                 ? "Reply to the annotation…"
@@ -2956,7 +3030,7 @@ export const Subagents: Story = {
 export const Annotations: Story = {
   tags: ["reduced-motion"],
   parameters: storyDocumentation(
-    "The pending-annotation surfaces under load: the playground opens on the Repo audit conversation with eight selections already lifted from documents — one-liners, full paragraphs, comments of very different lengths, some bare. The row above the pill stays one truncated pill plus '+ 7 others'; opening it shows each annotation as a tiny thread — the passage as the document's message with its source file linked beneath, the user's comments as their replies. Tapping a passage selects it and the pill composer replies to it, attaching follow-up comments; hovering a comment reveals its edit control and the comment edits in place. Sending delivers the whole set as one compact 'N annotations' pill on the message, and user messages in the transcript edit in place too, from the context menu's Edit.",
+    "The pending-annotation surfaces under load: the playground opens on the Repo audit conversation with eight selections already lifted from documents — one-liners, full paragraphs, comments of very different lengths, some bare. The row above the pill stays one truncated pill plus '+ 7 others'; opening it shows each annotation as a tiny thread — the passage as the document's message with its source file linked beneath, the user's comments as their replies. Tapping a passage selects it and the pill composer replies to it, attaching follow-up comments; hovering a comment reveals its edit control and the comment edits in place. Sending delivers the whole set as one compact 'N annotations' pill on the message, and user messages in the transcript edit in place too, from the context menu's Edit. Big text stays compact everywhere: a paste over 120 characters lands as a Pasted text chip in the composer and travels as the same chip on the sent bubble, and a long typed message clamps to four lines with a chevron — either opens its full text in the list view over the transcript.",
   ),
   render: () => (
     <PlaygroundExample
