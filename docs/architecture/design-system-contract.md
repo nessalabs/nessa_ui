@@ -988,6 +988,33 @@ Package exports are limited to:
 
 A Next App Router fixture must prove that a Server Component can import presentational components from the root and a client boundary can import `NessaProvider` from the same root.
 
+### The parser package
+
+`@nessa-ui/agent-stream` is published beside `@nessa-ui/react` and converts an
+agent CLI's bytes into a normalized event log. It renders nothing, so it
+declares no dependencies, no optional or bundled dependencies, and no peer
+dependencies, imports React through no spelling, and carries no `"use client"`
+directive. A Node process, a Server Component, or a non-React host must be able
+to consume it; anything that reintroduces the framework makes that false.
+
+Package exports are limited to:
+
+```text
+.
+./transcript
+```
+
+The split is the layering, not a convenience. The root entry carries the wire
+and mapper layers and stops at the agent message; the optional fold — turns,
+tool groups, delegated runs — is reached only through `./transcript`. The root
+entry must not reach the fold, by re-export or through any transitive relative
+import: the fold's two modules import each other's values, and
+`@nessa-ui/react` re-exports both entries with `export *`, where a name carried
+by both is ambiguous and is elided silently rather than reported.
+
+`@nessa-ui/react` re-exports both entries, so its own public surface is
+unchanged and a React host needs no migration.
+
 ## Real icon consumer before API stability
 
 The icon provider is provisional until a real Nessa component consumes it. A story-only hook harness is necessary but insufficient.
@@ -1139,6 +1166,21 @@ packages/react/
 ├── tsup.config.ts
 └── vitest.config.ts
 
+packages/agent-stream/          # published, framework-free; renders nothing
+├── src/
+│   ├── index.ts                # the contract entry — stops at the agent message
+│   ├── events.ts               # AgentEvent and the shared payload union
+│   ├── json.ts                 # the narrowing readers every wire value passes
+│   ├── transcript/             # the optional fold, reached only via "./transcript"
+│   │   ├── index.ts
+│   │   ├── fold.ts
+│   │   └── builder.ts
+│   ├── acp/ claude/ codex/ opencode/   # one folder per provider
+│   └── *.test.ts
+├── tsup.config.ts
+├── README.md
+└── LICENSE
+
 scripts/
 └── generate-theme-artifacts.ts
 
@@ -1146,6 +1188,14 @@ registry.source.ts
 registry.json
 public/r/
 ```
+
+Two packages are published. `@nessa-ui/react` owns the CSS contracts and the
+React runtime floor; `@nessa-ui/agent-stream` owns neither and declares nothing
+to install, so PKG-001, PKG-002 and PKG-003 read a different required-artifact
+list for each. Because `@nessa-ui/react` depends on the parser with
+`workspace:*`, the parser publishes first and both publish through `pnpm`,
+which rewrites that range — `npm publish` would ship the literal `workspace:*`
+and produce an uninstallable tarball.
 
 ## Registry topology
 
@@ -1185,9 +1235,9 @@ This table is the exhaustive machine-mirrored index of normative rule groups. De
 | STORY-001 | Every public component module has living Storybook docs and test coverage. | `#verification-infrastructure` |
 | STORY-002 | Input stories preserve explicit accessible names and error associations. | `#accessibility-and-rendering-invariants` |
 | INT-001 | ModelPicker previews cannot move its model-option hit-target surface. | `#interaction-geometry-stability` |
-| PKG-001 | The React package declares its supported React runtime floor. | `#root-exports-and-build-shape` |
-| PKG-002 | CSS exports and side effects preserve the package distribution contract. | `#root-exports-and-build-shape` |
-| PKG-003 | Published artifacts are freshly built and contain required code, CSS, docs, and license. | `#root-exports-and-build-shape` |
+| PKG-001 | Each published package declares its runtime floor: React's peers for the React package, and none at all for the framework-free parser. | `#root-exports-and-build-shape` |
+| PKG-002 | Exports, side effects, and the parser's contract/fold split preserve the package distribution contract. | `#root-exports-and-build-shape` |
+| PKG-003 | Published artifacts of every package are freshly built and contain required code, CSS where owned, docs, and license. | `#root-exports-and-build-shape` |
 | A11Y-001 | Canonical Light/Dark token pairs meet the frozen WCAG contrast thresholds. | `#accessibility-and-rendering-invariants` |
 | A11Y-002 | Effective focus and invalid treatments meet non-text contrast or use exact transitional exceptions. | `#accessibility-and-rendering-invariants` |
 | A11Y-003 | Target size, zoom, reflow, focus geometry, and forced-colors evidence require review until browser gates land. | `#accessibility-and-rendering-invariants` |

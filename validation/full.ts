@@ -10,7 +10,7 @@ import { runCommand } from "./process.ts"
 
 const execFileAsync = promisify(execFile)
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
-const allowedNewIgnored = ["packages/react/dist/", "apps/storybook/storybook-static/"]
+const allowedNewIgnored = ["packages/agent-stream/dist/", "packages/react/dist/", "apps/storybook/storybook-static/"]
 
 async function gitList(repoRoot: string, args: readonly string[]): Promise<string[]> {
   const { stdout } = await execFileAsync("git", [...args, "-z"], { cwd: repoRoot, maxBuffer: 20 * 1024 * 1024 })

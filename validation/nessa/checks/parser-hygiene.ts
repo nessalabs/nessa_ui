@@ -13,7 +13,7 @@ import { checkMetadata } from "../check-metadata.ts"
  * would have to be added to.
  */
 function ownsNarrowing(filePath: string): boolean {
-  return filePath === "packages/react/src/lib/agent-stream/json.ts" || /\/agent-stream\/[^/]+\/wire\.ts$/.test(filePath)
+  return filePath === "packages/agent-stream/src/json.ts" || /\/agent-stream\/src\/[^/]+\/wire\.ts$/.test(filePath)
 }
 
 const NARROWED_PRIMITIVES = new Set(["string", "number", "boolean", "object"])
@@ -121,7 +121,7 @@ export const parserHygieneCheck = defineCheck({
   async run(context) {
     const findings = []
 
-    for (const filePath of context.files.match(["packages/react/src/lib/agent-stream/**/*.ts"])) {
+    for (const filePath of context.files.match(["packages/agent-stream/src/**/*.ts"])) {
       const ast = await context.parseTypeScript(filePath)
 
       for (const declaration of enumDeclarations(ast)) {
@@ -148,7 +148,7 @@ export const parserHygieneCheck = defineCheck({
       for (const comparison of handRolledNarrowing(ast)) {
         findings.push(
           context.fail(
-            `Hand-rolled narrowing at line ${line(ast, comparison)}: use the named readers in lib/agent-stream/json.ts (asString, asNumber, asRecord, asOneOf) so every wire value is narrowed one way, in one place.`,
+            `Hand-rolled narrowing at line ${line(ast, comparison)}: use the named readers in @nessa-ui/agent-stream's json.ts (asString, asNumber, asRecord, asOneOf) so every wire value is narrowed one way, in one place.`,
             { contractId: "PARSE-003", path: filePath },
           ),
         )

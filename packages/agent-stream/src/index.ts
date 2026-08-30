@@ -1,4 +1,4 @@
-/** @responsibility Re-exports the agent stream parser: the shared contract, the shared folds, and the providers that feed them. */
+/** @responsibility Re-exports the agent stream parser: the shared contract and the providers that feed it, stopping at the agent message. */
 
 // ---------- the contract every provider maps onto ----------
 export {
@@ -56,27 +56,6 @@ export {
   type JsonLineResult,
   type JsonValue,
 } from "./json"
-
-// ---------- optional folds over the contract ----------
-export { TranscriptBuilder } from "./builder"
-export {
-  GROUP_MIN,
-  applyDeltas,
-  assembleTurn,
-  buildTranscript,
-  groupTools,
-  isCompacting,
-  isToolGroup,
-  previewOf,
-  rendersRow,
-  runKey,
-  type DelegatedRun,
-  type DeltaBuffers,
-  type ToolGroup,
-  type Transcript,
-  type Turn,
-  type WorkItem,
-} from "./transcript"
 
 export { type MappingEntry, type WireKind } from "./mapping"
 export { EventSink } from "./emitter"

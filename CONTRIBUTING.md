@@ -22,8 +22,20 @@ then delegates to the Storybook workspace. Set `NESSA_STORYBOOK_HOST` or
 `NESSA_STORYBOOK_PORT` when the default `127.0.0.1:6006` is unsuitable.
 
 Do not add `package-lock.json`, `yarn.lock`, or Bun lockfiles. Nessa's published
-package and shadcn registry remain usable by npm, Yarn, Bun, and pnpm consumers;
+packages and shadcn registry remain usable by npm, Yarn, Bun, and pnpm consumers;
 pnpm is the contributor tool for this repository.
+
+## Publishing order
+
+Two packages are published: `@nessa-ui/agent-stream`, which is framework-free
+and depends on nothing, and `@nessa-ui/react`, which depends on it with
+`workspace:*`.
+
+Publish the parser first, and publish both with `pnpm publish`. Only pnpm
+rewrites `workspace:*` into a real version range on pack; `npm publish` ships
+the literal string and produces a tarball nobody can install. Releasing
+`@nessa-ui/react` before the parser version it names exists on the registry
+breaks installs the same way.
 
 ## Protected-main workflow
 

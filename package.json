@@ -10,7 +10,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "build": "pnpm --filter @nessa-ui/react build",
+    "build": "pnpm --filter @nessa-ui/agent-stream build && pnpm --filter @nessa-ui/react build",
     "build:registry": "shadcn build",
     "build:storybook": "pnpm --filter @nessa-ui/storybook build",
     "check:package": "tsx validation/check-package.ts",
@@ -19,7 +19,7 @@
     "dev": "pnpm --filter @nessa-ui/storybook dev",
     "storybook": "pnpm --filter @nessa-ui/storybook dev",
     "test": "pnpm --filter @nessa-ui/storybook test",
-    "test:unit": "tsx --test \"packages/react/src/lib/app-shell-layout/layout-model.test.ts\" \"packages/react/src/components/split-view/split-view-math.test.ts\" \"packages/react/src/components/workflow-canvas/workflow-canvas-math.test.ts\" \"packages/react/src/components/kanban/kanban-math.test.ts\" \"packages/react/src/components/gantt-chart/gantt-chart-scheduling.test.ts\" \"packages/react/src/components/file-preview/file-kind.test.ts\" \"packages/react/src/components/file-preview/delimited-text.test.ts\" \"packages/react/src/components/flow-chart/flow-chart-layout.test.ts\" \"packages/react/src/components/radar-chart/radar-chart-geometry.test.ts\" \"packages/react/src/components/pie-chart/pie-chart-geometry.test.ts\" \"packages/react/src/lib/agent-stream/agent-stream.test.ts\" \"packages/react/src/lib/agent-stream/codex-stream.test.ts\" \"packages/react/src/lib/agent-stream/opencode-stream.test.ts\" \"packages/react/src/lib/agent-stream/acp-stream.test.ts\" \"packages/react/src/components/price-chart/price-chart-math.test.ts\"",
+    "test:unit": "tsx --test \"packages/react/src/lib/app-shell-layout/layout-model.test.ts\" \"packages/react/src/components/split-view/split-view-math.test.ts\" \"packages/react/src/components/workflow-canvas/workflow-canvas-math.test.ts\" \"packages/react/src/components/kanban/kanban-math.test.ts\" \"packages/react/src/components/gantt-chart/gantt-chart-scheduling.test.ts\" \"packages/react/src/components/file-preview/file-kind.test.ts\" \"packages/react/src/components/file-preview/delimited-text.test.ts\" \"packages/react/src/components/flow-chart/flow-chart-layout.test.ts\" \"packages/react/src/components/radar-chart/radar-chart-geometry.test.ts\" \"packages/react/src/components/pie-chart/pie-chart-geometry.test.ts\" \"packages/agent-stream/src/agent-stream.test.ts\" \"packages/agent-stream/src/codex-stream.test.ts\" \"packages/agent-stream/src/opencode-stream.test.ts\" \"packages/agent-stream/src/acp-stream.test.ts\" \"packages/react/src/components/price-chart/price-chart-math.test.ts\"",
     "typecheck": "pnpm -r typecheck && pnpm typecheck:validation",
     "typecheck:validation": "tsc -p validation/tsconfig.json --noEmit",
     "validate": "tsx validation/run.ts --phase=source",
