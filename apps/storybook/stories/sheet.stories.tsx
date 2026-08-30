@@ -1,6 +1,6 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { expect, userEvent, within } from "storybook/test"
+import { expect, userEvent, waitFor, within } from "storybook/test"
 import {
   Sheet,
   SheetAction,
@@ -79,7 +79,9 @@ export const Playground: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Open sheet" }))
     const dialog = canvas.getByRole("dialog", { name: "Queued" })
     await expect(dialog).toBeVisible()
-    await expect(canvas.getByRole("heading", { name: "Queued" })).toBeVisible()
+    await waitFor(() =>
+      expect(canvas.getByRole("heading", { name: "Queued" })).toBeVisible(),
+    )
     await userEvent.click(canvas.getByRole("button", { name: "Close" }))
     await expect(
       canvas.queryByRole("dialog", { name: "Queued" }),

@@ -3423,23 +3423,39 @@ export const AgentSurfaces: Story = {
     await expect(
       canvas.getByRole("dialog", { name: "Agent details" }),
     ).toBeVisible()
-    await expect(canvas.getByText("nessalabs/nessa_ui")).toBeVisible()
+    await waitFor(() =>
+      expect(
+        canvas.getByRole("heading", {
+          name: /agent message package implementation/i,
+        }),
+      ).toBeVisible(),
+    )
+    const project = canvas.getByText("nessalabs/nessa_ui")
+    project.scrollIntoView()
+    await expect(project).toBeVisible()
     await expect(canvas.getByText("Cursor Cloud")).toBeVisible()
     await userEvent.click(canvas.getByRole("button", { name: "Close" }))
     const input = canvas.getByRole("textbox", { name: "Message" })
     await userEvent.click(input)
     await userEvent.type(input, "/hist")
     await userEvent.click(await body.findByRole("option", { name: /history/ }))
-    await expect(
-      canvas.getByRole("dialog", { name: "All conversations" }),
-    ).toBeVisible()
-    await userEvent.click(
-      canvas.getByRole("button", { name: /repo audit/i }),
+    await waitFor(() =>
+      expect(
+        canvas.getByRole("dialog", { name: "All conversations" }),
+      ).toBeVisible(),
     )
     await expect(
-      canvas.getByRole("tab", { name: "Repo audit" }),
+      canvas.getByRole("button", { name: /repo audit/i }),
+    ).toBeVisible()
+    await userEvent.click(
+      canvas.getByRole("button", { name: /agent message package implementation/i }),
+    )
+    await expect(
+      canvas.queryByRole("dialog", { name: "All conversations" }),
+    ).not.toBeInTheDocument()
+    await expect(
+      canvas.getByRole("tab", { name: "Agent message" }),
     ).toHaveAttribute("aria-selected", "true")
-    await waitForSettledAnimations(canvasElement)
   },
 }
 

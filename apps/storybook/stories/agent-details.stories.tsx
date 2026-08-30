@@ -1,6 +1,6 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { expect, userEvent, within } from "storybook/test"
+import { expect, userEvent, waitFor, within } from "storybook/test"
 import {
   AgentDetails,
   AgentDetailsAction,
@@ -110,10 +110,14 @@ export const Playground: Story = {
     await expect(
       canvas.getByRole("dialog", { name: "Agent details" }),
     ).toBeVisible()
-    await expect(canvas.getByText("nessalabs/nessa_ui")).toBeVisible()
+    await waitFor(() =>
+      expect(canvas.getByText("nessalabs/nessa_ui")).toBeVisible(),
+    )
     await expect(canvas.getByText("Cursor Cloud")).toBeVisible()
     await userEvent.click(canvas.getByRole("button", { name: "Pin" }))
-    await expect(canvas.getByText("Pin")).toBeVisible()
+    await expect(
+      canvasElement.querySelector('[role="status"]'),
+    ).toHaveTextContent("Pin")
     await userEvent.click(canvas.getByRole("button", { name: "Close" }))
     await expect(
       canvas.queryByRole("dialog", { name: "Agent details" }),

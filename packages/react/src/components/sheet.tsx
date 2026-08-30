@@ -173,7 +173,7 @@ function Sheet({
         <div
           ref={panelRef}
           data-slot="sheet-panel"
-          className="relative z-10 flex max-h-[85%] min-h-0 w-full flex-col rounded-t-3xl bg-background shadow-[0_-8px_32px] shadow-black/20"
+          className="relative z-10 flex max-h-[85%] w-full flex-col overflow-y-auto rounded-t-3xl bg-background shadow-[0_-8px_32px] shadow-black/20"
         >
           {children}
         </div>
@@ -303,7 +303,7 @@ function SheetBody({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sheet-body"
       className={cn(
-        "flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 pb-6 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "flex flex-col gap-3 px-5 pb-6 pt-2",
         className,
       )}
       {...props}
