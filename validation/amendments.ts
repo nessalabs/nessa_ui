@@ -144,4 +144,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-010",
+    kind: "transition",
+    contractId: "PKG-003",
+    baseRevision: "2d78a3f468169edb14a1312637295ad566ffb841",
+    targets: ["validation/nessa/check-metadata.ts"],
+    beforeFingerprint: "d738b3180ff85f50d0bbf8e63b44fd76aca89f6d1816c67d5c813eb58c3685c5",
+    afterFingerprint: "6dc49eb23673abadf3c1d1c14c1583c5db429e407706636cbd7be5446bb444eb",
+    rationale: "PKG-003 already requires freshly built artifacts of every published package, but package-artifacts-built only declared React's dist as an input, so a broken parser build would not even select the check. The same transition records the PARSE-003 decoder-boundary rule as the file name at any depth — wire.ts or ACP's frame.ts — rather than a one-segment path that never exempted the nested transports the package actually ships.",
+    compatibility: "No consumer runtime API change and no rendered output change. The built-artifacts check now also requires the parser's two entries and refuses a client directive, a React import, or a fold re-export in those artifacts. PARSE-003's rule is unchanged: mappers and the fold still cannot hand-roll typeof narrowing; only the decoder boundary, which already sat upstream of the shared readers, is exempt — now including the nested wires AMEND-009's regex never reached. No existing requirement is weakened, and no exception is added.",
+    migration: "A parser change that produces dist must leave packages/agent-stream/dist/index.js, index.d.ts, transcript.js and transcript.d.ts in place, with no use client and no React import, and the contract entry's declarations must not name ./transcript. A new transport's decoder is named wire.ts (or frame.ts for JSON-RPC) at any depth under packages/agent-stream/src; everything past that boundary uses the named readers in json.ts.",
+    supersedes: null,
+    pullRequest: null,
+  },
 ])

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import test from "node:test"
@@ -10,7 +10,7 @@ import { InMemoryCache } from "../framework/in-memory-cache.ts"
 import { runChecks } from "../framework/runner.ts"
 import { renderJson, renderText, sortFindings } from "../framework/reporter.ts"
 import { runBounded } from "../framework/scheduler.ts"
-import { combineChangedPaths, excludeDeletedPaths } from "../run.ts"
+import { collectArtifactPaths, combineChangedPaths, excludeDeletedPaths } from "../run.ts"
 
 test("glob contract is POSIX-normalized, dot-aware, and rejects unsupported syntax", () => {
   const index = createFileIndex(["src\\nested\\a.ts", ".github/workflows/check.yml", "src/root.ts"])
@@ -19,6 +19,25 @@ test("glob contract is POSIX-normalized, dot-aware, and rejects unsupported synt
   assert.throws(() => validateGlob("+(src|test)/**"), /extglobs/)
   assert.throws(() => validateGlob("src/[abc"), /unbalanced/)
   assert.throws(() => validateGlob("!src/**"), /unsupported/)
+})
+
+test("the artifacts phase indexes every published package's dist, not only React's", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "nessa-artifacts-"))
+  try {
+    await mkdir(path.join(root, "packages/react/dist"), { recursive: true })
+    await mkdir(path.join(root, "packages/agent-stream/dist"), { recursive: true })
+    await writeFile(path.join(root, "packages/react/dist/index.js"), "react")
+    await writeFile(path.join(root, "packages/agent-stream/dist/index.js"), "parser")
+    await writeFile(path.join(root, "packages/agent-stream/dist/transcript.js"), "fold")
+    const paths = await collectArtifactPaths(root)
+    assert.deepEqual(paths.sort(), [
+      "packages/agent-stream/dist/index.js",
+      "packages/agent-stream/dist/transcript.js",
+      "packages/react/dist/index.js",
+    ])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 test("changed-path selection includes new untracked files deterministically", () => {
