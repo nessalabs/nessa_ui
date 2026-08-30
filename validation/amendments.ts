@@ -130,4 +130,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-009",
+    kind: "transition",
+    contractId: "PKG-001",
+    baseRevision: "0f38c0985c4d3e9c8c6afc5fb6324f5c2cfd60e7",
+    targets: ["validation/nessa/check-metadata.ts"],
+    beforeFingerprint: "bcd57383ecd6ab2c42f2eaf5480642f42747767794eb485bf26fbc36ae3ce5eb",
+    afterFingerprint: "90cc3b812e9708930f80b6045e038162d1f83d3d5649c1933b95f3d666c4f0f1",
+    rationale: "The parser was framework-free in its source and not in what it shipped: reaching it meant installing @nessa-ui/react, so a Node process or server component took a react >=19 peer, a rendering tree (mermaid, katex, react-markdown, radix), and a \"use client\" directive stamped onto every built module by the package's own build. The architecture doc's rule that no component may read the wire was therefore advisory, enforced by nothing. Extracting packages/agent-stream makes the layering a package boundary, and splitting its exports at the contract makes \"the parser stops at the agent message\" a fact a check can read: the main entry carries wire and mapper, the ./transcript subpath carries the optional fold.",
+    compatibility: "No consumer runtime API change and no rendered output change. @nessa-ui/react re-exports both entries, so its public surface is byte-for-byte what it was; the two star-exports are safe only because the entries are disjoint. Registry targets stay at lib/agent-stream/** so shadcn consumers see the same install paths. PARSE-001's rules are unchanged and follow their sources to the new location, with the wire.ts narrowing exemption matching exactly the one file it matched before. PKG-001, PKG-002 and PKG-003 additionally govern the parser package's declarations and its source-level independence. No existing requirement is weakened, and no exception is added.",
+    migration: "Parser code lives in packages/agent-stream/src and may declare no dependencies, no peers, no React import, and no client directive. A host that wants only the event log imports @nessa-ui/agent-stream; one that wants the default turns-and-groups shape also imports @nessa-ui/agent-stream/transcript. New code imports the package directly rather than through @nessa-ui/react, which re-exports it for compatibility.",
+    supersedes: null,
+    pullRequest: null,
+  },
 ])

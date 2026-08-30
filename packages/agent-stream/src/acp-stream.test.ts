@@ -14,7 +14,7 @@ import { asRecord, asString } from "./json"
 import { applyDeltas, buildTranscript, previewOf } from "./transcript"
 import { transportOf } from "./transports"
 
-const FIXTURES = fileURLToPath(new URL("../../../../../apps/storybook/stories/fixtures/agent-stream/", import.meta.url))
+const FIXTURES = fileURLToPath(new URL("../../../apps/storybook/stories/fixtures/agent-stream/", import.meta.url))
 
 /**
  * Every ACP capture, and which agent produced it.

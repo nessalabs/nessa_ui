@@ -3,9 +3,10 @@ import { checkMetadata } from "../check-metadata.ts"
 import { hasUnscopedUniversal, ruleOwnsGlobalReset, selectorOwnership } from "./css-ownership.ts"
 
 interface PackageJson {
+  dependencies?: Record<string, string>
   peerDependencies?: Record<string, string>
   exports?: Record<string, unknown>
-  sideEffects?: string[]
+  sideEffects?: string[] | boolean
   files?: string[]
   scripts?: Record<string, string>
 }
@@ -30,7 +31,33 @@ export function packageDeclarationIssues(pkg: PackageJson): string[] {
     "./app.css": "./dist/app.css",
   }
   if (canonicalJson(pkg.exports) !== canonicalJson(expectedExports)) issues.push("exact exports")
-  if (!pkg.sideEffects?.includes("**/*.css")) issues.push("css side effects")
+  if (!Array.isArray(pkg.sideEffects) || !pkg.sideEffects.includes("**/*.css")) issues.push("css side effects")
+  if (pkg.scripts?.prepack !== "pnpm build") issues.push("prepack build")
+  for (const file of ["dist", "README.md", "LICENSE"]) if (!pkg.files?.includes(file)) issues.push(`published ${file}`)
+  return issues
+}
+
+/**
+ * The parser package's declarations, which are the layering made enforceable.
+ *
+ * `@nessa-ui/agent-stream` stops at the agent message and draws nothing, so its
+ * independence is not a style preference — a declared dependency or a React
+ * peer would put the rendering tree back in front of any Node process, server
+ * component, or non-React host that wants only the event log. The exports map
+ * is checked exactly because the two-entry split *is* the boundary: collapsing
+ * the fold back into `.` would silently re-merge the layers this package exists
+ * to keep apart.
+ */
+export function parserPackageDeclarationIssues(pkg: PackageJson): string[] {
+  const issues: string[] = []
+  if (Object.keys(pkg.dependencies ?? {}).length) issues.push("no dependencies")
+  if (Object.keys(pkg.peerDependencies ?? {}).length) issues.push("no peers")
+  const expectedExports: Record<string, unknown> = {
+    ".": { types: "./dist/index.d.ts", import: "./dist/index.js" },
+    "./transcript": { types: "./dist/transcript.d.ts", import: "./dist/transcript.js" },
+  }
+  if (canonicalJson(pkg.exports) !== canonicalJson(expectedExports)) issues.push("exact exports")
+  if (pkg.sideEffects !== false) issues.push("side effect free")
   if (pkg.scripts?.prepack !== "pnpm build") issues.push("prepack build")
   for (const file of ["dist", "README.md", "LICENSE"]) if (!pkg.files?.includes(file)) issues.push(`published ${file}`)
   return issues
@@ -55,7 +82,35 @@ export const packageArtifactsCheck = defineCheck({
     if (!context.files.has("packages/react/LICENSE") || !context.files.has("packages/react/README.md")) {
       findings.push(context.fail("Package README or LICENSE is absent.", { contractId: "PKG-003" }))
     }
-    if (!findings.length) findings.push(context.pass("Package peer, export, side-effect, and publication declarations are intact.", { contractId: "PKG-001" }))
+    const parser = await context.readJson<PackageJson>("packages/agent-stream/package.json")
+    const parserIssues = new Set(parserPackageDeclarationIssues(parser))
+    if (parserIssues.has("no dependencies") || parserIssues.has("no peers")) {
+      findings.push(context.fail("The parser package must declare no dependencies and no peers, so a non-React host can consume it.", { contractId: "PKG-001" }))
+    }
+    if (parserIssues.has("exact exports")) findings.push(context.fail("The parser package must export exactly the contract entry and the transcript subpath.", { contractId: "PKG-002" }))
+    if (parserIssues.has("side effect free")) findings.push(context.fail("The parser package must declare itself side-effect free.", { contractId: "PKG-002" }))
+    if (parserIssues.has("prepack build")) findings.push(context.fail("The parser package's prepack must build a fresh package.", { contractId: "PKG-003" }))
+    for (const file of ["dist", "README.md", "LICENSE"]) {
+      if (parserIssues.has(`published ${file}`)) findings.push(context.fail(`The parser package's published files omit ${file}.`, { contractId: "PKG-003" }))
+    }
+    if (!context.files.has("packages/agent-stream/LICENSE") || !context.files.has("packages/agent-stream/README.md")) {
+      findings.push(context.fail("The parser package's README or LICENSE is absent.", { contractId: "PKG-003" }))
+    }
+
+    // Source-level independence. The manifest can promise a framework-free
+    // package while an import quietly reintroduces one, and a stray client
+    // directive would strand the parser behind a React boundary again.
+    for (const filePath of context.files.match(["packages/agent-stream/src/**/*.ts"])) {
+      const source = await context.readText(filePath)
+      if (hasUseClientDirective(source)) {
+        findings.push(context.fail("The parser must not carry a React client boundary.", { contractId: "PKG-001", path: filePath }))
+      }
+      if (/\bfrom\s+["']react(-dom)?["']/.test(source)) {
+        findings.push(context.fail("The parser must not import React.", { contractId: "PKG-001", path: filePath }))
+      }
+    }
+
+    if (!findings.length) findings.push(context.pass("Package peer, export, side-effect, and publication declarations are intact, and the parser package stays framework-free.", { contractId: "PKG-001" }))
     return findings
   },
 })

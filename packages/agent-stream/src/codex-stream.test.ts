@@ -18,7 +18,7 @@ import { transportOf } from "./transports"
 import { CODEX_EXEC_PROVENANCE, CodexItemType, CodexWireType, parseCodexLines } from "./codex/exec/wire"
 import { applyDeltas, buildTranscript, isToolGroup, previewOf } from "./transcript"
 
-const FIXTURES = fileURLToPath(new URL("../../../../../apps/storybook/stories/fixtures/agent-stream/codex/", import.meta.url))
+const FIXTURES = fileURLToPath(new URL("../../../apps/storybook/stories/fixtures/agent-stream/codex/", import.meta.url))
 
 function capture(name: string): string {
   return readFileSync(`${FIXTURES}${name}.jsonl`, "utf8")

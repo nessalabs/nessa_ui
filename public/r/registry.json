@@ -684,202 +684,207 @@
       "description": "A framework-free parser for coding-agent output streams: decodes Claude Code's stream-json and Codex's exec --json into one harness-agnostic event log, and folds that log into the turns, tool groups, delegated runs and plan a transcript UI draws.",
       "files": [
         {
-          "path": "packages/react/src/lib/agent-stream/acp/frame.ts",
+          "path": "packages/agent-stream/src/acp/frame.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/acp/frame.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/acp/index.ts",
+          "path": "packages/agent-stream/src/acp/index.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/acp/index.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/acp/mapper.ts",
+          "path": "packages/agent-stream/src/acp/mapper.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/acp/mapper.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/acp/mapping.ts",
+          "path": "packages/agent-stream/src/acp/mapping.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/acp/mapping.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/acp/wire.ts",
+          "path": "packages/agent-stream/src/acp/wire.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/acp/wire.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/builder.ts",
+          "path": "packages/agent-stream/src/builder.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/builder.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/capabilities.ts",
+          "path": "packages/agent-stream/src/capabilities.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/capabilities.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/claude/index.ts",
+          "path": "packages/agent-stream/src/claude/index.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/claude/index.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/claude/store.ts",
+          "path": "packages/agent-stream/src/claude/store.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/claude/store.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/claude/stream/capabilities.ts",
+          "path": "packages/agent-stream/src/claude/stream/capabilities.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/claude/stream/capabilities.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/claude/stream/mapper.ts",
+          "path": "packages/agent-stream/src/claude/stream/mapper.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/claude/stream/mapper.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/claude/stream/mapping.ts",
+          "path": "packages/agent-stream/src/claude/stream/mapping.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/claude/stream/mapping.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/claude/stream/wire.ts",
+          "path": "packages/agent-stream/src/claude/stream/wire.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/claude/stream/wire.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/claude/tools.ts",
+          "path": "packages/agent-stream/src/claude/tools.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/claude/tools.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/codex/app-server/capabilities.ts",
+          "path": "packages/agent-stream/src/codex/app-server/capabilities.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/codex/app-server/capabilities.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/codex/app-server/mapper.ts",
+          "path": "packages/agent-stream/src/codex/app-server/mapper.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/codex/app-server/mapper.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/codex/app-server/mapping.ts",
+          "path": "packages/agent-stream/src/codex/app-server/mapping.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/codex/app-server/mapping.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/codex/app-server/wire.ts",
+          "path": "packages/agent-stream/src/codex/app-server/wire.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/codex/app-server/wire.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/codex/exec/mapper.ts",
+          "path": "packages/agent-stream/src/codex/exec/mapper.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/codex/exec/mapper.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/codex/exec/mapping.ts",
+          "path": "packages/agent-stream/src/codex/exec/mapping.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/codex/exec/mapping.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/codex/exec/wire.ts",
+          "path": "packages/agent-stream/src/codex/exec/wire.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/codex/exec/wire.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/codex/index.ts",
+          "path": "packages/agent-stream/src/codex/index.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/codex/index.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/emitter.ts",
+          "path": "packages/agent-stream/src/emitter.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/emitter.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/events.ts",
+          "path": "packages/agent-stream/src/events.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/events.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/index.ts",
+          "path": "packages/agent-stream/src/index.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/index.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/json.ts",
+          "path": "packages/agent-stream/src/json.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/json.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/mapping.ts",
+          "path": "packages/agent-stream/src/mapping.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/mapping.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/opencode/capabilities.ts",
+          "path": "packages/agent-stream/src/opencode/capabilities.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/opencode/capabilities.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/opencode/index.ts",
+          "path": "packages/agent-stream/src/opencode/index.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/opencode/index.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/opencode/mapping.ts",
+          "path": "packages/agent-stream/src/opencode/mapping.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/opencode/mapping.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/opencode/parts.ts",
+          "path": "packages/agent-stream/src/opencode/parts.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/opencode/parts.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/opencode/run/mapper.ts",
+          "path": "packages/agent-stream/src/opencode/run/mapper.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/opencode/run/mapper.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/opencode/run/mapping.ts",
+          "path": "packages/agent-stream/src/opencode/run/mapping.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/opencode/run/mapping.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/opencode/run/wire.ts",
+          "path": "packages/agent-stream/src/opencode/run/wire.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/opencode/run/wire.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/opencode/server/mapper.ts",
+          "path": "packages/agent-stream/src/opencode/server/mapper.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/opencode/server/mapper.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/opencode/server/mapping.ts",
+          "path": "packages/agent-stream/src/opencode/server/mapping.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/opencode/server/mapping.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/opencode/server/wire.ts",
+          "path": "packages/agent-stream/src/opencode/server/wire.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/opencode/server/wire.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/opencode/store.ts",
+          "path": "packages/agent-stream/src/opencode/store.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/opencode/store.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/transcript.ts",
+          "path": "packages/agent-stream/src/transcript.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/transcript.ts"
         },
         {
-          "path": "packages/react/src/lib/agent-stream/transports.ts",
+          "path": "packages/agent-stream/src/transcript-entry.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/transcript-entry.ts"
+        },
+        {
+          "path": "packages/agent-stream/src/transports.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/transports.ts"
         }

@@ -30,6 +30,17 @@ const config: StorybookConfig = {
         dirname,
         "../../../packages/react/src/index.ts",
       ),
+      // Ordered, not alphabetical: a Vite string alias is a prefix
+      // replacement, so the bare package name would also swallow the subpath
+      // and resolve it to `index.ts/transcript`. The longer key goes first.
+      "@nessa-ui/agent-stream/transcript": path.resolve(
+        dirname,
+        "../../../packages/agent-stream/src/transcript-entry.ts",
+      ),
+      "@nessa-ui/agent-stream": path.resolve(
+        dirname,
+        "../../../packages/agent-stream/src/index.ts",
+      ),
     }
     return config
   },

@@ -21,7 +21,7 @@ import { opencodeExportCommand, parseOpencodeExport } from "./opencode/store"
 import { applyDeltas, buildTranscript, isToolGroup, previewOf } from "./transcript"
 
 const FIXTURES = fileURLToPath(
-  new URL("../../../../../apps/storybook/stories/fixtures/agent-stream/opencode/", import.meta.url),
+  new URL("../../../apps/storybook/stories/fixtures/agent-stream/opencode/", import.meta.url),
 )
 
 function capture(name: string): string {
