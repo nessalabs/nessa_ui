@@ -3472,21 +3472,21 @@ export const AgentSurfaces: Story = {
     await userEvent.click(input)
     await userEvent.type(input, "/hist")
     await userEvent.click(await body.findByRole("option", { name: /history/ }))
-    await waitFor(() =>
-      expect(
-        canvas.getByRole("tab", { name: "Back to Agent message" }),
-      ).toHaveAttribute("aria-selected", "true"),
+    const historyTab = canvas.getByRole("tab", { name: "Back to Agent message" })
+    await waitFor(() => expect(historyTab).toHaveAttribute("aria-selected", "true"))
+    await expect(historyTab.closest("[data-slot='chat-tab']")).toHaveAttribute(
+      "data-kind",
+      "history",
     )
     await expect(
       canvas.getByRole("button", { name: /repo audit/i }),
     ).toBeVisible()
-    await userEvent.click(
-      canvas.getByRole("button", { name: /agent message package implementation/i }),
-    )
     await expect(
-      canvas.getByRole("tab", { name: "Agent message" }),
-    ).toHaveAttribute("aria-selected", "true")
-    await expect(canvas.getByRole("tab", { name: "History" })).toBeInTheDocument()
+      canvas.getByRole("button", { name: /agent message package implementation/i }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByRole("list", { name: "Conversations" }),
+    ).toBeVisible()
   },
 }
 
