@@ -625,7 +625,14 @@ interface DemoMessage {
     }>
   }
   /** A named unit of work, rendered as an AgentActivityCard. */
-  card?: { title: string; subtitle: string }
+  card?: {
+    title: string
+    subtitle: string
+    /** RandomAvatar seed; defaults to the conversation agent. */
+    seed?: string
+    /** Floods the avatar while this named agent is working. */
+    busy?: boolean
+  }
   /** An in-transcript plan, rendered with TaskList. */
   todos?: Array<{ label: string; status: TaskListItemStatus }>
 }
@@ -839,6 +846,8 @@ const seededMessagesByTab: Record<string, DemoMessage[]> = {
       card: {
         title: "Explore chat UI components",
         subtitle: "Working · Explorer",
+        seed: "explorer",
+        busy: true,
       },
       todos: [
         { label: "Add exploring cues over ToolCall", status: "active" },
@@ -984,6 +993,7 @@ function ActivityToolRows({
 
 function DemoActivity({
   message,
+  agentSeed,
   onOpenCard,
   onOpenActivity,
   activityOpen,
@@ -992,6 +1002,8 @@ function DemoActivity({
   detailsSheetId,
 }: {
   message: DemoMessage
+  /** Conversation identity; still while tools are done, busy while running. */
+  agentSeed: string
   onOpenCard?: () => void
   onOpenActivity?: (sheet: DemoActivitySheet) => void
   activityOpen?: boolean
@@ -1007,6 +1019,13 @@ function DemoActivity({
       {message.activity ? (
         <AgentActivity status={message.activity.status}>
           <AgentActivityTrigger
+            icon={
+              <RandomAvatar
+                seed={agentSeed}
+                busy={message.activity.status === "running"}
+                className="size-4"
+              />
+            }
             aria-expanded={activityOpen}
             aria-controls={activityOpen ? activitySheetId : undefined}
             onClick={() =>
@@ -1028,7 +1047,13 @@ function DemoActivity({
       ) : null}
       {message.card ? (
         <AgentActivityCard
-          icon={<Sparkles aria-hidden="true" />}
+          icon={
+            <RandomAvatar
+              seed={message.card.seed ?? agentSeed}
+              busy={message.card.busy}
+              className="size-7"
+            />
+          }
           title={message.card.title}
           meta={message.card.subtitle}
           aria-haspopup="dialog"
@@ -2336,6 +2361,7 @@ function PlaygroundExample({
           />
           <DemoActivity
             message={entry}
+            agentSeed={activeTabId}
             activityOpen={
               activitySheet?.title === entry.activity?.summary
             }
@@ -2378,7 +2404,7 @@ function PlaygroundExample({
           activeTabId === agentTabId ? (
             <AgentActivity status="running" className="me-8 self-start">
               <AgentActivityTrigger
-                icon={<Sparkles aria-hidden="true" />}
+                icon={<RandomAvatar seed={activeTabId} busy className="size-4" />}
                 aria-expanded={activitySheet?.title === "Exploring…"}
                 aria-controls={
                   activitySheet?.title === "Exploring…"
@@ -2998,7 +3024,6 @@ function PlaygroundExample({
                   key={item.id}
                   id={item.id}
                   itemLabel={item.text}
-                  showHandle={false}
                   onPromote={() =>
                     setQueuedByTab((current) => {
                       const list = current[activeTabId] ?? []
@@ -3616,7 +3641,7 @@ export const Playground: Story = {
 export const AgentSurfaces: Story = {
   tags: ["reduced-motion"],
   parameters: storyDocumentation(
-    "The playground opened on the Agent message tab: exploring cues collapse tool work, clicking a cue opens that beat’s thinking and tool calls in the extra-details sheet (not inline), a named-task card and to-do list sit in the transcript, Queued 2 opens the follow-up sheet (Expand fills the window), right-clicking the tab offers View Details (project, model, runtime), and /history opens a History tab of the conversation roster.",
+    "The playground opened on the Agent message tab: exploring cues collapse tool work and carry the conversation agent’s RandomAvatar (still when the run is done; busy while Exploring…), clicking a cue opens that beat’s thinking and tool calls in the extra-details sheet (not inline), a named-task card uses the explorer’s busy avatar, Queued 2 opens the follow-up sheet where rows drag to reorder (Expand fills the window), right-clicking the tab offers View Details (project, model, runtime), and /history opens a History tab of the conversation roster.",
   ),
   render: () => <PlaygroundExample initialTabId={agentTabId} />,
   play: async ({ canvasElement }) => {
@@ -3625,6 +3650,16 @@ export const AgentSurfaces: Story = {
     const body = within(canvasElement.ownerDocument.body)
     await expect(canvas.getByText("Thought 1s")).toBeVisible()
     await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
+    const exploredCue = canvas.getByRole("button", { name: agentExplored })
+    await expect(
+      exploredCue.querySelector("[data-slot=random-avatar]"),
+    ).not.toHaveAttribute("aria-busy")
+    const explorerCard = canvas.getByRole("button", {
+      name: /explore chat ui components/i,
+    })
+    await expect(
+      explorerCard.querySelector("[data-slot=random-avatar]"),
+    ).toHaveAttribute("aria-busy", "true")
     await userEvent.click(canvas.getByRole("button", { name: "Thought 1s" }))
     const thoughtDialog = canvas.getByRole("dialog", { name: "Thought 1s" })
     await waitFor(() => expect(thoughtDialog).toBeVisible())
@@ -3668,6 +3703,15 @@ export const AgentSurfaces: Story = {
         "So add components for that and then show in demo video of what you built for each",
       ),
     ).toBeVisible()
+    const queueList = canvas.getByRole("list", { name: "Pending messages" })
+    const firstHandle = canvas.getByRole("button", {
+      name: /reorder we also need this all conversations/i,
+    })
+    firstHandle.focus()
+    await userEvent.keyboard("{Enter}{ArrowDown}{Enter}")
+    await expect(within(queueList).getAllByRole("listitem")[0]).toHaveTextContent(
+      "So add components for that",
+    )
     const queued = canvas.getByRole("dialog", { name: "Queued" })
     await expect(queued).toHaveAttribute("aria-modal", "true")
     await userEvent.click(canvas.getByRole("button", { name: "Expand" }))

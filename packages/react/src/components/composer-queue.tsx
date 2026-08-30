@@ -206,8 +206,9 @@ export interface ComposerQueueItemProps extends React.ComponentProps<"li"> {
   onMore?: () => void
   steerLabel?: string
   /**
-   * Hides the drag handle. Use it when the host offers promote instead of
-   * pointer sorting — a sheet of pending follow-ups, for example.
+   * Shows the drag handle so rows reorder by dragging one onto another.
+   * Defaults to true, including in the queued sheet. Pass false only when
+   * the host must not expose pointer sorting.
    */
   showHandle?: boolean
 }

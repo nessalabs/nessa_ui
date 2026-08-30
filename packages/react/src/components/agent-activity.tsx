@@ -158,6 +158,10 @@ function ActivityShimmer({
 const cueClassName =
   "flex w-fit min-w-0 max-w-full items-center gap-1.5 rounded-md px-1 py-0.5 font-sans nessa-text-2 text-muted-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none"
 
+/** Leading mark on a cue: SVG glyphs stay 14px; RandomAvatar fills 16px. */
+const cueIconClassName =
+  "flex shrink-0 items-center justify-center text-(--nessa-chat-accent) [&_svg]:size-3.5 [&_[data-slot=random-avatar]]:size-4"
+
 export type AgentActivityCueProps = {
   /**
    * The cue's lifecycle. While `running` the label shimmers. Defaults to
@@ -166,8 +170,9 @@ export type AgentActivityCueProps = {
    */
   status?: AgentActivityStatus
   /**
-   * The leading glyph — a sparkle for a live "Exploring…" beat. The cue
-   * owns sizing and color, so pass the bare icon element.
+   * The leading mark — typically a RandomAvatar that is `busy` while the
+   * agent is still working and still once it is not. The cue owns sizing,
+   * so pass the bare element.
    */
   icon?: React.ReactNode
 } & (
@@ -197,10 +202,7 @@ function AgentActivityCue(props: AgentActivityCueProps) {
   const content = (
     <>
       {props.icon != null ? (
-        <span
-          aria-hidden="true"
-          className="flex shrink-0 items-center justify-center text-(--nessa-chat-accent) [&_svg]:size-3.5"
-        >
+        <span aria-hidden="true" className={cueIconClassName}>
           {props.icon}
         </span>
       ) : null}
@@ -263,19 +265,23 @@ function AgentActivityCue(props: AgentActivityCueProps) {
 
 export interface AgentActivityTriggerProps
   extends Omit<React.ComponentProps<"button">, "children"> {
-  /** The leading glyph, rendered ahead of the label. */
+  /**
+   * The leading mark, rendered ahead of the label. Pass a RandomAvatar
+   * with `busy` while the group is running so the paint floods; omit
+   * `busy` (or pass false) when the run is complete.
+   */
   icon?: React.ReactNode
   /** The activity text, e.g. "Explored 3 files, 2 searches". */
   children?: React.ReactNode
 }
 
 /**
- * The always-visible cue for a run of tools: icon, label, and a chevron
- * that marks it as a control. Clicking opens the extra-details sheet for
- * that beat — it does not expand in the transcript. The host owns the
- * sheet; pass `aria-expanded` and `aria-controls` so the cue names it.
- * While the group is `running` the label shimmers; when it `error`ed the
- * label tints destructive.
+ * The always-visible cue for a run of tools: identity avatar, label, and
+ * a chevron that marks it as a control. Clicking opens the extra-details
+ * sheet for that beat — it does not expand in the transcript. The host
+ * owns the sheet; pass `aria-expanded` and `aria-controls` so the cue
+ * names it. While the group is `running` the label shimmers and the
+ * avatar is `busy`; when it `error`ed the label tints destructive.
  */
 function AgentActivityTrigger({
   icon,
@@ -298,10 +304,7 @@ function AgentActivityTrigger({
       {...props}
     >
       {icon != null ? (
-        <span
-          aria-hidden="true"
-          className="flex shrink-0 items-center justify-center text-(--nessa-chat-accent) [&_svg]:size-3.5"
-        >
+        <span aria-hidden="true" className={cueIconClassName}>
           {icon}
         </span>
       ) : null}
@@ -340,14 +343,19 @@ export interface AgentActivityCardProps
   title: React.ReactNode
   /** The status line under the title, e.g. "Working · Explorer". */
   meta?: React.ReactNode
-  /** The leading glyph. The card owns sizing and color. */
+  /**
+   * The leading identity. Pass a RandomAvatar (`busy` while that agent is
+   * working) the same way a subagent chip does; the card sizes it to the
+   * chip avatar. SVG glyphs still fit the circle.
+   */
   icon?: React.ReactNode
 }
 
 /**
- * A named unit of agent work as a compact card: icon, title, status line,
- * and a chevron. Use it when a beat has a name of its own — a spawned
- * explorer, a delegated run — rather than a counted summary of tools.
+ * A named unit of agent work as a compact card: identity avatar, title,
+ * status line, and a chevron. Use it when a beat has a name of its own —
+ * a spawned explorer, a delegated run — rather than a counted summary of
+ * tools. The avatar animates only while that agent is working.
  */
 function AgentActivityCard({
   title,
@@ -369,7 +377,7 @@ function AgentActivityCard({
       {icon != null ? (
         <span
           aria-hidden="true"
-          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-(--nessa-chat-accent)/15 text-(--nessa-chat-accent) [&_svg]:size-3.5"
+          className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-(--nessa-chat-accent) [&_svg]:size-3.5 [&_[data-slot=random-avatar]]:size-7"
         >
           {icon}
         </span>

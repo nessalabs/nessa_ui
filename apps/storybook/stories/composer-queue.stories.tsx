@@ -95,7 +95,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Pending-message rows for active agent runs, plus a delivery-mode control for choosing whether the next follow-up queues behind the run or steers it immediately. A compact Queued N badge opens a plain sheet of wrapping rows; promote moves one to the front. The host owns ordering and delivery semantics.",
+          "Pending-message rows for active agent runs, plus a delivery-mode control for choosing whether the next follow-up queues behind the run or steers it immediately. A compact Queued N badge opens a plain sheet of wrapping rows; drag a row onto another to reorder, or promote one to the front. The host owns ordering and delivery semantics.",
       },
     },
   },
@@ -277,7 +277,6 @@ function QueuedSheetExample() {
                   key={item.id}
                   id={item.id}
                   itemLabel={item.content}
-                  showHandle={false}
                   onPromote={() =>
                     setItems((current) => {
                       const next = current.filter(
@@ -308,7 +307,7 @@ function QueuedSheetExample() {
 
 export const QueuedSheet: Story = {
   parameters: storyDocumentation(
-    "The compact Queued N pill opens a sheet of wrapping follow-ups. Each row can promote to the front or be removed; Expand fills the ancestor and Minimize restores the drawer.",
+    "The compact Queued N pill opens a sheet of wrapping follow-ups. Drag one row onto another to reorder; each row can also promote to the front or be removed. Expand fills the ancestor and Minimize restores the drawer.",
   ),
   render: () => <QueuedSheetExample />,
   play: async ({ canvasElement }) => {
@@ -326,6 +325,15 @@ export const QueuedSheet: Story = {
     await expect(
       canvas.getByRole("list", { name: "Pending messages" }),
     ).toHaveAttribute("data-appearance", "plain")
+    const queue = canvas.getByRole("list", { name: "Pending messages" })
+    const firstHandle = canvas.getByRole("button", {
+      name: /reorder we also need this all conversations/i,
+    })
+    firstHandle.focus()
+    await userEvent.keyboard("{Enter}{ArrowDown}{Enter}")
+    await expect(within(queue).getAllByRole("listitem")[0]).toHaveTextContent(
+      "So add components for that",
+    )
     const dialog = canvas.getByRole("dialog", { name: "Queued" })
     await userEvent.click(canvas.getByRole("button", { name: "Expand" }))
     await expect(dialog).toHaveAttribute("data-expanded", "true")
@@ -334,8 +342,8 @@ export const QueuedSheet: Story = {
     await userEvent.click(
       canvas.getAllByRole("button", { name: /^promote /i })[1]!,
     )
-    await expect(canvas.getAllByRole("listitem")[0]).toHaveTextContent(
-      "So add components for that",
+    await expect(within(queue).getAllByRole("listitem")[0]).toHaveTextContent(
+      "We also need this all conversations",
     )
     await userEvent.click(canvas.getAllByRole("button", { name: /^remove /i })[0]!)
     await userEvent.click(canvas.getByRole("button", { name: "Done" }))
