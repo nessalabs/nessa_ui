@@ -191,7 +191,7 @@ function SheetHandle({ className, ...props }: React.ComponentProps<"div">) {
       className={cn("flex shrink-0 justify-center pt-2", className)}
       {...props}
     >
-      <span className="h-1 w-10 rounded-full bg-muted-foreground/35" />
+      <span className="h-1 w-10 rounded-full bg-muted-foreground/50" />
     </div>
   )
 }
@@ -200,15 +200,15 @@ export interface SheetHeaderProps extends React.ComponentProps<"div"> {}
 
 /**
  * The sheet's title row. Hosts place SheetClose, SheetTitle, and SheetAction
- * as children; the row is a three-slot grid so a lone title stays centered
- * whether or not the side controls are present.
+ * as children; the side columns share leftover width so the title stays
+ * optically centered whether or not Close or Done is present.
  */
 function SheetHeader({ className, ...props }: SheetHeaderProps) {
   return (
     <div
       data-slot="sheet-header"
       className={cn(
-        "grid shrink-0 grid-cols-[minmax(3.25rem,auto)_minmax(0,1fr)_minmax(3.25rem,auto)] items-center gap-2 px-3 pb-1 pt-1",
+        "grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 pb-1 pt-1",
         className,
       )}
       {...props}
@@ -256,7 +256,7 @@ function SheetClose({
         onClick?.(event)
         if (!event.defaultPrevented) close()
       }}
-      className={cn(sheetControlClassName, "col-start-1", className)}
+      className={cn(sheetControlClassName, "col-start-1 justify-self-start", className)}
       {...props}
     >
       {children ?? <X aria-hidden="true" />}
