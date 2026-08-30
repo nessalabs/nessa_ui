@@ -120,8 +120,11 @@ A provider is a folder; nothing else moves. Give it its own wire shapes and
 vocabularies, a mapping table stating **as data** which of its line kinds
 becomes which normalized event (including the kinds that deliberately become
 nothing, with the reason), and a mapper implementing the shared mapper
-interface. Export it namespaced, never flat — two star-exports sharing a name
-silently elide the symbol.
+interface. Export the provider *module* namespaced (`export * as foo`), never
+as a star-export into the barrel — two star-exports sharing a name silently
+elide the symbol. Mapper classes and their `map*Stream` helpers are the
+exception: those are also exported flat from the contract entry so a host can
+write `new ClaudeStreamMapper()` without a stutter.
 
 `claude/` and `codex/` are two worked examples. Copy their shape, not their
 vocabulary — and read both before assuming a rule generalizes: what looks like

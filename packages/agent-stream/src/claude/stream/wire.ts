@@ -459,19 +459,14 @@ export interface WireParseSuccess {
 export type WireParseResult = WireParseSuccess | WireParseFailure
 
 /**
- * Decodes one line of `--output-format stream-json`.
+ * Decodes one line of Claude Code's `--output-format stream-json` stream.
  *
  * Failure is returned rather than thrown: a stream is read for as long as the
  * process runs, and one malformed line — a truncated write, a stray log — must
  * not end the transcript. Blank lines are a failure with an explicit reason so
- * a caller can filter them knowingly instead of by accident.
- */
-/**
- * Decodes one line of Claude Code's stream.
- *
- * The decoding itself is shared — every provider's wire is newline-delimited
- * JSON, and one copy per provider is one place per provider for a bug in it to
- * live. What stays here is the naming and the return type.
+ * a caller can filter them knowingly instead of by accident. The decoding
+ * itself is shared — every provider's wire is newline-delimited JSON — and
+ * what stays here is the naming and the return type.
  */
 export function parseWireLine(line: string): WireParseResult {
   const result = parseJsonLine(line)

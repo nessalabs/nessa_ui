@@ -16,7 +16,7 @@ import { OPENCODE_RUN_PROVENANCE, OpencodeRunType, parseOpencodeLines } from "./
 import { OPENCODE_SERVER_MAPPING } from "./opencode/server/mapping"
 import { OpencodeServerMapper, mapOpencodeServerStream } from "./opencode/server/mapper"
 import { OPENCODE_SERVER_PROVENANCE, parseOpencodeSse, parseOpencodeSseLine } from "./opencode/server/wire"
-import { AGENT_TRANSPORTS, transportOf } from "./transports"
+import { AGENT_TRANSPORTS, transportOf, transportsOf } from "./transports"
 import { opencodeExportCommand, parseOpencodeExport } from "./opencode/store"
 import { applyDeltas, buildTranscript, isToolGroup, previewOf } from "./transcript/fold"
 
@@ -615,6 +615,10 @@ test("the transport table says what the captures show, provider by provider", ()
 
   assert.equal(transportOf("opencode", "nope"), null)
   assert.equal(transportOf("nope", "run"), null)
+
+  assert.equal(transportsOf("opencode")?.transports.length, 3)
+  assert.equal(transportsOf("claude")?.label, "Claude Code")
+  assert.equal(transportsOf("nope"), null)
 })
 
 test("the two opencode transports are described separately, with their own versions", () => {
