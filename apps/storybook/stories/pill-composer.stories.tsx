@@ -2074,7 +2074,7 @@ function PlaygroundExample({
         id={`chat-tab-panel-${activeTabId}`}
         aria-labelledby={`chat-tab-${activeTabId}`}
         role="tabpanel"
-        // Positioned, so the overlay replaces only the transcript surface —
+        // Positioned, so an extra-details sheet fills only the transcript —
         // the tab strip and the pill stay visible and usable around it.
         className="relative flex min-h-0 flex-1 flex-col"
       >
@@ -3455,6 +3455,11 @@ export const AgentSurfaces: Story = {
         "So add components for that and then show in demo video of what you built for each",
       ),
     ).toBeVisible()
+    const queued = canvas.getByRole("dialog", { name: "Queued" })
+    await userEvent.click(canvas.getByRole("button", { name: "Expand" }))
+    await expect(queued).toHaveAttribute("data-expanded", "true")
+    await userEvent.click(canvas.getByRole("button", { name: "Minimize" }))
+    await expect(queued).toHaveAttribute("data-expanded", "false")
     await userEvent.click(canvas.getByRole("button", { name: "Done" }))
     const agentTab = canvas.getByRole("tab", { name: "Agent message" })
     await userEvent.pointer({ keys: "[MouseRight]", target: agentTab })
@@ -3598,6 +3603,12 @@ export const Annotations: Story = {
     await expect(
       canvas.getAllByRole("button", { name: "Discard annotation" }),
     ).toHaveLength(7)
+    const annotations = canvas.getByRole("dialog", { name: "Annotations" })
+    await expect(annotations).toHaveAttribute("data-expanded", "true")
+    await userEvent.click(canvas.getByRole("button", { name: "Minimize" }))
+    await expect(annotations).toHaveAttribute("data-expanded", "false")
+    await userEvent.click(canvas.getByRole("button", { name: "Expand" }))
+    await expect(annotations).toHaveAttribute("data-expanded", "true")
     await userEvent.click(canvas.getByRole("button", { name: "Done" }))
     await expect(
       canvas.getByRole("button", { name: "+ 6 others" }),
