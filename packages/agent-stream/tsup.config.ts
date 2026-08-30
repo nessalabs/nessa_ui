@@ -5,11 +5,11 @@ export default defineConfig({
   dts: true,
   // The contract entry stops at the agent message; the fold ships behind its
   // own subpath so a host that only wants events never pulls it in. Named
-  // keys, because the fold's source file sits beside `transcript.ts` and the
-  // published name is what the exports map promises.
+  // keys, because the output name is what the exports map promises and what a
+  // registry consumer imports as `lib/agent-stream/transcript`.
   entry: {
     index: "src/index.ts",
-    transcript: "src/transcript-entry.ts",
+    transcript: "src/transcript/index.ts",
   },
   format: ["esm"],
   minify: false,

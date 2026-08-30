@@ -35,7 +35,7 @@ const config: StorybookConfig = {
       // and resolve it to `index.ts/transcript`. The longer key goes first.
       "@nessa-ui/agent-stream/transcript": path.resolve(
         dirname,
-        "../../../packages/agent-stream/src/transcript-entry.ts",
+        "../../../packages/agent-stream/src/transcript/index.ts",
       ),
       "@nessa-ui/agent-stream": path.resolve(
         dirname,

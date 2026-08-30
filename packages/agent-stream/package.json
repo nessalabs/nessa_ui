@@ -18,6 +18,13 @@
       "import": "./dist/transcript.js"
     }
   },
+  "typesVersions": {
+    "*": {
+      "transcript": [
+        "./dist/transcript.d.ts"
+      ]
+    }
+  },
   "files": [
     "dist",
     "README.md",

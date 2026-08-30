@@ -34,9 +34,10 @@ packages/agent-stream/src/
   json.ts          JsonValue and the narrowing readers      ← shared
   events.ts        AgentEvent, AgentEventPayload, the       ← shared: THE CONTRACT
                    vocabularies every provider maps onto
-  transcript-entry.ts  the fold's own entry                 ← "./transcript" export
-  transcript.ts    one-shot fold                            ← shared, optional
-  builder.ts       incremental fold                         ← shared, optional
+  transcript/
+    index.ts       the fold's own entry                     ← "./transcript" export
+    fold.ts        one-shot fold                            ← shared, optional
+    builder.ts     incremental fold                         ← shared, optional
   claude/
     wire.ts        Claude Code's line shapes + vocabularies ← provider
     mapping.ts     Claude's kinds → contract kinds, as data ← provider

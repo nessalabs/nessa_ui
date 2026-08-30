@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import test from "node:test"
 
-import { TranscriptBuilder } from "./builder"
+import { TranscriptBuilder } from "./transcript/builder"
 import { AgentEventType, isEvent } from "./events"
 import { CODEX_EVENT_MAPPING, codexWireKind } from "./codex/exec/mapping"
 import { CODEX_CAPABILITY_METHODS, codexCapabilities } from "./codex/app-server/capabilities"
@@ -16,7 +16,7 @@ import { CODEX_APP_SERVER_PROVENANCE, parseCodexAppServer } from "./codex/app-se
 import type { JsonValue } from "./json"
 import { transportOf } from "./transports"
 import { CODEX_EXEC_PROVENANCE, CodexItemType, CodexWireType, parseCodexLines } from "./codex/exec/wire"
-import { applyDeltas, buildTranscript, isToolGroup, previewOf } from "./transcript"
+import { applyDeltas, buildTranscript, isToolGroup, previewOf } from "./transcript/fold"
 
 const FIXTURES = fileURLToPath(new URL("../../../apps/storybook/stories/fixtures/agent-stream/codex/", import.meta.url))
 

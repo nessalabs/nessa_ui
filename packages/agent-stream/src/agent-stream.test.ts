@@ -17,9 +17,9 @@ import {
   subagentTranscriptPath,
   workflowAgentTranscriptPath,
 } from "./claude/store"
-import { TranscriptBuilder } from "./builder"
+import { TranscriptBuilder } from "./transcript/builder"
 import { ClaudeStreamMapper, mapClaudeStream } from "./claude/stream/mapper"
-import { applyDeltas, buildTranscript, isCompacting, isToolGroup, previewOf } from "./transcript"
+import { applyDeltas, buildTranscript, isCompacting, isToolGroup, previewOf } from "./transcript/fold"
 import { CLAUDE_STREAM_PROVENANCE, ClaudeSystemSubtype, ClaudeWireType, parseWireLines } from "./claude/stream/wire"
 import { asRecord } from "./json"
 

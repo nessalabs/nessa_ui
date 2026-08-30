@@ -9,10 +9,10 @@ import type {
   ToolResult,
   Usage,
   WorkflowPhaseProgress,
-} from "./events"
+} from "../events"
 import { TranscriptBuilder } from "./builder"
-import { pathKey } from "./events"
-import type { AgentEventType } from "./events"
+import { pathKey } from "../events"
+import type { AgentEventType } from "../events"
 
 /** A run of consecutive same-tool calls, collapsed behind one row. */
 export interface ToolGroup {

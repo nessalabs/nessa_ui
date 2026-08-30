@@ -1,9 +1,9 @@
 /** @responsibility Folds a live event log incrementally, so a running session costs work proportional to what arrived rather than to its whole length. */
 
-import type { AgentEvent, AgentPath, PlanStep, SessionInfo, ToolResult, Usage } from "./events"
-import { pathKey } from "./events"
-import type { DelegatedRun, Transcript, Turn, WorkItem } from "./transcript"
-import { assembleTurn, collapseRun, rendersRow } from "./transcript"
+import type { AgentEvent, AgentPath, PlanStep, SessionInfo, ToolResult, Usage } from "../events"
+import { pathKey } from "../events"
+import type { DelegatedRun, Transcript, Turn, WorkItem } from "./fold"
+import { assembleTurn, collapseRun, rendersRow } from "./fold"
 
 const EMPTY_TASKS: ReadonlySet<string> = new Set()
 

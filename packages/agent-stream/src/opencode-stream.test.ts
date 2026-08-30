@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import test from "node:test"
 
-import { TranscriptBuilder } from "./builder"
+import { TranscriptBuilder } from "./transcript/builder"
 import { AgentEventType, isEvent } from "./events"
 import { OPENCODE_CAPABILITY_COMMANDS, opencodeCapabilities } from "./opencode/capabilities"
 import { mapAcpStream } from "./acp/mapper"
@@ -18,7 +18,7 @@ import { OpencodeServerMapper, mapOpencodeServerStream } from "./opencode/server
 import { OPENCODE_SERVER_PROVENANCE, parseOpencodeSse, parseOpencodeSseLine } from "./opencode/server/wire"
 import { AGENT_TRANSPORTS, transportOf } from "./transports"
 import { opencodeExportCommand, parseOpencodeExport } from "./opencode/store"
-import { applyDeltas, buildTranscript, isToolGroup, previewOf } from "./transcript"
+import { applyDeltas, buildTranscript, isToolGroup, previewOf } from "./transcript/fold"
 
 const FIXTURES = fileURLToPath(
   new URL("../../../apps/storybook/stories/fixtures/agent-stream/opencode/", import.meta.url),

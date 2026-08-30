@@ -709,9 +709,9 @@
           "target": "lib/agent-stream/acp/wire.ts"
         },
         {
-          "path": "packages/agent-stream/src/builder.ts",
+          "path": "packages/agent-stream/src/transcript/builder.ts",
           "type": "registry:lib",
-          "target": "lib/agent-stream/builder.ts"
+          "target": "lib/agent-stream/transcript/builder.ts"
         },
         {
           "path": "packages/agent-stream/src/capabilities.ts",
@@ -874,14 +874,14 @@
           "target": "lib/agent-stream/opencode/store.ts"
         },
         {
-          "path": "packages/agent-stream/src/transcript.ts",
+          "path": "packages/agent-stream/src/transcript/fold.ts",
           "type": "registry:lib",
-          "target": "lib/agent-stream/transcript.ts"
+          "target": "lib/agent-stream/transcript/fold.ts"
         },
         {
-          "path": "packages/agent-stream/src/transcript-entry.ts",
+          "path": "packages/agent-stream/src/transcript/index.ts",
           "type": "registry:lib",
-          "target": "lib/agent-stream/transcript-entry.ts"
+          "target": "lib/agent-stream/transcript/index.ts"
         },
         {
           "path": "packages/agent-stream/src/transports.ts",
