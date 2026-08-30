@@ -174,7 +174,7 @@ function Sheet({
       animations.push(
         panel.animate(
           [
-            { opacity: 0.72, translate: "0 1.25rem" },
+            { opacity: 0, translate: "0 100%" },
             { opacity: 1, translate: "0 0" },
           ],
           { duration, easing },

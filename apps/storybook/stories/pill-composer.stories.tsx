@@ -3643,6 +3643,7 @@ export const AgentSurfaces: Story = {
     await expect(
       canvas.queryByRole("textbox", { name: "Message" }),
     ).not.toBeInTheDocument()
+    await waitForSettledAnimations(canvasElement)
   },
 }
 

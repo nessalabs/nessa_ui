@@ -164,15 +164,18 @@ export const LiveAndCard: Story = {
   render: () => {
     function Example() {
       const [open, setOpen] = React.useState(false)
+      const [status, setStatus] = React.useState<"running" | "complete">(
+        "running",
+      )
       return (
         <div className="relative h-80 w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-[2rem] bg-background p-4">
           <div className="flex flex-col gap-3">
-            <AgentActivity status="running">
+            <AgentActivity status={status}>
               <AgentActivityTrigger
                 icon={<Sparkles />}
                 onClick={() => setOpen(true)}
               >
-                Exploring…
+                {status === "running" ? "Exploring…" : explored}
               </AgentActivityTrigger>
             </AgentActivity>
             <AgentActivityCard
@@ -185,7 +188,10 @@ export const LiveAndCard: Story = {
             <Sheet
               label="Exploring…"
               modal={false}
-              onClose={() => setOpen(false)}
+              onClose={() => {
+                setOpen(false)
+                setStatus("complete")
+              }}
             >
               <SheetHandle />
               <SheetHeader>
@@ -234,5 +240,7 @@ export const LiveAndCard: Story = {
     await expect(
       canvas.queryByRole("dialog", { name: "Exploring…" }),
     ).not.toBeInTheDocument()
+    await expect(group).toHaveAttribute("data-status", "complete")
+    await expect(group).not.toHaveAttribute("aria-busy")
   },
 }

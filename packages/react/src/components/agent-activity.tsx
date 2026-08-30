@@ -69,7 +69,9 @@ export interface AgentActivityProps extends React.ComponentProps<"div"> {
  * — AgentActivity owns the cue, not the overlay.
  *
  * Compose AgentActivityTrigger for a disclosing cue. A thought or live
- * line with nothing behind it should be AgentActivityCue instead.
+ * line with nothing behind it should be AgentActivityCue instead. Render
+ * AgentActivityContent in the extra-details sheet — it is always visible
+ * and is not a collapsible region under the trigger.
  */
 function AgentActivity({
   status = "complete",
@@ -310,8 +312,9 @@ function AgentActivityTrigger({
 export interface AgentActivityContentProps extends React.ComponentProps<"div"> {}
 
 /**
- * The thinking and tool-call list for a cue, shown in the extra-details
- * sheet rather than under the transcript line.
+ * The thinking and tool-call list for a cue. Place it in the extra-details
+ * sheet body, not beside the trigger in the transcript — it is a layout
+ * grouping, not a collapsible region.
  */
 function AgentActivityContent({
   className,
