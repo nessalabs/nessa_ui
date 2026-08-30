@@ -3445,8 +3445,16 @@ export const Playground: Story = {
       },
       { timeout: 4000 },
     )
-    // Same ordering as above: the fade has to finish before its landing
-    // value can be asserted, or a slow runner reads a mid-fade frame.
+    // The second reply is in the transcript as soon as its first word
+    // streams; the rim stays lit until generating ends. Wait for that
+    // end state — under reduced motion waitForSettledAnimations is a
+    // no-op and must not stand in for it.
+    await waitFor(
+      () => {
+        expect(composer).not.toHaveAttribute("data-generating")
+      },
+      { timeout: 4000 },
+    )
     await waitForSettledAnimations(canvasElement)
     await waitFor(() => {
       expect(getComputedStyle(rim).opacity).toBe("0")
