@@ -1,12 +1,19 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { expect, userEvent, within } from "storybook/test"
+import { expect, userEvent, waitFor, within } from "storybook/test"
 import {
   AgentActivity,
   AgentActivityCard,
   AgentActivityContent,
   AgentActivityCue,
   AgentActivityTrigger,
+  Sheet,
+  SheetAction,
+  SheetBody,
+  SheetExpand,
+  SheetHandle,
+  SheetHeader,
+  SheetTitle,
   formatAgentActivitySummary,
   formatAgentThoughtSummary,
   ToolCall,
@@ -20,6 +27,35 @@ import { SearchIcon } from "./icons/nucleo"
 import { storyDocumentation } from "./story-documentation"
 
 const explored = formatAgentActivitySummary({ files: 3, searches: 2 })
+const thought = formatAgentThoughtSummary(1)
+const thoughtDetail =
+  "The playground already has ToolCall rows. Collapse them behind a cue so the transcript stays a conversation."
+
+function ToolRows() {
+  return (
+    <AgentActivityContent>
+      <ToolCall>
+        <ToolCallTrigger icon={<FileSearch />} meta="chat-tabs.tsx">
+          Read
+        </ToolCallTrigger>
+        <ToolCallContent>
+          <ToolCallTabs
+            input={`{ "path": "chat-tabs.tsx" }`}
+            output="export function ChatTabs…"
+          />
+        </ToolCallContent>
+      </ToolCall>
+      <ToolCall>
+        <ToolCallTrigger icon={<SearchIcon />} meta="wrapTab">
+          Search
+        </ToolCallTrigger>
+        <ToolCallContent>
+          <ToolCallTabs input={`{ "pattern": "wrapTab" }`} output="2 matches" />
+        </ToolCallContent>
+      </ToolCall>
+    </AgentActivityContent>
+  )
+}
 
 const meta = {
   title: "Components/AgentActivity",
@@ -29,7 +65,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Collapsed agent work in a transcript: a quiet cue such as “Explored 3 files, 2 searches” that expands into the individual tool calls, a named-task card for a delegated run, and a standalone thought or live “Exploring…” line. The transcript stays a conversation; the tools stay behind the cue until a reader asks for them.",
+          "Collapsed agent work in a transcript: a quiet cue such as “Explored 3 files, 2 searches” that opens the extra-details sheet with that beat’s thinking and tool calls, a named-task card for a delegated run, and a standalone thought or live “Exploring…” line. The transcript stays a conversation; the tools never expand inline.",
       },
     },
   },
@@ -40,72 +76,141 @@ type Story = StoryObj<typeof meta>
 
 export const Playground: Story = {
   parameters: storyDocumentation(
-    "A finished run of tools behind one cue. The trigger toggles the disclosure and carries the expanded state on aria-expanded; the revealed rows are ordinary ToolCall disclosures.",
+    "A finished run of tools behind one cue. The trigger opens the extra-details sheet; the transcript line stays collapsed. Thought cues with details disclose the same way.",
   ),
-  render: () => (
-    <div className="flex w-[min(28rem,calc(100vw-2rem))] flex-col gap-3">
-      <AgentActivityCue>{formatAgentThoughtSummary(1)}</AgentActivityCue>
-      <AgentActivity>
-        <AgentActivityTrigger>{explored}</AgentActivityTrigger>
-        <AgentActivityContent>
-          <ToolCall>
-            <ToolCallTrigger icon={<FileSearch />} meta="chat-tabs.tsx">
-              Read
-            </ToolCallTrigger>
-            <ToolCallContent>
-              <ToolCallTabs input={`{ "path": "chat-tabs.tsx" }`} output="export function ChatTabs…" />
-            </ToolCallContent>
-          </ToolCall>
-          <ToolCall>
-            <ToolCallTrigger icon={<SearchIcon />} meta="wrapTab">
-              Search
-            </ToolCallTrigger>
-            <ToolCallContent>
-              <ToolCallTabs input={`{ "pattern": "wrapTab" }`} output="2 matches" />
-            </ToolCallContent>
-          </ToolCall>
-        </AgentActivityContent>
-      </AgentActivity>
-    </div>
-  ),
+  render: () => {
+    function Example() {
+      const [open, setOpen] = React.useState<"thought" | "explored" | null>(
+        null,
+      )
+      const title = open === "thought" ? thought : explored
+      return (
+        <div className="relative h-96 w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-[2rem] bg-background p-4">
+          <div className="flex flex-col gap-3">
+            <AgentActivityCue discloses onClick={() => setOpen("thought")}>
+              {thought}
+            </AgentActivityCue>
+            <AgentActivity>
+              <AgentActivityTrigger onClick={() => setOpen("explored")}>
+                {explored}
+              </AgentActivityTrigger>
+            </AgentActivity>
+          </div>
+          {open ? (
+            <Sheet label={title} modal={false} onClose={() => setOpen(null)}>
+              <SheetHandle />
+              <SheetHeader>
+                <SheetExpand />
+                <SheetTitle>{title}</SheetTitle>
+                <SheetAction>Done</SheetAction>
+              </SheetHeader>
+              <SheetBody>
+                {open === "thought" ? (
+                  <p className="m-0 font-sans nessa-text-4 text-foreground">
+                    {thoughtDetail}
+                  </p>
+                ) : (
+                  <>
+                    <AgentActivityCue>{thought}</AgentActivityCue>
+                    <p className="m-0 font-sans nessa-text-4 text-foreground">
+                      {thoughtDetail}
+                    </p>
+                    <ToolRows />
+                  </>
+                )}
+              </SheetBody>
+            </Sheet>
+          ) : null}
+        </div>
+      )
+    }
+    return <Example />
+  },
   play: async ({ canvasElement }) => {
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
     const canvas = within(canvasElement)
-    await expect(canvas.getByText("Thought 1s")).toBeVisible()
+    await expect(canvas.getByText(thought)).toBeVisible()
     const trigger = canvas.getByRole("button", { name: explored })
-    await expect(trigger).toHaveAttribute("aria-expanded", "false")
+    await expect(trigger).toHaveAttribute("aria-haspopup", "dialog")
     await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
     await userEvent.click(trigger)
-    await expect(trigger).toHaveAttribute("aria-expanded", "true")
-    await expect(canvas.getByRole("button", { name: /read/i })).toBeVisible()
-    await userEvent.click(trigger)
-    await expect(trigger).toHaveAttribute("aria-expanded", "false")
+    const dialog = canvas.getByRole("dialog", { name: explored })
+    await waitFor(() => expect(dialog).toBeVisible())
+    await waitFor(() =>
+      expect(canvas.getByRole("button", { name: /read/i })).toBeVisible(),
+    )
+    await userEvent.click(canvas.getByRole("button", { name: "Done" }))
+    await expect(
+      canvas.queryByRole("dialog", { name: explored }),
+    ).not.toBeInTheDocument()
+    await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
+    await userEvent.click(canvas.getByRole("button", { name: thought }))
+    await expect(canvas.getByRole("dialog", { name: thought })).toBeVisible()
+    await waitFor(() =>
+      expect(canvas.getByText(thoughtDetail)).toBeVisible(),
+    )
+    await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
+    await userEvent.click(canvas.getByRole("button", { name: "Done" }))
+    await expect(
+      canvas.queryByRole("dialog", { name: thought }),
+    ).not.toBeInTheDocument()
   },
 }
 
 export const LiveAndCard: Story = {
   parameters: storyDocumentation(
-    "While the agent is still working the cue shimmers and the group is aria-busy. A named beat — a spawned explorer — uses the card instead of a counted summary.",
+    "While the agent is still working the cue shimmers and the group is aria-busy. Clicking Exploring… opens the live tools in the extra-details sheet. A named beat — a spawned explorer — uses the card instead of a counted summary.",
   ),
-  render: () => (
-    <div className="flex w-[min(28rem,calc(100vw-2rem))] flex-col gap-3">
-      <AgentActivity status="running">
-        <AgentActivityTrigger icon={<Sparkles />}>
-          Exploring…
-        </AgentActivityTrigger>
-        <AgentActivityContent>
-          <ToolCall status="running">
-            <ToolCallTrigger icon={<SearchIcon />}>Searching composer call sites</ToolCallTrigger>
-          </ToolCall>
-        </AgentActivityContent>
-      </AgentActivity>
-      <AgentActivityCard
-        icon={<Sparkles />}
-        title="Explore chat UI components"
-        meta="Working · Explorer"
-      />
-    </div>
-  ),
+  render: () => {
+    function Example() {
+      const [open, setOpen] = React.useState(false)
+      return (
+        <div className="relative h-80 w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-[2rem] bg-background p-4">
+          <div className="flex flex-col gap-3">
+            <AgentActivity status="running">
+              <AgentActivityTrigger
+                icon={<Sparkles />}
+                onClick={() => setOpen(true)}
+              >
+                Exploring…
+              </AgentActivityTrigger>
+            </AgentActivity>
+            <AgentActivityCard
+              icon={<Sparkles />}
+              title="Explore chat UI components"
+              meta="Working · Explorer"
+            />
+          </div>
+          {open ? (
+            <Sheet
+              label="Exploring…"
+              modal={false}
+              onClose={() => setOpen(false)}
+            >
+              <SheetHandle />
+              <SheetHeader>
+                <SheetExpand />
+                <SheetTitle>Exploring…</SheetTitle>
+                <SheetAction>Done</SheetAction>
+              </SheetHeader>
+              <SheetBody>
+                <AgentActivityContent>
+                  <ToolCall status="running">
+                    <ToolCallTrigger icon={<SearchIcon />}>
+                      Searching composer call sites
+                    </ToolCallTrigger>
+                  </ToolCall>
+                </AgentActivityContent>
+              </SheetBody>
+            </Sheet>
+          ) : null}
+        </div>
+      )
+    }
+    return <Example />
+  },
   play: async ({ canvasElement }) => {
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
     const canvas = within(canvasElement)
     const group = canvasElement.querySelector('[data-slot="agent-activity"]')
     await expect(group).toHaveAttribute("data-status", "running")
@@ -113,5 +218,21 @@ export const LiveAndCard: Story = {
     await expect(
       canvas.getByRole("button", { name: /explore chat ui components/i }),
     ).toBeVisible()
+    await expect(
+      canvas.queryByRole("button", { name: /searching composer/i }),
+    ).toBeNull()
+    await userEvent.click(canvas.getByRole("button", { name: /exploring/i }))
+    await expect(
+      canvas.getByRole("dialog", { name: "Exploring…" }),
+    ).toBeVisible()
+    await waitFor(() =>
+      expect(
+        canvas.getByRole("button", { name: /searching composer/i }),
+      ).toBeVisible(),
+    )
+    await userEvent.click(canvas.getByRole("button", { name: "Done" }))
+    await expect(
+      canvas.queryByRole("dialog", { name: "Exploring…" }),
+    ).not.toBeInTheDocument()
   },
 }

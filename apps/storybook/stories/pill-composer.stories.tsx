@@ -607,9 +607,11 @@ interface DemoMessage {
   parts?: ChatComposerContentPart[]
   /** A thinking beat shown as a quiet cue above the reply, e.g. "Thought 1s". */
   thought?: string
+  /** The thinking text shown in the extra-details sheet for that cue. */
+  thoughtDetail?: string
   /**
    * A collapsed run of tool work. The transcript shows the summary; the
-   * calls stay behind the cue until it is opened.
+   * calls open in the extra-details sheet, not under the cue.
    */
   activity?: {
     summary: string
@@ -619,6 +621,7 @@ interface DemoMessage {
       meta?: string
       input?: string
       output?: string
+      status?: "running" | "complete"
     }>
   }
   /** A named unit of work, rendered as an AgentActivityCard. */
@@ -792,6 +795,8 @@ const seededMessagesByTab: Record<string, DemoMessage[]> = {
       role: "assistant",
       text: "I'll start by reading the repo workflow and mapping the existing chat surface so the cues sit on top of ToolCall rather than replacing it.",
       thought: formatAgentThoughtSummary(1),
+      thoughtDetail:
+        "The playground already has ToolCall rows. Collapse them behind a cue so the transcript stays a conversation — the extra-details sheet is where the calls live.",
       activity: {
         summary: agentExplored,
         tools: [
@@ -942,48 +947,73 @@ function SubagentChip({
  * assistant turn — kept out of the bubble so the transcript stays a
  * conversation.
  */
+type DemoActivitySheet = {
+  title: string
+  thought?: { summary: string; detail?: string }
+  tools?: NonNullable<DemoMessage["activity"]>["tools"]
+}
+
+function ActivityToolRows({
+  tools,
+}: {
+  tools: NonNullable<DemoActivitySheet["tools"]>
+}) {
+  return (
+    <AgentActivityContent>
+      {tools.map((tool) => (
+        <ToolCall
+          key={`${tool.name}-${tool.meta ?? ""}`}
+          status={tool.status}
+        >
+          <ToolCallTrigger
+            icon={<FileSearch aria-hidden="true" />}
+            meta={tool.meta}
+          >
+            {tool.name}
+          </ToolCallTrigger>
+          {tool.input || tool.output ? (
+            <ToolCallContent>
+              <ToolCallTabs input={tool.input} output={tool.output} />
+            </ToolCallContent>
+          ) : null}
+        </ToolCall>
+      ))}
+    </AgentActivityContent>
+  )
+}
+
 function DemoActivity({
   message,
   onOpenCard,
+  onOpenActivity,
 }: {
   message: DemoMessage
   onOpenCard?: () => void
+  onOpenActivity?: (sheet: DemoActivitySheet) => void
 }) {
-  if (
-    !message.thought &&
-    !message.activity &&
-    !message.card &&
-    !message.todos
-  ) {
+  if (!message.activity && !message.card && !message.todos) {
     return null
   }
   return (
     <div className="me-8 flex max-w-[92%] flex-col items-start gap-2 self-start">
-      {message.thought ? (
-        <AgentActivityCue>{message.thought}</AgentActivityCue>
-      ) : null}
       {message.activity ? (
         <AgentActivity status={message.activity.status}>
-          <AgentActivityTrigger>{message.activity.summary}</AgentActivityTrigger>
-          {message.activity.tools && message.activity.tools.length > 0 ? (
-            <AgentActivityContent>
-              {message.activity.tools.map((tool) => (
-                <ToolCall key={`${tool.name}-${tool.meta ?? ""}`}>
-                  <ToolCallTrigger
-                    icon={<FileSearch aria-hidden="true" />}
-                    meta={tool.meta}
-                  >
-                    {tool.name}
-                  </ToolCallTrigger>
-                  {tool.input || tool.output ? (
-                    <ToolCallContent>
-                      <ToolCallTabs input={tool.input} output={tool.output} />
-                    </ToolCallContent>
-                  ) : null}
-                </ToolCall>
-              ))}
-            </AgentActivityContent>
-          ) : null}
+          <AgentActivityTrigger
+            onClick={() =>
+              onOpenActivity?.({
+                title: message.activity!.summary,
+                thought: message.thought
+                  ? {
+                      summary: message.thought,
+                      detail: message.thoughtDetail,
+                    }
+                  : undefined,
+                tools: message.activity!.tools,
+              })
+            }
+          >
+            {message.activity.summary}
+          </AgentActivityTrigger>
         </AgentActivity>
       ) : null}
       {message.card ? (
@@ -1528,6 +1558,8 @@ function PlaygroundExample({
   const [historyQuery, setHistoryQuery] = React.useState("")
   const [detailsTabId, setDetailsTabId] = React.useState<string | null>(null)
   const [queueOpen, setQueueOpen] = React.useState(false)
+  const [activitySheet, setActivitySheet] =
+    React.useState<DemoActivitySheet | null>(null)
   const [queuedByTab, setQueuedByTab] = React.useState<
     Record<string, { id: string; text: string }[]>
   >({
@@ -1665,6 +1697,7 @@ function PlaygroundExample({
     setViewedQuotes(null)
     setModelCardOpen(false)
     setOverlay(null)
+    setActivitySheet(null)
   }
   const activeFileItem = fileTabs[activeTabId] ?? inlinePreview ?? undefined
   const isHistoryTab = activeTabId === historyTabId
@@ -1961,6 +1994,7 @@ function PlaygroundExample({
           setViewedQuotes(null)
           setFocusedThreadId(null)
           setEditingMessageId(null)
+          setActivitySheet(null)
         }}
         onClose={(id) => {
           if (id === generatingTabId) {
@@ -2167,9 +2201,30 @@ function PlaygroundExample({
         {messages.map((entry) => (
           <React.Fragment key={entry.id}>
           {entry.thought ? (
-            <AgentActivityCue className="self-start">
-              {entry.thought}
-            </AgentActivityCue>
+            entry.thoughtDetail ? (
+              <AgentActivityCue
+                className="self-start"
+                discloses
+                onClick={() => {
+                  setQuotesOpen(false)
+                  setViewedQuotes(null)
+                  setQueueOpen(false)
+                  setActivitySheet({
+                    title: entry.thought!,
+                    thought: {
+                      summary: entry.thought!,
+                      detail: entry.thoughtDetail,
+                    },
+                  })
+                }}
+              >
+                {entry.thought}
+              </AgentActivityCue>
+            ) : (
+              <AgentActivityCue className="self-start">
+                {entry.thought}
+              </AgentActivityCue>
+            )
           ) : null}
           <DemoBubble
             message={entry}
@@ -2247,8 +2302,14 @@ function PlaygroundExample({
 
           />
           <DemoActivity
-            message={{ ...entry, thought: undefined }}
+            message={entry}
             onOpenCard={() => setDetailsTabId(activeTabId)}
+            onOpenActivity={(sheet) => {
+              setQuotesOpen(false)
+              setViewedQuotes(null)
+              setQueueOpen(false)
+              setActivitySheet(sheet)
+            }}
           />
           {entry.spawned ? (
             <div className="me-8 mt-1.5 flex max-w-[85%] flex-col gap-1.5 self-start">
@@ -2266,16 +2327,25 @@ function PlaygroundExample({
         {generating && !messages.some((message) => message.streaming) ? (
           activeTabId === agentTabId ? (
             <AgentActivity status="running" className="me-8 self-start">
-              <AgentActivityTrigger icon={<Sparkles aria-hidden="true" />}>
+              <AgentActivityTrigger
+                icon={<Sparkles aria-hidden="true" />}
+                onClick={() => {
+                  setQuotesOpen(false)
+                  setViewedQuotes(null)
+                  setQueueOpen(false)
+                  setActivitySheet({
+                    title: "Exploring…",
+                    tools: [
+                      {
+                        name: "Searching the playground surface",
+                        status: "running",
+                      },
+                    ],
+                  })
+                }}
+              >
                 Exploring…
               </AgentActivityTrigger>
-              <AgentActivityContent>
-                <ToolCall status="running">
-                  <ToolCallTrigger icon={<FileSearch aria-hidden="true" />}>
-                    Searching the playground surface
-                  </ToolCallTrigger>
-                </ToolCall>
-              </AgentActivityContent>
             </AgentActivity>
           ) : (
             <ChatTypingIndicator label="Assistant is typing" />
@@ -2291,7 +2361,43 @@ function PlaygroundExample({
           {overlay.body}
         </ChatAttachmentViewer>
       ) : null}
-      {quotesOpen || viewedQuotes ? (
+      {activitySheet ? (
+        // Thinking and tool calls for one cue open in the extra-details
+        // sheet so the transcript stays a conversation. The sheet fills
+        // this tabpanel (tabs and composer stay).
+        <Sheet
+          label={activitySheet.title}
+          modal={false}
+          onReturnFocus={() => inputRef.current?.focus()}
+          onClose={() => setActivitySheet(null)}
+        >
+          <SheetHandle />
+          <SheetHeader>
+            <SheetExpand />
+            <SheetTitle>{activitySheet.title}</SheetTitle>
+            <SheetAction>Done</SheetAction>
+          </SheetHeader>
+          <SheetBody>
+            {activitySheet.thought ? (
+              <>
+                {activitySheet.thought.summary !== activitySheet.title ? (
+                  <AgentActivityCue>
+                    {activitySheet.thought.summary}
+                  </AgentActivityCue>
+                ) : null}
+                {activitySheet.thought.detail ? (
+                  <p className="m-0 font-sans nessa-text-4 text-foreground">
+                    {activitySheet.thought.detail}
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+            {activitySheet.tools && activitySheet.tools.length > 0 ? (
+              <ActivityToolRows tools={activitySheet.tools} />
+            ) : null}
+          </SheetBody>
+        </Sheet>
+      ) : quotesOpen || viewedQuotes ? (
         // Annotations use the expandable sheet as the extra-details
         // surface: it fills this tabpanel (tabs and composer stay) and
         // Minimize restores a drawer over the transcript. Not modal, so
@@ -2393,7 +2499,9 @@ function PlaygroundExample({
           onClose={() => setModelCardOpen(false)}
         />
       ) : null}
-      {quotesOpen || viewedQuotes || overlay || isHistoryTab ? null : (
+      {quotesOpen || viewedQuotes || overlay || isHistoryTab || activitySheet
+        ? null
+        : (
         // Everything waiting to travel with the next message rides one row:
         // one chip stands for the set and the rest collapse into a count
         // that opens the full list over the transcript.
@@ -2418,7 +2526,10 @@ function PlaygroundExample({
           className="self-start"
           count={queued.length}
           aria-label={`Queued ${queued.length}`}
-          onClick={() => setQueueOpen(true)}
+          onClick={() => {
+            setActivitySheet(null)
+            setQueueOpen(true)
+          }}
         />
       ) : null}
       {fileTabs[activeTabId] || isHistoryTab ? null : (
@@ -3215,7 +3326,7 @@ type Story = StoryObj<typeof meta>
 export const Playground: Story = {
   tags: ["reduced-motion"],
   parameters: storyDocumentation(
-    "The intended small-surface composition — the floating chat window: pill tabs across the top (each tab an independent conversation, with the busy dot on whichever tab is streaming), + and voice actions inside the pill, Enter as the only send affordance, and no standing model control — typing /model raises a closable model card in the chat, typing /history opens a History tab of the all-conversations roster, and right-clicking a conversation tab offers View Details (project, model, runtime) plus pin, share, and archive. Tool work stays behind exploring cues — “Thought 1s”, “Explored 3 files, 2 searches” — that expand into ToolCall rows instead of dumping every invocation into the transcript; a Queued N pill above the composer opens a sheet of pending follow-ups. The voice action streams a ghost transcription into the editable input — with Hold to record on (the default) it records only while held, the waveform bars pulsing as a live meter, and with it off a click toggles listening with a red stop control; right-click it for a microphone options menu above the pill. Agent replies think first (typing dots), then stream in word by word through MessageMarkdown's streaming mode — rich markdown renders as it arrives and the rim stays lit until the stream completes, and + opens a menu that attaches photos, files, and folders as uniform square tiles — thumbnail previews for photos, icon tiles for the rest — each with a corner delete button and an Open action the host wires to its full view. Bubbles are iMessage-style with tails and a Delivered receipt; right-clicking (or long-pressing) one shows the tapback reaction row and a Reply action — reacting never frosts the transcript; choosing Reply enters the frosted thread view — the rest of the transcript recedes behind a blur while the composer switches to Reply, iMessage-style (Escape from anywhere, or tapping the bubble again, leaves the reply view; a threaded message keeps its whole thread in focus), and while the agent works the rim lights and the mic hands over to a stop control.",
+    "The intended small-surface composition — the floating chat window: pill tabs across the top (each tab an independent conversation, with the busy dot on whichever tab is streaming), + and voice actions inside the pill, Enter as the only send affordance, and no standing model control — typing /model raises a closable model card in the chat, typing /history opens a History tab of the all-conversations roster, and right-clicking a conversation tab offers View Details (project, model, runtime) plus pin, share, and archive. Tool work stays behind exploring cues — “Thought 1s”, “Explored 3 files, 2 searches” — that open the extra-details sheet with that beat’s thinking and tool calls instead of expanding in the transcript; a Queued N pill above the composer opens a sheet of pending follow-ups. The voice action streams a ghost transcription into the editable input — with Hold to record on (the default) it records only while held, the waveform bars pulsing as a live meter, and with it off a click toggles listening with a red stop control; right-click it for a microphone options menu above the pill. Agent replies think first (typing dots), then stream in word by word through MessageMarkdown's streaming mode — rich markdown renders as it arrives and the rim stays lit until the stream completes, and + opens a menu that attaches photos, files, and folders as uniform square tiles — thumbnail previews for photos, icon tiles for the rest — each with a corner delete button and an Open action the host wires to its full view. Bubbles are iMessage-style with tails and a Delivered receipt; right-clicking (or long-pressing) one shows the tapback reaction row and a Reply action — reacting never frosts the transcript; choosing Reply enters the frosted thread view — the rest of the transcript recedes behind a blur while the composer switches to Reply, iMessage-style (Escape from anywhere, or tapping the bubble again, leaves the reply view; a threaded message keeps its whole thread in focus), and while the agent works the rim lights and the mic hands over to a stop control.",
   ),
   render: () => <PlaygroundExample />,
   play: async ({ canvasElement }) => {
@@ -3430,7 +3541,7 @@ export const Playground: Story = {
 export const AgentSurfaces: Story = {
   tags: ["reduced-motion"],
   parameters: storyDocumentation(
-    "The playground opened on the Agent message tab: exploring cues collapse tool work, a named-task card and to-do list sit in the transcript, Queued 2 opens the follow-up sheet (Expand fills the window), right-clicking the tab offers View Details (project, model, runtime), and /history opens a History tab of the conversation roster.",
+    "The playground opened on the Agent message tab: exploring cues collapse tool work, clicking a cue opens that beat’s thinking and tool calls in the extra-details sheet (not inline), a named-task card and to-do list sit in the transcript, Queued 2 opens the follow-up sheet (Expand fills the window), right-clicking the tab offers View Details (project, model, runtime), and /history opens a History tab of the conversation roster.",
   ),
   render: () => <PlaygroundExample initialTabId={agentTabId} />,
   play: async ({ canvasElement }) => {
@@ -3438,11 +3549,33 @@ export const AgentSurfaces: Story = {
     const canvas = within(canvasElement)
     const body = within(canvasElement.ownerDocument.body)
     await expect(canvas.getByText("Thought 1s")).toBeVisible()
+    await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
+    await userEvent.click(canvas.getByRole("button", { name: "Thought 1s" }))
+    const thoughtDialog = canvas.getByRole("dialog", { name: "Thought 1s" })
+    await waitFor(() => expect(thoughtDialog).toBeVisible())
+    await waitFor(() =>
+      expect(
+        canvas.getByText(/the playground already has toolcall rows/i),
+      ).toBeVisible(),
+    )
+    await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
+    await userEvent.click(canvas.getByRole("button", { name: "Done" }))
+    await expect(
+      canvas.queryByRole("dialog", { name: "Thought 1s" }),
+    ).not.toBeInTheDocument()
     const cue = canvas.getByRole("button", { name: agentExplored })
-    await expect(cue).toHaveAttribute("aria-expanded", "false")
+    await expect(cue).toHaveAttribute("aria-haspopup", "dialog")
     await userEvent.click(cue)
-    await expect(cue).toHaveAttribute("aria-expanded", "true")
-    await expect(canvas.getByRole("button", { name: /read/i })).toBeVisible()
+    const activityDialog = canvas.getByRole("dialog", { name: agentExplored })
+    await waitFor(() => expect(activityDialog).toBeVisible())
+    await waitFor(() =>
+      expect(canvas.getByRole("button", { name: /read/i })).toBeVisible(),
+    )
+    await userEvent.click(canvas.getByRole("button", { name: "Done" }))
+    await expect(
+      canvas.queryByRole("dialog", { name: agentExplored }),
+    ).not.toBeInTheDocument()
+    await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
     await userEvent.click(canvas.getByRole("button", { name: "Queued 2" }))
     await expect(canvas.getByRole("dialog", { name: "Queued" })).toBeVisible()
     await waitFor(() =>

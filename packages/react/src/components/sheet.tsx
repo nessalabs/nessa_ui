@@ -14,6 +14,28 @@ function cssDurationInMilliseconds(value: string, fallback: number) {
   return value.trim().endsWith("ms") ? parsed : parsed * 1000
 }
 
+/** Reads the sheet's duration and standard easing from theme tokens. */
+function sheetMotion(
+  node: HTMLElement,
+  durationToken: string,
+  fallback: number,
+) {
+  const styles = getComputedStyle(node)
+  return {
+    duration: cssDurationInMilliseconds(
+      styles.getPropertyValue(durationToken),
+      fallback,
+    ),
+    easing:
+      styles.getPropertyValue("--nessa-motion-easing-standard").trim() ||
+      "ease-out",
+  }
+}
+
+function cancelAnimations(animations: Animation[]) {
+  for (const animation of animations) animation.cancel()
+}
+
 /**
  * How many open sheets are covering each sibling. Sheets can stack — a
  * details panel over a queue — and whichever closes first must not uncover
@@ -84,8 +106,10 @@ export interface SheetProps extends React.ComponentProps<"div"> {
  * SheetExpand, SheetAction, and SheetBody. SheetExpand toggles the drawer
  * into a filled extra-details surface over the same ancestor — the host
  * that positions the transcript (rather than the whole window) keeps its
- * tab strip and composer when the panel expands. The sheet draws the chrome
- * and owns dismissal; the host owns what the panel shows.
+ * tab strip and composer when the panel expands. The drawer rises from the
+ * bottom on open; expand and minimize interpolate height so the panel grows
+ * and recedes in place. Reduced motion skips both. The sheet draws the
+ * chrome and owns dismissal; the host owns what the panel shows.
  */
 function Sheet({
   onClose,
@@ -102,6 +126,7 @@ function Sheet({
 }: SheetProps) {
   const ref = React.useRef<HTMLDivElement>(null)
   const panelRef = React.useRef<HTMLDivElement>(null)
+  const backdropRef = React.useRef<HTMLDivElement>(null)
   const onCloseRef = React.useRef(onClose)
   const onReturnFocusRef = React.useRef(onReturnFocus)
   const onExpandedChangeRef = React.useRef(onExpandedChange)
@@ -124,31 +149,134 @@ function Sheet({
     [close, expanded, setExpanded],
   )
   const openedExpanded = React.useRef(expanded)
+  const enterAnimationsRef = React.useRef<Animation[]>([])
+  const prevExpandedRef = React.useRef(expanded)
+  const prevHeightRef = React.useRef<number | null>(null)
+  const collapsedRadiusRef = React.useRef("0px")
 
   React.useEffect(() => {
     const panel = panelRef.current
+    const backdrop = backdropRef.current
     if (!panel || typeof panel.animate !== "function") return
     if (window.matchMedia(reducedMotionQuery).matches) return
-    const duration = cssDurationInMilliseconds(
-      getComputedStyle(panel).getPropertyValue("--nessa-motion-duration-fast"),
-      160,
+    const { duration, easing } = sheetMotion(
+      panel,
+      "--nessa-motion-duration-normal",
+      200,
     )
     if (duration === 0) return
-    const easing =
-      getComputedStyle(panel)
-        .getPropertyValue("--nessa-motion-easing-standard")
-        .trim() || "ease-out"
-    const animation = panel.animate(
-      openedExpanded.current
-        ? [{ opacity: 0 }, { opacity: 1 }]
-        : [
-            { opacity: 0, translate: "0 12%" },
+    const animations: Animation[] = []
+    if (openedExpanded.current) {
+      animations.push(
+        panel.animate([{ opacity: 0 }, { opacity: 1 }], { duration, easing }),
+      )
+    } else {
+      animations.push(
+        panel.animate(
+          [
+            { opacity: 0.72, translate: "0 1.25rem" },
             { opacity: 1, translate: "0 0" },
           ],
-      { duration, easing },
-    )
-    return () => animation.cancel()
+          { duration, easing },
+        ),
+      )
+      if (backdrop) {
+        animations.push(
+          backdrop.animate([{ opacity: 0 }, { opacity: 1 }], {
+            duration,
+            easing,
+          }),
+        )
+      }
+    }
+    enterAnimationsRef.current = animations
+    return () => {
+      cancelAnimations(animations)
+      enterAnimationsRef.current = []
+    }
   }, [])
+
+  React.useLayoutEffect(() => {
+    const panel = panelRef.current
+    const backdrop = backdropRef.current
+    if (!panel) return
+    if (!expanded) {
+      collapsedRadiusRef.current = getComputedStyle(panel).borderTopLeftRadius
+    }
+    const nextHeight = panel.getBoundingClientRect().height
+    const prevHeight = prevHeightRef.current
+    prevHeightRef.current = nextHeight
+    const wasExpanded = prevExpandedRef.current
+    prevExpandedRef.current = expanded
+    if (wasExpanded === expanded) return
+    cancelAnimations(enterAnimationsRef.current)
+    enterAnimationsRef.current = []
+    if (window.matchMedia(reducedMotionQuery).matches) return
+    if (
+      prevHeight == null ||
+      typeof panel.animate !== "function" ||
+      Math.abs(prevHeight - nextHeight) < 0.5
+    ) {
+      return
+    }
+    const { duration, easing } = sheetMotion(
+      panel,
+      "--nessa-motion-duration-slow",
+      300,
+    )
+    if (duration === 0) return
+    const collapsedRadius = `${collapsedRadiusRef.current} ${collapsedRadiusRef.current} 0 0`
+    const fromRadius = wasExpanded ? "0px" : collapsedRadius
+    const toRadius = expanded ? "0px" : collapsedRadius
+    panel.style.height = `${prevHeight}px`
+    panel.style.flexGrow = "0"
+    panel.style.flexShrink = "0"
+    panel.style.overflow = "hidden"
+    const animations: Animation[] = [
+      panel.animate(
+        [
+          { height: `${prevHeight}px`, borderRadius: fromRadius },
+          { height: `${nextHeight}px`, borderRadius: toRadius },
+        ],
+        { duration, easing, fill: "forwards" },
+      ),
+    ]
+    if (backdrop) {
+      const fromOpacity = wasExpanded ? 0 : 1
+      const toOpacity = expanded ? 0 : 1
+      backdrop.style.opacity = String(fromOpacity)
+      animations.push(
+        backdrop.animate([{ opacity: fromOpacity }, { opacity: toOpacity }], {
+          duration,
+          easing,
+          fill: "forwards",
+        }),
+      )
+    }
+    const clearInline = () => {
+      panel.style.height = ""
+      panel.style.flexGrow = ""
+      panel.style.flexShrink = ""
+      panel.style.overflow = ""
+      if (backdrop) backdrop.style.opacity = ""
+    }
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      clearInline()
+      cancelAnimations(animations)
+    }
+    void Promise.all(animations.map((animation) => animation.finished)).then(
+      finish,
+      () => {},
+    )
+    return () => {
+      settled = true
+      cancelAnimations(animations)
+      clearInline()
+    }
+  }, [expanded])
 
   React.useEffect(() => {
     const node = ref.current
@@ -246,13 +374,13 @@ function Sheet({
         tabIndex={-1}
         onKeyDown={handleKeyDown}
         className={cn(
-          "absolute inset-0 z-30 flex flex-col overflow-hidden rounded-[inherit] font-sans",
-          !expanded && "justify-end",
+          "absolute inset-0 z-30 flex flex-col justify-end overflow-hidden rounded-[inherit] font-sans",
           className,
         )}
         {...props}
       >
         <div
+          ref={backdropRef}
           aria-hidden="true"
           data-slot="sheet-backdrop"
           onClick={close}

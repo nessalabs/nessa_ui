@@ -1325,7 +1325,7 @@
       "name": "sheet",
       "type": "registry:ui",
       "title": "Sheet",
-      "description": "A bottom sheet that rises over its nearest positioned ancestor: a modal dialog with a backdrop, a grab bar, a header of close or expand plus a centered title and optional Done, and a scrolling body. SheetExpand toggles the drawer into a filled extra-details surface over the same ancestor. Pass modal={false} for a contained extra-details surface that leaves surrounding chrome reachable.",
+      "description": "A bottom sheet that rises over its nearest positioned ancestor: a modal dialog with a backdrop, a grab bar, a header of close or expand plus a centered title and optional Done, and a scrolling body. The drawer slides up from the bottom on open; SheetExpand interpolates height into a filled extra-details surface over the same ancestor. Pass modal={false} for a contained extra-details surface that leaves surrounding chrome reachable.",
       "dependencies": [
         "lucide-react"
       ],
@@ -1345,10 +1345,9 @@
       "name": "agent-activity",
       "type": "registry:ui",
       "title": "Agent Activity",
-      "description": "Collapsed agent work in a transcript: a quiet cue that expands into tool calls, a named-task card for a delegated run, and a standalone thought or live Exploring line.",
+      "description": "Collapsed agent work in a transcript: a quiet cue that opens the extra-details sheet with that beat’s thinking and tool calls, a named-task card for a delegated run, and a standalone thought or live Exploring line.",
       "dependencies": [
-        "lucide-react",
-        "radix-ui"
+        "lucide-react"
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",

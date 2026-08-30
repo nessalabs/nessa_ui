@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { ChevronRight } from "lucide-react"
-import { Collapsible } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
@@ -55,12 +54,6 @@ function formatAgentThoughtSummary(seconds: number): string {
 }
 
 export interface AgentActivityProps extends React.ComponentProps<"div"> {
-  /** Controlled expanded state; pair with `onOpenChange`. */
-  open?: boolean
-  /** Initial expanded state when uncontrolled. Collapsed by default. */
-  defaultOpen?: boolean
-  /** Called when the trigger toggles the expanded state. */
-  onOpenChange?: (open: boolean) => void
   /**
    * The run's lifecycle state, exposed as `data-status`. While `running`
    * the group is `aria-busy` and the trigger label shimmers; `error` tints
@@ -70,31 +63,25 @@ export interface AgentActivityProps extends React.ComponentProps<"div"> {
 }
 
 /**
- * A collapsed run of tool work in an agent transcript: one quiet cue that
- * expands into the individual calls. The transcript stays a conversation;
- * the tools stay behind the cue until a reader asks for them.
+ * A collapsed run of tool work in an agent transcript: one quiet cue. The
+ * transcript stays a conversation; clicking the cue opens the extra-details
+ * sheet with that beat's thinking and tool calls. The sheet is the host's
+ * — AgentActivity owns the cue, not the overlay.
  *
- * Compose AgentActivityTrigger for the cue and AgentActivityContent for the
- * revealed ToolCall rows. A cue with nothing behind it should be
- * AgentActivityCue instead — a disclosure with no content is a lie.
+ * Compose AgentActivityTrigger for a disclosing cue. A thought or live
+ * line with nothing behind it should be AgentActivityCue instead.
  */
 function AgentActivity({
-  open,
-  defaultOpen,
-  onOpenChange,
   status = "complete",
   className,
   ...props
 }: AgentActivityProps) {
   return (
     <AgentActivityStatusContext.Provider value={status}>
-      <Collapsible.Root
+      <div
         data-slot="agent-activity"
         data-status={status}
         aria-busy={status === "running" || undefined}
-        open={open}
-        defaultOpen={defaultOpen}
-        onOpenChange={onOpenChange}
         className={cn(
           "group/agent-activity flex w-full min-w-0 flex-col font-sans",
           className,
@@ -169,7 +156,7 @@ function ActivityShimmer({
 const cueClassName =
   "flex w-fit min-w-0 max-w-full items-center gap-1.5 rounded-md px-1 py-0.5 font-sans nessa-text-2 text-muted-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none"
 
-export interface AgentActivityCueProps extends React.ComponentProps<"span"> {
+export type AgentActivityCueProps = {
   /**
    * The cue's lifecycle. While `running` the label shimmers. Defaults to
    * `complete`. A standalone cue that is not inside AgentActivity reads this
@@ -181,56 +168,92 @@ export interface AgentActivityCueProps extends React.ComponentProps<"span"> {
    * owns sizing and color, so pass the bare icon element.
    */
   icon?: React.ReactNode
-  /**
-   * Shows the trailing chevron that marks the cue as a control. Standalone
-   * cues that open a sheet or the current run's details pass this; a
-   * thought beat does not.
-   */
-  discloses?: boolean
-}
+} & (
+  | (React.ComponentProps<"span"> & {
+      /**
+       * Renders the cue as a control that opens details — typically the
+       * extra-details sheet — with a trailing chevron. Omit when the line
+       * is only a thought beat with nothing behind it.
+       */
+      discloses?: false
+    })
+  | (Omit<React.ComponentProps<"button">, "type"> & {
+      discloses: true
+    })
+)
 
 /**
  * A quiet transcript line for agent work that is not a message: "Thought
  * 1s", "Explored 3 files, 2 searches", "Exploring…". Renders as text so a
- * thought beat does not invite a click. Pair it with `discloses` and wrap
- * it in a button (or use AgentActivityTrigger) when the line opens details.
+ * thought beat does not invite a click. Pass `discloses` when the line
+ * opens that beat's thinking and tool calls in the extra-details sheet.
  */
-function AgentActivityCue({
-  status: statusProp,
-  icon,
-  discloses = false,
-  className,
-  children,
-  ...props
-}: AgentActivityCueProps) {
+function AgentActivityCue(props: AgentActivityCueProps) {
   const groupStatus = React.useContext(AgentActivityStatusContext)
-  const status = statusProp ?? groupStatus
-  return (
-    <span
-      data-slot="agent-activity-cue"
-      data-status={status}
-      className={cn(
-        cueClassName,
-        status === "error" && "text-destructive",
-        className,
-      )}
-      {...props}
-    >
-      {icon != null ? (
+  const status = props.status ?? groupStatus
+  const content = (
+    <>
+      {props.icon != null ? (
         <span
           aria-hidden="true"
           className="flex shrink-0 items-center justify-center text-(--nessa-chat-accent) [&_svg]:size-3.5"
         >
-          {icon}
+          {props.icon}
         </span>
       ) : null}
-      <ActivityShimmer active={status === "running"}>{children}</ActivityShimmer>
-      {discloses ? (
-        <ChevronRight
-          aria-hidden="true"
-          className="size-3.5 shrink-0"
-        />
+      <ActivityShimmer active={status === "running"}>
+        {props.children}
+      </ActivityShimmer>
+      {props.discloses ? (
+        <ChevronRight aria-hidden="true" className="size-3.5 shrink-0" />
       ) : null}
+    </>
+  )
+  const sharedClassName = cn(
+    cueClassName,
+    status === "error" && "text-destructive",
+    props.discloses &&
+      "cursor-pointer hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+    props.className,
+  )
+  if (props.discloses) {
+    const {
+      status: _status,
+      icon: _icon,
+      discloses: _discloses,
+      className: _className,
+      children: _children,
+      ...rest
+    } = props
+    return (
+      <button
+        type="button"
+        data-slot="agent-activity-cue"
+        data-status={status}
+        aria-haspopup="dialog"
+        className={sharedClassName}
+        {...rest}
+      >
+        {content}
+      </button>
+    )
+  }
+  const {
+    status: _status,
+    icon: _icon,
+    discloses: _discloses,
+    className: _className,
+    children: _children,
+    ...rest
+  } = props
+  return (
+    <span
+      data-slot="agent-activity-cue"
+      data-status={status}
+      className={sharedClassName}
+      {...rest}
+    >
+      {content}
     </span>
   )
 }
@@ -244,9 +267,11 @@ export interface AgentActivityTriggerProps
 }
 
 /**
- * The always-visible cue for a disclosure: icon, label, and a chevron that
- * tracks the expanded state. While the group is `running` the label
- * shimmers; when it `error`ed the label tints destructive.
+ * The always-visible cue for a run of tools: icon, label, and a chevron
+ * that marks it as a control. Clicking opens the extra-details sheet for
+ * that beat — it does not expand in the transcript. While the group is
+ * `running` the label shimmers; when it `error`ed the label tints
+ * destructive.
  */
 function AgentActivityTrigger({
   icon,
@@ -256,8 +281,10 @@ function AgentActivityTrigger({
 }: AgentActivityTriggerProps) {
   const status = React.useContext(AgentActivityStatusContext)
   return (
-    <Collapsible.Trigger
+    <button
+      type="button"
       data-slot="agent-activity-trigger"
+      aria-haspopup="dialog"
       className={cn(
         cueClassName,
         "cursor-pointer hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
@@ -275,29 +302,26 @@ function AgentActivityTrigger({
         </span>
       ) : null}
       <ActivityShimmer active={status === "running"}>{children}</ActivityShimmer>
-      <ChevronRight
-        aria-hidden="true"
-        className="size-3.5 shrink-0 transition-transform [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] group-data-[state=open]/agent-activity:rotate-90 motion-reduce:transition-none"
-      />
-    </Collapsible.Trigger>
+      <ChevronRight aria-hidden="true" className="size-3.5 shrink-0" />
+    </button>
   )
 }
 
 export interface AgentActivityContentProps extends React.ComponentProps<"div"> {}
 
 /**
- * The revealed tool-call list, indented under the cue so the expanded
- * details read as part of the same beat rather than as new messages.
+ * The thinking and tool-call list for a cue, shown in the extra-details
+ * sheet rather than under the transcript line.
  */
 function AgentActivityContent({
   className,
   ...props
 }: AgentActivityContentProps) {
   return (
-    <Collapsible.Content
+    <div
       data-slot="agent-activity-content"
       className={cn(
-        "mt-1.5 flex min-w-0 flex-col items-start gap-1 pl-1",
+        "flex min-w-0 flex-col items-start gap-1.5",
         className,
       )}
       {...props}

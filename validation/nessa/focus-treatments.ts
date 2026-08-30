@@ -38,8 +38,8 @@ const composerFocusComponents = Object.freeze([
   { component: "transcript-divider", count: 1 },
   // Close and Expand share the circular recipe; Done is the trailing pill.
   { component: "sheet", count: 3 },
-  // The disclosure trigger and the named-task card; a standalone cue is text.
-  { component: "agent-activity", count: 2 },
+  // The disclosing cue, the details trigger, and the named-task card.
+  { component: "agent-activity", count: 3 },
   // Each circular action is one target; the title and rows are not controls.
   { component: "agent-details", count: 1 },
   // The conversation row. The search field is an Input and draws its own ring.
