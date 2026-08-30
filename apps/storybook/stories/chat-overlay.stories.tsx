@@ -64,7 +64,10 @@ function ChatFrame({ children }: { children: React.ReactNode }) {
         aria-labelledby={`chat-tab-${tab}`}
         className="relative flex min-h-0 flex-1 flex-col gap-2 overflow-hidden px-1"
       >
-        <div className="flex min-h-0 flex-1 flex-col justify-end gap-2 overflow-y-auto">
+        <div
+          id="takeover-transcript"
+          className="flex min-h-0 flex-1 flex-col justify-end gap-2 overflow-y-auto"
+        >
           {transcript.map((entry) => (
             // The entrance animation is ChatBubbles' subject, not this
             // story's, and its mid-flight colors race the accessibility pass.
@@ -127,13 +130,28 @@ export const TranscriptTakeover: Story = {
     // The frame around the transcript is untouched.
     await expect(canvas.getByRole("tab", { name: "Repo audit" })).toBeVisible()
     await expect(canvas.getByText("Ask me anything")).toBeVisible()
+    // What the view is drawn over is inert, so nothing behind it takes a
+    // pointer or a Tab stop while it is unreadable.
+    const transcript = canvasElement.querySelector("#takeover-transcript")
+    const opener = canvas.getByRole("button", { name: "Open the skill" })
+    await expect(transcript).toHaveAttribute("inert")
+    await expect(opener).toHaveAttribute("inert")
+    // A host that mounts something behind an open view — a card, a banner —
+    // does not open a reachable hole behind it.
+    const late = document.createElement("div")
+    late.id = "late-sibling"
+    overlay.parentElement?.append(late)
+    await waitFor(() => expect(late).toHaveAttribute("inert"))
+    late.remove()
     await userEvent.click(canvas.getByRole("button", { name: "Back to chat" }))
     await waitFor(() =>
       expect(canvas.queryByRole("dialog")).not.toBeInTheDocument(),
     )
-    await expect(
-      canvas.getByRole("button", { name: "Open the skill" }),
-    ).toHaveFocus()
+    // Closing gives the chat back before it gives focus back, so focus never
+    // lands on an element that is still inert.
+    await expect(transcript).not.toHaveAttribute("inert")
+    await expect(opener).not.toHaveAttribute("inert")
+    await expect(opener).toHaveFocus()
   },
 }
 
@@ -149,6 +167,9 @@ export const CaptionedContent: Story = {
     await waitFor(() =>
       expect(canvas.getByText("skill-creator/SKILL.md")).toBeVisible(),
     )
+    // A click that lands on the prose keeps focus inside the view rather
+    // than dropping it on the body, so Escape still reaches the view.
+    await userEvent.click(canvas.getByText(/Draft a reusable skill/))
     await userEvent.keyboard("{Escape}")
     await waitFor(() =>
       expect(canvas.queryByRole("dialog")).not.toBeInTheDocument(),

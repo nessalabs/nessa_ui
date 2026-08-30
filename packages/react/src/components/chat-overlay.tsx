@@ -13,6 +13,16 @@ function cssDurationInMilliseconds(value: string, fallback: number) {
   return value.trim().endsWith("ms") ? parsed : parsed * 1000
 }
 
+/**
+ * How many open overlays are covering each element. Views stack — a passage's
+ * source document opens over the annotations that quoted it — and whichever
+ * closes first must not uncover content the survivor is still drawn over, so
+ * coverage is released on the last one out rather than the first.
+ * Elements a host inerted itself never enter the map, and so are never
+ * un-inerted by an overlay closing.
+ */
+const coverCounts = new WeakMap<HTMLElement, number>()
+
 const ChatOverlayContext = React.createContext<{ close: () => void }>({
   close: () => {},
 })
@@ -117,15 +127,27 @@ function ChatOverlay({
     // The view covers its parent's other children, so while it is open they
     // are inert: nothing behind it takes focus, a pointer, or a screen
     // reader's attention. Siblings that are dialogs themselves are left
-    // alone, as is anything the host had already inerted — the set below
-    // holds only what this overlay applied, so only that is undone.
+    // alone, as is anything the host had already inerted — the count below
+    // tracks only coverage the overlays applied, so only that is undone.
     const parent = node.parentElement
     const covered = new Set<HTMLElement>()
+    const release = (sibling: HTMLElement) => {
+      covered.delete(sibling)
+      const count = (coverCounts.get(sibling) ?? 1) - 1
+      if (count > 0) return coverCounts.set(sibling, count)
+      coverCounts.delete(sibling)
+      sibling.removeAttribute("inert")
+    }
     const coverSiblings = () => {
+      // A sibling React has unmounted is no longer covered by anything.
+      for (const sibling of covered) if (!sibling.isConnected) release(sibling)
       for (const sibling of parent?.children ?? []) {
         if (sibling === node || !(sibling instanceof HTMLElement)) continue
         if (sibling.getAttribute("role") === "dialog") continue
-        if (covered.has(sibling) || sibling.hasAttribute("inert")) continue
+        if (covered.has(sibling)) continue
+        const count = coverCounts.get(sibling)
+        if (count === undefined && sibling.hasAttribute("inert")) continue
+        coverCounts.set(sibling, (count ?? 0) + 1)
         sibling.setAttribute("inert", "")
         covered.add(sibling)
       }
@@ -137,7 +159,9 @@ function ChatOverlay({
     if (parent && observer) observer.observe(parent, { childList: true })
     return () => {
       observer?.disconnect()
-      for (const sibling of covered) sibling.removeAttribute("inert")
+      // Uncovering runs before focus returns, so focus is never handed to an
+      // element that is still inert.
+      for (const sibling of [...covered]) release(sibling)
       // A control that is gone cannot take focus back; hosts that hide the
       // opener while the view is open say where focus should land instead.
       if (opener?.isConnected) opener.focus()
