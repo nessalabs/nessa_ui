@@ -69,17 +69,23 @@ export function excludeDeletedPaths(indexedPaths: readonly string[], deletedPath
   return indexedPaths.filter((filePath) => !deleted.has(filePath))
 }
 
-async function artifactPaths(): Promise<string[]> {
-  const root = path.join(repoRoot, "packages/react/dist")
+// Built artifacts live under each published package's dist/, which git
+// ignores. The artifacts phase therefore walks the disk rather than the index.
+// Every packages/<name>/dist is included so a second published package is not
+// invisible to PKG-003 the way the parser package was.
+export async function collectArtifactPaths(root: string): Promise<string[]> {
   const result: string[] = []
   async function walk(directory: string): Promise<void> {
     for (const entry of await readdir(directory, { withFileTypes: true }).catch(() => [])) {
       const absolute = path.join(directory, entry.name)
       if (entry.isDirectory()) await walk(absolute)
-      else result.push(path.relative(repoRoot, absolute).replaceAll(path.sep, "/"))
+      else result.push(path.relative(root, absolute).replaceAll(path.sep, "/"))
     }
   }
-  await walk(root)
+  const packagesRoot = path.join(root, "packages")
+  for (const entry of await readdir(packagesRoot, { withFileTypes: true }).catch(() => [])) {
+    if (entry.isDirectory()) await walk(path.join(packagesRoot, entry.name, "dist"))
+  }
   return result
 }
 
@@ -106,7 +112,7 @@ export async function runValidation(args = process.argv.slice(2)): Promise<RunRe
         await gitPaths(["ls-files", "--cached", "--others", "--exclude-standard"]),
         await gitPaths(["ls-files", "--deleted"]),
       )
-    : await artifactPaths()
+    : await collectArtifactPaths(repoRoot)
   const changedPaths = options.changedSince
     ? combineChangedPaths(
         await gitPaths(["diff", "--name-only", options.changedSince, "--"]),
