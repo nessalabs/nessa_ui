@@ -19,8 +19,9 @@ change; the sources below are always current, and this is not.**
 
 | Question | Read |
 | --- | --- |
-| What can I call? | `packages/agent-stream/src/index.ts` — the contract and providers, stopping at the agent message |
+| What can I call? | `packages/agent-stream/src/contract.ts` — the contract and providers, stopping at the agent message |
 | Where is the fold? | `packages/agent-stream/src/transcript/` — imported as `@nessa-ui/agent-stream/transcript` |
+| Why two barrels? | `index.ts` is the shadcn registry's barrel and carries both halves; copied source has no exports map |
 | What is in an event? | `events.ts` — the contract, with every payload variant documented |
 | How do I actually use it? | `agent-stream.test.ts` — executable examples against real captures |
 | Why is the wire like this? | [docs/architecture/agent-stream-parsers.md](../../docs/architecture/agent-stream-parsers.md) |

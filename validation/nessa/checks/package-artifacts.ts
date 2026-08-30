@@ -56,6 +56,35 @@ export function moduleSpecifiers(source: string, filePath: string): string[] {
   return found
 }
 
+/**
+ * The specifiers a file re-exports wholesale, i.e. `export * from "x"`.
+ *
+ * Narrower than `moduleSpecifiers` on purpose. That function answers "does this
+ * file touch x at all", which is the right question for a ban and the wrong one
+ * for a requirement: `export { one } from "./transcript"` mentions the module
+ * and still drops sixteen of its seventeen symbols, and `import "./transcript"`
+ * mentions it while exporting nothing. Only a star re-export carries the whole
+ * surface forward, so only a star re-export satisfies the barrel.
+ */
+export function starReexportSpecifiers(source: string, filePath: string): string[] {
+  const ast = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true)
+  const found: string[] = []
+  ast.forEachChild(function step(node) {
+    if (
+      ts.isExportDeclaration(node) &&
+      node.exportClause === undefined &&
+      !node.isTypeOnly &&
+      node.moduleSpecifier &&
+      ts.isStringLiteralLike(node.moduleSpecifier)
+    ) {
+      // `export * from "./x.ts"` and `export * from "./x"` name one module.
+      found.push(node.moduleSpecifier.text.replace(/\.ts$/, ""))
+    }
+    ts.forEachChild(node, step)
+  })
+  return found
+}
+
 /** React, in any of the entry points that would drag the framework back in. */
 export function isReactSpecifier(specifier: string): boolean {
   return specifier === "react" || specifier === "react-dom" || specifier.startsWith("react/") || specifier.startsWith("react-dom/")
@@ -111,9 +140,31 @@ export function parserPackageDeclarationIssues(pkg: PackageJson): string[] {
 }
 
 /**
+ * The barrel a copied-source consumer imports, which must stay the whole API.
+ *
+ * The registry has no exports map, so `lib/agent-stream/index.ts` is the only
+ * surface a shadcn consumer has. Trimming it to the contract — the shape the
+ * published package deliberately has — deletes the fold from every project that
+ * installed this item, and does it silently, because the copied files still
+ * typecheck until a call site names a missing symbol. Requiring the two
+ * star-exports verbatim keeps the barrel equal to contract-plus-fold by
+ * construction rather than by upkeep.
+ */
+const REGISTRY_BARREL = "packages/agent-stream/src/index.ts"
+const REQUIRED_BARREL_EXPORTS = ["./contract", "./transcript"] as const
+
+export function registryBarrelIssues(source: string): string[] {
+  const reexported = starReexportSpecifiers(source, REGISTRY_BARREL)
+  return REQUIRED_BARREL_EXPORTS.filter((required) => !reexported.includes(required))
+}
+
+const CONTRACT_ENTRY = "packages/agent-stream/src/contract.ts"
+const FOLD_ROOT = "packages/agent-stream/src/transcript/"
+
+/**
  * Whether the contract entry can reach the fold, following relative imports.
  *
- * The exports map can promise a two-entry split while `src/index.ts` quietly
+ * The exports map can promise a two-entry split while `src/contract.ts` quietly
  * re-exports the fold, and every other check here would still pass: the map is
  * unchanged, no dependency appears, no React is imported. What breaks is
  * invisible. The fold's two modules import each other's *values*
@@ -127,9 +178,6 @@ export function parserPackageDeclarationIssues(pkg: PackageJson): string[] {
  *
  * Walking the graph is what makes the layering a fact rather than a comment.
  */
-const CONTRACT_ENTRY = "packages/agent-stream/src/index.ts"
-const FOLD_ROOT = "packages/agent-stream/src/transcript/"
-
 export async function foldReachableFromContract(context: {
   readText(filePath: string): Promise<string>
   files: { has(filePath: string): boolean }
@@ -218,6 +266,26 @@ export const packageArtifactsCheck = defineCheck({
       }
     }
 
+    if (!context.files.has(REGISTRY_BARREL)) {
+      findings.push(context.fail(
+        "The registry barrel is absent: a shadcn consumer would install an item with no lib/agent-stream/index.ts, so every import of it fails.",
+        { contractId: "PKG-002", path: REGISTRY_BARREL },
+      ))
+    } else {
+      for (const missing of registryBarrelIssues(await context.readText(REGISTRY_BARREL))) {
+        findings.push(context.fail(
+          `The registry barrel must re-export ${missing}: copied source has no exports map, so trimming this file silently deletes that half of the API from every shadcn consumer.`,
+          { contractId: "PKG-002", path: REGISTRY_BARREL },
+        ))
+      }
+    }
+
+    if (!context.files.has(CONTRACT_ENTRY)) {
+      findings.push(context.fail(
+        "The contract entry is absent, so the layering walk has nothing to follow and would report no violations. Rename the constant with the file.",
+        { contractId: "PKG-002", path: CONTRACT_ENTRY },
+      ))
+    }
     for (const reached of await foldReachableFromContract(context)) {
       findings.push(context.fail(
         "The contract entry must not reach the fold: re-exporting it inlines the transcript/builder cycle and makes @nessa-ui/react's two star-exports ambiguous, which elides every fold symbol from its public API without an error.",

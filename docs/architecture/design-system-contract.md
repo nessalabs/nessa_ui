@@ -1015,6 +1015,14 @@ by both is ambiguous and is elided silently rather than reported.
 `@nessa-ui/react` re-exports both entries, so its own public surface is
 unchanged and a React host needs no migration.
 
+The shadcn registry copies source and has no exports map, so a registry
+consumer's only surface is `lib/agent-stream/index.ts`. That barrel re-exports
+the contract and the fold together and must continue to: trimming it to the
+published package's shape deletes the fold from every project that installed
+the item, and does it silently, because the copied files still typecheck until
+a call site names a missing symbol. `src/index.ts` therefore exists apart from
+`src/contract.ts` and is never an entry point of the published package.
+
 ## Real icon consumer before API stability
 
 The icon provider is provisional until a real Nessa component consumes it. A story-only hook harness is necessary but insufficient.

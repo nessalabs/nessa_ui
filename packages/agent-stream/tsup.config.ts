@@ -8,7 +8,7 @@ export default defineConfig({
   // keys, because the output name is what the exports map promises and what a
   // registry consumer imports as `lib/agent-stream/transcript`.
   entry: {
-    index: "src/index.ts",
+    index: "src/contract.ts",
     transcript: "src/transcript/index.ts",
   },
   format: ["esm"],

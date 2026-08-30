@@ -1,98 +1,23 @@
-/** @responsibility Re-exports the agent stream parser: the shared contract and the providers that feed it, stopping at the agent message. */
+/** @responsibility The barrel a copied-source consumer imports: the contract and the fold together. */
 
-// ---------- the contract every provider maps onto ----------
-export {
-  AgentEventType,
-  FileChange,
-  PlanStepStatus,
-  TaskKind,
-  isEvent,
-  isMainThread,
-  pathKey,
-  type AgentEvent,
-  type AgentEventPayload,
-  type AgentStreamMapper,
-  type AgentPath,
-  type BlockRef,
-  type DeltaPayload,
-  type FileEdit,
-  type MapperOptions,
-  type PlanStep,
-  type SessionInfo,
-  type WireProvenance,
-  type ToolKind,
-  type ToolResult,
-  type TurnStatus,
-  type Usage,
-  type WorkflowAgentProgress,
-  type WorkflowPhaseProgress,
-} from "./events"
-export {
-  unreportedCapabilities,
-  type AgentCapabilities,
-  type CapabilityCommand,
-  type CapabilityHook,
-  type CapabilityModel,
-  type CapabilityPlugin,
-  type CapabilityPluginSource,
-  type CapabilityServer,
-  type CapabilitySkill,
-  type CapabilityTool,
-  type CommandSource,
-} from "./capabilities"
-export {
-  asArray,
-  asBoolean,
-  asNumber,
-  asObject,
-  asOneOf,
-  asRecord,
-  asString,
-  asStrings,
-  parseJsonLine,
-  parseJsonObjectLine,
-  parseJsonLines,
-  shortenPath,
-  type JsonLineResult,
-  type JsonValue,
-} from "./json"
-
-export { type MappingEntry, type WireKind } from "./mapping"
-export { EventSink } from "./emitter"
-export {
-  AGENT_TRANSPORTS,
-  transportOf,
-  transportsOf,
-  type ProviderDescriptor,
-  type Supported,
-  type TransportDescriptor,
-  type TransportSupport,
-} from "./transports"
-
-// ---------- providers ----------
 /**
- * Namespaced, not flattened.
+ * Not an entry point of the published package — deliberately.
  *
- * A provider's surface is full of names a second provider wants too —
- * `parseWireLine`, `toolKind`, `SessionCapabilities`, `TranscriptRef`. Two
- * star-exports sharing a name silently elide the symbol, so flattening would
- * make adding `codex/` a breaking change to this module's public API: exactly
- * the "nothing else moves" claim the layering exists to keep.
+ * `@nessa-ui/agent-stream` ships two entries and its layering is the exports
+ * map: `.` is `contract.ts` and stops at the agent message, `./transcript` is
+ * the fold. A shadcn consumer gets neither, because the registry copies source
+ * and copied source has no exports map. For that consumer the barrel *is* the
+ * API, so a barrel carrying only the contract would silently delete the fold
+ * from every project that had installed this item.
+ *
+ * So the barrel re-exports both, and it re-exports rather than enumerates: two
+ * star-exports cannot drift from what the entries actually carry. They are safe
+ * because the entries are disjoint by construction — the contract entry is held
+ * away from the fold by the package-artifacts check, which is the same fact
+ * that makes this file's two lines unambiguous.
+ *
+ * The published package never reaches this file; `tsup` builds `contract.ts`
+ * and `transcript/index.ts`, so the npm consumer still gets the split.
  */
-export * as acp from "./acp"
-export * as claude from "./claude"
-export * as codex from "./codex"
-export * as opencode from "./opencode"
-
-// Mapper classes and their one-shot helpers are also exported flat, because
-// reaching for a parser by name is the common case and `claude.ClaudeStreamMapper`
-// stutters.
-export { ClaudeStreamMapper, mapClaudeStream } from "./claude"
-export { CodexAppServerMapper, CodexStreamMapper, mapCodexAppServerStream, mapCodexStream } from "./codex"
-export { AcpMapper, mapAcpStream } from "./acp"
-export {
-  OpencodeRunMapper,
-  OpencodeServerMapper,
-  mapOpencodeServerStream,
-  mapOpencodeStream,
-} from "./opencode"
+export * from "./contract"
+export * from "./transcript"

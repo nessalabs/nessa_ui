@@ -126,6 +126,27 @@ export function relativeRegistryTopology(
   return { issues, relativeRegistryItems }
 }
 
+/**
+ * Source trees whose registry item must copy every file in them.
+ *
+ * A registry item is normally a curated subset of a package, so a source file
+ * that no item ships is unremarkable. The parser is the exception: copied source
+ * is the *entire* surface a shadcn consumer has, and its modules import each
+ * other by relative path. One file missing from the item is not a smaller
+ * install, it is a broken one — `lib/agent-stream/index.ts` re-exporting a
+ * `./contract` that was never copied fails at install time, and nothing else
+ * here would notice, because every other check walks only the files the item
+ * already lists.
+ */
+const FULLY_COPIED_TREES = [
+  { item: "agent-stream", glob: "packages/agent-stream/src/**/*.ts" },
+] as const
+
+export function uncopiedSources(listed: ReadonlySet<string>, onDisk: readonly string[]): string[] {
+  // Tests exercise the parser; they are not part of what a consumer installs.
+  return onDisk.filter((filePath) => !filePath.endsWith(".test.ts") && !listed.has(filePath)).sort()
+}
+
 export const registryParityCheck = defineCheck({
   id: "registry-parity",
   ...checkMetadata["registry-parity"],
@@ -193,6 +214,18 @@ export const registryParityCheck = defineCheck({
         }
       }
     }
+    for (const { item: itemName, glob } of FULLY_COPIED_TREES) {
+      const item = registry.items.find((candidate) => candidate.name === itemName)
+      if (!item) {
+        findings.push(context.fail(`Registry item ${itemName} is absent, so nothing copies ${glob}.`, { contractId: "REG-002", path: "registry.json" }))
+        continue
+      }
+      const listed = new Set((item.files ?? []).map((file) => file.path))
+      for (const missing of uncopiedSources(listed, context.files.match([glob]))) {
+        findings.push(context.fail(`${itemName} does not copy ${missing}; a consumer installing this item gets a source tree with a missing module.`, { contractId: "REG-002", path: "registry.json" }))
+      }
+    }
+
     if (!findings.length) findings.push(context.pass("Registry catalog, embedded source, and dependencies match canonical inputs.", { contractId: "REG-001" }))
     return findings
   },
