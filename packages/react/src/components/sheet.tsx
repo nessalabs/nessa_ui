@@ -102,9 +102,9 @@ export interface SheetProps extends React.ComponentProps<"div"> {
  * keystroke. Pass `modal={false}` for a contained extra-details surface that
  * still covers its siblings but leaves surrounding chrome in the tab order.
  *
- * Mount it as a child of the ancestor it should fill. Queue and agent
- * details sit on the chat frame so Expand covers the window; thinking,
- * tools, and annotations sit in the tabpanel so the tab strip and composer
+ * Mount it as a child of the ancestor it should fill. Queue, agent details,
+ * and activity (thought / explored) sit on the chat frame so Expand covers
+ * the window; annotations sit in the tabpanel so the tab strip and composer
  * stay. Prefer one modal sheet per ancestor — two stacked modal sheets
  * both trap Tab.
  *
@@ -424,6 +424,7 @@ const sheetDragThreshold = 48
 function SheetHandle({ className, ...props }: React.ComponentProps<"div">) {
   const { expanded, setExpanded, close } = useSheet()
   const startY = React.useRef<number | null>(null)
+  const lastY = React.useRef(0)
 
   const panelFrom = (target: EventTarget | null) =>
     target instanceof Element
@@ -432,6 +433,19 @@ function SheetHandle({ className, ...props }: React.ComponentProps<"div">) {
 
   const clearTranslate = (panel: HTMLElement | null) => {
     if (panel) panel.style.translate = ""
+  }
+
+  const settleDrag = (panel: HTMLElement | null) => {
+    const origin = startY.current
+    startY.current = null
+    clearTranslate(panel)
+    if (origin == null) return
+    const dy = lastY.current - origin
+    if (dy <= -sheetDragThreshold) setExpanded(true)
+    else if (dy >= sheetDragThreshold) {
+      if (expanded) setExpanded(false)
+      else close()
+    }
   }
 
   return (
@@ -447,6 +461,7 @@ function SheetHandle({ className, ...props }: React.ComponentProps<"div">) {
         props.onPointerDown?.(event)
         if (event.defaultPrevented || event.button !== 0) return
         startY.current = event.clientY
+        lastY.current = event.clientY
         try {
           event.currentTarget.setPointerCapture(event.pointerId)
         } catch {
@@ -456,7 +471,8 @@ function SheetHandle({ className, ...props }: React.ComponentProps<"div">) {
       onPointerMove={(event) => {
         props.onPointerMove?.(event)
         if (event.defaultPrevented || startY.current == null) return
-        const dy = event.clientY - startY.current
+        lastY.current = event.clientY
+        const dy = lastY.current - startY.current
         const panel = panelFrom(event.currentTarget)
         if (!panel) return
         if (expanded) {
@@ -467,21 +483,16 @@ function SheetHandle({ className, ...props }: React.ComponentProps<"div">) {
       }}
       onPointerUp={(event) => {
         props.onPointerUp?.(event)
-        if (event.defaultPrevented || startY.current == null) return
-        const dy = event.clientY - startY.current
-        const panel = panelFrom(event.currentTarget)
-        clearTranslate(panel)
-        startY.current = null
-        if (dy <= -sheetDragThreshold) setExpanded(true)
-        else if (dy >= sheetDragThreshold) {
-          if (expanded) setExpanded(false)
-          else close()
-        }
+        if (event.defaultPrevented) return
+        // Settle from the last move. pointerup.clientY is 0 on synthetic
+        // events and some touch releases; treating that as the end Y
+        // would look like a large upward fling and expand by accident.
+        settleDrag(panelFrom(event.currentTarget))
       }}
       onPointerCancel={(event) => {
         props.onPointerCancel?.(event)
-        clearTranslate(panelFrom(event.currentTarget))
         startY.current = null
+        clearTranslate(panelFrom(event.currentTarget))
       }}
     >
       <span className="h-1 w-10 rounded-full bg-muted-foreground/50" />
@@ -501,7 +512,7 @@ function SheetHeader({ className, ...props }: SheetHeaderProps) {
     <div
       data-slot="sheet-header"
       className={cn(
-        "grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 px-5 pb-2 pt-1",
+        "grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 px-6 pb-2 pt-2",
         className,
       )}
       {...props}
@@ -629,7 +640,7 @@ function SheetBody({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sheet-body"
       className={cn(
-        "flex flex-col gap-3 px-5 pb-6 pt-2",
+        "flex flex-col gap-3 px-6 pb-6 pt-2",
         expanded &&
           "min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className,

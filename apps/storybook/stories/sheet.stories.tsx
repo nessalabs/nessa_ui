@@ -93,7 +93,7 @@ export const Playground: Story = {
 
 export const ExpandToggle: Story = {
   parameters: storyDocumentation(
-    "SheetExpand grows the drawer into a filled extra-details surface over the same ancestor; Minimize recedes it. Dragging the grab bar up expands and dragging it down minimizes. Escape and Done still dismiss.",
+    "SheetExpand grows the drawer into a filled extra-details surface over the same ancestor; Minimize recedes it. Dragging the grab bar up expands, dragging it down minimizes, and dragging down from the drawer dismisses. Escape and Done still dismiss.",
   ),
   render: () => {
     function ExpandExample() {
@@ -143,51 +143,36 @@ export const ExpandToggle: Story = {
       "[data-slot=sheet-handle]",
     )!
     const grabY = grab.getBoundingClientRect().top + 4
-    fireEvent.pointerDown(grab, {
-      pointerId: 1,
-      pointerType: "touch",
-      isPrimary: true,
-      button: 0,
-      buttons: 1,
-      clientY: grabY,
-    })
-    fireEvent.pointerMove(grab, {
-      pointerId: 1,
-      pointerType: "touch",
-      isPrimary: true,
-      buttons: 1,
-      clientY: grabY - 80,
-    })
-    fireEvent.pointerUp(grab, {
-      pointerId: 1,
-      pointerType: "touch",
-      button: 0,
-      clientY: grabY - 80,
-    })
+    const dragGrab = (pointerId: number, endY: number) => {
+      fireEvent.pointerDown(grab, {
+        pointerId,
+        pointerType: "touch",
+        isPrimary: true,
+        button: 0,
+        buttons: 1,
+        clientY: grabY,
+      })
+      fireEvent.pointerMove(grab, {
+        pointerId,
+        pointerType: "touch",
+        isPrimary: true,
+        buttons: 1,
+        clientY: endY,
+      })
+      // clientY 0 on release is the real-device / synthetic miss that
+      // used to read as an upward fling. Settle from the last move.
+      fireEvent.pointerUp(grab, {
+        pointerId,
+        pointerType: "touch",
+        button: 0,
+        clientY: 0,
+      })
+    }
+    dragGrab(1, grabY - 80)
     await expect(dialog).toHaveAttribute("data-expanded", "true")
-    fireEvent.pointerDown(grab, {
-      pointerId: 2,
-      pointerType: "touch",
-      isPrimary: true,
-      button: 0,
-      buttons: 1,
-      clientY: grabY,
-    })
-    fireEvent.pointerMove(grab, {
-      pointerId: 2,
-      pointerType: "touch",
-      isPrimary: true,
-      buttons: 1,
-      clientY: grabY + 80,
-    })
-    fireEvent.pointerUp(grab, {
-      pointerId: 2,
-      pointerType: "touch",
-      button: 0,
-      clientY: grabY + 80,
-    })
+    dragGrab(2, grabY + 80)
     await expect(dialog).toHaveAttribute("data-expanded", "false")
-    await userEvent.click(canvas.getByRole("button", { name: "Done" }))
+    dragGrab(3, grabY + 80)
     await expect(
       canvas.queryByRole("dialog", { name: "Queued" }),
     ).not.toBeInTheDocument()
