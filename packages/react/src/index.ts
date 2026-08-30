@@ -29,6 +29,21 @@ export {
   type ConversationRailTriggerProps,
 } from "./components/conversation-rail"
 export {
+  Drawer,
+  DrawerBody,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+  useDrawer,
+  type DrawerContentProps,
+  type DrawerProps,
+  type DrawerSide,
+} from "./components/drawer"
+export {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,

@@ -67,6 +67,7 @@ type FocusComponent =
   | "selection-tooltip"
   | "tool-approval"
   | "checkbox"
+  | "drawer"
   | "dropdown-menu"
   | "pagination"
   | "page-outline"
@@ -422,6 +423,32 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
+  // The panel takes focus when it opens, so it carries an indicator; the
+  // outline is inset because a panel flush with the viewport edge would show
+  // only half of an outset one.
+  {
+    component: "drawer",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The drawer's resize handle follows the SplitView separator's treatment:
+  // a full-strength ring with no offset, drawn on the hairline itself, since
+  // an offset outline around a 1px line reads as a floating box rather than
+  // as the moved edge. The panel is deliberately unclipped so the ring is not
+  // cut in half where the handle sits on its edge.
+  {
+    component: "drawer",
+    layer: "ring",
+    state: "focus-visible",
+    className: "focus-visible:ring-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
   {
     component: "app-shell/app-shell-dock",
     layer: "ring",
@@ -552,6 +579,10 @@ export const focusGeometryClasses = Object.freeze([
   // outline draws inset.
   { component: "pagination", className: "focus-visible:outline-2", count: 1 },
   { component: "pagination", className: "focus-visible:-outline-offset-2", count: 1 },
+  { component: "drawer", className: "focus-visible:outline-2", count: 1 },
+  { component: "drawer", className: "focus-visible:-outline-offset-2", count: 1 },
+  { component: "drawer", className: "focus-visible:ring-2", count: 1 },
+  { component: "drawer", className: "focus-visible:ring-offset-0", count: 1 },
   { component: "split-view/split-view-separator", className: "focus-visible:ring-2", count: 1 },
   { component: "split-view/split-view-separator", className: "focus-visible:ring-offset-0", count: 1 },
   { component: "app-shell/app-shell-dock", className: "focus-visible:ring-2", count: 1 },
