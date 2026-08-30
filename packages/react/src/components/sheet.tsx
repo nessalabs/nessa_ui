@@ -14,6 +14,14 @@ function cssDurationInMilliseconds(value: string, fallback: number) {
   return value.trim().endsWith("ms") ? parsed : parsed * 1000
 }
 
+/**
+ * How many open sheets are covering each sibling. Sheets can stack — a
+ * details panel over a queue — and whichever closes first must not uncover
+ * content the survivor is still drawn over. Elements a host inerted itself
+ * never enter the map, and so are never un-inerted by a sheet closing.
+ */
+const coverCounts = new WeakMap<HTMLElement, number>()
+
 const SheetContext = React.createContext<{ close: () => void }>({
   close: () => {},
 })
@@ -104,16 +112,29 @@ function Sheet({
     const covered = new Set<HTMLElement>()
     const release = (sibling: HTMLElement) => {
       covered.delete(sibling)
+      const count = (coverCounts.get(sibling) ?? 1) - 1
+      if (count > 0) return coverCounts.set(sibling, count)
+      coverCounts.delete(sibling)
       sibling.removeAttribute("inert")
     }
-    for (const sibling of parent?.children ?? []) {
-      if (sibling === node || !(sibling instanceof HTMLElement)) continue
-      if (sibling.getAttribute("role") === "dialog") continue
-      if (sibling.hasAttribute("inert")) continue
-      sibling.setAttribute("inert", "")
-      covered.add(sibling)
+    const coverSiblings = () => {
+      for (const sibling of covered) if (!sibling.isConnected) release(sibling)
+      for (const sibling of parent?.children ?? []) {
+        if (sibling === node || !(sibling instanceof HTMLElement)) continue
+        if (sibling.getAttribute("role") === "dialog") continue
+        if (covered.has(sibling)) continue
+        const count = coverCounts.get(sibling)
+        if (count === undefined && sibling.hasAttribute("inert")) continue
+        coverCounts.set(sibling, (count ?? 0) + 1)
+        sibling.setAttribute("inert", "")
+        covered.add(sibling)
+      }
     }
+    coverSiblings()
+    const observer = parent ? new MutationObserver(coverSiblings) : null
+    if (parent && observer) observer.observe(parent, { childList: true })
     return () => {
+      observer?.disconnect()
       for (const sibling of [...covered]) release(sibling)
       if (opener?.isConnected) opener.focus()
       else onReturnFocusRef.current?.()
