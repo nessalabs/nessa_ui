@@ -83,7 +83,9 @@ export interface ChatTabsProps
  * accent, a glowing dot for busy tabs, an attention badge for tabs that
  * need the user, a close control on closeable tabs, and a
  * trailing new-tab button. A history tab holds the conversation roster
- * opened from `/history`. Arrow keys, Home, and End rove the tablist and
+ * opened from `/history`. The selected tab is scrolled into the track so a
+ * newly opened file, subagent, or history tab is not stranded off-screen.
+ * Arrow keys, Home, and End rove the tablist and
  * Delete closes a closeable tab (the ✕ is a pointer-only affordance, since
  * a tablist may own nothing but tabs); a panel host labels itself with
  * `chat-tab-panel-<id>` to pair with a tab's `aria-controls`. `wrapTab`
@@ -109,6 +111,14 @@ function ChatTabs({
   // tab (the type allows null, and hosts may close the active tab without
   // reselecting) — the first tab takes it as a fallback.
   const hasActiveTab = tabs.some((tab) => tab.id === value)
+
+  React.useEffect(() => {
+    if (value == null) return
+    tabRefs.current
+      .get(value)
+      ?.closest("[data-slot='chat-tab']")
+      ?.scrollIntoView({ inline: "nearest", block: "nearest" })
+  }, [value, tabs])
 
   const selectRelativeTab = (index: number, key: string) => {
     if (tabs.length === 0) return

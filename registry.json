@@ -1102,7 +1102,7 @@
       "name": "chat-tabs",
       "type": "registry:ui",
       "title": "Chat Tabs",
-      "description": "The floating chat window's tab strip: pill tabs on a scrolling tablist with chat-accent-tinted active state, busy dots, attention badges, per-tab close controls, a new-tab button, roving arrow-key navigation, and a wrapTab slot for hanging a context menu on each pill.",
+      "description": "The floating chat window's tab strip: pill tabs on a scrolling tablist with chat-accent-tinted active state, busy dots, attention badges, per-tab close controls, a new-tab button, roving arrow-key navigation, a wrapTab slot for hanging a context menu on each pill, and the selected tab scrolled into the track.",
       "dependencies": [
         "lucide-react"
       ],
