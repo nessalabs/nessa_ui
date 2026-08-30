@@ -116,16 +116,27 @@ function ChatOverlay({
     ;(firstControl ?? node).focus()
     // The view covers its parent's other children, so while it is open they
     // are inert: nothing behind it takes focus, a pointer, or a screen
-    // reader's attention. Other dialogs beside it are left alone.
-    const covered = Array.from(node.parentElement?.children ?? []).filter(
-      (sibling): sibling is HTMLElement =>
-        sibling !== node &&
-        sibling instanceof HTMLElement &&
-        sibling.getAttribute("role") !== "dialog" &&
-        !sibling.hasAttribute("inert"),
-    )
-    for (const sibling of covered) sibling.setAttribute("inert", "")
+    // reader's attention. Siblings that are dialogs themselves are left
+    // alone, as is anything the host had already inerted — the set below
+    // holds only what this overlay applied, so only that is undone.
+    const parent = node.parentElement
+    const covered = new Set<HTMLElement>()
+    const coverSiblings = () => {
+      for (const sibling of parent?.children ?? []) {
+        if (sibling === node || !(sibling instanceof HTMLElement)) continue
+        if (sibling.getAttribute("role") === "dialog") continue
+        if (covered.has(sibling) || sibling.hasAttribute("inert")) continue
+        sibling.setAttribute("inert", "")
+        covered.add(sibling)
+      }
+    }
+    coverSiblings()
+    // Hosts mount things behind an open view — a card, a banner — and those
+    // are covered too rather than becoming a reachable hole behind it.
+    const observer = parent ? new MutationObserver(coverSiblings) : null
+    if (parent && observer) observer.observe(parent, { childList: true })
     return () => {
+      observer?.disconnect()
       for (const sibling of covered) sibling.removeAttribute("inert")
       // A control that is gone cannot take focus back; hosts that hide the
       // opener while the view is open say where focus should land instead.
