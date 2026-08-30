@@ -134,10 +134,19 @@ export const Tabs: Story = {
       canvas.queryByRole("tab", { name: "Scratchpad" }),
     ).not.toBeInTheDocument()
     await userEvent.click(canvas.getByRole("button", { name: "New tab" }))
-    await expect(canvas.getByRole("tab", { name: "New chat" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    )
+    const newChat = canvas.getByRole("tab", { name: "New chat" })
+    await expect(newChat).toHaveAttribute("aria-selected", "true")
     await expect(canvas.getByRole("tabpanel")).toHaveTextContent("New chat")
+    const track = canvasElement.querySelector<HTMLElement>(
+      "[data-slot=chat-tabs-track]",
+    )!
+    const pill = newChat.closest<HTMLElement>("[data-slot=chat-tab]")!
+    const trackRect = track.getBoundingClientRect()
+    const pillRect = pill.getBoundingClientRect()
+    await expect(pillRect.left).toBeGreaterThanOrEqual(trackRect.left - 1)
+    await expect(pillRect.right).toBeLessThanOrEqual(trackRect.right + 1)
+    await expect(
+      canvasElement.ownerDocument.scrollingElement?.scrollTop ?? 0,
+    ).toBe(0)
   },
 }

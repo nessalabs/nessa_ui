@@ -49,10 +49,6 @@ export default defineConfig({
         ],
         test: {
           name: "storybook-reduced-motion",
-          // Same budget as `storybook`: Playground plays wait on streams and
-          // sheet motion, and the default 15s trips when the full suite is
-          // loaded. Reduced motion skips the animation, not the work.
-          testTimeout: 30000,
           browser: {
             enabled: true,
             provider: playwright({}),

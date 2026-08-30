@@ -84,7 +84,9 @@ export interface ChatTabsProps
  * need the user, a close control on closeable tabs, and a
  * trailing new-tab button. A history tab holds the conversation roster
  * opened from `/history`. The selected tab is scrolled into the track so a
- * newly opened file, subagent, or history tab is not stranded off-screen.
+ * newly opened file, subagent, or history tab is not stranded off-screen
+ * — only the overflow track moves, so a docs page or transcript around
+ * the strip does not scroll.
  * Arrow keys, Home, and End rove the tablist and
  * Delete closes a closeable tab (the ✕ is a pointer-only affordance, since
  * a tablist may own nothing but tabs); a panel host labels itself with
@@ -114,10 +116,21 @@ function ChatTabs({
 
   React.useEffect(() => {
     if (value == null) return
-    tabRefs.current
+    const tab = tabRefs.current
       .get(value)
-      ?.closest("[data-slot='chat-tab']")
-      ?.scrollIntoView({ inline: "nearest", block: "nearest" })
+      ?.closest<HTMLElement>("[data-slot=chat-tab]")
+    const track = tab?.closest<HTMLElement>("[data-slot=chat-tabs-track]")
+    if (!tab || !track) return
+    // Scroll only the overflow track. Element.scrollIntoView walks every
+    // ancestor and, on a Storybook docs page, pulls the story canvas into
+    // the iframe — sending the documentation heading above the viewport.
+    const tabRect = tab.getBoundingClientRect()
+    const trackRect = track.getBoundingClientRect()
+    if (tabRect.left < trackRect.left) {
+      track.scrollLeft -= trackRect.left - tabRect.left
+    } else if (tabRect.right > trackRect.right) {
+      track.scrollLeft += tabRect.right - trackRect.right
+    }
   }, [value, tabs])
 
   const selectRelativeTab = (index: number, key: string) => {
