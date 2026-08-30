@@ -36,8 +36,8 @@ const composerFocusComponents = Object.freeze([
   { component: "tool-call", count: 3 },
   // The label is the only target; the rules either side are decoration.
   { component: "transcript-divider", count: 1 },
-  // Close and Done share the sheet; the backdrop is pointer-only.
-  { component: "sheet", count: 2 },
+  // Close and Expand share the circular recipe; Done is the trailing pill.
+  { component: "sheet", count: 3 },
   // The disclosure trigger and the named-task card; a standalone cue is text.
   { component: "agent-activity", count: 2 },
   // Each circular action is one target; the title and rows are not controls.

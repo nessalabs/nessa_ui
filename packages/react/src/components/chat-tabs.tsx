@@ -8,16 +8,16 @@ import { cn } from "@/lib/utils"
 const chatTabsFocusClassName =
   "outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
 
-export type ChatTabKind = "conversation" | "subagent" | "file"
+export type ChatTabKind = "conversation" | "subagent" | "file" | "history"
 
 export interface ChatTabItem {
   id: string
   title: string
   /**
    * What the tab holds. A chat window's tabs are not all conversations —
-   * a subagent's own transcript and an opened document sit in the same
-   * strip — and hosts style and test against the exposed `data-kind`.
-   * Defaults to `conversation`.
+   * a subagent's own transcript, an opened document, and the conversation
+   * history roster sit in the same strip — and hosts style and test against
+   * the exposed `data-kind`. Defaults to `conversation`.
    */
   kind?: ChatTabKind
   /**
@@ -82,7 +82,8 @@ export interface ChatTabsProps
  * scrolling tablist, the active tab washed and outlined in the chat
  * accent, a glowing dot for busy tabs, an attention badge for tabs that
  * need the user, a close control on closeable tabs, and a
- * trailing new-tab button. Arrow keys, Home, and End rove the tablist and
+ * trailing new-tab button. A history tab holds the conversation roster
+ * opened from `/history`. Arrow keys, Home, and End rove the tablist and
  * Delete closes a closeable tab (the ✕ is a pointer-only affordance, since
  * a tablist may own nothing but tabs); a panel host labels itself with
  * `chat-tab-panel-<id>` to pair with a tab's `aria-controls`. `wrapTab`

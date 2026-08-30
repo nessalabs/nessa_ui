@@ -511,6 +511,7 @@ export {
   SheetAction,
   SheetBody,
   SheetClose,
+  SheetExpand,
   SheetHandle,
   SheetHeader,
   SheetTitle,

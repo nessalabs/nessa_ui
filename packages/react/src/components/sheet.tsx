@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { X } from "lucide-react"
+import { Maximize2, Minimize2, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -22,11 +22,20 @@ function cssDurationInMilliseconds(value: string, fallback: number) {
  */
 const coverCounts = new WeakMap<HTMLElement, number>()
 
-const SheetContext = React.createContext<{ close: () => void }>({
+const SheetContext = React.createContext<{
+  close: () => void
+  expanded: boolean
+  setExpanded: (expanded: boolean) => void
+}>({
   close: () => {},
+  expanded: false,
+  setExpanded: () => {},
 })
 
-/** Reads the enclosing sheet's close handler, for custom dismiss controls. */
+/**
+ * Reads the enclosing sheet: dismiss, whether the panel fills its ancestor,
+ * and the expand toggle. SheetExpand, SheetClose, and SheetAction use it.
+ */
 function useSheet() {
   return React.useContext(SheetContext)
 }
@@ -43,6 +52,15 @@ export interface SheetProps extends React.ComponentProps<"div"> {
    * not.
    */
   onReturnFocus?: () => void
+  /**
+   * Controlled expand: `true` fills the positioned ancestor, `false` is the
+   * bottom drawer. Pair with `onExpandedChange`.
+   */
+  expanded?: boolean
+  /** Uncontrolled initial expand. Drawer by default. */
+  defaultExpanded?: boolean
+  /** Fires when SheetExpand toggles the panel between drawer and filled. */
+  onExpandedChange?: (expanded: boolean) => void
 }
 
 /**
@@ -53,13 +71,19 @@ export interface SheetProps extends React.ComponentProps<"div"> {
  * nothing behind it takes a pointer or a keystroke.
  *
  * Compose the panel from SheetHandle, SheetHeader, SheetTitle, SheetClose,
- * SheetAction, and SheetBody. The sheet draws the chrome and owns dismissal;
- * the host owns what the panel shows.
+ * SheetExpand, SheetAction, and SheetBody. SheetExpand toggles the drawer
+ * into a filled extra-details surface over the same ancestor — the host
+ * that positions the transcript (rather than the whole window) keeps its
+ * tab strip and composer when the panel expands. The sheet draws the chrome
+ * and owns dismissal; the host owns what the panel shows.
  */
 function Sheet({
   onClose,
   label = "Sheet",
   onReturnFocus,
+  expanded: expandedProp,
+  defaultExpanded = false,
+  onExpandedChange,
   className,
   children,
   onKeyDown,
@@ -69,12 +93,26 @@ function Sheet({
   const panelRef = React.useRef<HTMLDivElement>(null)
   const onCloseRef = React.useRef(onClose)
   const onReturnFocusRef = React.useRef(onReturnFocus)
+  const onExpandedChangeRef = React.useRef(onExpandedChange)
+  const [uncontrolledExpanded, setUncontrolledExpanded] =
+    React.useState(defaultExpanded)
+  const isExpandedControlled = expandedProp !== undefined
+  const expanded = isExpandedControlled ? expandedProp : uncontrolledExpanded
   React.useEffect(() => {
     onCloseRef.current = onClose
     onReturnFocusRef.current = onReturnFocus
+    onExpandedChangeRef.current = onExpandedChange
   })
   const close = React.useCallback(() => onCloseRef.current(), [])
-  const context = React.useMemo(() => ({ close }), [close])
+  const setExpanded = React.useCallback((next: boolean) => {
+    if (!isExpandedControlled) setUncontrolledExpanded(next)
+    onExpandedChangeRef.current?.(next)
+  }, [isExpandedControlled])
+  const context = React.useMemo(
+    () => ({ close, expanded, setExpanded }),
+    [close, expanded, setExpanded],
+  )
+  const openedExpanded = React.useRef(expanded)
 
   React.useEffect(() => {
     const panel = panelRef.current
@@ -86,10 +124,12 @@ function Sheet({
     )
     if (duration === 0) return
     const animation = panel.animate(
-      [
-        { opacity: 0, translate: "0 12%" },
-        { opacity: 1, translate: "0 0" },
-      ],
+      openedExpanded.current
+        ? [{ opacity: 0 }, { opacity: 1 }]
+        : [
+            { opacity: 0, translate: "0 12%" },
+            { opacity: 1, translate: "0 0" },
+          ],
       { duration, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
     )
     return () => animation.cancel()
@@ -156,10 +196,12 @@ function Sheet({
         aria-modal="true"
         aria-label={label}
         data-slot="sheet"
+        data-expanded={expanded ? "true" : "false"}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
         className={cn(
-          "absolute inset-0 z-30 flex flex-col justify-end font-sans",
+          "absolute inset-0 z-30 flex flex-col font-sans",
+          !expanded && "justify-end",
           className,
         )}
         {...props}
@@ -168,12 +210,21 @@ function Sheet({
           aria-hidden="true"
           data-slot="sheet-backdrop"
           onClick={close}
-          className="absolute inset-0 bg-foreground/40"
+          className={cn(
+            "absolute inset-0 bg-foreground/40",
+            expanded && "pointer-events-none opacity-0",
+          )}
         />
         <div
           ref={panelRef}
           data-slot="sheet-panel"
-          className="relative z-10 flex max-h-[85%] w-full flex-col overflow-y-auto rounded-t-3xl bg-card text-card-foreground shadow-[0_-8px_32px] shadow-black/20"
+          data-expanded={expanded ? "true" : "false"}
+          className={cn(
+            "relative z-10 flex w-full flex-col bg-card text-card-foreground shadow-[0_-8px_32px] shadow-black/20",
+            expanded
+              ? "min-h-0 flex-1 overflow-hidden rounded-none"
+              : "max-h-[85%] overflow-y-auto rounded-t-3xl",
+          )}
         >
           {children}
         </div>
@@ -182,8 +233,10 @@ function Sheet({
   )
 }
 
-/** The grab bar that marks the panel as a sheet. Decorative. */
+/** The grab bar that marks the panel as a drawer. Hidden while expanded. */
 function SheetHandle({ className, ...props }: React.ComponentProps<"div">) {
+  const { expanded } = useSheet()
+  if (expanded) return null
   return (
     <div
       aria-hidden="true"
@@ -199,9 +252,9 @@ function SheetHandle({ className, ...props }: React.ComponentProps<"div">) {
 export interface SheetHeaderProps extends React.ComponentProps<"div"> {}
 
 /**
- * The sheet's title row. Hosts place SheetClose, SheetTitle, and SheetAction
- * as children; the side columns share leftover width so the title stays
- * optically centered whether or not Close or Done is present.
+ * The sheet's title row. Hosts place SheetClose or SheetExpand, SheetTitle,
+ * and SheetAction as children; the side columns share leftover width so the
+ * title stays optically centered whether or not the side controls are present.
  */
 function SheetHeader({ className, ...props }: SheetHeaderProps) {
   return (
@@ -265,6 +318,38 @@ function SheetClose({
 }
 
 /**
+ * Toggles the panel between the bottom drawer and a surface that fills the
+ * sheet's positioned ancestor. The same control reads Expand or Minimize.
+ */
+function SheetExpand({
+  className,
+  onClick,
+  ...props
+}: React.ComponentProps<"button">) {
+  const { expanded, setExpanded } = useSheet()
+  return (
+    <button
+      type="button"
+      data-slot="sheet-expand"
+      aria-label={expanded ? "Minimize" : "Expand"}
+      aria-expanded={expanded}
+      onClick={(event) => {
+        onClick?.(event)
+        if (!event.defaultPrevented) setExpanded(!expanded)
+      }}
+      className={cn(sheetControlClassName, "col-start-1 justify-self-start", className)}
+      {...props}
+    >
+      {expanded ? (
+        <Minimize2 aria-hidden="true" />
+      ) : (
+        <Maximize2 aria-hidden="true" />
+      )}
+    </button>
+  )
+}
+
+/**
  * A trailing header control — typically "Done". Closes the enclosing sheet
  * unless the click is cancelled.
  */
@@ -295,15 +380,18 @@ function SheetAction({
 }
 
 /**
- * The sheet's scrolling body. It fills the space under the header and hides
- * its scrollbar, matching the transcript it rises over.
+ * The sheet's scrolling body. In the drawer it sizes to its content; while
+ * expanded it fills under the header and hides its scrollbar.
  */
 function SheetBody({ className, ...props }: React.ComponentProps<"div">) {
+  const { expanded } = useSheet()
   return (
     <div
       data-slot="sheet-body"
       className={cn(
         "flex flex-col gap-3 px-5 pb-6 pt-2",
+        expanded &&
+          "min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className,
       )}
       {...props}
@@ -316,6 +404,7 @@ export {
   SheetAction,
   SheetBody,
   SheetClose,
+  SheetExpand,
   SheetHandle,
   SheetHeader,
   SheetTitle,

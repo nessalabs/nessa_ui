@@ -44,9 +44,6 @@ import {
   ChatMessageQuote,
   ChatMessageReceipt,
   chatReactionOptions,
-  ChatOverlay,
-  ChatOverlayBack,
-  ChatOverlayBody,
   ChatTabs,
   ChatTray,
   ChatTypingIndicator,
@@ -68,6 +65,7 @@ import {
   SheetAction,
   SheetBody,
   SheetClose,
+  SheetExpand,
   SheetHandle,
   SheetHeader,
   SheetTitle,
@@ -734,6 +732,7 @@ const demoSubagents: Record<string, DemoSubagent> = {
 // sit far above the live counter so canned replies never collide.
 const auditTabId = "audit"
 const agentTabId = "agent-message"
+const historyTabId = "history"
 
 const agentExplored = formatAgentActivitySummary({ files: 3, searches: 2 })
 
@@ -1023,7 +1022,6 @@ function DemoActivity({
  * controls sit beside it. Enter saves, Escape cancels.
  */
 /**
- * Maps one demo message onto the ChatBubbles kit/**
  * Maps one demo message onto the ChatBubbles kit: attachments (single tile
  * or fanned stack), reply quote, the bubble itself as the reply control,
  * and the delivery receipt.
@@ -1527,7 +1525,6 @@ function PlaygroundExample({
   const generating = generatingTabId !== null && generatingTabId === activeTabId
   const [model, setModel] = React.useState<ModelPickerValue>(defaultModel)
   const [modelCardOpen, setModelCardOpen] = React.useState(false)
-  const [historyOpen, setHistoryOpen] = React.useState(false)
   const [historyQuery, setHistoryQuery] = React.useState("")
   const [detailsTabId, setDetailsTabId] = React.useState<string | null>(null)
   const [queueOpen, setQueueOpen] = React.useState(false)
@@ -1639,7 +1636,38 @@ function PlaygroundExample({
     )
     setActiveTabId(tabId)
   }
+  const openHistoryTab = () => {
+    const parentId = activeTabId === historyTabId ? undefined : activeTabId
+    setTabs((current) => {
+      if (current.some((tab) => tab.id === historyTabId)) {
+        return current.map((tab) =>
+          tab.id === historyTabId && parentId
+            ? { ...tab, parentId }
+            : tab,
+        )
+      }
+      return [
+        ...current,
+        {
+          id: historyTabId,
+          kind: "history" as const,
+          title: "History",
+          closeable: true,
+          parentId,
+        },
+      ]
+    })
+    setActiveTabId(historyTabId)
+    setHistoryQuery("")
+    setQueueOpen(false)
+    setDetailsTabId(null)
+    setQuotesOpen(false)
+    setViewedQuotes(null)
+    setModelCardOpen(false)
+    setOverlay(null)
+  }
   const activeFileItem = fileTabs[activeTabId] ?? inlinePreview ?? undefined
+  const isHistoryTab = activeTabId === historyTabId
   const [menuTargetId, setMenuTargetId] = React.useState<number | null>(null)
   const attachmentCounters = React.useRef<Record<DemoAttachmentKind, number>>({ photo: 0, file: 0, folder: 0, skill: 0, plugin: 0 })
   const inputRef = React.useRef<ChatComposerEditorHandle>(null)
@@ -1896,6 +1924,8 @@ function PlaygroundExample({
               ) : (
                 <FileText aria-hidden="true" />
               )
+            ) : tab.kind === "history" ? (
+              <History aria-hidden="true" className="size-4" />
             ) : sub ? (
               // The tab's own parentId gives it the back gesture: ChatTabs
               // swaps this avatar for a back chevron while the pointer is on
@@ -1976,7 +2006,6 @@ function PlaygroundExample({
           setMenuTargetId(null)
           setOverlay(null)
           setModelCardOpen(false)
-          setHistoryOpen(false)
           setQueueOpen(false)
           setDetailsTabId(null)
           inputRef.current?.focus()
@@ -2074,6 +2103,41 @@ function PlaygroundExample({
               },
             ])
           }
+        />
+      ) : isHistoryTab ? (
+        <ConversationHistory
+          className="min-h-0 flex-1 px-1"
+          conversations={tabs
+            .filter((tab) => (tab.kind ?? "conversation") === "conversation")
+            .map((tab): ConversationHistoryEntry => {
+              const info = demoAgentInfo[tab.id]
+              const last = (messagesByTab[tab.id] ?? []).at(-1)
+              return {
+                id: tab.id,
+                title: info?.title ?? tab.title,
+                preview: last?.text ?? "New conversation",
+                updated: info?.updated ?? "Just now",
+                project: info?.path,
+                pinned: tab.id === agentTabId,
+              }
+            })
+            .filter((entry) => {
+              const haystack =
+                `${entry.title} ${entry.preview ?? ""} ${entry.project ?? ""}`
+              return haystack
+                .toLocaleLowerCase()
+                .includes(historyQuery.trim().toLocaleLowerCase())
+            })}
+          value={
+            tabs.find((tab) => tab.id === historyTabId)?.parentId ?? null
+          }
+          onValueChange={(id) => {
+            setActiveTabId(id)
+            setHistoryQuery("")
+            setInlinePreview(null)
+          }}
+          query={historyQuery}
+          onQueryChange={setHistoryQuery}
         />
       ) : (
       <div
@@ -2220,13 +2284,12 @@ function PlaygroundExample({
         </ChatAttachmentViewer>
       ) : null}
       {quotesOpen || viewedQuotes ? (
-        // The annotations read as messages over the transcript — pending
-        // ones removable, a sent message's read-only — while the tab strip
-        // and the pill stay live around the reading view.
-        <ChatOverlay
+        // Annotations use the expandable sheet as the extra-details
+        // surface: it fills this tabpanel (tabs and composer stay) and
+        // Minimize restores a drawer over the transcript.
+        <Sheet
           label="Annotations"
-          // The tray chip that opened this view hides while it is open, so
-          // closing hands focus to the composer instead of the document.
+          defaultExpanded
           onReturnFocus={() => inputRef.current?.focus()}
           onClose={() => {
             setQuotesOpen(false)
@@ -2234,7 +2297,13 @@ function PlaygroundExample({
             setSelectedQuote(null)
           }}
         >
-          <ChatOverlayBody>
+          <SheetHandle />
+          <SheetHeader>
+            <SheetExpand />
+            <SheetTitle>Annotations</SheetTitle>
+            <SheetAction>Done</SheetAction>
+          </SheetHeader>
+          <SheetBody>
             <ChatAnnotationList>
               {(viewedQuotes ?? quotes).map((entry, at) => (
                 <ChatAnnotationThread
@@ -2293,63 +2362,14 @@ function PlaygroundExample({
                           )
                   }
                 >
-                  {/* The kit's markdown renderer in the passage bubble:
-                      pasted markdown and lifted prose both read formatted. */}
                   <MessageMarkdown className="leading-5">
                     {entry.text}
                   </MessageMarkdown>
                 </ChatAnnotationThread>
               ))}
             </ChatAnnotationList>
-          </ChatOverlayBody>
-          <ChatOverlayBack />
-        </ChatOverlay>
-      ) : null}
-      {historyOpen ? (
-        <ChatOverlay
-          label="All conversations"
-          onReturnFocus={() => inputRef.current?.focus()}
-          onClose={() => {
-            setHistoryOpen(false)
-            setHistoryQuery("")
-          }}
-        >
-          <ChatOverlayBody className="px-3">
-            <ConversationHistory
-              conversations={tabs
-                .filter((tab) => (tab.kind ?? "conversation") === "conversation")
-                .map((tab): ConversationHistoryEntry => {
-                  const info = demoAgentInfo[tab.id]
-                  const last = (messagesByTab[tab.id] ?? []).at(-1)
-                  return {
-                    id: tab.id,
-                    title: info?.title ?? tab.title,
-                    preview: last?.text ?? "New conversation",
-                    updated: info?.updated ?? "Just now",
-                    project: info?.path,
-                    pinned: tab.id === agentTabId,
-                  }
-                })
-                .filter((entry) => {
-                  const haystack =
-                    `${entry.title} ${entry.preview ?? ""} ${entry.project ?? ""}`
-                  return haystack
-                    .toLocaleLowerCase()
-                    .includes(historyQuery.trim().toLocaleLowerCase())
-                })}
-              value={activeTabId}
-              onValueChange={(id) => {
-                setActiveTabId(id)
-                setHistoryOpen(false)
-                setHistoryQuery("")
-                setInlinePreview(null)
-              }}
-              query={historyQuery}
-              onQueryChange={setHistoryQuery}
-            />
-          </ChatOverlayBody>
-          <ChatOverlayBack>Back to chat</ChatOverlayBack>
-        </ChatOverlay>
+          </SheetBody>
+        </Sheet>
       ) : null}
       </div>
       {modelCardOpen ? (
@@ -2383,7 +2403,7 @@ function PlaygroundExample({
           onClear={() => setQuotes([])}
         />
       )}
-      {queued.length > 0 && !fileTabs[activeTabId] ? (
+      {queued.length > 0 && !fileTabs[activeTabId] && !isHistoryTab ? (
         <ComposerQueueBadge
           className="self-start"
           count={queued.length}
@@ -2391,7 +2411,7 @@ function PlaygroundExample({
           onClick={() => setQueueOpen(true)}
         />
       ) : null}
-      {fileTabs[activeTabId] ? null : (
+      {fileTabs[activeTabId] || isHistoryTab ? null : (
       <PillComposer
         generating={generating}
         onSubmit={(event) => {
@@ -2676,7 +2696,7 @@ function PlaygroundExample({
                   return
                 }
                 if (item.id === historyCommand.id) {
-                  setHistoryOpen(true)
+                  openHistoryTab()
                   return
                 }
                 // Skills and plugins are inline chips on the text baseline,
@@ -2769,6 +2789,7 @@ function PlaygroundExample({
         >
           <SheetHandle />
           <SheetHeader>
+            <SheetExpand />
             <SheetTitle>Queued</SheetTitle>
             <SheetAction>Done</SheetAction>
           </SheetHeader>
@@ -3184,7 +3205,7 @@ type Story = StoryObj<typeof meta>
 export const Playground: Story = {
   tags: ["reduced-motion"],
   parameters: storyDocumentation(
-    "The intended small-surface composition — the floating chat window: pill tabs across the top (each tab an independent conversation, with the busy dot on whichever tab is streaming), + and voice actions inside the pill, Enter as the only send affordance, and no standing model control — typing /model raises a closable model card in the chat, typing /history opens the all-conversations roster, and right-clicking a conversation tab offers View Details (project, model, runtime) plus pin, share, and archive. Tool work stays behind exploring cues — “Thought 1s”, “Explored 3 files, 2 searches” — that expand into ToolCall rows instead of dumping every invocation into the transcript; a Queued N pill above the composer opens a sheet of pending follow-ups. The voice action streams a ghost transcription into the editable input — with Hold to record on (the default) it records only while held, the waveform bars pulsing as a live meter, and with it off a click toggles listening with a red stop control; right-click it for a microphone options menu above the pill. Agent replies think first (typing dots), then stream in word by word through MessageMarkdown's streaming mode — rich markdown renders as it arrives and the rim stays lit until the stream completes, and + opens a menu that attaches photos, files, and folders as uniform square tiles — thumbnail previews for photos, icon tiles for the rest — each with a corner delete button and an Open action the host wires to its full view. Bubbles are iMessage-style with tails and a Delivered receipt; right-clicking (or long-pressing) one shows the tapback reaction row and a Reply action — reacting never frosts the transcript; choosing Reply enters the frosted thread view — the rest of the transcript recedes behind a blur while the composer switches to Reply, iMessage-style (Escape from anywhere, or tapping the bubble again, leaves the reply view; a threaded message keeps its whole thread in focus), and while the agent works the rim lights and the mic hands over to a stop control.",
+    "The intended small-surface composition — the floating chat window: pill tabs across the top (each tab an independent conversation, with the busy dot on whichever tab is streaming), + and voice actions inside the pill, Enter as the only send affordance, and no standing model control — typing /model raises a closable model card in the chat, typing /history opens a History tab of the all-conversations roster, and right-clicking a conversation tab offers View Details (project, model, runtime) plus pin, share, and archive. Tool work stays behind exploring cues — “Thought 1s”, “Explored 3 files, 2 searches” — that expand into ToolCall rows instead of dumping every invocation into the transcript; a Queued N pill above the composer opens a sheet of pending follow-ups. The voice action streams a ghost transcription into the editable input — with Hold to record on (the default) it records only while held, the waveform bars pulsing as a live meter, and with it off a click toggles listening with a red stop control; right-click it for a microphone options menu above the pill. Agent replies think first (typing dots), then stream in word by word through MessageMarkdown's streaming mode — rich markdown renders as it arrives and the rim stays lit until the stream completes, and + opens a menu that attaches photos, files, and folders as uniform square tiles — thumbnail previews for photos, icon tiles for the rest — each with a corner delete button and an Open action the host wires to its full view. Bubbles are iMessage-style with tails and a Delivered receipt; right-clicking (or long-pressing) one shows the tapback reaction row and a Reply action — reacting never frosts the transcript; choosing Reply enters the frosted thread view — the rest of the transcript recedes behind a blur while the composer switches to Reply, iMessage-style (Escape from anywhere, or tapping the bubble again, leaves the reply view; a threaded message keeps its whole thread in focus), and while the agent works the rim lights and the mic hands over to a stop control.",
   ),
   render: () => <PlaygroundExample />,
   play: async ({ canvasElement }) => {
@@ -3399,7 +3420,7 @@ export const Playground: Story = {
 export const AgentSurfaces: Story = {
   tags: ["reduced-motion"],
   parameters: storyDocumentation(
-    "The playground opened on the Agent message tab: exploring cues collapse tool work, a named-task card and to-do list sit in the transcript, Queued 2 opens the follow-up sheet, right-clicking the tab offers View Details (project, model, runtime), and /history opens the all-conversations roster.",
+    "The playground opened on the Agent message tab: exploring cues collapse tool work, a named-task card and to-do list sit in the transcript, Queued 2 opens the follow-up sheet (Expand fills the window), right-clicking the tab offers View Details (project, model, runtime), and /history opens a History tab of the conversation roster.",
   ),
   render: () => <PlaygroundExample initialTabId={agentTabId} />,
   play: async ({ canvasElement }) => {
@@ -3453,8 +3474,8 @@ export const AgentSurfaces: Story = {
     await userEvent.click(await body.findByRole("option", { name: /history/ }))
     await waitFor(() =>
       expect(
-        canvas.getByRole("dialog", { name: "All conversations" }),
-      ).toBeVisible(),
+        canvas.getByRole("tab", { name: "Back to Agent message" }),
+      ).toHaveAttribute("aria-selected", "true"),
     )
     await expect(
       canvas.getByRole("button", { name: /repo audit/i }),
@@ -3463,11 +3484,9 @@ export const AgentSurfaces: Story = {
       canvas.getByRole("button", { name: /agent message package implementation/i }),
     )
     await expect(
-      canvas.queryByRole("dialog", { name: "All conversations" }),
-    ).not.toBeInTheDocument()
-    await expect(
       canvas.getByRole("tab", { name: "Agent message" }),
     ).toHaveAttribute("aria-selected", "true")
+    await expect(canvas.getByRole("tab", { name: "History" })).toBeInTheDocument()
   },
 }
 
@@ -3533,7 +3552,7 @@ export const Subagents: Story = {
 export const Annotations: Story = {
   tags: ["reduced-motion"],
   parameters: storyDocumentation(
-    "The pending-annotation surfaces under load: the playground opens on the Repo audit conversation with eight selections already lifted from documents — one-liners, full paragraphs, comments of very different lengths, some bare. The row above the pill stays one truncated pill plus '+ 7 others'; opening it shows each annotation as a tiny thread — the passage as the document's message with its source file linked beneath, the user's comments as their replies. Tapping a passage selects it and the pill composer replies to it, attaching follow-up comments; hovering a comment reveals its edit control and the comment edits in place. Sending delivers the whole set as one compact 'N annotations' pill on the message, and user messages in the transcript edit in place too, from the context menu's Edit. Big text stays compact everywhere: a paste over 120 characters lands as a Pasted text chip in the composer and travels as the same chip on the sent bubble, and a long typed message clamps to four lines with a chevron — either opens its full text in the list view over the transcript.",
+    "The pending-annotation surfaces under load: the playground opens on the Repo audit conversation with eight selections already lifted from documents — one-liners, full paragraphs, comments of very different lengths, some bare. The row above the pill stays one truncated pill plus '+ 7 others'; opening it shows each annotation as a tiny thread in an expandable sheet — the passage as the document's message with its source file linked beneath, the user's comments as their replies. Tapping a passage selects it and the pill composer replies to it, attaching follow-up comments; hovering a comment reveals its edit control and the comment edits in place. Sending delivers the whole set as one compact 'N annotations' pill on the message, and user messages in the transcript edit in place too, from the context menu's Edit. Big text stays compact everywhere: a paste over 120 characters lands as a Pasted text chip in the composer and travels as the same chip on the sent bubble, and a long typed message clamps to four lines with a chevron — either opens its full text in the list view over the transcript.",
   ),
   render: () => (
     <PlaygroundExample
@@ -3564,7 +3583,7 @@ export const Annotations: Story = {
     await expect(
       canvas.getAllByRole("button", { name: "Discard annotation" }),
     ).toHaveLength(7)
-    await userEvent.click(canvas.getByRole("button", { name: "Back to chat" }))
+    await userEvent.click(canvas.getByRole("button", { name: "Done" }))
     await expect(
       canvas.getByRole("button", { name: "+ 6 others" }),
     ).toBeInTheDocument()

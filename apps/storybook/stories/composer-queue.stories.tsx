@@ -15,6 +15,7 @@ import {
   Sheet,
   SheetAction,
   SheetBody,
+  SheetExpand,
   SheetHandle,
   SheetHeader,
   SheetTitle,
@@ -258,6 +259,7 @@ function QueuedSheetExample() {
         <Sheet label="Queued" onClose={() => setOpen(false)}>
           <SheetHandle />
           <SheetHeader>
+            <SheetExpand />
             <SheetTitle>Queued</SheetTitle>
             <SheetAction>Done</SheetAction>
           </SheetHeader>
@@ -306,7 +308,7 @@ function QueuedSheetExample() {
 
 export const QueuedSheet: Story = {
   parameters: storyDocumentation(
-    "The compact Queued N pill opens a sheet of wrapping follow-ups. Each row can promote to the front or be removed; the list is unboxed so the sheet is the surface.",
+    "The compact Queued N pill opens a sheet of wrapping follow-ups. Each row can promote to the front or be removed; Expand fills the ancestor and Minimize restores the drawer.",
   ),
   render: () => <QueuedSheetExample />,
   play: async ({ canvasElement }) => {
@@ -324,6 +326,11 @@ export const QueuedSheet: Story = {
     await expect(
       canvas.getByRole("list", { name: "Pending messages" }),
     ).toHaveAttribute("data-appearance", "plain")
+    const dialog = canvas.getByRole("dialog", { name: "Queued" })
+    await userEvent.click(canvas.getByRole("button", { name: "Expand" }))
+    await expect(dialog).toHaveAttribute("data-expanded", "true")
+    await userEvent.click(canvas.getByRole("button", { name: "Minimize" }))
+    await expect(dialog).toHaveAttribute("data-expanded", "false")
     await userEvent.click(
       canvas.getAllByRole("button", { name: /^promote /i })[1]!,
     )
