@@ -1980,7 +1980,15 @@ function PlaygroundExample({
                   : tab,
               )
             if (id === activeTabId && next.length > 0) {
-              setActiveTabId(next[0]!.id)
+              // History, file, and subagent tabs point at the conversation
+              // they were opened from; closing one should land there, not
+              // always on the first pill in the strip.
+              const parentId = closed?.parentId
+              setActiveTabId(
+                parentId && next.some((tab) => tab.id === parentId)
+                  ? parentId
+                  : next[0]!.id,
+              )
             }
             return next
           })
@@ -2383,7 +2391,7 @@ function PlaygroundExample({
           onClose={() => setModelCardOpen(false)}
         />
       ) : null}
-      {quotesOpen || viewedQuotes || overlay ? null : (
+      {quotesOpen || viewedQuotes || overlay || isHistoryTab ? null : (
         // Everything waiting to travel with the next message rides one row:
         // one chip stands for the set and the rest collapse into a count
         // that opens the full list over the transcript.
@@ -3472,8 +3480,12 @@ export const AgentSurfaces: Story = {
     await userEvent.click(input)
     await userEvent.type(input, "/hist")
     await userEvent.click(await body.findByRole("option", { name: /history/ }))
+    await waitFor(() =>
+      expect(
+        canvas.getByRole("tab", { name: "Back to Agent message" }),
+      ).toHaveAttribute("aria-selected", "true"),
+    )
     const historyTab = canvas.getByRole("tab", { name: "Back to Agent message" })
-    await waitFor(() => expect(historyTab).toHaveAttribute("aria-selected", "true"))
     await expect(historyTab.closest("[data-slot='chat-tab']")).toHaveAttribute(
       "data-kind",
       "history",
@@ -3487,6 +3499,9 @@ export const AgentSurfaces: Story = {
     await expect(
       canvas.getByRole("list", { name: "Conversations" }),
     ).toBeVisible()
+    await expect(
+      canvas.queryByRole("textbox", { name: "Message" }),
+    ).not.toBeInTheDocument()
   },
 }
 

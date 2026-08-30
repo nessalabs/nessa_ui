@@ -1325,7 +1325,7 @@
       "name": "sheet",
       "type": "registry:ui",
       "title": "Sheet",
-      "description": "A bottom sheet that rises over its nearest positioned ancestor: a modal dialog with a backdrop, grab bar, header of close or Done plus a centered title, and a scrolling body.",
+      "description": "A bottom sheet that rises over its nearest positioned ancestor: a modal dialog with a backdrop, a grab bar, a header of close or expand plus a centered title and optional Done, and a scrolling body. SheetExpand toggles the drawer into a filled extra-details surface over the same ancestor.",
       "dependencies": [
         "lucide-react"
       ],
