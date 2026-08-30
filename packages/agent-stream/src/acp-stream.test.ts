@@ -11,10 +11,10 @@ import { parseAcp, parseAcpLine } from "./acp/frame"
 import { ACP_PROTOCOL_VERSION } from "./acp/wire"
 
 import { asRecord, asString } from "./json"
-import { applyDeltas, buildTranscript, previewOf } from "./transcript"
+import { applyDeltas, buildTranscript, previewOf } from "./transcript/fold"
 import { transportOf } from "./transports"
 
-const FIXTURES = fileURLToPath(new URL("../../../../../apps/storybook/stories/fixtures/agent-stream/", import.meta.url))
+const FIXTURES = fileURLToPath(new URL("../../../apps/storybook/stories/fixtures/agent-stream/", import.meta.url))
 
 /**
  * Every ACP capture, and which agent produced it.

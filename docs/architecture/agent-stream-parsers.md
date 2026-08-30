@@ -5,7 +5,7 @@ output stream, and a record of what a live Claude Code stream actually contains.
 Everything asserted here was observed in a capture, and every capture named is
 checked in under
 `apps/storybook/stories/fixtures/agent-stream/`. The reference implementation is
-`packages/react/src/lib/agent-stream/`, and the Storybook story
+`packages/agent-stream/src/`, and the Storybook story
 **Composites/AgentStream** renders each capture next to its raw bytes.
 
 If you are an agent asked to build one of these: read this file, then read the
@@ -28,12 +28,16 @@ decoding, normalization, the event contract, and the disk locators are the
 product. A host builds its own transcript, its own sidebar, its own everything.
 
 ```
-lib/agent-stream/
+packages/agent-stream/src/
+  index.ts         the contract entry, stopping at the      ← "." export
+                   agent message
   json.ts          JsonValue and the narrowing readers      ← shared
   events.ts        AgentEvent, AgentEventPayload, the       ← shared: THE CONTRACT
                    vocabularies every provider maps onto
-  transcript.ts    one-shot fold                            ← shared, optional
-  builder.ts       incremental fold                         ← shared, optional
+  transcript/
+    index.ts       the fold's own entry                     ← "./transcript" export
+    fold.ts        one-shot fold                            ← shared, optional
+    builder.ts     incremental fold                         ← shared, optional
   claude/
     wire.ts        Claude Code's line shapes + vocabularies ← provider
     mapping.ts     Claude's kinds → contract kinds, as data ← provider
@@ -116,6 +120,26 @@ different wire layer and mapper.
 
 **Never let a component read the wire directly.** The wire's shape is a fact
 about a CLI release; the event model is a fact about your product.
+
+### The layering is a package boundary, not a convention
+
+The three layers ship as `@nessa-ui/agent-stream`, which has no dependencies,
+no peer dependencies, and no React. Its two entries cut the stack at the
+contract:
+
+| Entry | Layers | For |
+| --- | --- | --- |
+| `@nessa-ui/agent-stream` | wire + mapper | anything that wants the event log and draws its own shape |
+| `@nessa-ui/agent-stream/transcript` | the fold | hosts that want the default turns-and-groups shape |
+
+Splitting it this way is what makes the rule above enforceable rather than
+advisory. While the parser lived inside `@nessa-ui/react`, reaching it meant
+taking a `react >=19` peer dependency and a rendering tree — mermaid, katex,
+react-markdown, radix — and every built module carried a `"use client"`
+directive, so a Node process or a server component could not use the parser
+its own architecture diagram said was framework-free.
+
+`@nessa-ui/react` re-exports both entries, so a React host sees no change.
 
 ### What state the mapper actually needs
 

@@ -1,0 +1,65 @@
+{
+  "name": "@nessa-ui/agent-stream",
+  "version": "0.1.0",
+  "description": "Dependency-free parsers that normalize coding-agent CLI streams into one event contract.",
+  "license": "MIT",
+  "sideEffects": false,
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./transcript": {
+      "types": "./dist/transcript.d.ts",
+      "import": "./dist/transcript.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "transcript": [
+        "./dist/transcript.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "pnpm clean && tsup",
+    "clean": "rimraf dist",
+    "prepack": "pnpm build",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.1",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nessalabs/nessa_ui.git",
+    "directory": "packages/agent-stream"
+  },
+  "keywords": [
+    "agent",
+    "claude-code",
+    "codex",
+    "opencode",
+    "acp",
+    "parser"
+  ],
+  "author": "nessalabs",
+  "bugs": {
+    "url": "https://github.com/nessalabs/nessa_ui/issues"
+  },
+  "homepage": "https://github.com/nessalabs/nessa_ui#readme"
+}

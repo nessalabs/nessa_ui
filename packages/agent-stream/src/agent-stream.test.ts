@@ -17,13 +17,13 @@ import {
   subagentTranscriptPath,
   workflowAgentTranscriptPath,
 } from "./claude/store"
-import { TranscriptBuilder } from "./builder"
+import { TranscriptBuilder } from "./transcript/builder"
 import { ClaudeStreamMapper, mapClaudeStream } from "./claude/stream/mapper"
-import { applyDeltas, buildTranscript, isCompacting, isToolGroup, previewOf } from "./transcript"
+import { applyDeltas, buildTranscript, isCompacting, isToolGroup, previewOf } from "./transcript/fold"
 import { CLAUDE_STREAM_PROVENANCE, ClaudeSystemSubtype, ClaudeWireType, parseWireLines } from "./claude/stream/wire"
 import { asRecord } from "./json"
 
-const FIXTURES = fileURLToPath(new URL("../../../../../apps/storybook/stories/fixtures/agent-stream/", import.meta.url))
+const FIXTURES = fileURLToPath(new URL("../../../apps/storybook/stories/fixtures/agent-stream/", import.meta.url))
 
 function capture(name: string): string {
   return readFileSync(`${FIXTURES}${name}.jsonl`, "utf8")
@@ -974,14 +974,14 @@ test("an unreadable line still names the session it arrived on", () => {
  * that level of detail, generate it rather than writing it down.
  */
 test("the skill points at files that exist", () => {
-  const skill = readFileSync(fileURLToPath(new URL("../../../../../skills/agent-stream/SKILL.md", import.meta.url)), "utf8")
+  const skill = readFileSync(fileURLToPath(new URL("../../../skills/agent-stream/SKILL.md", import.meta.url)), "utf8")
 
   const referenced = [...skill.matchAll(/`([\w./*-]+\.(?:ts|jsonl|md))`/g)].map((match) => match[1]!)
   assert.ok(referenced.length > 0, "the skill should send the reader somewhere")
 
   const roots = [
     fileURLToPath(new URL(".", import.meta.url)),
-    fileURLToPath(new URL("../../../../../", import.meta.url)),
+    fileURLToPath(new URL("../../../", import.meta.url)),
   ]
   for (const path of new Set(referenced)) {
     // A glob points at a directory of captures; anything else is a real file.
@@ -994,7 +994,7 @@ test("the skill points at files that exist", () => {
 })
 
 test("the skill's frontmatter is the shape a skill loader reads", () => {
-  const skill = readFileSync(fileURLToPath(new URL("../../../../../skills/agent-stream/SKILL.md", import.meta.url)), "utf8")
+  const skill = readFileSync(fileURLToPath(new URL("../../../skills/agent-stream/SKILL.md", import.meta.url)), "utf8")
   const frontmatter = /^---\n([\s\S]+?)\n---/.exec(skill)?.[1]
   assert.notEqual(frontmatter, undefined, "a skill without frontmatter is never loaded")
   assert.match(frontmatter!, /^name: [a-z][a-z0-9-]*$/m)
