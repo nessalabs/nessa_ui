@@ -474,7 +474,7 @@
       "name": "generating-surface",
       "type": "registry:ui",
       "title": "Generating Surface",
-      "description": "An ambient placeholder for content that takes a while to generate — drifting smoke and a shimmering status label reserve the space, then morph into the finished content when generation completes.",
+      "description": "An ambient placeholder for content that takes a while to generate \u2014 drifting smoke and a shimmering status label reserve the space, then morph into the finished content when generation completes.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -512,7 +512,7 @@
       "name": "gradient-surface",
       "type": "registry:ui",
       "title": "Gradient Surface",
-      "description": "A decorative gradient backdrop for heroes and banners — a deep colour wash from a swappable palette, an optional contour, wave, or ring line overlay, and film grain over the whole frame.",
+      "description": "A decorative gradient backdrop for heroes and banners \u2014 a deep colour wash from a swappable palette, an optional contour, wave, or ring line overlay, and film grain over the whole frame.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -529,7 +529,7 @@
       "name": "mermaid-diagram",
       "type": "registry:ui",
       "title": "Mermaid Diagram",
-      "description": "Mermaid diagrams — flowcharts, sequence diagrams, and every other Mermaid grammar — rendered to SVG with app-wide light and dark theming and a fullscreen pan-and-zoom viewer.",
+      "description": "Mermaid diagrams \u2014 flowcharts, sequence diagrams, and every other Mermaid grammar \u2014 rendered to SVG with app-wide light and dark theming and a fullscreen pan-and-zoom viewer.",
       "dependencies": [
         "lucide-react",
         "mermaid"
@@ -1096,7 +1096,7 @@
       "name": "chat-overlay",
       "type": "registry:ui",
       "title": "Chat Overlay",
-      "description": "A reading view that takes over a chat's transcript region while its tab strip and composer stay visible and usable: a focus-trapped dialog surface with a scrolling body, a centered back link, and an optional caption.",
+      "description": "A reading view that takes over a chat's transcript region while its tab strip and composer stay visible and usable: a non-modal dialog surface that makes the content it covers inert, with a scrolling body, a centered back link, and an optional caption.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"

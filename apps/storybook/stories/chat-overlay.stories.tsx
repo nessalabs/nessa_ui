@@ -25,7 +25,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A reading view that takes over a chat's transcript without disturbing the window around it. It fills its nearest positioned ancestor, so a host that positions the transcript region — rather than the whole chat frame — keeps its tab strip and composer visible and usable while the overlay is open: the reader can still switch conversations or keep typing. That is the difference from ChatAttachmentViewer, which owns a tile grid and a back arrow of its own; ChatOverlay is the bare surface for reading views such as a previewed file, one message's full text, or the annotations waiting to be sent. ChatOverlayBody is the scrolling content region and takes its layout from the host, ChatOverlayBack is the quiet centered way out, and ChatOverlaySummary captions the content. The overlay traps Tab inside itself while open, returns focus to whatever opened it, closes on Escape, and fades in only when motion is allowed.",
+          "A reading view that takes over a chat's transcript without disturbing the window around it. It fills its nearest positioned ancestor, so a host that positions the transcript region — rather than the whole chat frame — keeps its tab strip and composer visible and usable while the overlay is open: the reader can still switch conversations or keep typing. That is the difference from ChatAttachmentViewer, which owns a tile grid and a back arrow of its own; ChatOverlay is the bare surface for reading views such as a previewed file, one message's full text, or the annotations waiting to be sent. ChatOverlayBody is the scrolling content region and takes its layout from the host, ChatOverlayBack is the quiet centered way out, and ChatOverlaySummary captions the content. It is deliberately not a modal dialog: Tab is not trapped and the chat around it is not hidden, because the strip and composer beside it stay in use — but the siblings it is drawn over go inert while it is open, so nothing behind the view takes focus or a pointer. Focus moves into the view on open and returns to whatever opened it on close (or to wherever onReturnFocus says, for hosts whose opener hides behind the view), Escape closes it from anywhere inside, and it fades in only when motion is allowed.",
       },
     },
   },
@@ -139,7 +139,7 @@ export const TranscriptTakeover: Story = {
 
 export const CaptionedContent: Story = {
   parameters: storyDocumentation(
-    "ChatOverlaySummary captions what is on screen — a file name, a count of what the view holds — in the quiet line above the way out. Escape closes the view from anywhere inside it, so a reader who scrolled deep into the content never has to travel back to a control.",
+    "ChatOverlaySummary captions what is on screen — a file name, a count of what the view holds — in the quiet line above the way out. Escape closes the view from anywhere inside it, including after a click that landed on plain text, because the view itself can hold focus; a reader who scrolled deep into the content never has to travel back to a control.",
   ),
   render: () => <TakeoverExample summary="skill-creator/SKILL.md" />,
   play: async ({ canvasElement }) => {

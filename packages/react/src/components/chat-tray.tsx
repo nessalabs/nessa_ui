@@ -31,15 +31,16 @@ export interface ChatTrayItem {
 }
 
 export interface ChatTrayChipProps
-  extends Omit<React.ComponentProps<"button">, "children"> {
+  extends Omit<React.ComponentProps<"span">, "children"> {
   item: ChatTrayItem
 }
 
 /**
  * One pending item, as a compact chip: kind glyph, truncated label, and the
- * full text on hover. With an `onClick` it is a button, so a chip can open
- * what it stands for; without one it is inert text rather than a focus stop
- * that does nothing.
+ * full text on hover. `onClick` is what makes it a control — with one it
+ * renders as a button, without one as inert text rather than a focus stop
+ * that does nothing. Its props are a span's for that reason: a chip is not
+ * always a button, so button-only attributes would be a lie half the time.
  */
 function ChatTrayChip({ item, className, ...props }: ChatTrayChipProps) {
   const content = (
@@ -80,7 +81,7 @@ function ChatTrayChip({ item, className, ...props }: ChatTrayChipProps) {
         "cursor-pointer hover:text-foreground",
         chatTrayFocusClassName,
       )}
-      {...props}
+      {...(props as React.ComponentProps<"button">)}
     >
       {content}
     </button>

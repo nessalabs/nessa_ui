@@ -244,6 +244,8 @@ function ChatAnnotationBadge({
   count,
   onOpen,
   className,
+  onClick,
+  onKeyDown,
   ...props
 }: ChatAnnotationBadgeProps) {
   return (
@@ -251,24 +253,20 @@ function ChatAnnotationBadge({
       data-slot="chat-annotation-badge"
       role={onOpen ? "button" : undefined}
       tabIndex={onOpen ? 0 : undefined}
-      onClick={
-        onOpen
-          ? (event) => {
-              event.stopPropagation()
-              onOpen()
-            }
-          : undefined
-      }
-      onKeyDown={
-        onOpen
-          ? (event) => {
-              if (event.key !== "Enter" && event.key !== " ") return
-              event.preventDefault()
-              event.stopPropagation()
-              onOpen()
-            }
-          : undefined
-      }
+      onClick={(event) => {
+        onClick?.(event)
+        if (!onOpen || event.defaultPrevented) return
+        event.stopPropagation()
+        onOpen()
+      }}
+      onKeyDown={(event) => {
+        onKeyDown?.(event)
+        if (!onOpen || event.defaultPrevented) return
+        if (event.key !== "Enter" && event.key !== " ") return
+        event.preventDefault()
+        event.stopPropagation()
+        onOpen()
+      }}
       className={cn(
         onOpen &&
           cn(

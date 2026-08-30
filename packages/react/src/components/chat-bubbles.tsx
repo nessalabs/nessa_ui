@@ -184,10 +184,11 @@ export interface ChatBubbleProps
    */
   clampLines?: 2 | 3 | 4 | 5 | 6
   /**
-   * Opens the full text of a clamped bubble. Ignored without `clampLines`,
-   * and ignored alongside `onSelect`: a bubble that is itself a control
-   * cannot nest one, so a selectable bubble still clamps but hands its
-   * expand affordance to the message's ChatMessageActions row instead.
+   * Opens the full text of a clamped bubble, through a trailing chevron.
+   * Ignored without `clampLines`, and ignored alongside `onSelect`: a bubble
+   * that is itself a control cannot nest one. A selectable bubble still
+   * clamps, but its host owes readers an expand control of its own — in the
+   * message's ChatMessageActions row, for instance.
    */
   onExpand?: () => void
 }

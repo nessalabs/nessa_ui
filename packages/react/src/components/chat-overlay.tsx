@@ -51,9 +51,12 @@ export interface ChatOverlayProps extends React.ComponentProps<"div"> {
  * trapped and nothing outside is hidden — the tab strip and composer beside
  * it stay in use, which is the whole point of taking over the transcript
  * rather than the window. ChatAttachmentViewer is the modal sibling, for
- * views that should take everything. Escape closes the view from inside it,
- * after any control that wants the keystroke first has had it, and the fade
- * honors reduced motion.
+ * views that should take everything. What it does cover, it covers
+ * completely: the siblings it is drawn over go inert while it is open, so
+ * nothing behind it takes focus or a pointer.
+ *
+ * Escape closes the view from inside it, after any control that stops the
+ * keystroke first has had it, and the fade honors reduced motion.
  */
 function ChatOverlay({
   onClose,
@@ -61,6 +64,7 @@ function ChatOverlay({
   onReturnFocus,
   className,
   children,
+  onKeyDown,
   ...props
 }: ChatOverlayProps) {
   const ref = React.useRef<HTMLDivElement>(null)
@@ -104,12 +108,25 @@ function ChatOverlay({
       ownerDocument.activeElement instanceof HTMLElement
         ? ownerDocument.activeElement
         : null
-    node
-      .querySelector<HTMLElement>(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      )
-      ?.focus()
+    // The view itself is the fallback focus target, so a reading view with
+    // no controls of its own still answers Escape.
+    const firstControl = node.querySelector<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    )
+    ;(firstControl ?? node).focus()
+    // The view covers its parent's other children, so while it is open they
+    // are inert: nothing behind it takes focus, a pointer, or a screen
+    // reader's attention. Other dialogs beside it are left alone.
+    const covered = Array.from(node.parentElement?.children ?? []).filter(
+      (sibling): sibling is HTMLElement =>
+        sibling !== node &&
+        sibling instanceof HTMLElement &&
+        sibling.getAttribute("role") !== "dialog" &&
+        !sibling.hasAttribute("inert"),
+    )
+    for (const sibling of covered) sibling.setAttribute("inert", "")
     return () => {
+      for (const sibling of covered) sibling.removeAttribute("inert")
       // A control that is gone cannot take focus back; hosts that hide the
       // opener while the view is open say where focus should land instead.
       if (opener?.isConnected) opener.focus()
@@ -120,9 +137,14 @@ function ChatOverlay({
   }, [])
 
   // Escape is handled on the overlay itself, in the bubble phase, so a
-  // control inside it — an inline editor, a menu — cancels its own state
-  // first and stops the event before the whole view closes.
+  // control inside it that stops the event — an inline editor — cancels its
+  // own state without closing the view. A layer that dismisses from its own
+  // document listener without stopping the event (Radix menus and popovers
+  // do this) closes the view along with itself, so a host nesting one should
+  // stop the keystroke in its own handler.
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    // The host's handler runs first and can claim the keystroke.
+    onKeyDown?.(event)
     if (event.key !== "Escape" || event.defaultPrevented) return
     event.preventDefault()
     onCloseRef.current()
@@ -135,6 +157,9 @@ function ChatOverlay({
         role="dialog"
         aria-label={label}
         data-slot="chat-overlay"
+        // Focusable as a last resort: clicking the view's own text keeps
+        // focus inside it, so Escape still works after a stray click.
+        tabIndex={-1}
         onKeyDown={handleKeyDown}
         className={cn(
           "absolute inset-0 z-20 flex flex-col rounded-[inherit] bg-background font-sans",
