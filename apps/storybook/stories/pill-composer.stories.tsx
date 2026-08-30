@@ -755,50 +755,29 @@ function InlineBubbleEditor({
   onCancel: () => void
 }) {
   const [draft, setDraft] = React.useState(text)
-  const commit = () => {
-    if (draft.trim()) onSave(draft.trim())
-    else onCancel()
-  }
   return (
-    <span className="flex w-full max-w-full items-center gap-1">
-      <ChatBubble className="min-w-0 flex-1">
-        <input
-          autoFocus
-          aria-label="Edit message"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault()
-              commit()
-            }
-            if (event.key === "Escape") {
-              event.preventDefault()
-              onCancel()
-            }
-          }}
-          className="w-full min-w-24 border-0 bg-transparent p-0 font-sans nessa-text-4 leading-5 text-inherit outline-none"
-        />
-      </ChatBubble>
-      <button
-        type="button"
-        aria-label="Save message"
-        title="Save"
-        onClick={commit}
-        className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3.5"
-      >
-        <Check aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        aria-label="Cancel edit"
-        title="Cancel"
-        onClick={onCancel}
-        className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3.5"
-      >
-        <X aria-hidden="true" />
-      </button>
-    </span>
+    <ChatBubble className="max-w-full">
+      <input
+        autoFocus
+        aria-label="Edit message"
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault()
+            if (draft.trim()) onSave(draft.trim())
+            else onCancel()
+          }
+          if (event.key === "Escape") {
+            event.preventDefault()
+            onCancel()
+          }
+        }}
+        onBlur={() => onCancel()}
+        style={{ width: `${Math.min(Math.max(draft.length + 1, 6), 64)}ch` }}
+        className="max-w-full border-0 bg-transparent p-0 font-sans nessa-text-4 leading-5 text-inherit outline-none"
+      />
+    </ChatBubble>
   )
 }
 
@@ -818,7 +797,7 @@ function HoverAction({
       aria-label={label}
       title={label}
       onClick={onClick}
-      className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3.5"
+      className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3"
     >
       {children}
     </button>
@@ -1068,40 +1047,49 @@ function DemoBubble({
             ) : null}
           </ContextMenuContent>
         </ContextMenu>
-        {message.role === "assistant" ? (
-          // Presentation-only affordances riding the agent bubble's right
-          // edge on hover — fork, retry, copy — the shapes, not the
-          // features yet.
-          <span className="pointer-events-none absolute left-full top-1/2 ml-1 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity focus-within:pointer-events-auto focus-within:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100">
-            <HoverAction label="Fork the conversation from here">
-              <GitFork aria-hidden="true" />
-            </HoverAction>
-            <HoverAction label="Retry this reply">
-              <RefreshCw aria-hidden="true" />
-            </HoverAction>
-            <HoverAction label="Copy">
-              <Copy aria-hidden="true" />
-            </HoverAction>
-          </span>
-        ) : null}
         </span>
-        {message.role === "user" && !editing ? (
-          // The user side reveals its actions where the receipt lives —
-          // copy, and edit as a hover alternative to the context menu.
-          <span className="pointer-events-none absolute right-0 top-full mt-0.5 flex items-center gap-0.5 opacity-0 transition-opacity focus-within:pointer-events-auto focus-within:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100">
-            <HoverAction label="Copy">
-              <Copy aria-hidden="true" />
-            </HoverAction>
-            {onEditStart ? (
-              <HoverAction label="Edit message" onClick={onEditStart}>
-                <Pencil aria-hidden="true" />
+        {/* One pattern for both sides: a hover-revealed footer row under
+            the bubble — the receipt lives here too, so the transcript
+            carries no standing chrome. Padding, not margin, bridges the
+            gap so the pointer can reach the actions without losing hover. */}
+        <span
+          className={cn(
+            "pointer-events-none absolute top-full z-10 flex items-center gap-0.5 pt-0.5 opacity-0 transition-opacity focus-within:pointer-events-auto focus-within:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100",
+            message.role === "user" ? "right-0" : "left-0",
+          )}
+        >
+          {message.role === "user" ? (
+            <>
+              {delivered ? (
+                <span className="pe-1 font-sans nessa-text-1 text-muted-foreground">
+                  Delivered
+                </span>
+              ) : null}
+              <HoverAction label="Copy">
+                <Copy aria-hidden="true" />
               </HoverAction>
-            ) : null}
-          </span>
-        ) : null}
+              {onEditStart ? (
+                <HoverAction label="Edit message" onClick={onEditStart}>
+                  <Pencil aria-hidden="true" />
+                </HoverAction>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <HoverAction label="Fork the conversation from here">
+                <GitFork aria-hidden="true" />
+              </HoverAction>
+              <HoverAction label="Retry this reply">
+                <RefreshCw aria-hidden="true" />
+              </HoverAction>
+              <HoverAction label="Copy">
+                <Copy aria-hidden="true" />
+              </HoverAction>
+            </>
+          )}
+        </span>
         </>
       ) : null}
-      {delivered ? <ChatMessageReceipt>Delivered</ChatMessageReceipt> : null}
     </ChatMessage>
   )
 }
@@ -1845,7 +1833,7 @@ function PlaygroundExample({
         ref={logRef}
         aria-label="Conversation"
         role="log"
-        className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {/* Bottom-anchors a short transcript without justify-end, which
             would trap overflowing messages above an unscrollable top. */}
