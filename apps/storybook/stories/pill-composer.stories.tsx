@@ -3414,11 +3414,13 @@ export const AgentSurfaces: Story = {
     await expect(canvas.getByRole("button", { name: /read/i })).toBeVisible()
     await userEvent.click(canvas.getByRole("button", { name: "Queued 2" }))
     await expect(canvas.getByRole("dialog", { name: "Queued" })).toBeVisible()
-    await expect(
-      canvas.getByText(
-        "We also need this all conversations view for that which will be triggered with / history",
-      ),
-    ).toBeVisible()
+    await waitFor(() =>
+      expect(
+        canvas.getByText(
+          "We also need this all conversations view for that which will be triggered with / history",
+        ),
+      ).toBeVisible(),
+    )
     await expect(
       canvas.getByText(
         "So add components for that and then show in demo video of what you built for each",

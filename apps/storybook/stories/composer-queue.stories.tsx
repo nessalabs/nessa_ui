@@ -314,11 +314,13 @@ export const QueuedSheet: Story = {
     const canvas = within(canvasElement)
     await userEvent.click(canvas.getByRole("button", { name: "Queued 2" }))
     await expect(canvas.getByRole("dialog", { name: "Queued" })).toBeVisible()
-    await expect(
-      canvas.getByText(
-        "We also need this all conversations view for that which will be triggered with / history",
-      ),
-    ).toBeVisible()
+    await waitFor(() =>
+      expect(
+        canvas.getByText(
+          "We also need this all conversations view for that which will be triggered with / history",
+        ),
+      ).toBeVisible(),
+    )
     await expect(
       canvas.getByRole("list", { name: "Pending messages" }),
     ).toHaveAttribute("data-appearance", "plain")
