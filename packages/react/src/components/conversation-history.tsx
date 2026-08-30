@@ -48,8 +48,8 @@ export interface ConversationHistoryProps
  * A roster of conversations: an optional search field and a list of rows
  * the host already knows about. The list stores nothing and sorts nothing —
  * pass the rows in the order they should appear, and apply the query
- * before they arrive. Selecting a row reports its id; opening a
- * conversation is the host's job.
+ * before they arrive. Each row is a button; the selected one is
+ * `aria-current`. Opening a conversation is the host's job.
  */
 function ConversationHistory({
   conversations,
@@ -99,7 +99,7 @@ function ConversationHistory({
       ) : (
         <ul
           data-slot="conversation-history-list"
-          role="listbox"
+          role="list"
           aria-label={label}
           className="m-0 flex min-h-0 flex-1 list-none flex-col overflow-y-auto p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
@@ -109,8 +109,7 @@ function ConversationHistory({
               <li key={conversation.id} className="min-w-0">
                 <button
                   type="button"
-                  role="option"
-                  aria-selected={selected}
+                  aria-current={selected ? "true" : undefined}
                   data-slot="conversation-history-item"
                   data-pinned={conversation.pinned || undefined}
                   onClick={() => onValueChange?.(conversation.id)}

@@ -2094,6 +2094,11 @@ function PlaygroundExample({
         ) : null}
         {messages.map((entry) => (
           <React.Fragment key={entry.id}>
+          {entry.thought ? (
+            <AgentActivityCue className="self-start">
+              {entry.thought}
+            </AgentActivityCue>
+          ) : null}
           <DemoBubble
             message={entry}
             delivered={entry.id === lastUserId}
@@ -2170,7 +2175,7 @@ function PlaygroundExample({
 
           />
           <DemoActivity
-            message={entry}
+            message={{ ...entry, thought: undefined }}
             onOpenCard={() => setDetailsTabId(activeTabId)}
           />
           {entry.spawned ? (
@@ -3429,7 +3434,7 @@ export const AgentSurfaces: Story = {
       canvas.getByRole("dialog", { name: "All conversations" }),
     ).toBeVisible()
     await userEvent.click(
-      canvas.getByRole("option", { name: /repo audit/i }),
+      canvas.getByRole("button", { name: /repo audit/i }),
     )
     await expect(
       canvas.getByRole("tab", { name: "Repo audit" }),

@@ -80,24 +80,24 @@ export const Playground: Story = {
   render: () => <HistoryExample />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    const list = canvas.getByRole("listbox", { name: "Conversations" })
-    await expect(within(list).getAllByRole("option")).toHaveLength(3)
-    const selected = canvas.getByRole("option", {
+    const list = canvas.getByRole("list", { name: "Conversations" })
+    await expect(within(list).getAllByRole("button")).toHaveLength(3)
+    const selected = canvas.getByRole("button", {
       name: /agent message package implementation/i,
     })
-    await expect(selected).toHaveAttribute("aria-selected", "true")
+    await expect(selected).toHaveAttribute("aria-current", "true")
     const search = canvas.getByRole("searchbox", {
       name: "Search conversations",
     })
     await userEvent.type(search, "audit")
-    await expect(within(list).getAllByRole("option")).toHaveLength(1)
+    await expect(within(list).getAllByRole("button")).toHaveLength(1)
     await expect(
-      canvas.getByRole("option", { name: /repo audit/i }),
+      canvas.getByRole("button", { name: /repo audit/i }),
     ).toBeVisible()
     await userEvent.clear(search)
-    await userEvent.click(canvas.getByRole("option", { name: /release notes/i }))
+    await userEvent.click(canvas.getByRole("button", { name: /release notes/i }))
     await expect(
-      canvas.getByRole("option", { name: /release notes/i }),
-    ).toHaveAttribute("aria-selected", "true")
+      canvas.getByRole("button", { name: /release notes/i }),
+    ).toHaveAttribute("aria-current", "true")
   },
 }
