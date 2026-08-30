@@ -106,10 +106,12 @@ export interface SheetProps extends React.ComponentProps<"div"> {
  * SheetExpand, SheetAction, and SheetBody. SheetExpand toggles the drawer
  * into a filled extra-details surface over the same ancestor — the host
  * that positions the transcript (rather than the whole window) keeps its
- * tab strip and composer when the panel expands. The drawer rises from the
- * bottom on open; expand and minimize interpolate height so the panel grows
- * and recedes in place. Reduced motion skips both. The sheet draws the
- * chrome and owns dismissal; the host owns what the panel shows.
+ * tab strip and composer when the panel expands. The drawer lifts a short
+ * way from the bottom on open; expand and minimize interpolate height so
+ * the panel grows and recedes in place. Both use the slow duration and
+ * standard easing so the motion stays one language. Reduced motion skips
+ * them. The sheet draws the chrome and owns dismissal; the host owns what
+ * the panel shows.
  */
 function Sheet({
   onClose,
@@ -161,8 +163,8 @@ function Sheet({
     if (window.matchMedia(reducedMotionQuery).matches) return
     const { duration, easing } = sheetMotion(
       panel,
-      "--nessa-motion-duration-normal",
-      200,
+      "--nessa-motion-duration-slow",
+      300,
     )
     if (duration === 0) return
     const animations: Animation[] = []
@@ -171,10 +173,12 @@ function Sheet({
         panel.animate([{ opacity: 0 }, { opacity: 1 }], { duration, easing }),
       )
     } else {
+      // A short lift — a fraction of the panel, not a full-height slide —
+      // plus a fade, so the drawer arrives from below without rushing.
       animations.push(
         panel.animate(
           [
-            { opacity: 0, translate: "0 100%" },
+            { opacity: 0, translate: "0 8%" },
             { opacity: 1, translate: "0 0" },
           ],
           { duration, easing },
@@ -407,15 +411,18 @@ function Sheet({
   )
 }
 
-/** The grab bar that marks the panel as a drawer. Hidden while expanded. */
+/** The grab bar that marks the panel as a drawer. Recedes while expanded. */
 function SheetHandle({ className, ...props }: React.ComponentProps<"div">) {
   const { expanded } = useSheet()
-  if (expanded) return null
   return (
     <div
       aria-hidden="true"
       data-slot="sheet-handle"
-      className={cn("flex shrink-0 justify-center pt-2", className)}
+      className={cn(
+        "flex shrink-0 justify-center overflow-hidden pt-2 transition-[max-height,padding,opacity] [transition-duration:var(--nessa-motion-duration-slow)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
+        expanded ? "max-h-0 pt-0 opacity-0" : "max-h-6 opacity-100",
+        className,
+      )}
       {...props}
     >
       <span className="h-1 w-10 rounded-full bg-muted-foreground/50" />
