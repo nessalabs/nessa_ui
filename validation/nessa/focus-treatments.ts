@@ -8,8 +8,18 @@ const sidebarFocusComponents = Object.freeze([
 ] as const)
 
 const composerFocusComponents = Object.freeze([
-  { component: "chat-bubbles", count: 5 },
+  // The passage a comment attaches to, the source-document link, and the
+  // badge that opens a sent message's annotations.
+  { component: "chat-annotations", count: 3 },
+  // The five transcript controls, plus a message's hover action and the
+  // clamped bubble that opens its full text.
+  { component: "chat-bubbles", count: 7 },
   { component: "chat-composer", count: 3 },
+  // Only the back link: the overlay traps focus, and its content is the
+  // host's own.
+  { component: "chat-overlay", count: 1 },
+  // The chip, the collapsed-count control, and the discard-all button.
+  { component: "chat-tray", count: 3 },
   { component: "code-block", count: 1 },
   { component: "composer-access-mode", count: 2 },
   { component: "composer-queue", count: 5 },

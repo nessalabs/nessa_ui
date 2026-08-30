@@ -4,10 +4,14 @@ import { expect, userEvent, waitFor, within } from "storybook/test"
 import {
   Button,
   Card,
+  ChatAnnotationBadge,
+  ChatAnnotationList,
+  ChatAnnotationThread,
   ChatAttachmentStack,
   ChatAttachmentTile,
   ChatAttachmentViewer,
   ChatBubble,
+  ChatBubbleEditor,
   ChatComposerAction,
   ChatComposerAttachments,
   ChatComposerInput,
@@ -24,10 +28,16 @@ import {
   type ChatComposerContentPart,
   type ChatComposerEditorHandle,
   ChatMessage,
+  ChatMessageAction,
+  ChatMessageActions,
   ChatMessageQuote,
   ChatMessageReceipt,
   chatReactionOptions,
+  ChatOverlay,
+  ChatOverlayBack,
+  ChatOverlayBody,
   ChatTabs,
+  ChatTray,
   ChatTypingIndicator,
   cn,
   MessageMarkdown,
@@ -53,6 +63,8 @@ import {
   type PillComposerRimVariant,
   SectionedListbox,
   RandomAvatar,
+  type ChatAnnotation,
+  type ChatTrayItem,
   type ModelPickerGroup,
   type ModelPickerValue,
 } from "@nessa-ui/react"
@@ -529,17 +541,6 @@ function StopAction({
   )
 }
 
-interface PendingQuote {
-  /** A stable identity for list rendering; display data otherwise. */
-  id?: string
-  /** The passage lifted from the document. */
-  text: string
-  /** The user's comments on it — the first from the selection tooltip, the rest added later from the annotation view. */
-  comments?: string[]
-  /** The slash item whose document the passage came from. */
-  sourceId?: string
-}
-
 interface DemoMessage {
   id: number
   role: "user" | "assistant"
@@ -547,7 +548,7 @@ interface DemoMessage {
   /** The quoted text of the message this one replies to, iMessage-style. */
   replyTo?: string
   /** Passages lifted from previewed documents, quoted above the bubble. */
-  quotes?: PendingQuote[]
+  quotes?: ChatAnnotation[]
   /** Full text behind each pasted-text chip in this message, by chip id. */
   pasted?: Record<string, string>
   /** The id of the message this one replies to, linking it into a thread. */
@@ -771,80 +772,6 @@ function SubagentChip({
  * tone, its text becomes an editable field, and small save and cancel
  * controls sit beside it. Enter saves, Escape cancels.
  */
-function InlineBubbleEditor({
-  text,
-  onSave,
-  onCancel,
-}: {
-  text: string
-  onSave: (text: string) => void
-  onCancel: () => void
-}) {
-  const [draft, setDraft] = React.useState(text)
-  // The caret opens at the end of the text, ready to append.
-  const placeCaretAtEnd = React.useCallback(
-    (node: HTMLTextAreaElement | null) => {
-      if (!node) return
-      node.focus()
-      node.setSelectionRange(node.value.length, node.value.length)
-    },
-    [],
-  )
-  return (
-    <ChatBubble className="max-w-full">
-      {/* field-sizing lets the textarea take exactly its content's shape,
-          so the editing bubble wraps and measures like the resting one. */}
-      <textarea
-        ref={placeCaretAtEnd}
-        aria-label="Edit message"
-        rows={1}
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && !event.shiftKey) {
-            event.preventDefault()
-            event.stopPropagation()
-            if (draft.trim()) onSave(draft.trim())
-            else onCancel()
-          }
-          if (event.key === "Escape") {
-            // Cancels only this edit — the window-level Escape handler
-            // would otherwise also collapse reply or thread focus.
-            event.preventDefault()
-            event.stopPropagation()
-            onCancel()
-          }
-        }}
-        onBlur={() => onCancel()}
-        className="block max-w-full resize-none overflow-hidden whitespace-pre-wrap break-words border-0 bg-transparent p-0 font-sans nessa-text-4 leading-5 text-inherit outline-none [field-sizing:content]"
-      />
-    </ChatBubble>
-  )
-}
-
-/** A hover-revealed, presentation-only icon action for a message row. */
-function HoverAction({
-  label,
-  onClick,
-  children,
-}: {
-  label: string
-  onClick?: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3"
-    >
-      {children}
-    </button>
-  )
-}
-
 /**
  * Maps one demo message onto the ChatBubbles kit/**
  * Maps one demo message onto the ChatBubbles kit: attachments (single tile
@@ -898,7 +825,7 @@ function DemoBubble({
   /** Opens the document a lifted passage came from. */
   onQuoteSourceOpen?: (sourceId: string) => void
   /** Opens the read-only list of this message's annotations. */
-  onQuotesOpen?: (quotes: PendingQuote[]) => void
+  onQuotesOpen?: (quotes: ChatAnnotation[]) => void
   /** True while this user message's bubble is swapped for the editor. */
   editing?: boolean
   /** Enters edit mode for this user message (context-menu Edit). */
@@ -910,6 +837,10 @@ function DemoBubble({
   /** Flips the tapback menu above the press point at this element's edges. */
   menuBoundary?: Element | null
 }) {
+  const longMessage =
+    message.role === "user" &&
+    message.text.length > LONG_MESSAGE_CHARS &&
+    onLongOpen !== undefined
   // Reply commits after the menu closes: Radix's close-autofocus would
   // otherwise return focus to the bubble and undo the composer focus.
   const replyChosenRef = React.useRef(false)
@@ -976,29 +907,15 @@ function DemoBubble({
         // The annotations travel as one compact pill — the chat stays
         // clean, and tapping it opens the same list view they were
         // reviewed in before sending.
-        <ChatMessageQuote
-          role="button"
-          tabIndex={0}
+        <ChatAnnotationBadge
           title="Show the annotations"
-          onClick={(event) => {
-            event.stopPropagation()
-            onQuotesOpen?.(message.quotes!)
-          }}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter" && event.key !== " ") return
-            event.preventDefault()
-            onQuotesOpen?.(message.quotes!)
-          }}
-          className="cursor-pointer hover:bg-accent"
-        >
-          {message.quotes.length === 1
-            ? "1 annotation"
-            : `${message.quotes.length} annotations`}
-        </ChatMessageQuote>
+          count={message.quotes.length}
+          onOpen={() => onQuotesOpen?.(message.quotes!)}
+        />
       ) : null}
       {editing ? (
-        <InlineBubbleEditor
-          text={message.text}
+        <ChatBubbleEditor
+          defaultValue={message.text}
           onSave={(text) => onEditSave?.(text)}
           onCancel={() => onEditCancel?.()}
         />
@@ -1015,6 +932,13 @@ function DemoBubble({
               title="Right-click to reply or react"
               tabIndex={0}
               reaction={message.reaction}
+              // A huge typed message stays compact in the transcript: the
+              // bubble clamps itself and the chevron opens the full text in
+              // the reading view, the way a pasted-text chip does.
+              clampLines={longMessage ? 4 : undefined}
+              onExpand={
+                longMessage ? () => onLongOpen?.(message.text) : undefined
+              }
               className={
                 message.role === "assistant" ? "px-4 py-2.5" : undefined
               }
@@ -1026,34 +950,6 @@ function DemoBubble({
                 >
                   {message.text}
                 </MessageMarkdown>
-              ) : message.role === "user" &&
-                message.text.length > LONG_MESSAGE_CHARS &&
-                onLongOpen ? (
-                // A huge typed message stays compact in the transcript —
-                // four lines and a chevron; the full text lives in the
-                // list view, like the pasted-text chips.
-                <span
-                  role="button"
-                  tabIndex={0}
-                  title="Show the whole message"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onLongOpen(message.text)
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key !== "Enter" && event.key !== " ") return
-                    event.preventDefault()
-                    event.stopPropagation()
-                    onLongOpen(message.text)
-                  }}
-                  className="flex cursor-pointer items-end gap-1"
-                >
-                  <span className="line-clamp-4">{message.text}</span>
-                  <ChevronRight
-                    aria-hidden="true"
-                    className="mb-0.5 size-3.5 shrink-0 opacity-80"
-                  />
-                </span>
               ) : message.parts ? (
                 <BubbleParts
                   parts={message.parts}
@@ -1136,42 +1032,42 @@ function DemoBubble({
             the bubble — the receipt lives here too, so the transcript
             carries no standing chrome. Padding, not margin, bridges the
             gap so the pointer can reach the actions without losing hover. */}
-        <span
-          className={cn(
-            "pointer-events-none absolute top-full z-10 flex items-center gap-0.5 pt-0.5 opacity-0 transition-opacity focus-within:pointer-events-auto focus-within:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100",
-            message.role === "user" ? "right-0" : "left-0",
-          )}
-        >
+        <ChatMessageActions>
           {message.role === "user" ? (
             <>
               {delivered ? (
-                <ChatMessageReceipt className="mt-0 pe-1">
-                  Delivered
-                </ChatMessageReceipt>
+                <ChatMessageReceipt>Delivered</ChatMessageReceipt>
               ) : null}
-              <HoverAction label="Copy">
+              <ChatMessageAction aria-label="Copy" title="Copy">
                 <Copy aria-hidden="true" />
-              </HoverAction>
+              </ChatMessageAction>
               {onEditStart ? (
-                <HoverAction label="Edit message" onClick={onEditStart}>
+                <ChatMessageAction
+                  aria-label="Edit message"
+                  title="Edit message"
+                  onClick={onEditStart}
+                >
                   <Pencil aria-hidden="true" />
-                </HoverAction>
+                </ChatMessageAction>
               ) : null}
             </>
           ) : (
             <>
-              <HoverAction label="Fork the conversation from here">
+              <ChatMessageAction
+                aria-label="Fork the conversation from here"
+                title="Fork the conversation from here"
+              >
                 <GitFork aria-hidden="true" />
-              </HoverAction>
-              <HoverAction label="Retry this reply">
+              </ChatMessageAction>
+              <ChatMessageAction aria-label="Retry this reply" title="Retry this reply">
                 <RefreshCw aria-hidden="true" />
-              </HoverAction>
-              <HoverAction label="Copy">
+              </ChatMessageAction>
+              <ChatMessageAction aria-label="Copy" title="Copy">
                 <Copy aria-hidden="true" />
-              </HoverAction>
+              </ChatMessageAction>
             </>
           )}
-        </span>
+        </ChatMessageActions>
         </>
       ) : null}
     </ChatMessage>
@@ -1279,16 +1175,18 @@ function attachmentSummary(attachments: DemoAttachment[]) {
 
 // A pile of pending annotations in every shape — one-liners, paragraphs,
 // commented and bare — for exercising the pending row and the list view.
-const seededAnnotations: PendingQuote[] = [
+const seededAnnotations: ChatAnnotation[] = [
   {
     id: "seed-1",
     text: "Gather the relevant context from the current chat.",
     comments: ["This should spell out how much history counts as relevant."],
+    sourceLabel: "SKILL.md",
     sourceId: "skill-creator",
   },
   {
     id: "seed-2",
     text: "Apply the checklist this skill carries.",
+    sourceLabel: "SKILL.md",
     sourceId: "skill-creator",
   },
   {
@@ -1298,23 +1196,27 @@ const seededAnnotations: PendingQuote[] = [
       "Way too long for one step — split the summary rule and the linking rule into separate steps, and give each a concrete length budget so agents stop guessing.",
       "Also decide who owns the link target.",
     ],
+    sourceLabel: "SKILL.md",
     sourceId: "skill-creator",
   },
   {
     id: "seed-4",
     text: "Invoke with /skill-creator from any conversation.",
     comments: ["Mention the trigger menu too."],
+    sourceLabel: "SKILL.md",
     sourceId: "skill-creator",
   },
   {
     id: "seed-5",
     text: "Draft a reusable skill from this conversation.",
+    sourceLabel: "SKILL.md",
     sourceId: "skill-creator",
   },
   {
     id: "seed-6",
     text: "The checklist this skill carries should include accessibility, performance, and error handling, each with at least one concrete check the reviewer can run without leaving the editor.",
     comments: ["a11y first."],
+    sourceLabel: "SKILL.md",
     sourceId: "code-review",
   },
   { id: "seed-7", text: "When to use", sourceId: "skill-creator" },
@@ -1324,142 +1226,11 @@ const seededAnnotations: PendingQuote[] = [
     comments: [
       "The whole Steps section reads as written for humans; add a machine-readable variant so the runner can verify each step actually happened.",
     ],
+    sourceLabel: "SKILL.md",
     sourceId: "skill-creator",
   },
 ]
 
-
-/** A sent-style comment bubble whose text edits in place, inside the bubble. */
-function EditableCommentBubble({
-  text,
-  onSave,
-}: {
-  text: string
-  /** Omitted in read-only views; present, it enables the hover edit control. */
-  onSave?: (text: string) => void
-}) {
-  const [editing, setEditing] = React.useState(false)
-  if (editing && onSave) {
-    return (
-      <InlineBubbleEditor
-        text={text}
-        onSave={(next) => {
-          onSave(next)
-          setEditing(false)
-        }}
-        onCancel={() => setEditing(false)}
-      />
-    )
-  }
-  return (
-    <span className="group/comment flex max-w-full items-center gap-1 self-end">
-      {onSave ? (
-        <button
-          type="button"
-          aria-label="Edit comment"
-          title="Edit comment"
-          onClick={() => setEditing(true)}
-          className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground opacity-0 outline-none transition-opacity hover:text-foreground focus-visible:opacity-100 focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring group-hover/comment:opacity-100 [&_svg]:size-3"
-        >
-          <Pencil aria-hidden="true" />
-        </button>
-      ) : null}
-      <ChatBubble>{text}</ChatBubble>
-    </span>
-  )
-}
-
-/**
- * One annotation in the full-list view, read as a tiny thread: the lifted
- * passage is the document's message, the user's comments are their replies.
- * In the pending view the passage selects for follow-up comments, comments
- * edit in place, and the row removes; the sent view is read-only.
- */
-function AnnotationThread({
-  quote,
-  selected = false,
-  onSelect,
-  onRemove,
-  onOpenSource,
-  onEditComment,
-}: {
-  quote: PendingQuote
-  /** Marks this annotation as the one the composer replies to. */
-  selected?: boolean
-  /** Selects (or deselects) this annotation for follow-up comments. */
-  onSelect?: () => void
-  /** Omitted in the read-only view of a sent message's annotations. */
-  onRemove?: () => void
-  /** Opens the document this passage was lifted from. */
-  onOpenSource?: () => void
-  /** Replaces one comment's text; omitted in the read-only view. */
-  onEditComment?: (index: number, text: string) => void
-}) {
-  const sourceName = quote.sourceId
-    ? slashItemForId(quote.sourceId)
-    : undefined
-  return (
-    <div className="flex items-start gap-2">
-      <div
-        className={cn(
-          "flex min-w-0 flex-1 flex-col gap-1 rounded-2xl p-1 transition-colors",
-          selected && "bg-(--nessa-chat-accent)/10",
-        )}
-      >
-        <ChatMessage tone="received" className="max-w-full">
-          <ChatBubble
-            role={onSelect ? "button" : undefined}
-            tabIndex={onSelect ? 0 : undefined}
-            title={onSelect ? "Reply to this annotation" : undefined}
-            onClick={onSelect}
-            onKeyDown={
-              onSelect
-                ? (event) => {
-                    if (event.key !== "Enter" && event.key !== " ") return
-                    event.preventDefault()
-                    onSelect()
-                  }
-                : undefined
-            }
-            className={onSelect ? "cursor-pointer px-4 py-2.5" : "px-4 py-2.5"}
-          >
-            {/* The kit's markdown renderer — pasted markdown, long typed
-                text, and lifted passages all read formatted here. */}
-            <MessageMarkdown className="leading-5">{quote.text}</MessageMarkdown>
-          </ChatBubble>
-          {sourceName && onOpenSource ? (
-            <button
-              type="button"
-              onClick={onOpenSource}
-              className="self-start rounded-full border-0 bg-transparent p-0 px-1 font-sans nessa-text-1 text-(--nessa-chat-accent) outline-none hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            >
-              {chipFileMock(sourceName).name}
-            </button>
-          ) : null}
-        </ChatMessage>
-        {quote.comments?.map((comment, index) => (
-          <ChatMessage key={index} tone="sent" className="max-w-full self-end">
-            <EditableCommentBubble
-              text={comment}
-              onSave={
-                onEditComment
-                  ? (next) => onEditComment(index, next)
-                  : undefined
-              }
-            />
-          </ChatMessage>
-        ))}
-      </div>
-      {onRemove ? (
-        <span className="mt-1.5 shrink-0">
-          <HoverAction label="Discard quoted selection" onClick={onRemove}>
-            <X aria-hidden="true" />
-          </HoverAction>
-        </span>
-      ) : null}
-    </div>
-  )
-}
 
 /**
  * A small-surface host: an iMessage-style transcript over the pill
@@ -1478,7 +1249,7 @@ function PlaygroundExample({
 }: {
   replyDelay?: number
   initialTabId?: string
-  initialQuotes?: PendingQuote[]
+  initialQuotes?: ChatAnnotation[]
 }) {
   const [tabs, setTabs] = React.useState([
     { id: "chat-1", title: "Release notes" },
@@ -1505,13 +1276,13 @@ function PlaygroundExample({
   const [modelCardOpen, setModelCardOpen] = React.useState(false)
   // Passages lifted out of previewed documents — with any comments made on
   // them — attached to the next send.
-  const [quotes, setQuotes] = React.useState<PendingQuote[]>(initialQuotes)
+  const [quotes, setQuotes] = React.useState<ChatAnnotation[]>(initialQuotes)
   // The full-list view of pending quotes, rendered live so removals and
   // expands reflect immediately.
   const [quotesOpen, setQuotesOpen] = React.useState(false)
   // A sent message's annotations opened read-only from its pill.
   const [viewedQuotes, setViewedQuotes] = React.useState<
-    PendingQuote[] | null
+    ChatAnnotation[] | null
   >(null)
   // The pending annotation the composer replies to while the list is open.
   const [selectedQuote, setSelectedQuote] = React.useState<number | null>(null)
@@ -1522,7 +1293,8 @@ function PlaygroundExample({
   // Full text behind each pasted-text chip, keyed by chip id.
   const pastedTexts = React.useRef<Record<string, string>>({})
   /** Shows a full text in the list view — the transcript stays compact. */
-  const openFullText = (text: string) => setViewedQuotes([{ text }])
+  const openFullText = (text: string) =>
+    setViewedQuotes([{ id: `full-${nextId.current++}`, text }])
   // Chips open their file directly: plain press previews in the current
   // tab, a modified press (Cmd/Ctrl) parks the file as its own tab.
   const openChipFromLabel = (label: string, newTab: boolean) => {
@@ -1582,7 +1354,13 @@ function PlaygroundExample({
         ? current
         : [
             ...current,
-            { id: tabId, title: chipFileMock(item).name, closeable: true },
+            {
+              id: tabId,
+              kind: "file" as const,
+              parentId: activeTabId,
+              title: chipFileMock(item).name,
+              closeable: true,
+            },
           ],
     )
     setActiveTabId(tabId)
@@ -1675,12 +1453,12 @@ function PlaygroundExample({
     ? demoSubagents[activeTabId.slice("sub:".length)]
     : undefined
 
-  // Where each subagent tab was opened from, for the back gesture.
-  const subagentParents = React.useRef<Record<string, string>>({})
   /** Opens (or re-fronts) a subagent's conversation as its own tab. */
   const openSubagent = (id: string) => {
     const tabId = subagentTabId(id)
-    subagentParents.current[tabId] ??=
+    // The tab remembers where it was opened from, which is all ChatTabs
+    // needs to offer the way back.
+    const parentId =
       activeTabId.startsWith("sub:") || fileTabs[activeTabId]
         ? auditTabId
         : activeTabId
@@ -1689,7 +1467,13 @@ function PlaygroundExample({
         ? current
         : [
             ...current,
-            { id: tabId, title: demoSubagents[id]!.name, closeable: true },
+            {
+              id: tabId,
+              kind: "subagent" as const,
+              parentId,
+              title: demoSubagents[id]!.name,
+              closeable: true,
+            },
           ],
     )
     setActiveTabId(tabId)
@@ -1825,27 +1609,14 @@ function PlaygroundExample({
                 <FileText aria-hidden="true" />
               )
             ) : sub ? (
-              // On the tab you are already inside, hovering swaps the
-              // avatar for a back glyph: clicking the active subagent tab
-              // returns to the conversation that spawned it (handled in
-              // onValueChange, since re-selecting it is otherwise a no-op).
-              <span className="relative flex size-4 items-center justify-center">
-                <RandomAvatar
-                  seed={sub.id}
-                  busy={sub.status === "running"}
-                  className={cn(
-                    "size-4",
-                    tab.id === activeTabId &&
-                      "[[data-slot=chat-tab]:hover_&]:opacity-0",
-                  )}
-                />
-                {tab.id === activeTabId ? (
-                  <ChevronLeft
-                    aria-hidden="true"
-                    className="absolute inset-0 m-auto hidden size-3.5 text-foreground [[data-slot=chat-tab]:hover_&]:block"
-                  />
-                ) : null}
-              </span>
+              // The tab's own parentId gives it the back gesture: ChatTabs
+              // swaps this avatar for a back chevron while the pointer is on
+              // the tab the reader is already inside.
+              <RandomAvatar
+                seed={sub.id}
+                busy={sub.status === "running"}
+                className="size-4"
+              />
             ) : (
               // Every conversation is an agent: each chat tab carries its
               // own watercolor avatar, seeded by the conversation id.
@@ -1861,13 +1632,9 @@ function PlaygroundExample({
             setInlinePreview(null)
             if (id === activeTabId) return
           }
-          // Re-selecting the subagent tab you are inside goes back to the
-          // conversation that spawned it — the hover back glyph's action.
-          const target =
-            id === activeTabId && id.startsWith("sub:")
-              ? subagentParents.current[id] ?? auditTabId
-              : id
-          setActiveTabId(target)
+          // ChatTabs resolves the back gesture itself: re-selecting a tab
+          // with a parent reports the parent's id, not its own.
+          setActiveTabId(id)
           setReplyTarget(null)
           setMenuTargetId(null)
           setOverlay(null)
@@ -1940,6 +1707,7 @@ function PlaygroundExample({
               {
                 id: `quote-${nextId.current++}`,
                 text,
+                sourceLabel: chipFileMock(activeFileItem).name,
                 sourceId: activeFileItem.id,
               },
             ])
@@ -1952,6 +1720,7 @@ function PlaygroundExample({
                 id: `quote-${nextId.current++}`,
                 text,
                 comments: [comment],
+                sourceLabel: chipFileMock(activeFileItem).name,
                 sourceId: activeFileItem.id,
               },
             ])
@@ -2079,78 +1848,86 @@ function PlaygroundExample({
       ) : null}
       {quotesOpen || viewedQuotes ? (
         // The annotations read as messages over the transcript — pending
-        // ones removable, a sent message's read-only — and the way back is
-        // spelled out where the summary line used to be.
-        <div className="absolute inset-0 z-10 flex flex-col bg-background">
-          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto py-2 text-left [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {(viewedQuotes ?? quotes).map((entry, at) => (
-              <AnnotationThread
-                key={entry.id ?? at}
-                quote={entry}
-                selected={!viewedQuotes && selectedQuote === at}
-                onSelect={
-                  viewedQuotes
-                    ? undefined
-                    : () =>
-                        setSelectedQuote((current) =>
-                          current === at ? null : at,
-                        )
-                }
-                onRemove={
-                  viewedQuotes
-                    ? undefined
-                    : () => {
-                        const next = quotes.filter(
-                          (_, index2) => index2 !== at,
-                        )
-                        setQuotes(next)
-                        setSelectedQuote(null)
-                        if (next.length === 0) setQuotesOpen(false)
-                      }
-                }
-                onOpenSource={
-                  entry.sourceId && slashItemForId(entry.sourceId)
-                    ? () => {
-                        setQuotesOpen(false)
-                        setViewedQuotes(null)
-                        setSelectedQuote(null)
-                        openChipPreview(slashItemForId(entry.sourceId!)!, false)
-                      }
-                    : undefined
-                }
-                onEditComment={
-                  viewedQuotes
-                    ? undefined
-                    : (index, text) =>
-                        setQuotes((current) =>
-                          current.map((quote, index2) =>
-                            index2 === at
-                              ? {
-                                  ...quote,
-                                  comments: quote.comments?.map(
-                                    (comment, index3) =>
-                                      index3 === index ? text : comment,
-                                  ),
-                                }
-                              : quote,
-                          ),
-                        )
-                }
-              />
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setQuotesOpen(false)
-              setViewedQuotes(null)
-              setSelectedQuote(null)
-            }}
-            className="mx-auto shrink-0 cursor-pointer rounded-full border-0 bg-transparent px-3 py-1.5 font-sans nessa-text-2 font-medium text-(--nessa-chat-accent) outline-none hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          >
-            Back to chat
-          </button>
-        </div>
+        // ones removable, a sent message's read-only — while the tab strip
+        // and the pill stay live around the reading view.
+        <ChatOverlay
+          label="Annotations"
+          onClose={() => {
+            setQuotesOpen(false)
+            setViewedQuotes(null)
+            setSelectedQuote(null)
+          }}
+        >
+          <ChatOverlayBody>
+            <ChatAnnotationList>
+              {(viewedQuotes ?? quotes).map((entry, at) => (
+                <ChatAnnotationThread
+                  key={entry.id}
+                  annotation={entry}
+                  selected={!viewedQuotes && selectedQuote === at}
+                  onSelect={
+                    viewedQuotes
+                      ? undefined
+                      : () =>
+                          setSelectedQuote((current) =>
+                            current === at ? null : at,
+                          )
+                  }
+                  onRemove={
+                    viewedQuotes
+                      ? undefined
+                      : () => {
+                          const next = quotes.filter(
+                            (_, index2) => index2 !== at,
+                          )
+                          setQuotes(next)
+                          setSelectedQuote(null)
+                          if (next.length === 0) setQuotesOpen(false)
+                        }
+                  }
+                  onOpenSource={
+                    entry.sourceId && slashItemForId(entry.sourceId)
+                      ? () => {
+                          setQuotesOpen(false)
+                          setViewedQuotes(null)
+                          setSelectedQuote(null)
+                          openChipPreview(
+                            slashItemForId(entry.sourceId!)!,
+                            false,
+                          )
+                        }
+                      : undefined
+                  }
+                  onEditComment={
+                    viewedQuotes
+                      ? undefined
+                      : (index: number, text: string) =>
+                          setQuotes((current) =>
+                            current.map((quote, index2) =>
+                              index2 === at
+                                ? {
+                                    ...quote,
+                                    comments: quote.comments?.map(
+                                      (comment, index3) =>
+                                        index3 === index ? text : comment,
+                                    ),
+                                  }
+                                : quote,
+                            ),
+                          )
+                  }
+                >
+                  {/* The kit's markdown renderer in the passage bubble:
+                      pasted markdown and lifted prose both read formatted. */}
+                  <MessageMarkdown className="leading-5">
+                    {entry.text}
+                  </MessageMarkdown>
+                </ChatAnnotationThread>
+              ))}
+            </ChatAnnotationList>
+          </ChatOverlayBody>
+          <ChatOverlayBack />
+        </ChatOverlay>
       ) : null}
       </div>
       {modelCardOpen ? (
@@ -2164,42 +1941,26 @@ function PlaygroundExample({
           onClose={() => setModelCardOpen(false)}
         />
       ) : null}
-      {quotes.length > 0 && !quotesOpen && !viewedQuotes && !overlay ? (
-        // One quote pill stands for the whole set — it, or "+ N other",
-        // opens the full list over the transcript.
-        <div className="flex max-w-full items-center gap-1.5 self-start">
-          <button
-            type="button"
-            title={
-              quotes[0]!.comments?.length
-                ? `${quotes[0]!.comments[0]} — “${quotes[0]!.text}”`
-                : quotes[0]!.text
-            }
-            aria-label={`Quoted selection: ${quotes[0]!.text}`}
-            onClick={() => setQuotesOpen(true)}
-            className="inline-flex min-w-0 cursor-pointer items-center rounded-full border-0 bg-transparent p-0 text-start font-sans outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          >
-            <ChatMessageQuote className="m-0 inline-block max-w-52 truncate whitespace-nowrap">
-              {quotes[0]!.comments?.[0] ?? quotes[0]!.text}
-            </ChatMessageQuote>
-          </button>
-          {quotes.length > 1 ? (
-            <button
-              type="button"
-              onClick={() => setQuotesOpen(true)}
-              className="shrink-0 cursor-pointer whitespace-nowrap rounded-full border-0 bg-transparent p-0 font-sans nessa-text-1 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            >
-              + {quotes.length - 1} other{quotes.length > 2 ? "s" : ""}
-            </button>
-          ) : null}
-          <HoverAction
-            label="Discard quoted selections"
-            onClick={() => setQuotes([])}
-          >
-            <X aria-hidden="true" />
-          </HoverAction>
-        </div>
-      ) : null}
+      {quotesOpen || viewedQuotes || overlay ? null : (
+        // Everything waiting to travel with the next message rides one row:
+        // one chip stands for the set and the rest collapse into a count
+        // that opens the full list over the transcript.
+        <ChatTray
+          className="self-start"
+          label="Attached to this message"
+          items={quotes.map((quote) => ({
+            id: quote.id,
+            kind: "quote" as const,
+            label: quote.comments?.[0] ?? quote.text,
+            detail: quote.comments?.length
+              ? `${quote.comments[0]} — “${quote.text}”`
+              : quote.text,
+          }))}
+          onOpenItem={() => setQuotesOpen(true)}
+          onOpenAll={() => setQuotesOpen(true)}
+          onClear={() => setQuotes([])}
+        />
+      )}
       {fileTabs[activeTabId] ? null : (
       <PillComposer
         generating={generating}
@@ -3142,14 +2903,14 @@ export const Annotations: Story = {
       canvas.getByText(/machine-readable variant/),
     ).toBeInTheDocument()
     await expect(
-      canvas.getAllByRole("button", { name: "Discard quoted selection" }),
+      canvas.getAllByRole("button", { name: "Discard annotation" }),
     ).toHaveLength(8)
     // Removing one keeps the list live.
     await userEvent.click(
-      canvas.getAllByRole("button", { name: "Discard quoted selection" })[1]!,
+      canvas.getAllByRole("button", { name: "Discard annotation" })[1]!,
     )
     await expect(
-      canvas.getAllByRole("button", { name: "Discard quoted selection" }),
+      canvas.getAllByRole("button", { name: "Discard annotation" }),
     ).toHaveLength(7)
     await userEvent.click(canvas.getByRole("button", { name: "Back to chat" }))
     await expect(

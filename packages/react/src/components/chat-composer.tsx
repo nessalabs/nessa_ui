@@ -6,9 +6,12 @@ import {
   AtSign,
   Box,
   ClipboardType,
+  Folder,
+  Image,
   LoaderCircle,
   Paperclip,
   Puzzle,
+  TextQuote,
   X,
 } from "lucide-react"
 import { Popover } from "radix-ui"
@@ -496,6 +499,9 @@ export type ChatComposerAttachmentKind =
   | "plugin"
   | "pasted-text"
   | "file"
+  | "photo"
+  | "folder"
+  | "quote"
   | "mention"
 
 const attachmentKindIcons: Record<
@@ -506,6 +512,9 @@ const attachmentKindIcons: Record<
   plugin: Puzzle,
   "pasted-text": ClipboardType,
   file: Paperclip,
+  photo: Image,
+  folder: Folder,
+  quote: TextQuote,
   mention: AtSign,
 }
 

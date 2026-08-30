@@ -402,7 +402,10 @@ export {
   ChatAttachmentTile,
   ChatAttachmentViewer,
   ChatBubble,
+  ChatBubbleEditor,
   ChatMessage,
+  ChatMessageAction,
+  ChatMessageActions,
   ChatMessageQuote,
   ChatMessageReceipt,
   ChatReactionPicker,
@@ -411,6 +414,7 @@ export {
   type ChatAttachmentStackProps,
   type ChatAttachmentTileProps,
   type ChatAttachmentViewerProps,
+  type ChatBubbleEditorProps,
   type ChatBubbleProps,
   type ChatMessageProps,
   type ChatMessageTone,
@@ -421,8 +425,33 @@ export {
 export {
   ChatTabs,
   type ChatTabItem,
+  type ChatTabKind,
   type ChatTabsProps,
 } from "./components/chat-tabs"
+export {
+  ChatOverlay,
+  ChatOverlayBack,
+  ChatOverlayBody,
+  ChatOverlaySummary,
+  useChatOverlay,
+  type ChatOverlayProps,
+} from "./components/chat-overlay"
+export {
+  ChatAnnotationBadge,
+  ChatAnnotationComment,
+  ChatAnnotationList,
+  ChatAnnotationThread,
+  type ChatAnnotation,
+  type ChatAnnotationBadgeProps,
+  type ChatAnnotationThreadProps,
+} from "./components/chat-annotations"
+export {
+  ChatTray,
+  ChatTrayChip,
+  type ChatTrayChipProps,
+  type ChatTrayItem,
+  type ChatTrayProps,
+} from "./components/chat-tray"
 export {
   PillComposer,
   PillComposerRow,

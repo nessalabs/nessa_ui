@@ -1,16 +1,33 @@
 "use client"
 
 import * as React from "react"
-import { Plus, X } from "lucide-react"
+import { ChevronLeft, Plus, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
 const chatTabsFocusClassName =
   "outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
 
+export type ChatTabKind = "conversation" | "subagent" | "file"
+
 export interface ChatTabItem {
   id: string
   title: string
+  /**
+   * What the tab holds. A chat window's tabs are not all conversations —
+   * a subagent's own transcript and an opened document sit in the same
+   * strip — and hosts style and test against the exposed `data-kind`.
+   * Defaults to `conversation`.
+   */
+  kind?: ChatTabKind
+  /**
+   * The tab this one was opened from — the conversation that spawned a
+   * subagent, the chat a document was opened out of. It makes the tab its
+   * own way back: while it is the active tab, hovering swaps its glyph for
+   * a back chevron and selecting it again returns to the parent, so a
+   * drilled-into tab needs no separate back control in the view below.
+   */
+  parentId?: string
   /** A leading glyph; the tab owns its size and color. */
   icon?: React.ReactNode
   /** Shows the close control and lets `onClose` remove the tab. */
@@ -40,6 +57,11 @@ export interface ChatTabsProps
   newTabLabel?: string
   /** The accessible name announced for the tab list. */
   label?: string
+  /**
+   * Names the back gesture in a drilled-into tab's tooltip, given the parent
+   * tab's title. Defaults to `Back to <parent title>`.
+   */
+  backLabel?: (parentTitle: string) => string
   /** Pinned after the new-tab control, outside the scrolling track. */
   trailing?: React.ReactNode
 }
@@ -62,6 +84,7 @@ function ChatTabs({
   onNew,
   newTabLabel = "New tab",
   label = "Chat tabs",
+  backLabel = (parentTitle: string) => `Back to ${parentTitle}`,
   trailing,
   className,
   ...props
@@ -101,11 +124,21 @@ function ChatTabs({
         {tabs.map((tab, index) => {
           const active = tab.id === value
           const badgeCount = Math.max(0, tab.badgeCount ?? 0)
+          // A tab opened out of another carries its way back. The gesture
+          // only exists on the tab the reader is already inside: selecting a
+          // tab you are not in has an obvious meaning, and overloading that
+          // would take it away.
+          const parent =
+            tab.parentId === undefined
+              ? undefined
+              : tabs.find((candidate) => candidate.id === tab.parentId)
+          const goesBack = active && parent !== undefined
           return (
             <span
               key={tab.id}
               role="presentation"
               data-slot="chat-tab"
+              data-kind={tab.kind ?? "conversation"}
               data-active={active || undefined}
               className={cn(
                 "relative inline-flex max-w-56 shrink-0 items-center rounded-full border transition-[background-color,border-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
@@ -134,8 +167,8 @@ function ChatTabs({
                 aria-controls={`chat-tab-panel-${tab.id}`}
                 tabIndex={active || (!hasActiveTab && index === 0) ? 0 : -1}
                 aria-label={tab.title}
-                title={tab.title}
-                onClick={() => onValueChange(tab.id)}
+                title={goesBack ? backLabel(parent.title) : tab.title}
+                onClick={() => onValueChange(goesBack ? parent.id : tab.id)}
                 onKeyDown={(event) => {
                   if (
                     ["ArrowLeft", "ArrowRight", "Home", "End"].includes(
@@ -174,12 +207,35 @@ function ChatTabs({
                   chatTabsFocusClassName,
                 )}
               >
-                {tab.icon ? (
+                {tab.icon || goesBack ? (
                   <span
                     aria-hidden="true"
-                    className="flex shrink-0 items-center justify-center [&_svg]:size-3.5"
+                    className="relative flex size-3.5 shrink-0 items-center justify-center [&_svg]:size-3.5"
                   >
-                    {tab.icon}
+                    {tab.icon ? (
+                      <span
+                        className={cn(
+                          "flex items-center justify-center",
+                          // The glyph steps aside for the back chevron
+                          // while the pointer is on the tab it belongs to.
+                          goesBack &&
+                            "[[data-slot=chat-tab]:hover_&]:opacity-0",
+                        )}
+                      >
+                        {tab.icon}
+                      </span>
+                    ) : null}
+                    {goesBack ? (
+                      <ChevronLeft
+                        aria-hidden="true"
+                        className={cn(
+                          "absolute inset-0 m-auto text-foreground",
+                          tab.icon
+                            ? "hidden [[data-slot=chat-tab]:hover_&]:block"
+                            : undefined,
+                        )}
+                      />
+                    ) : null}
                   </span>
                 ) : null}
                 <span className="min-w-0 truncate">{tab.title}</span>
