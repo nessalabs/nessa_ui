@@ -33,9 +33,13 @@ function SheetExample({
         <Sheet label="Queued" onClose={() => setOpen(false)}>
           <SheetHandle />
           <SheetHeader>
-            {action ? null : <SheetClose />}
+            <SheetExpand />
             <SheetTitle>Queued</SheetTitle>
-            {action ? <SheetAction>Done</SheetAction> : null}
+            {action ? (
+              <SheetAction>Done</SheetAction>
+            ) : (
+              <SheetClose className="col-start-3 justify-self-end" />
+            )}
           </SheetHeader>
           <SheetBody>
             <p className="m-0 font-sans nessa-text-4 text-foreground">
@@ -71,7 +75,7 @@ type Story = StoryObj<typeof meta>
 
 export const Playground: Story = {
   parameters: storyDocumentation(
-    "Open the sheet from the host button. The circular close control and Escape both dismiss it, and focus returns to the opener.",
+    "Open the sheet from the host button. Expand fills the ancestor; the circular close control and Escape both dismiss it, and focus returns to the opener.",
   ),
   render: () => <SheetExample />,
   play: async ({ canvasElement }) => {

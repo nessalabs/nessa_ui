@@ -261,7 +261,7 @@ function ComposerQueueItem({
           ? "grid-cols-[1.75rem_minmax(0,1fr)_auto]"
           : "grid-cols-[minmax(0,1fr)_auto]",
         plain
-          ? "items-start bg-transparent px-5 py-3.5"
+          ? "items-start bg-transparent px-6 py-3.5"
           : "items-center bg-card px-2 py-1.5",
         Boolean(transition) && "[transition:var(--composer-queue-sort-transition)]",
         className,
