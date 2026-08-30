@@ -1,6 +1,6 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { expect, userEvent, waitFor, within } from "storybook/test"
+import { expect, fireEvent, userEvent, waitFor, within } from "storybook/test"
 import {
   Sheet,
   SheetAction,
@@ -60,7 +60,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A bottom sheet that rises over its nearest positioned ancestor: a modal dialog with a backdrop, a grab bar, a header of close or expand plus a centered title and optional Done, and a scrolling body. The drawer lifts a short way from the bottom on open; SheetExpand interpolates height into a filled extra-details surface over the same ancestor, and Minimize recedes it. Escape, the backdrop, SheetClose, and SheetAction all dismiss it. Focus moves into the panel on open and returns to the opener on close; siblings it covers go inert. Pass modal={false} for a contained extra-details surface that leaves surrounding chrome reachable.",
+          "A bottom sheet that rises over its nearest positioned ancestor: a modal dialog with a backdrop, a grab bar, a header of close or expand plus a centered title and optional Done, and a scrolling body. The drawer lifts a short way from the bottom on open; dragging the grab bar up (or SheetExpand) interpolates height into a filled extra-details surface over the same ancestor, and dragging down or Minimize recedes it. Escape, the backdrop, SheetClose, and SheetAction all dismiss it. Focus moves into the panel on open and returns to the opener on close; siblings it covers go inert. Pass modal={false} for a contained extra-details surface that leaves surrounding chrome reachable.",
       },
     },
   },
@@ -93,7 +93,7 @@ export const Playground: Story = {
 
 export const ExpandToggle: Story = {
   parameters: storyDocumentation(
-    "SheetExpand grows the drawer into a filled extra-details surface over the same ancestor; Minimize recedes it. Escape and Done still dismiss.",
+    "SheetExpand grows the drawer into a filled extra-details surface over the same ancestor; Minimize recedes it. Dragging the grab bar up expands and dragging it down minimizes. Escape and Done still dismiss.",
   ),
   render: () => {
     function ExpandExample() {
@@ -138,6 +138,54 @@ export const ExpandToggle: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Expand" }))
     await expect(dialog).toHaveAttribute("data-expanded", "true")
     await userEvent.click(canvas.getByRole("button", { name: "Minimize" }))
+    await expect(dialog).toHaveAttribute("data-expanded", "false")
+    const grab = canvasElement.querySelector<HTMLElement>(
+      "[data-slot=sheet-handle]",
+    )!
+    const grabY = grab.getBoundingClientRect().top + 4
+    fireEvent.pointerDown(grab, {
+      pointerId: 1,
+      pointerType: "touch",
+      isPrimary: true,
+      button: 0,
+      buttons: 1,
+      clientY: grabY,
+    })
+    fireEvent.pointerMove(grab, {
+      pointerId: 1,
+      pointerType: "touch",
+      isPrimary: true,
+      buttons: 1,
+      clientY: grabY - 80,
+    })
+    fireEvent.pointerUp(grab, {
+      pointerId: 1,
+      pointerType: "touch",
+      button: 0,
+      clientY: grabY - 80,
+    })
+    await expect(dialog).toHaveAttribute("data-expanded", "true")
+    fireEvent.pointerDown(grab, {
+      pointerId: 2,
+      pointerType: "touch",
+      isPrimary: true,
+      button: 0,
+      buttons: 1,
+      clientY: grabY,
+    })
+    fireEvent.pointerMove(grab, {
+      pointerId: 2,
+      pointerType: "touch",
+      isPrimary: true,
+      buttons: 1,
+      clientY: grabY + 80,
+    })
+    fireEvent.pointerUp(grab, {
+      pointerId: 2,
+      pointerType: "touch",
+      button: 0,
+      clientY: grabY + 80,
+    })
     await expect(dialog).toHaveAttribute("data-expanded", "false")
     await userEvent.click(canvas.getByRole("button", { name: "Done" }))
     await expect(

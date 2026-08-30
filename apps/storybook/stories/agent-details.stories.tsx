@@ -11,6 +11,7 @@ import {
   Sheet,
   SheetBody,
   SheetClose,
+  SheetExpand,
   SheetHandle,
   SheetHeader,
 } from "@nessa-ui/react"
@@ -37,7 +38,8 @@ function DetailsExample({ openByDefault = false }: { openByDefault?: boolean }) 
         <Sheet label="Agent details" onClose={() => setOpen(false)}>
           <SheetHandle />
           <SheetHeader>
-            <SheetClose />
+            <SheetExpand />
+            <SheetClose className="col-start-3 justify-self-end" />
           </SheetHeader>
           <SheetBody>
             <AgentDetails title="Agent message package implementation">
@@ -89,7 +91,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "The identity of an agent conversation: a title, a row of compact actions (edit, pin, share), and an Info section for the project path, branch, model, runtime, and timestamps. The panel does not own how it is shown — the catalog mounts it in a Sheet, which is the chat window’s details view.",
+          "The identity of an agent conversation: a title, a row of compact actions (edit, pin, share), and an Info section for the project path, branch, model, runtime, and timestamps. The panel does not own how it is shown — the catalog mounts it in a Sheet; Expand and dragging the grab bar fill the chat window.",
       },
     },
   },

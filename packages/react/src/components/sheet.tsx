@@ -112,12 +112,13 @@ export interface SheetProps extends React.ComponentProps<"div"> {
  * SheetExpand, SheetAction, and SheetBody. SheetExpand toggles the drawer
  * into a filled extra-details surface over the same ancestor — the host
  * that positions the transcript (rather than the whole window) keeps its
- * tab strip and composer when the panel expands. The drawer lifts a short
- * way from the bottom on open; expand and minimize interpolate height so
- * the panel grows and recedes in place. Both use the slow duration and
- * standard easing so the motion stays one language. Reduced motion skips
- * them. The sheet draws the chrome and owns dismissal; the host owns what
- * the panel shows.
+ * tab strip and composer when the panel expands. Dragging the grab bar
+ * does the same: up expands, down minimizes or dismisses. The drawer lifts
+ * a short way from the bottom on open; expand and minimize interpolate
+ * height so the panel grows and recedes in place. Both use the slow
+ * duration and standard easing so the motion stays one language. Reduced
+ * motion skips them. The sheet draws the chrome and owns dismissal; the
+ * host owns what the panel shows.
  */
 function Sheet({
   onClose,
@@ -417,16 +418,71 @@ function Sheet({
   )
 }
 
-/** The grab bar that marks the panel as a drawer. Hidden while expanded. */
+const sheetDragThreshold = 48
+
+/** The grab bar that marks the panel as a drawer. Drag up to expand, down to minimize or dismiss. */
 function SheetHandle({ className, ...props }: React.ComponentProps<"div">) {
-  const { expanded } = useSheet()
-  if (expanded) return null
+  const { expanded, setExpanded, close } = useSheet()
+  const startY = React.useRef<number | null>(null)
+
+  const panelFrom = (target: EventTarget | null) =>
+    target instanceof Element
+      ? target.closest<HTMLElement>("[data-slot=sheet-panel]")
+      : null
+
+  const clearTranslate = (panel: HTMLElement | null) => {
+    if (panel) panel.style.translate = ""
+  }
+
   return (
     <div
       aria-hidden="true"
       data-slot="sheet-handle"
-      className={cn("flex shrink-0 justify-center pt-2", className)}
+      className={cn(
+        "flex shrink-0 cursor-grab touch-none justify-center pt-3 pb-1 active:cursor-grabbing",
+        className,
+      )}
       {...props}
+      onPointerDown={(event) => {
+        props.onPointerDown?.(event)
+        if (event.defaultPrevented || event.button !== 0) return
+        startY.current = event.clientY
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId)
+        } catch {
+          // Synthetic pointer events (play tests) have no active pointer id.
+        }
+      }}
+      onPointerMove={(event) => {
+        props.onPointerMove?.(event)
+        if (event.defaultPrevented || startY.current == null) return
+        const dy = event.clientY - startY.current
+        const panel = panelFrom(event.currentTarget)
+        if (!panel) return
+        if (expanded) {
+          panel.style.translate = dy > 0 ? `0 ${dy}px` : ""
+        } else {
+          panel.style.translate = `0 ${dy}px`
+        }
+      }}
+      onPointerUp={(event) => {
+        props.onPointerUp?.(event)
+        if (event.defaultPrevented || startY.current == null) return
+        const dy = event.clientY - startY.current
+        const panel = panelFrom(event.currentTarget)
+        clearTranslate(panel)
+        startY.current = null
+        if (dy <= -sheetDragThreshold) setExpanded(true)
+        else if (dy >= sheetDragThreshold) {
+          if (expanded) setExpanded(false)
+          else close()
+        }
+      }}
+      onPointerCancel={(event) => {
+        props.onPointerCancel?.(event)
+        clearTranslate(panelFrom(event.currentTarget))
+        startY.current = null
+      }}
     >
       <span className="h-1 w-10 rounded-full bg-muted-foreground/50" />
     </div>
@@ -445,7 +501,7 @@ function SheetHeader({ className, ...props }: SheetHeaderProps) {
     <div
       data-slot="sheet-header"
       className={cn(
-        "grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 pb-1 pt-1",
+        "grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 px-5 pb-2 pt-1",
         className,
       )}
       {...props}

@@ -1644,8 +1644,12 @@ function PlaygroundExample({
   // Full text behind each pasted-text chip, keyed by chip id.
   const pastedTexts = React.useRef<Record<string, string>>({})
   /** Shows a full text in the list view — the transcript stays compact. */
-  const openFullText = (text: string) =>
+  const openFullText = (text: string) => {
+    setActivitySheet(null)
+    setQueueOpen(false)
+    setDetailsTabId(null)
     setViewedQuotes([{ id: `full-${nextId.current++}`, text }])
+  }
   // Chips open their file directly: plain press previews in the current
   // tab, a modified press (Cmd/Ctrl) parks the file as its own tab.
   const openChipFromLabel = (label: string, newTab: boolean) => {
@@ -2317,7 +2321,12 @@ function PlaygroundExample({
               const item = slashItemForId(sourceId)
               if (item) openChipPreview(item, false)
             }}
-            onQuotesOpen={setViewedQuotes}
+            onQuotesOpen={(next) => {
+              setActivitySheet(null)
+              setQueueOpen(false)
+              setDetailsTabId(null)
+              setViewedQuotes(next)
+            }}
             onPastedOpen={(chipId) => {
               const full =
                 entry.pasted?.[chipId] ?? pastedTexts.current[chipId]
@@ -2444,44 +2453,7 @@ function PlaygroundExample({
           {overlay.body}
         </ChatAttachmentViewer>
       ) : null}
-      {activitySheet ? (
-        // Thinking and tool calls for one cue open in the extra-details
-        // sheet so the transcript stays a conversation. The sheet fills
-        // this tabpanel (tabs and composer stay).
-        <Sheet
-          id={extraSheetId}
-          label={activitySheet.title}
-          modal={false}
-          onReturnFocus={() => inputRef.current?.focus()}
-          onClose={() => setActivitySheet(null)}
-        >
-          <SheetHandle />
-          <SheetHeader>
-            <SheetExpand />
-            <SheetTitle>{activitySheet.title}</SheetTitle>
-            <SheetAction>Done</SheetAction>
-          </SheetHeader>
-          <SheetBody>
-            {activitySheet.thought ? (
-              <>
-                {activitySheet.thought.summary !== activitySheet.title ? (
-                  <AgentActivityCue>
-                    {activitySheet.thought.summary}
-                  </AgentActivityCue>
-                ) : null}
-                {activitySheet.thought.detail ? (
-                  <p className="m-0 font-sans nessa-text-4 text-foreground">
-                    {activitySheet.thought.detail}
-                  </p>
-                ) : null}
-              </>
-            ) : null}
-            {activitySheet.tools && activitySheet.tools.length > 0 ? (
-              <ActivityToolRows tools={activitySheet.tools} />
-            ) : null}
-          </SheetBody>
-        </Sheet>
-      ) : quotesOpen || viewedQuotes ? (
+      {quotesOpen || viewedQuotes ? (
         // Annotations use the expandable sheet as the extra-details
         // surface: it fills this tabpanel (tabs and composer stay) and
         // Minimize restores a drawer over the transcript. Not modal, so
@@ -2601,8 +2573,18 @@ function PlaygroundExample({
               ? `${quote.comments[0]} — “${quote.text}”`
               : quote.text,
           }))}
-          onOpenItem={() => setQuotesOpen(true)}
-          onOpenAll={() => setQuotesOpen(true)}
+          onOpenItem={() => {
+            setActivitySheet(null)
+            setQueueOpen(false)
+            setDetailsTabId(null)
+            setQuotesOpen(true)
+          }}
+          onOpenAll={() => {
+            setActivitySheet(null)
+            setQueueOpen(false)
+            setDetailsTabId(null)
+            setQuotesOpen(true)
+          }}
           onClear={() => setQuotes([])}
         />
       )}
@@ -2929,6 +2911,43 @@ function PlaygroundExample({
         </ChatComposerTrigger>
       </PillComposer>
       )}
+      {activitySheet ? (
+        // Thinking and tool calls for one cue open as a frame-level sheet
+        // so Expand and a drag-up on the grab bar fill the chat window,
+        // the same extra-details surface as the queue.
+        <Sheet
+          id={extraSheetId}
+          label={activitySheet.title}
+          onReturnFocus={() => inputRef.current?.focus()}
+          onClose={() => setActivitySheet(null)}
+        >
+          <SheetHandle />
+          <SheetHeader>
+            <SheetExpand />
+            <SheetTitle>{activitySheet.title}</SheetTitle>
+            <SheetAction>Done</SheetAction>
+          </SheetHeader>
+          <SheetBody>
+            {activitySheet.thought ? (
+              <>
+                {activitySheet.thought.summary !== activitySheet.title ? (
+                  <AgentActivityCue>
+                    {activitySheet.thought.summary}
+                  </AgentActivityCue>
+                ) : null}
+                {activitySheet.thought.detail ? (
+                  <p className="m-0 font-sans nessa-text-4 text-foreground">
+                    {activitySheet.thought.detail}
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+            {activitySheet.tools && activitySheet.tools.length > 0 ? (
+              <ActivityToolRows tools={activitySheet.tools} />
+            ) : null}
+          </SheetBody>
+        </Sheet>
+      ) : null}
       {detailsTabId ? (
         <Sheet
           id={detailsSheetId}
@@ -2938,7 +2957,8 @@ function PlaygroundExample({
         >
           <SheetHandle />
           <SheetHeader>
-            <SheetClose />
+            <SheetExpand />
+            <SheetClose className="col-start-3 justify-self-end" />
           </SheetHeader>
           <SheetBody>
             <AgentDetails
@@ -3641,7 +3661,7 @@ export const Playground: Story = {
 export const AgentSurfaces: Story = {
   tags: ["reduced-motion"],
   parameters: storyDocumentation(
-    "The playground opened on the Agent message tab: exploring cues collapse tool work and carry the conversation agent’s RandomAvatar (still when the run is done; busy while Exploring…), clicking a cue opens that beat’s thinking and tool calls in the extra-details sheet (not inline), a named-task card uses the explorer’s busy avatar, Queued 2 opens the follow-up sheet where rows drag to reorder (Expand fills the window), right-clicking the tab offers View Details (project, model, runtime), and /history opens a History tab whose roster leads with project-seeded avatars so conversations in the same project share a painting.",
+    "The playground opened on the Agent message tab: exploring cues collapse tool work and carry the conversation agent’s RandomAvatar (still when the run is done; busy while Exploring…), clicking a cue opens that beat’s thinking and tool calls in a frame-level extra-details sheet (Expand and drag-up fill the chat window), a named-task card uses the explorer’s busy avatar, Queued 2 opens the follow-up sheet where rows drag to reorder, right-clicking the tab offers View Details (project, model, runtime), and /history opens a History tab whose roster leads with project-seeded avatars so conversations in the same project share a painting.",
   ),
   render: () => <PlaygroundExample initialTabId={agentTabId} />,
   play: async ({ canvasElement }) => {
@@ -3668,6 +3688,11 @@ export const AgentSurfaces: Story = {
         canvas.getByText(/the playground already has toolcall rows/i),
       ).toBeVisible(),
     )
+    await expect(thoughtDialog).toHaveAttribute("aria-modal", "true")
+    await userEvent.click(canvas.getByRole("button", { name: "Expand" }))
+    await expect(thoughtDialog).toHaveAttribute("data-expanded", "true")
+    await userEvent.click(canvas.getByRole("button", { name: "Minimize" }))
+    await expect(thoughtDialog).toHaveAttribute("data-expanded", "false")
     await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
     await userEvent.click(canvas.getByRole("button", { name: "Done" }))
     await expect(
@@ -3679,11 +3704,15 @@ export const AgentSurfaces: Story = {
     await userEvent.click(cue)
     const activityDialog = canvas.getByRole("dialog", { name: agentExplored })
     await waitFor(() => expect(activityDialog).toBeVisible())
-    await expect(activityDialog).not.toHaveAttribute("aria-modal")
+    await expect(activityDialog).toHaveAttribute("aria-modal", "true")
     await expect(cue).toHaveAttribute("aria-expanded", "true")
     await waitFor(() =>
       expect(canvas.getByRole("button", { name: /read/i })).toBeVisible(),
     )
+    await userEvent.click(canvas.getByRole("button", { name: "Expand" }))
+    await expect(activityDialog).toHaveAttribute("data-expanded", "true")
+    await userEvent.click(canvas.getByRole("button", { name: "Minimize" }))
+    await expect(activityDialog).toHaveAttribute("data-expanded", "false")
     await userEvent.click(canvas.getByRole("button", { name: "Done" }))
     await expect(
       canvas.queryByRole("dialog", { name: agentExplored }),
