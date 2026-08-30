@@ -23,9 +23,13 @@ export interface ChatTabItem {
   /**
    * The tab this one was opened from — the conversation that spawned a
    * subagent, the chat a document was opened out of. It makes the tab its
-   * own way back: while it is the active tab, hovering swaps its glyph for
-   * a back chevron and selecting it again returns to the parent, so a
-   * drilled-into tab needs no separate back control in the view below.
+   * own way back: while it is the active tab, hovering or focusing it swaps
+   * its glyph for a back chevron and selecting it again reports the parent's
+   * id, so a drilled-into tab needs no separate back control in the view
+   * below. The tab says so: its accessible name becomes the back label while
+   * the gesture is live, and it exposes `data-goes-back`. A parent that is
+   * no longer in `tabs` withdraws the gesture, so hosts that close tabs
+   * should re-point the children of a closed tab at its own parent.
    */
   parentId?: string
   /** A leading glyph; the tab owns its size and color. */
@@ -166,8 +170,9 @@ function ChatTabs({
                 aria-busy={tab.loading || undefined}
                 aria-controls={`chat-tab-panel-${tab.id}`}
                 tabIndex={active || (!hasActiveTab && index === 0) ? 0 : -1}
-                aria-label={tab.title}
+                aria-label={goesBack ? backLabel(parent.title) : tab.title}
                 title={goesBack ? backLabel(parent.title) : tab.title}
+                data-goes-back={goesBack || undefined}
                 onClick={() => onValueChange(goesBack ? parent.id : tab.id)}
                 onKeyDown={(event) => {
                   if (
@@ -219,7 +224,7 @@ function ChatTabs({
                           // The glyph steps aside for the back chevron
                           // while the pointer is on the tab it belongs to.
                           goesBack &&
-                            "[[data-slot=chat-tab]:hover_&]:opacity-0",
+                            "[[data-slot=chat-tab]:hover_&]:opacity-0 [[data-slot=chat-tab]:has(:focus-visible)_&]:opacity-0",
                         )}
                       >
                         {tab.icon}
@@ -231,7 +236,7 @@ function ChatTabs({
                         className={cn(
                           "absolute inset-0 m-auto text-foreground",
                           tab.icon
-                            ? "hidden [[data-slot=chat-tab]:hover_&]:block"
+                            ? "hidden [[data-slot=chat-tab]:hover_&]:block [[data-slot=chat-tab]:has(:focus-visible)_&]:block"
                             : undefined,
                         )}
                       />

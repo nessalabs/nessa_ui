@@ -37,10 +37,38 @@ export interface ChatTrayChipProps
 
 /**
  * One pending item, as a compact chip: kind glyph, truncated label, and the
- * full text on hover. It is a button whenever the host gives it an `onClick`,
- * so a chip can open what it stands for.
+ * full text on hover. With an `onClick` it is a button, so a chip can open
+ * what it stands for; without one it is inert text rather than a focus stop
+ * that does nothing.
  */
 function ChatTrayChip({ item, className, ...props }: ChatTrayChipProps) {
+  const content = (
+    <>
+      <ChatComposerAttachmentIcon
+        kind={item.kind}
+        icon={item.icon}
+        className="size-3"
+      />
+      <span className="min-w-0 truncate">{item.label}</span>
+    </>
+  )
+  const chipClassName = cn(
+    "inline-flex min-w-0 max-w-52 shrink-0 items-center gap-1 rounded-2xl border border-border bg-transparent px-3 py-1 font-sans nessa-text-2 leading-4 text-muted-foreground transition-colors",
+    className,
+  )
+  if (!props.onClick) {
+    return (
+      <span
+        data-slot="chat-tray-chip"
+        data-kind={item.kind}
+        title={item.detail ?? item.label}
+        className={chipClassName}
+        {...(props as React.HTMLAttributes<HTMLSpanElement>)}
+      >
+        {content}
+      </span>
+    )
+  }
   return (
     <button
       type="button"
@@ -48,18 +76,13 @@ function ChatTrayChip({ item, className, ...props }: ChatTrayChipProps) {
       data-kind={item.kind}
       title={item.detail ?? item.label}
       className={cn(
-        "inline-flex min-w-0 max-w-52 shrink-0 cursor-pointer items-center gap-1 rounded-2xl border border-border bg-transparent px-3 py-1 font-sans nessa-text-2 leading-4 text-muted-foreground transition-colors hover:text-foreground",
+        chipClassName,
+        "cursor-pointer hover:text-foreground",
         chatTrayFocusClassName,
-        className,
       )}
       {...props}
     >
-      <ChatComposerAttachmentIcon
-        kind={item.kind}
-        icon={item.icon}
-        className="size-3"
-      />
-      <span className="min-w-0 truncate">{item.label}</span>
+      {content}
     </button>
   )
 }
@@ -110,6 +133,7 @@ function ChatTray({
   return (
     <div
       data-slot="chat-tray"
+      role="group"
       aria-label={label}
       className={cn("flex max-w-full items-center gap-1.5", className)}
       {...props}

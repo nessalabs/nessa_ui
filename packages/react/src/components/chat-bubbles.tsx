@@ -183,7 +183,12 @@ export interface ChatBubbleProps
    * clamped text activatable.
    */
   clampLines?: 2 | 3 | 4 | 5 | 6
-  /** Opens the full text of a clamped bubble. Ignored without `clampLines`. */
+  /**
+   * Opens the full text of a clamped bubble. Ignored without `clampLines`,
+   * and ignored alongside `onSelect`: a bubble that is itself a control
+   * cannot nest one, so a selectable bubble still clamps but hands its
+   * expand affordance to the message's ChatMessageActions row instead.
+   */
   onExpand?: () => void
 }
 
@@ -292,7 +297,10 @@ function ChatBubble({
   ) : null
   // A clamped bubble reads as a preview of itself: the text truncates at the
   // line cap and a chevron points at the reading view the host opens.
-  const expand = clampLines === undefined ? undefined : onExpand
+  // Nesting a control inside the bubble-as-button would be invalid content
+  // and a second tab stop for one visual control.
+  const expand =
+    clampLines === undefined || onSelect !== undefined ? undefined : onExpand
   const content =
     clampLines === undefined ? (
       children
@@ -441,8 +449,15 @@ function ChatMessageActions({
     <div
       data-slot="chat-message-actions"
       className={cn(
-        "absolute top-full z-10 flex items-center gap-0.5 pt-0.5 transition-opacity",
-        tone === "sent" ? "right-0" : "left-0",
+        // With a fine pointer the row hangs under the bubble so the
+        // transcript's rhythm never shifts as it appears. On touch, where it
+        // is always visible, it takes real space instead — overlaying there
+        // would put its controls on top of the next message.
+        "flex items-center gap-0.5 pt-0.5 transition-opacity",
+        "[@media(hover:hover)_and_(pointer:fine)]:absolute [@media(hover:hover)_and_(pointer:fine)]:top-full [@media(hover:hover)_and_(pointer:fine)]:z-10",
+        tone === "sent"
+          ? "self-end [@media(hover:hover)_and_(pointer:fine)]:right-0"
+          : "self-start [@media(hover:hover)_and_(pointer:fine)]:left-0",
         // A receipt dropped in this row sheds the standing spacing it needs
         // when it sits directly under a bubble.
         "[&>[data-slot=chat-message-receipt]]:mt-0 [&>[data-slot=chat-message-receipt]]:pe-1",
@@ -477,13 +492,18 @@ function ChatMessageAction({
 export interface ChatBubbleEditorProps
   extends Omit<
     React.ComponentProps<"textarea">,
-    "value" | "defaultValue" | "onChange" | "rows"
+    "value" | "defaultValue" | "onChange" | "rows" | "ref"
   > {
   /** The message text to edit; the caret opens after its last character. */
   defaultValue: string
   /** Commits the trimmed draft. Empty drafts cancel instead. */
   onSave: (text: string) => void
-  /** Leaves edit mode unchanged — Escape, blur, and empty saves call it. */
+  /**
+   * Leaves edit mode unchanged. Escape, an empty save, and losing focus all
+   * call it — clicking away discards the draft rather than keeping a half-
+   * edited message alive, so a host that needs a confirmation step should
+   * own its own editing surface.
+   */
   onCancel: () => void
 }
 

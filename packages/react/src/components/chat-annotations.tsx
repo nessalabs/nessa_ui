@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Pencil, X } from "lucide-react"
+import { MessageSquareReply, Pencil, X } from "lucide-react"
 
 import {
   ChatBubble,
@@ -54,8 +54,16 @@ export interface ChatAnnotationThreadProps
   annotation: ChatAnnotation
   /** Marks this annotation as the one a follow-up comment attaches to. */
   selected?: boolean
-  /** Selects (or deselects) this annotation. Also makes the passage pressable. */
+  /**
+   * Selects (or deselects) this annotation — typically to say that the next
+   * comment attaches here. Pressing the passage does it for pointer users,
+   * and a reply control beside the thread carries the same action with its
+   * pressed state, since the passage can hold host content of its own and
+   * must not become a control wrapped around other controls.
+   */
   onSelect?: () => void
+  /** Names the reply control for assistive technology. */
+  selectLabel?: string
   /** Discards the annotation. Omit in read-only views. */
   onRemove?: () => void
   /** Opens the document the passage came from. Needs `sourceLabel` to show. */
@@ -70,6 +78,7 @@ function ChatAnnotationThread({
   annotation,
   selected = false,
   onSelect,
+  selectLabel = "Reply to this annotation",
   onRemove,
   onOpenSource,
   onEditComment,
@@ -92,22 +101,11 @@ function ChatAnnotationThread({
       >
         <ChatMessage tone="received" className="max-w-full">
           <ChatBubble
-            role={onSelect ? "button" : undefined}
-            tabIndex={onSelect ? 0 : undefined}
+            // Pointer convenience only: the passage renders host content —
+            // markdown with its own links — so it must not be a control. The
+            // reply action beside the thread is the real, focusable one.
             onClick={onSelect}
-            onKeyDown={
-              onSelect
-                ? (event) => {
-                    if (event.key !== "Enter" && event.key !== " ") return
-                    event.preventDefault()
-                    onSelect()
-                  }
-                : undefined
-            }
-            className={cn(
-              "px-4 py-2.5",
-              onSelect && cn("cursor-pointer", chatAnnotationsFocusClassName),
-            )}
+            className={cn("px-4 py-2.5", onSelect && "cursor-pointer")}
           >
             {children ?? annotation.text}
           </ChatBubble>
@@ -141,15 +139,27 @@ function ChatAnnotationThread({
           </ChatMessage>
         ))}
       </div>
-      {onRemove ? (
-        <span className="mt-1.5 shrink-0">
-          <ChatMessageAction
-            aria-label="Discard annotation"
-            title="Discard annotation"
-            onClick={onRemove}
-          >
-            <X aria-hidden="true" />
-          </ChatMessageAction>
+      {onSelect || onRemove ? (
+        <span className="mt-1.5 flex shrink-0 flex-col gap-0.5">
+          {onSelect ? (
+            <ChatMessageAction
+              aria-label={selectLabel}
+              title={selectLabel}
+              aria-pressed={selected}
+              onClick={onSelect}
+            >
+              <MessageSquareReply aria-hidden="true" />
+            </ChatMessageAction>
+          ) : null}
+          {onRemove ? (
+            <ChatMessageAction
+              aria-label="Discard annotation"
+              title="Discard annotation"
+              onClick={onRemove}
+            >
+              <X aria-hidden="true" />
+            </ChatMessageAction>
+          ) : null}
         </span>
       ) : null}
     </div>
@@ -208,6 +218,7 @@ function ChatAnnotationList({
   return (
     <div
       data-slot="chat-annotation-list"
+      role="group"
       aria-label={ariaLabel}
       className={cn("flex flex-col gap-2", className)}
       {...props}

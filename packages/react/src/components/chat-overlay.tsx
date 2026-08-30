@@ -27,6 +27,14 @@ export interface ChatOverlayProps extends React.ComponentProps<"div"> {
   onClose: () => void
   /** The accessible name of the dialog. */
   label?: string
+  /**
+   * Puts focus back where it belongs on close, when the control that opened
+   * the overlay is gone by then — a chip that hides while its view is open,
+   * a message that scrolled out of a virtualized list. The overlay returns
+   * focus to its opener whenever that element is still in the document, and
+   * calls this instead when it is not.
+   */
+  onReturnFocus?: () => void
 }
 
 /**
@@ -36,13 +44,21 @@ export interface ChatOverlayProps extends React.ComponentProps<"div"> {
  * tab strip and composer visible and usable while the overlay is open. That
  * is the difference from ChatAttachmentViewer, which owns its own grid and
  * back control; this is the bare surface for reading views such as pending
- * annotations, a previewed file, or one message's full text. Escape closes
- * it, focus is trapped inside while it is open and returns to the opener on
- * close, and the fade honors reduced motion.
+ * annotations, a previewed file, or one message's full text.
+ *
+ * It is deliberately not a modal dialog. Focus moves into the view when it
+ * opens and returns to the control that opened it on close, but Tab is not
+ * trapped and nothing outside is hidden — the tab strip and composer beside
+ * it stay in use, which is the whole point of taking over the transcript
+ * rather than the window. ChatAttachmentViewer is the modal sibling, for
+ * views that should take everything. Escape closes the view from inside it,
+ * after any control that wants the keystroke first has had it, and the fade
+ * honors reduced motion.
  */
 function ChatOverlay({
   onClose,
   label = "Conversation view",
+  onReturnFocus,
   className,
   children,
   ...props
@@ -70,8 +86,10 @@ function ChatOverlay({
   // on their identity would re-capture the opener and yank focus back to the
   // first control on every parent render.
   const onCloseRef = React.useRef(onClose)
+  const onReturnFocusRef = React.useRef(onReturnFocus)
   React.useEffect(() => {
     onCloseRef.current = onClose
+    onReturnFocusRef.current = onReturnFocus
   })
   const close = React.useCallback(() => onCloseRef.current(), [])
   const context = React.useMemo(() => ({ close }), [close])
@@ -79,56 +97,45 @@ function ChatOverlay({
     const node = ref.current
     const ownerDocument = node?.ownerDocument
     if (!node || !ownerDocument) return
+    // The view takes over the reading area, so focus moves into it — but it
+    // does not trap Tab: the chat around it stays reachable, which is the
+    // whole point of taking over the transcript rather than the window.
     const opener =
       ownerDocument.activeElement instanceof HTMLElement
         ? ownerDocument.activeElement
         : null
-    const focusables = () =>
-      Array.from(
-        node.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-        ),
-      ).filter((element) => !element.hasAttribute("disabled"))
-    focusables()[0]?.focus()
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault()
-        event.stopPropagation()
-        onCloseRef.current()
-        return
-      }
-      if (event.key !== "Tab") return
-      const order = focusables()
-      if (order.length === 0) return
-      const first = order[0]!
-      const last = order[order.length - 1]!
-      const current = ownerDocument.activeElement
-      if (event.shiftKey && (current === first || !node.contains(current))) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && current === last) {
-        event.preventDefault()
-        first.focus()
-      }
-    }
-    ownerDocument.addEventListener("keydown", handleKeyDown, { capture: true })
+    node
+      .querySelector<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )
+      ?.focus()
     return () => {
-      ownerDocument.removeEventListener("keydown", handleKeyDown, {
-        capture: true,
-      })
-      opener?.focus()
+      // A control that is gone cannot take focus back; hosts that hide the
+      // opener while the view is open say where focus should land instead.
+      if (opener?.isConnected) opener.focus()
+      else onReturnFocusRef.current?.()
     }
-    // Mount-once by design; onClose flows through onCloseRef.
+    // Mount-once by design; the callbacks flow through refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Escape is handled on the overlay itself, in the bubble phase, so a
+  // control inside it — an inline editor, a menu — cancels its own state
+  // first and stops the event before the whole view closes.
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Escape" || event.defaultPrevented) return
+    event.preventDefault()
+    onCloseRef.current()
+  }
+
   return (
     <ChatOverlayContext.Provider value={context}>
       <div
         ref={ref}
         role="dialog"
-        aria-modal="true"
         aria-label={label}
         data-slot="chat-overlay"
+        onKeyDown={handleKeyDown}
         className={cn(
           "absolute inset-0 z-20 flex flex-col rounded-[inherit] bg-background font-sans",
           className,

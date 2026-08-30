@@ -8,9 +8,9 @@ const sidebarFocusComponents = Object.freeze([
 ] as const)
 
 const composerFocusComponents = Object.freeze([
-  // The passage a comment attaches to, the source-document link, and the
-  // badge that opens a sent message's annotations.
-  { component: "chat-annotations", count: 3 },
+  // The source-document link and the badge that opens a sent message's
+  // annotations; the thread's reply and discard controls are ChatMessageActions.
+  { component: "chat-annotations", count: 2 },
   // The five transcript controls, plus a message's hover action and the
   // clamped bubble that opens its full text.
   { component: "chat-bubbles", count: 7 },

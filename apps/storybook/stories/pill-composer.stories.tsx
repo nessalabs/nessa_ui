@@ -64,6 +64,7 @@ import {
   SectionedListbox,
   RandomAvatar,
   type ChatAnnotation,
+  type ChatTabItem,
   type ChatTrayItem,
   type ModelPickerGroup,
   type ModelPickerValue,
@@ -1251,10 +1252,12 @@ function PlaygroundExample({
   initialTabId?: string
   initialQuotes?: ChatAnnotation[]
 }) {
-  const [tabs, setTabs] = React.useState([
+  // The kit's own tab shape: kind says what a tab holds and parentId gives a
+  // drilled-into tab its way back.
+  const [tabs, setTabs] = React.useState<ChatTabItem[]>([
     { id: "chat-1", title: "Release notes" },
     { id: auditTabId, title: "Repo audit" },
-  ] as { id: string; title: string; closeable?: boolean }[])
+  ])
   const [activeTabId, setActiveTabId] = React.useState(initialTabId)
   const [messagesByTab, setMessagesByTab] = React.useState<
     Record<string, DemoMessage[]>
@@ -1651,7 +1654,16 @@ function PlaygroundExample({
             setGeneratingTabId(null)
           }
           setTabs((current) => {
-            const next = current.filter((tab) => tab.id !== id)
+            const closed = current.find((tab) => tab.id === id)
+            const next = current
+              .filter((tab) => tab.id !== id)
+              // Anything opened out of the closed tab would lose its back
+              // gesture, so it inherits that tab's own parent.
+              .map((tab) =>
+                tab.parentId === id
+                  ? { ...tab, parentId: closed?.parentId ?? auditTabId }
+                  : tab,
+              )
             if (id === activeTabId && next.length > 0) {
               setActiveTabId(next[0]!.id)
             }
@@ -1852,6 +1864,9 @@ function PlaygroundExample({
         // and the pill stay live around the reading view.
         <ChatOverlay
           label="Annotations"
+          // The tray chip that opened this view hides while it is open, so
+          // closing hands focus to the composer instead of the document.
+          onReturnFocus={() => inputRef.current?.focus()}
           onClose={() => {
             setQuotesOpen(false)
             setViewedQuotes(null)
@@ -2828,7 +2843,7 @@ export const Playground: Story = {
 export const Subagents: Story = {
   tags: ["reduced-motion"],
   parameters: storyDocumentation(
-    "The playground opened on the seeded Repo audit tab, where an agent turn split its work across two subagents. Each subagent renders as a drill-in chip under the spawning bubble — watercolor avatar, name, and status, the avatar animating while it runs — and clicking one opens that subagent's own conversation as a closeable tab whose glyph is the same animating avatar, so no busy dot is needed. Inside, hovering the active subagent tab swaps its avatar for a back glyph, and clicking it returns to the parent conversation; the caption above the transcript names the subagent's task, the composer retargets to the subagent, and every chat capability — tapbacks, replies, dictation — works unchanged.",
+    "The playground opened on the seeded Repo audit tab, where an agent turn split its work across two subagents. Each subagent renders as a drill-in chip under the spawning bubble — watercolor avatar, name, and status, the avatar animating while it runs — and clicking one opens that subagent's own conversation as a closeable tab whose glyph is the same animating avatar, so no busy dot is needed. Inside, hovering or focusing the active subagent tab swaps its avatar for a back glyph and its name becomes the back label, and selecting it returns to the parent conversation; the caption above the transcript names the subagent's task, the composer retargets to the subagent, and every chat capability — tapbacks, replies, dictation — works unchanged.",
   ),
   render: () => <PlaygroundExample initialTabId={auditTabId} />,
   play: async ({ canvasElement }) => {
@@ -2845,8 +2860,13 @@ export const Subagents: Story = {
     // transcript to its conversation; a running subagent's tab shows no
     // busy dot — its animating avatar already carries that meaning.
     await userEvent.click(reviewerChip)
-    const reviewerTab = await canvas.findByRole("tab", { name: /Reviewer/ })
+    // The tab you are inside announces what selecting it now does, rather
+    // than leaving the back gesture to the hover chevron alone.
+    const reviewerTab = await canvas.findByRole("tab", {
+      name: "Back to Repo audit",
+    })
     await expect(reviewerTab).toHaveAttribute("aria-selected", "true")
+    await expect(reviewerTab).toHaveAttribute("data-goes-back", "true")
     await expect(
       reviewerTab.querySelector('[data-slot="chat-tab-loading"]'),
     ).toBeNull()
@@ -2857,8 +2877,8 @@ export const Subagents: Story = {
       canvas.getByRole("textbox", { name: "Message" }),
     ).toHaveAttribute("data-placeholder", "Message Reviewer…")
     // The provenance caption names the task; the way back is the tab
-    // itself — re-selecting the subagent tab you are inside (the hover
-    // back glyph's action) returns to the spawning conversation.
+    // itself — re-selecting the subagent tab you are inside (the back
+    // glyph's action) returns to the spawning conversation.
     await expect(
       canvas.getByText(/Subagent · Review the transcript diff/),
     ).toBeInTheDocument()
@@ -2866,10 +2886,11 @@ export const Subagents: Story = {
     await expect(
       canvas.getByText(/Explorer is back — nine call sites/),
     ).toBeInTheDocument()
-    // The Reviewer tab stays parked in the strip for hopping back.
-    await expect(
-      canvas.getByRole("tab", { name: /Reviewer/ }),
-    ).toHaveAttribute("aria-selected", "false")
+    // Parked in the strip, it is a plain tab again: no back gesture, and
+    // its own name back.
+    const parkedTab = canvas.getByRole("tab", { name: "Reviewer" })
+    await expect(parkedTab).toHaveAttribute("aria-selected", "false")
+    await expect(parkedTab).not.toHaveAttribute("data-goes-back")
     // The messages pop in on a transition; the a11y pass that follows the
     // play reads computed colors, so the finite animations must settle
     // first. The busy subagent avatars animate forever by design, so only
