@@ -2294,9 +2294,11 @@ function PlaygroundExample({
       {quotesOpen || viewedQuotes ? (
         // Annotations use the expandable sheet as the extra-details
         // surface: it fills this tabpanel (tabs and composer stay) and
-        // Minimize restores a drawer over the transcript.
+        // Minimize restores a drawer over the transcript. Not modal, so
+        // Tab can still reach the strip and the pill.
         <Sheet
           label="Annotations"
+          modal={false}
           defaultExpanded
           onReturnFocus={() => inputRef.current?.focus()}
           onClose={() => {
@@ -3456,6 +3458,7 @@ export const AgentSurfaces: Story = {
       ),
     ).toBeVisible()
     const queued = canvas.getByRole("dialog", { name: "Queued" })
+    await expect(queued).toHaveAttribute("aria-modal", "true")
     await userEvent.click(canvas.getByRole("button", { name: "Expand" }))
     await expect(queued).toHaveAttribute("data-expanded", "true")
     await userEvent.click(canvas.getByRole("button", { name: "Minimize" }))
@@ -3605,6 +3608,7 @@ export const Annotations: Story = {
     ).toHaveLength(7)
     const annotations = canvas.getByRole("dialog", { name: "Annotations" })
     await expect(annotations).toHaveAttribute("data-expanded", "true")
+    await expect(annotations).not.toHaveAttribute("aria-modal")
     await userEvent.click(canvas.getByRole("button", { name: "Minimize" }))
     await expect(annotations).toHaveAttribute("data-expanded", "false")
     await userEvent.click(canvas.getByRole("button", { name: "Expand" }))

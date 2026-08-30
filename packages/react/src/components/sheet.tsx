@@ -61,14 +61,24 @@ export interface SheetProps extends React.ComponentProps<"div"> {
   defaultExpanded?: boolean
   /** Fires when SheetExpand toggles the panel between drawer and filled. */
   onExpandedChange?: (expanded: boolean) => void
+  /**
+   * When true (the default), the sheet is modal to its positioned ancestor:
+   * `aria-modal`, Tab stays inside the panel, and siblings go inert. Queue
+   * and details use this. When false, Tab is not trapped and `aria-modal` is
+   * omitted so chrome outside the ancestor — a tab strip and composer around
+   * a transcript-scoped sheet — stays reachable. Annotations use this.
+   */
+  modal?: boolean
 }
 
 /**
  * A bottom sheet that rises over its nearest positioned ancestor — typically
- * a chat window — without leaving that frame. It is a modal dialog: the
- * backdrop and Escape dismiss it, focus moves into the panel on open and
- * returns to the opener on close, and the siblings it covers go inert so
- * nothing behind it takes a pointer or a keystroke.
+ * a chat window — without leaving that frame. By default it is a modal
+ * dialog: the backdrop and Escape dismiss it, Tab stays inside, focus moves
+ * into the panel on open and returns to the opener on close, and the
+ * siblings it covers go inert so nothing behind it takes a pointer or a
+ * keystroke. Pass `modal={false}` for a contained extra-details surface that
+ * still covers its siblings but leaves surrounding chrome in the tab order.
  *
  * Compose the panel from SheetHandle, SheetHeader, SheetTitle, SheetClose,
  * SheetExpand, SheetAction, and SheetBody. SheetExpand toggles the drawer
@@ -84,6 +94,7 @@ function Sheet({
   expanded: expandedProp,
   defaultExpanded = false,
   onExpandedChange,
+  modal = true,
   className,
   children,
   onKeyDown,
@@ -123,6 +134,10 @@ function Sheet({
       160,
     )
     if (duration === 0) return
+    const easing =
+      getComputedStyle(panel)
+        .getPropertyValue("--nessa-motion-easing-standard")
+        .trim() || "ease-out"
     const animation = panel.animate(
       openedExpanded.current
         ? [{ opacity: 0 }, { opacity: 1 }]
@@ -130,7 +145,7 @@ function Sheet({
             { opacity: 0, translate: "0 12%" },
             { opacity: 1, translate: "0 0" },
           ],
-      { duration, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+      { duration, easing },
     )
     return () => animation.cancel()
   }, [])
@@ -173,12 +188,43 @@ function Sheet({
     coverSiblings()
     const observer = parent ? new MutationObserver(coverSiblings) : null
     if (parent && observer) observer.observe(parent, { childList: true })
+    const focusables = () =>
+      Array.from(
+        node.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute("disabled"))
+    const handleTab = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return
+      const order = focusables()
+      if (order.length === 0) return
+      const first = order[0]!
+      const last = order[order.length - 1]!
+      const current = ownerDocument.activeElement
+      if (event.shiftKey && (current === first || !node.contains(current))) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && current === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    if (modal) {
+      ownerDocument.addEventListener("keydown", handleTab, { capture: true })
+    }
     return () => {
       observer?.disconnect()
+      if (modal) {
+        ownerDocument.removeEventListener("keydown", handleTab, {
+          capture: true,
+        })
+      }
       for (const sibling of [...covered]) release(sibling)
       if (opener?.isConnected) opener.focus()
       else onReturnFocusRef.current?.()
     }
+    // Mount-once by design; modal is the value at open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -193,14 +239,14 @@ function Sheet({
       <div
         ref={ref}
         role="dialog"
-        aria-modal="true"
+        aria-modal={modal || undefined}
         aria-label={label}
         data-slot="sheet"
         data-expanded={expanded ? "true" : "false"}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
         className={cn(
-          "absolute inset-0 z-30 flex flex-col font-sans",
+          "absolute inset-0 z-30 flex flex-col overflow-hidden rounded-[inherit] font-sans",
           !expanded && "justify-end",
           className,
         )}
@@ -220,7 +266,7 @@ function Sheet({
           data-slot="sheet-panel"
           data-expanded={expanded ? "true" : "false"}
           className={cn(
-            "relative z-10 flex w-full flex-col bg-card text-card-foreground shadow-[0_-8px_32px] shadow-black/20",
+            "relative z-10 flex w-full flex-col bg-card text-card-foreground shadow-[0_-8px_32px] shadow-(color:--foreground)/20",
             expanded
               ? "min-h-0 flex-1 overflow-hidden rounded-none"
               : "max-h-[85%] overflow-y-auto rounded-t-3xl",

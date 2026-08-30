@@ -75,7 +75,7 @@ type Story = StoryObj<typeof meta>
 
 export const Playground: Story = {
   parameters: storyDocumentation(
-    "Search narrows the roster. Selecting a row marks it aria-selected. An empty query shows every conversation the host passed.",
+    "Search narrows the roster. Selecting a row marks it aria-current. An empty query shows every conversation the host passed.",
   ),
   render: () => <HistoryExample />,
   play: async ({ canvasElement }) => {
@@ -85,6 +85,7 @@ export const Playground: Story = {
     const selected = canvas.getByRole("button", {
       name: /agent message package implementation/i,
     })
+    await expect(selected).toHaveAccessibleName(/pinned/i)
     await expect(selected).toHaveAttribute("aria-current", "true")
     const search = canvas.getByRole("searchbox", {
       name: "Search conversations",

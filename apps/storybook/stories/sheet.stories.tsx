@@ -60,7 +60,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A bottom sheet that rises over its nearest positioned ancestor: a modal dialog with a backdrop, a grab bar, a header of close or expand plus a centered title and optional Done, and a scrolling body. SheetExpand toggles the drawer into a filled extra-details surface over the same ancestor. Escape, the backdrop, SheetClose, and SheetAction all dismiss it. Focus moves into the panel on open and returns to the opener on close; siblings it covers go inert.",
+          "A bottom sheet that rises over its nearest positioned ancestor: a modal dialog with a backdrop, a grab bar, a header of close or expand plus a centered title and optional Done, and a scrolling body. SheetExpand toggles the drawer into a filled extra-details surface over the same ancestor. Escape, the backdrop, SheetClose, and SheetAction all dismiss it. Focus moves into the panel on open and returns to the opener on close; siblings it covers go inert. Pass modal={false} for a contained extra-details surface that leaves surrounding chrome reachable.",
       },
     },
   },
@@ -133,6 +133,7 @@ export const ExpandToggle: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Open sheet" }))
     const dialog = canvas.getByRole("dialog", { name: "Queued" })
     await waitFor(() => expect(dialog).toBeVisible())
+    await expect(dialog).toHaveAttribute("aria-modal", "true")
     await expect(dialog).toHaveAttribute("data-expanded", "false")
     await userEvent.click(canvas.getByRole("button", { name: "Expand" }))
     await expect(dialog).toHaveAttribute("data-expanded", "true")

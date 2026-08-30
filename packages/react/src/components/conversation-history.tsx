@@ -121,10 +121,13 @@ function ConversationHistory({
                   <span className="min-w-0 flex-1">
                     <span className="flex min-w-0 items-center gap-1.5">
                       {conversation.pinned ? (
-                        <Pin
-                          aria-hidden="true"
-                          className="size-3 shrink-0 text-muted-foreground"
-                        />
+                        <>
+                          <Pin
+                            aria-hidden="true"
+                            className="size-3 shrink-0 text-muted-foreground"
+                          />
+                          <span className="sr-only">Pinned </span>
+                        </>
                       ) : null}
                       <span className="min-w-0 truncate font-sans nessa-text-4 font-semibold text-foreground">
                         {conversation.title}
