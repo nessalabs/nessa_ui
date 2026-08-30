@@ -4,27 +4,19 @@ import { defineCheck } from "../../framework/define-check.ts"
 import { checkMetadata } from "../check-metadata.ts"
 
 /**
- * The file allowed to narrow raw JSON by hand.
+ * The files allowed to narrow raw JSON by hand.
  *
- * `json.ts` is where the narrowing lives on purpose, so it cannot route through
- * itself. Nothing else qualifies.
- *
- * A `wire.ts` exemption used to sit here on the theory that a provider's wire
- * decides whether a decoded line is an object at all and so cannot use a reader
- * that already assumes one. No wire has ever needed it: every one of the six
- * reaches object-ness through `parseJsonObjectLine` and the shared readers, and
- * the rule passes with the clause removed. Worse, the clause matched only a
- * one-level-deep `wire.ts`, so it never covered `claude/stream/wire.ts` and its
- * peers — the comment claimed a generality the pattern did not have, and
- * widening it to match would have granted four more files a licence none of
- * them asked for.
- *
- * A future wire that genuinely must hand-roll goes through the exception
- * ledger, where the decision is explicit and reviewed, rather than being
- * granted silently by living at the right path.
+ * `json.ts` is where the narrowing lives on purpose. Each transport's decoder
+ * sits upstream of it, deciding whether a decoded line is an object at all, and
+ * cannot use a reader that already assumes one. The exemption is the decoder
+ * *name*, at any depth: `wire.ts` for a type-tagged stream, `frame.ts` for a
+ * JSON-RPC conversation. A one-segment path would miss every nested transport
+ * (`claude/stream/wire.ts`, `codex/exec/wire.ts`, …) and ACP's frame decoder.
  */
-function ownsNarrowing(filePath: string): boolean {
-  return filePath === "packages/agent-stream/src/json.ts"
+export function ownsNarrowing(filePath: string): boolean {
+  if (filePath === "packages/agent-stream/src/json.ts") return true
+  if (!filePath.startsWith("packages/agent-stream/src/")) return false
+  return filePath.endsWith("/wire.ts") || filePath.endsWith("/frame.ts")
 }
 
 const NARROWED_PRIMITIVES = new Set(["string", "number", "boolean", "object"])

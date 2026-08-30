@@ -53,9 +53,10 @@ names, and a star-export collision would make adding a third a breaking change.
 import { acp, claude, codex, opencode } from "@nessa-ui/agent-stream"
 ```
 
-The four entry points are also exported flat, since reaching for a parser by
-name is the common case: `ClaudeStreamMapper`, `CodexStreamMapper`,
-`CodexAppServerMapper`, `OpencodeRunMapper`, `OpencodeServerMapper`, `AcpMapper`.
+The six mappers — and the `map*Stream` helpers that drive them over a whole
+capture — are also exported flat, since reaching for a parser by name is the
+common case: `ClaudeStreamMapper`, `CodexStreamMapper`, `CodexAppServerMapper`,
+`OpencodeRunMapper`, `OpencodeServerMapper`, `AcpMapper`.
 
 ## React
 

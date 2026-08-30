@@ -84,8 +84,9 @@ export * as claude from "./claude"
 export * as codex from "./codex"
 export * as opencode from "./opencode"
 
-// The two entry points are also exported flat, because reaching for a parser by
-// name is the common case and `claude.ClaudeStreamMapper` stutters.
+// Mapper classes and their one-shot helpers are also exported flat, because
+// reaching for a parser by name is the common case and `claude.ClaudeStreamMapper`
+// stutters.
 export { ClaudeStreamMapper, mapClaudeStream } from "./claude"
 export { CodexAppServerMapper, CodexStreamMapper, mapCodexAppServerStream, mapCodexStream } from "./codex"
 export { AcpMapper, mapAcpStream } from "./acp"

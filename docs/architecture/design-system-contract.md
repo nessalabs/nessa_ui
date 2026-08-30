@@ -1130,7 +1130,12 @@ because each one fails silently when it is broken.
    narrowing happens once, behind names, in one module. Scattered `typeof`
    comparisons are the failure this forbids: they drift, they disagree, and
    each one is a place a malformed line becomes a crash or a wrong value
-   instead of an absent one.
+   instead of an absent one. The decoder boundary itself is the exemption:
+   `json.ts` (where the readers live) and each transport's `wire.ts`, or ACP's
+   `frame.ts` for a JSON-RPC conversation that has no `type` field. Nested
+   transports keep that name at any depth — `claude/stream/wire.ts` is the
+   same boundary as `acp/wire.ts`. Everything past that boundary — mappers,
+   mapping tables, the fold — uses the named readers.
 
 The parsers themselves, and what the wire actually contains, are documented in
 [agent stream parsers](./agent-stream-parsers.md); this section governs only

@@ -2,6 +2,8 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import {
+  PARSER_BUILT_ENTRIES,
+  builtContractReachesFold,
   foldReachableFromContract,
   hasUseClientDirective,
   isReactSpecifier,
@@ -190,4 +192,24 @@ test("star re-export detection ignores every other way to name a module", () => 
     'const required = require("./required")',
   ].join("\n")
   assert.deepEqual(starReexportSpecifiers(source, "sample.ts"), ["./kept"])
+})
+
+test("the built parser entries match the two-entry exports map", () => {
+  assert.deepEqual([...PARSER_BUILT_ENTRIES], [
+    "packages/agent-stream/dist/index.js",
+    "packages/agent-stream/dist/index.d.ts",
+    "packages/agent-stream/dist/transcript.js",
+    "packages/agent-stream/dist/transcript.d.ts",
+  ])
+})
+
+test("the built contract entry is refused when it names the fold", () => {
+  assert.equal(builtContractReachesFold('export * from "./events"\n'), false)
+  assert.equal(builtContractReachesFold('export * from "./transcript"\n'), true)
+  assert.equal(builtContractReachesFold('export * from "./transcript.js"\n'), true)
+  assert.equal(builtContractReachesFold('export * from "./transcript/index.js"\n'), true)
+  assert.equal(builtContractReachesFold("export declare const TranscriptBuilder: unknown\n"), false)
+  // A mention in a comment is not a reach — the same reason React imports
+  // are read off the AST rather than matched in text.
+  assert.equal(builtContractReachesFold('/** routes via from "./transcript" */\nexport * from "./events"\n'), false)
 })

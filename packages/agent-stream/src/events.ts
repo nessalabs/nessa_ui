@@ -269,6 +269,17 @@ export type DeltaPayload =
   | { readonly delta: "input"; readonly block: BlockRef; readonly partialJson: string }
   | { readonly delta: "block_stop"; readonly block: BlockRef }
 
+/**
+ * A tool the operator refused, as summarised on the turn's own result. It
+ * repeats what the ask already said, which is what lets a consumer show a
+ * refusal on a transcript replayed from the result alone.
+ */
+export interface PermissionDenial {
+  readonly toolName: string
+  readonly callId: string
+  readonly input: JsonValue
+}
+
 /** What happened. */
 export type AgentEventPayload =
   // ---------- session and turn lifecycle ----------
@@ -474,17 +485,6 @@ export type AgentEventPayload =
  * literal. The values are the literals themselves, so the two are
  * interchangeable and both survive JSON.
  */
-/**
- * A tool the operator refused, as summarised on the turn's own result. It
- * repeats what the ask already said, which is what lets a consumer show a
- * refusal on a transcript replayed from the result alone.
- */
-export interface PermissionDenial {
-  readonly toolName: string
-  readonly callId: string
-  readonly input: JsonValue
-}
-
 export const AgentEventType = Object.freeze({
   SessionStarted: "session_started",
   ModelChanged: "model_changed",

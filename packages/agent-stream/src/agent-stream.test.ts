@@ -5,7 +5,8 @@ import { existsSync, readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import test from "node:test"
 
-import { AgentEventType, isEvent, type AgentEvent } from "./events"
+import { unreportedCapabilities, type AgentCapabilities } from "./capabilities"
+import { AgentEventType, isEvent, isMainThread, pathKey, type AgentEvent } from "./events"
 import { sessionCapabilities } from "./claude/stream/capabilities"
 import { CLAUDE_EVENT_MAPPING, claudeMappingFor, claudeWireKind } from "./claude/stream/mapping"
 import {
@@ -46,6 +47,61 @@ const NAMES = [
   "disk_subagent_a37fefefbc61e13e3",
   "disk_workflow_agent_a35ea63276cd501aa",
 ] as const
+
+test("path keys and the main-thread predicate are the envelope's own questions", () => {
+  const main: AgentEvent = {
+    id: "s:1",
+    sessionId: "s",
+    seq: 1,
+    ts: null,
+    agentPath: [],
+    payload: { type: "user_message", text: "hi", synthetic: false },
+    raw: {},
+  }
+  const nested = { ...main, agentPath: ["call-1", "call-2"] }
+  assert.equal(isMainThread(main), true)
+  assert.equal(isMainThread(nested), false)
+  assert.equal(pathKey([]), "")
+  assert.equal(pathKey(["call-1", "call-2"]), "call-1>call-2")
+})
+
+test("unreported capabilities are the sections a provider left null, not empty", () => {
+  const blank: AgentCapabilities = {
+    sessionId: null,
+    model: null,
+    cwd: null,
+    permissionMode: null,
+    models: null,
+    commands: null,
+    skills: null,
+    agents: null,
+    tools: null,
+    mcpServers: null,
+    plugins: null,
+    pluginSources: null,
+    hooks: null,
+  }
+  assert.deepEqual(unreportedCapabilities(blank), [
+    "models",
+    "commands",
+    "skills",
+    "agents",
+    "tools",
+    "MCP servers",
+    "plugins",
+    "plugin sources",
+    "hooks",
+  ])
+  assert.deepEqual(unreportedCapabilities({ ...blank, models: [], tools: [] }), [
+    "commands",
+    "skills",
+    "agents",
+    "MCP servers",
+    "plugins",
+    "plugin sources",
+    "hooks",
+  ])
+})
 
 test("every captured line decodes", () => {
   for (const name of NAMES) {

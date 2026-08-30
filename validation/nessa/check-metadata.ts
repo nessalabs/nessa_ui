@@ -20,5 +20,5 @@ export const checkMetadata = Object.freeze({
   "parser-hygiene": { phase: "source", inputs: ["packages/agent-stream/src/**/*.ts"], dependsOn: [], global: false },
   "package-artifacts": { phase: "source", inputs: ["packages/react/package.json", "packages/react/{README.md,LICENSE}", "packages/agent-stream/package.json", "packages/agent-stream/{README.md,LICENSE}", "packages/agent-stream/src/**/*.ts"], dependsOn: [], global: false },
   accessibility: { phase: "source", inputs: ["packages/react/src/theme.css", "packages/react/src/components/**/*.tsx", "packages/react/src/composites/**/*.tsx", "validation/exceptions.ts", "validation/nessa/{contrast-matrix,focus-treatments}.ts"], dependsOn: ["theme-parity"], global: false },
-  "package-artifacts-built": { phase: "artifacts", inputs: ["packages/react/dist/**/*"], dependsOn: [], global: false },
+  "package-artifacts-built": { phase: "artifacts", inputs: ["packages/react/dist/**/*", "packages/agent-stream/dist/**/*"], dependsOn: [], global: false },
 } satisfies Record<string, CheckMetadata>)
