@@ -3641,7 +3641,7 @@ export const Playground: Story = {
 export const AgentSurfaces: Story = {
   tags: ["reduced-motion"],
   parameters: storyDocumentation(
-    "The playground opened on the Agent message tab: exploring cues collapse tool work and carry the conversation agent’s RandomAvatar (still when the run is done; busy while Exploring…), clicking a cue opens that beat’s thinking and tool calls in the extra-details sheet (not inline), a named-task card uses the explorer’s busy avatar, Queued 2 opens the follow-up sheet where rows drag to reorder (Expand fills the window), right-clicking the tab offers View Details (project, model, runtime), and /history opens a History tab of the conversation roster.",
+    "The playground opened on the Agent message tab: exploring cues collapse tool work and carry the conversation agent’s RandomAvatar (still when the run is done; busy while Exploring…), clicking a cue opens that beat’s thinking and tool calls in the extra-details sheet (not inline), a named-task card uses the explorer’s busy avatar, Queued 2 opens the follow-up sheet where rows drag to reorder (Expand fills the window), right-clicking the tab offers View Details (project, model, runtime), and /history opens a History tab whose roster leads with project-seeded avatars so conversations in the same project share a painting.",
   ),
   render: () => <PlaygroundExample initialTabId={agentTabId} />,
   play: async ({ canvasElement }) => {
@@ -3762,6 +3762,15 @@ export const AgentSurfaces: Story = {
     await expect(
       canvas.getByRole("list", { name: "Conversations" }),
     ).toBeVisible()
+    const historyList = canvas.getByRole("list", { name: "Conversations" })
+    const historyAvatars = [
+      ...historyList.querySelectorAll("[data-slot=random-avatar]"),
+    ]
+    await expect(historyAvatars).toHaveLength(3)
+    const figures = historyAvatars.map((avatar) =>
+      avatar.getAttribute("data-figure"),
+    )
+    await expect(new Set(figures).size).toBe(1)
     await expect(
       canvas.queryByRole("textbox", { name: "Message" }),
     ).not.toBeInTheDocument()

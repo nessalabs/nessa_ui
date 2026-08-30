@@ -64,7 +64,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A roster of conversations: an optional search field and a list of rows the host already knows about. The list stores nothing and sorts nothing — pass the rows in the order they should appear. Selecting a row reports its id. The playground opens this from the /history command.",
+          "A searchable roster of conversations: host-owned rows with a project-seeded RandomAvatar (same project, same painting), title, preview, project, pin, and relative time. Selecting a row reports its id.",
       },
     },
   },
@@ -75,7 +75,7 @@ type Story = StoryObj<typeof meta>
 
 export const Playground: Story = {
   parameters: storyDocumentation(
-    "Search narrows the roster. Selecting a row marks it aria-current. An empty query shows every conversation the host passed.",
+    "Search narrows the roster. Selecting a row marks it aria-current. Conversations that share a project share a RandomAvatar painting; a row with no project falls back to its id. An empty query shows every conversation the host passed.",
   ),
   render: () => <HistoryExample />,
   play: async ({ canvasElement }) => {
@@ -87,6 +87,24 @@ export const Playground: Story = {
     })
     await expect(selected).toHaveAccessibleName(/pinned/i)
     await expect(selected).toHaveAttribute("aria-current", "true")
+    const agentAvatar = selected.querySelector("[data-slot=random-avatar]")
+    const auditAvatar = canvas
+      .getByRole("button", { name: /repo audit/i })
+      .querySelector("[data-slot=random-avatar]")
+    const releaseAvatar = canvas
+      .getByRole("button", { name: /release notes/i })
+      .querySelector("[data-slot=random-avatar]")
+    await expect(agentAvatar).toBeTruthy()
+    await expect(auditAvatar).toBeTruthy()
+    await expect(releaseAvatar).toBeTruthy()
+    await expect(agentAvatar).toHaveAttribute(
+      "data-figure",
+      auditAvatar!.getAttribute("data-figure"),
+    )
+    await expect(releaseAvatar).not.toHaveAttribute(
+      "data-figure",
+      agentAvatar!.getAttribute("data-figure"),
+    )
     const search = canvas.getByRole("searchbox", {
       name: "Search conversations",
     })

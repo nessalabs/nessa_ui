@@ -5,6 +5,7 @@ import { Pin, Search } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Input } from "./input"
+import { RandomAvatar } from "./random-avatar"
 
 export interface ConversationHistoryEntry {
   /** Identifies the conversation across selection. */
@@ -17,8 +18,19 @@ export interface ConversationHistoryEntry {
   updated?: string
   /** Pins the row above unpinned conversations when the host sorts that way. */
   pinned?: boolean
-  /** Optional project or path, shown under the preview. */
+  /**
+   * Optional project or path, shown under the preview. Also seeds the row
+   * avatar: conversations that share a project share a painting, the way
+   * threads with the same contact share a photo. When omitted, the
+   * conversation id is the seed so the row still has an identity.
+   */
   project?: string
+}
+
+/** Project path when present, otherwise the conversation id. */
+function conversationAvatarSeed(conversation: ConversationHistoryEntry) {
+  const project = conversation.project?.trim()
+  return project && project.length > 0 ? project : conversation.id
 }
 
 export interface ConversationHistoryProps
@@ -46,10 +58,12 @@ export interface ConversationHistoryProps
 
 /**
  * A roster of conversations: an optional search field and a list of rows
- * the host already knows about. The list stores nothing and sorts nothing —
- * pass the rows in the order they should appear, and apply the query
- * before they arrive. Each row is a button; the selected one is
- * `aria-current`. Opening a conversation is the host's job.
+ * the host already knows about. Each row leads with a RandomAvatar seeded
+ * by project (or id when there is no project) so the roster reads like a
+ * conversation list. The list stores nothing and sorts nothing — pass the
+ * rows in the order they should appear, and apply the query before they
+ * arrive. Each row is a button; the selected one is `aria-current`.
+ * Opening a conversation is the host's job.
  */
 function ConversationHistory({
   conversations,
@@ -114,10 +128,14 @@ function ConversationHistory({
                   data-pinned={conversation.pinned || undefined}
                   onClick={() => onValueChange?.(conversation.id)}
                   className={cn(
-                    "flex w-full min-w-0 items-start gap-2.5 rounded-xl border-0 bg-transparent px-2.5 py-2.5 text-start outline-none transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                    "flex w-full min-w-0 items-start gap-3 rounded-xl border-0 bg-transparent px-2.5 py-2.5 text-start outline-none transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                     selected && "bg-accent",
                   )}
                 >
+                  <RandomAvatar
+                    seed={conversationAvatarSeed(conversation)}
+                    className="mt-0.5 size-10"
+                  />
                   <span className="min-w-0 flex-1">
                     <span className="flex min-w-0 items-center gap-1.5">
                       {conversation.pinned ? (

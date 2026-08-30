@@ -634,13 +634,14 @@
       "name": "conversation-history",
       "type": "registry:ui",
       "title": "Conversation History",
-      "description": "A searchable roster of conversations: host-owned rows with title, preview, project, pin, and relative time. Selecting a row reports its id.",
+      "description": "A searchable roster of conversations: host-owned rows with a project-seeded RandomAvatar (same project, same painting), title, preview, project, pin, and relative time. Selecting a row reports its id.",
       "dependencies": [
         "lucide-react"
       ],
       "registryDependencies": [
-        "nessalabs/nessa_ui/input",
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/input",
+        "nessalabs/nessa_ui/random-avatar",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
