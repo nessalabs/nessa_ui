@@ -619,6 +619,8 @@ function ChatComposerEditor({
           // owns any surface treatment.
           "min-w-0 w-full overflow-y-auto whitespace-pre-wrap break-words border-0 bg-transparent px-1 py-1 font-sans nessa-text-5 text-foreground outline-none",
           // Chat surfaces scroll without chrome; opt back in via scrollbar.
+          // (Kept as a literal per SRC-002: governed class surfaces stay in
+          // their consuming module.)
           !scrollbar &&
             "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           "empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)]",

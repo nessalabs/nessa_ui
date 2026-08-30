@@ -236,12 +236,16 @@ function DocumentSurface({
   /** Posts a comment message that carries the selection as its quote. */
   onComment: (text: string, comment: string) => void
 }) {
-  const file = chipFileMock(item)
-  const previewFile = {
-    src: `data:${file.mimeType};charset=utf-8,${encodeURIComponent(file.content)}`,
-    name: file.name,
-    mimeType: file.mimeType,
-  }
+  // Rebuilding the data URI re-encodes the whole document; the file only
+  // changes with the item.
+  const previewFile = React.useMemo(() => {
+    const file = chipFileMock(item)
+    return {
+      src: `data:${file.mimeType};charset=utf-8,${encodeURIComponent(file.content)}`,
+      name: file.name,
+      mimeType: file.mimeType,
+    }
+  }, [item])
   const containerRef = React.useRef<HTMLDivElement>(null)
   const [selection, setSelection] = React.useState<{
     text: string
@@ -250,6 +254,15 @@ function DocumentSurface({
   } | null>(null)
   const [mode, setMode] = React.useState<"actions" | "comment">("actions")
   const [draft, setDraft] = React.useState("")
+  /** Saves the tooltip comment and puts the surface back to rest. */
+  const commitComment = () => {
+    if (!selection || !draft.trim()) return
+    onComment(selection.text, draft.trim())
+    setDraft("")
+    setMode("actions")
+    containerRef.current?.ownerDocument.getSelection()?.removeAllRanges()
+    setSelection(null)
+  }
   const captureSelection = () => {
     if (mode === "comment") return
     const container = containerRef.current
@@ -285,7 +298,13 @@ function DocumentSurface({
       )}
       {selection ? (
         <SelectionTooltip
-          className="absolute z-10 -translate-x-1/2 -translate-y-full"
+          className={cn(
+            "absolute z-10 -translate-x-1/2",
+            // Near the top edge the pill flips below the selection —
+            // -translate-y-full there would push it out of the scroll
+            // container where it clips unclickable.
+            selection.top >= 48 && "-translate-y-full",
+          )}
           style={{
             // The comment composer is wider than the action pill, so it
             // centers on the surface; the action pill hugs the selection,
@@ -297,7 +316,10 @@ function DocumentSurface({
                     Math.max(selection.left, 120),
                     (containerRef.current?.clientWidth ?? 480) - 120,
                   ),
-            top: Math.max(selection.top - 8, 0),
+            top:
+              selection.top >= 48
+                ? selection.top - 8
+                : selection.top + 28,
           }}
         >
           {mode === "actions" ? (
@@ -338,25 +360,14 @@ function DocumentSurface({
                 onKeyDown={(event) => {
                   if (event.key !== "Enter" || !draft.trim()) return
                   event.preventDefault()
-                  onComment(selection.text, draft.trim())
-                  setDraft("")
-                  setMode("actions")
-                  containerRef.current?.ownerDocument.getSelection()?.removeAllRanges()
-                  setSelection(null)
+                  commitComment()
                 }}
                 className="h-8 w-52 border-0 bg-transparent shadow-none dark:bg-transparent"
               />
               <SelectionTooltipAction
                 aria-label="Save comment"
                 tooltip="Save comment"
-                onClick={() => {
-                  if (!draft.trim()) return
-                  onComment(selection.text, draft.trim())
-                  setDraft("")
-                  setMode("actions")
-                  containerRef.current?.ownerDocument.getSelection()?.removeAllRanges()
-                  setSelection(null)
-                }}
+                onClick={commitComment}
               >
                 <Check aria-hidden="true" />
               </SelectionTooltipAction>
@@ -378,18 +389,20 @@ function DocumentSurface({
   )
 }
 
+// One flattened catalog, indexed once — the sections are static, and chips
+// reference items by label (editor chips) or id (lifted passages).
+const slashItems = slashSections.flatMap((section) => section.items)
+const slashItemsByLabel = new Map(slashItems.map((item) => [item.label, item]))
+const slashItemsById = new Map(slashItems.map((item) => [item.id, item]))
+
 /** Finds the catalog entry behind an inserted chip, for the read view. */
 function slashItemForLabel(label: string): SlashItem | undefined {
-  return slashSections
-    .flatMap((section) => section.items)
-    .find((item) => item.label === label)
+  return slashItemsByLabel.get(label)
 }
 
 /** Finds the catalog entry a lifted passage came from. */
 function slashItemForId(id: string): SlashItem | undefined {
-  return slashSections
-    .flatMap((section) => section.items)
-    .find((item) => item.id === id)
+  return slashItemsById.get(id)
 }
 
 /** The pill's slash sections: a Commands section ahead of the shared skills and plugins. */
@@ -517,6 +530,8 @@ function StopAction({
 }
 
 interface PendingQuote {
+  /** A stable identity for list rendering; display data otherwise. */
+  id?: string
   /** The passage lifted from the document. */
   text: string
   /** The user's comments on it — the first from the selection tooltip, the rest added later from the annotation view. */
@@ -533,6 +548,8 @@ interface DemoMessage {
   replyTo?: string
   /** Passages lifted from previewed documents, quoted above the bubble. */
   quotes?: PendingQuote[]
+  /** Full text behind each pasted-text chip in this message, by chip id. */
+  pasted?: Record<string, string>
   /** The id of the message this one replies to, linking it into a thread. */
   replyToId?: number
   /** Photos, files, and folders sent with the message. */
@@ -625,6 +642,12 @@ interface DemoSubagent {
   task: string
   status: "running" | "done"
 }
+
+/** One "big text stays compact" policy: pastes at or past the chip
+ * threshold land as pasted-text chips, and typed messages past the clamp
+ * threshold render clamped with the full text behind the list view. */
+const PASTE_CHIP_MIN_CHARS = 120
+const LONG_MESSAGE_CHARS = 280
 
 /** The tab id a subagent's own conversation lives under. */
 const subagentTabId = (id: string) => `sub:${id}`
@@ -780,11 +803,15 @@ function InlineBubbleEditor({
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault()
+            event.stopPropagation()
             if (draft.trim()) onSave(draft.trim())
             else onCancel()
           }
           if (event.key === "Escape") {
+            // Cancels only this edit — the window-level Escape handler
+            // would otherwise also collapse reply or thread focus.
             event.preventDefault()
+            event.stopPropagation()
             onCancel()
           }
         }}
@@ -984,7 +1011,7 @@ function DemoBubble({
         <ContextMenu onOpenChange={onMenuOpenChange}>
           <ContextMenuTrigger asChild>
             <ChatBubble
-              aria-label={`Reply to: ${message.text}`}
+              aria-label={`Reply to: ${message.text || "attachment message"}`}
               title="Right-click to reply or react"
               tabIndex={0}
               reaction={message.reaction}
@@ -1000,7 +1027,7 @@ function DemoBubble({
                   {message.text}
                 </MessageMarkdown>
               ) : message.role === "user" &&
-                message.text.length > 280 &&
+                message.text.length > LONG_MESSAGE_CHARS &&
                 onLongOpen ? (
                 // A huge typed message stays compact in the transcript —
                 // four lines and a chevron; the full text lives in the
@@ -1118,9 +1145,9 @@ function DemoBubble({
           {message.role === "user" ? (
             <>
               {delivered ? (
-                <span className="pe-1 font-sans nessa-text-1 text-muted-foreground">
+                <ChatMessageReceipt className="mt-0 pe-1">
                   Delivered
-                </span>
+                </ChatMessageReceipt>
               ) : null}
               <HoverAction label="Copy">
                 <Copy aria-hidden="true" />
@@ -1254,12 +1281,18 @@ function attachmentSummary(attachments: DemoAttachment[]) {
 // commented and bare — for exercising the pending row and the list view.
 const seededAnnotations: PendingQuote[] = [
   {
+    id: "seed-1",
     text: "Gather the relevant context from the current chat.",
     comments: ["This should spell out how much history counts as relevant."],
     sourceId: "skill-creator",
   },
-  { text: "Apply the checklist this skill carries.", sourceId: "skill-creator" },
   {
+    id: "seed-2",
+    text: "Apply the checklist this skill carries.",
+    sourceId: "skill-creator",
+  },
+  {
+    id: "seed-3",
     text: "Report the result back into the thread. The report should stay short enough to read in the transcript, with the full detail behind a link, so the conversation keeps moving while the evidence stays reachable for whoever wants to dig in later.",
     comments: [
       "Way too long for one step — split the summary rule and the linking rule into separate steps, and give each a concrete length budget so agents stop guessing.",
@@ -1268,18 +1301,25 @@ const seededAnnotations: PendingQuote[] = [
     sourceId: "skill-creator",
   },
   {
+    id: "seed-4",
     text: "Invoke with /skill-creator from any conversation.",
     comments: ["Mention the trigger menu too."],
     sourceId: "skill-creator",
   },
-  { text: "Draft a reusable skill from this conversation.", sourceId: "skill-creator" },
   {
+    id: "seed-5",
+    text: "Draft a reusable skill from this conversation.",
+    sourceId: "skill-creator",
+  },
+  {
+    id: "seed-6",
     text: "The checklist this skill carries should include accessibility, performance, and error handling, each with at least one concrete check the reviewer can run without leaving the editor.",
     comments: ["a11y first."],
     sourceId: "code-review",
   },
-  { text: "When to use", sourceId: "skill-creator" },
+  { id: "seed-7", text: "When to use", sourceId: "skill-creator" },
   {
+    id: "seed-8",
     text: "Steps",
     comments: [
       "The whole Steps section reads as written for humans; add a machine-readable variant so the runner can verify each step actually happened.",
@@ -1411,14 +1451,11 @@ function AnnotationThread({
         ))}
       </div>
       {onRemove ? (
-        <button
-          type="button"
-          aria-label="Discard quoted selection"
-          onClick={onRemove}
-          className="mt-1.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3"
-        >
-          <X aria-hidden="true" />
-        </button>
+        <span className="mt-1.5 shrink-0">
+          <HoverAction label="Discard quoted selection" onClick={onRemove}>
+            <X aria-hidden="true" />
+          </HoverAction>
+        </span>
       ) : null}
     </div>
   )
@@ -1432,6 +1469,8 @@ function AnnotationThread({
  * space on a standing picker. The rim lights while the "agent" works and a
  * canned reply lands.
  */
+const EMPTY_MESSAGES: DemoMessage[] = []
+
 function PlaygroundExample({
   replyDelay = 900,
   initialTabId = "chat-1",
@@ -1441,7 +1480,6 @@ function PlaygroundExample({
   initialTabId?: string
   initialQuotes?: PendingQuote[]
 }) {
-  const [message, setMessage] = React.useState("")
   const [tabs, setTabs] = React.useState([
     { id: "chat-1", title: "Release notes" },
     { id: auditTabId, title: "Repo audit" },
@@ -1450,7 +1488,7 @@ function PlaygroundExample({
   const [messagesByTab, setMessagesByTab] = React.useState<
     Record<string, DemoMessage[]>
   >(seededMessagesByTab)
-  const messages = messagesByTab[activeTabId] ?? []
+  const messages = messagesByTab[activeTabId] ?? EMPTY_MESSAGES
   const updateMessages = React.useCallback(
     (tabId: string, updater: (current: DemoMessage[]) => DemoMessage[]) =>
       setMessagesByTab((current) => ({
@@ -1614,23 +1652,38 @@ function PlaygroundExample({
     }, thinkDelay)
   }
 
-  const lastUserId = [...messages].reverse().find((entry) => entry.role === "user")?.id
+  let lastUserId: number | undefined
+  for (let at = messages.length - 1; at >= 0; at -= 1) {
+    if (messages[at]!.role === "user") {
+      lastUserId = messages[at]!.id
+      break
+    }
+  }
 
   // An overflowing transcript keeps its newest message in view: switching
-  // tabs jumps to the end and new or streaming messages follow it.
+  // tabs jumps to the end, and appended or streaming messages follow —
+  // reacting to or editing an older message must not yank the scroll.
+  const lastMessage = messages[messages.length - 1]
   React.useEffect(() => {
     const log = logRef.current
     if (log) log.scrollTop = log.scrollHeight
-  }, [activeTabId, messages])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTabId, messages.length, lastMessage?.text])
 
   // The subagent whose conversation is on screen, when a sub: tab is active.
   const activeSubagent = activeTabId.startsWith("sub:")
     ? demoSubagents[activeTabId.slice("sub:".length)]
     : undefined
 
+  // Where each subagent tab was opened from, for the back gesture.
+  const subagentParents = React.useRef<Record<string, string>>({})
   /** Opens (or re-fronts) a subagent's conversation as its own tab. */
   const openSubagent = (id: string) => {
     const tabId = subagentTabId(id)
+    subagentParents.current[tabId] ??=
+      activeTabId.startsWith("sub:") || fileTabs[activeTabId]
+        ? auditTabId
+        : activeTabId
     setTabs((current) =>
       current.some((tab) => tab.id === tabId)
         ? current
@@ -1645,8 +1698,10 @@ function PlaygroundExample({
     setOverlay(null)
     setModelCardOpen(false)
     setInlinePreview(null)
-    setQuotes([])
+    // Pending annotations survive navigation — only the views close.
     setQuotesOpen(false)
+    setViewedQuotes(null)
+    setSelectedQuote(null)
   }
 
   const addAttachment = (kind: DemoAttachmentKind) => {
@@ -1680,9 +1735,9 @@ function PlaygroundExample({
         inputRef.current?.focus()
         return
       }
-      // The transcription streams into the real editor at the caret; the
-      // editor reports the text back through onContentChange.
-      inputRef.current?.insertText(word)
+      // The transcription streams into the real editor at the caret, each
+      // word separated the way the spoken stream would be typed.
+      inputRef.current?.insertText(index === 1 ? word : ` ${word}`)
     }, 280)
     return () => clearInterval(interval)
   }, [listening])
@@ -1809,7 +1864,9 @@ function PlaygroundExample({
           // Re-selecting the subagent tab you are inside goes back to the
           // conversation that spawned it — the hover back glyph's action.
           const target =
-            id === activeTabId && id.startsWith("sub:") ? auditTabId : id
+            id === activeTabId && id.startsWith("sub:")
+              ? subagentParents.current[id] ?? auditTabId
+              : id
           setActiveTabId(target)
           setReplyTarget(null)
           setMenuTargetId(null)
@@ -1880,14 +1937,23 @@ function PlaygroundExample({
           onAttach={(text) =>
             setQuotes((current) => [
               ...current,
-              { text, sourceId: activeFileItem.id },
+              {
+                id: `quote-${nextId.current++}`,
+                text,
+                sourceId: activeFileItem.id,
+              },
             ])
           }
           // A comment attaches too — nothing sends until the user sends.
           onComment={(text, comment) =>
             setQuotes((current) => [
               ...current,
-              { text, comments: [comment], sourceId: activeFileItem.id },
+              {
+                id: `quote-${nextId.current++}`,
+                text,
+                comments: [comment],
+                sourceId: activeFileItem.id,
+              },
             ])
           }
         />
@@ -1945,7 +2011,8 @@ function PlaygroundExample({
             }}
             onQuotesOpen={setViewedQuotes}
             onPastedOpen={(chipId) => {
-              const full = pastedTexts.current[chipId]
+              const full =
+                entry.pasted?.[chipId] ?? pastedTexts.current[chipId]
               if (full) openFullText(full)
             }}
             onLongOpen={openFullText}
@@ -1956,9 +2023,14 @@ function PlaygroundExample({
                 : undefined
             }
             onEditSave={(text) => {
+              // The editor edits the flattened text, so the saved message
+              // is that text — stale parts would otherwise keep rendering
+              // the pre-edit chips over the new words.
               updateMessages(activeTabId, (current) =>
                 current.map((message) =>
-                  message.id === entry.id ? { ...message, text } : message,
+                  message.id === entry.id
+                    ? { ...message, text, parts: undefined }
+                    : message,
                 ),
               )
               setEditingMessageId(null)
@@ -2013,7 +2085,7 @@ function PlaygroundExample({
           <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto py-2 text-left [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {(viewedQuotes ?? quotes).map((entry, at) => (
               <AnnotationThread
-                key={at}
+                key={entry.id ?? at}
                 quote={entry}
                 selected={!viewedQuotes && selectedQuote === at}
                 onSelect={
@@ -2120,15 +2192,12 @@ function PlaygroundExample({
               + {quotes.length - 1} other{quotes.length > 2 ? "s" : ""}
             </button>
           ) : null}
-          <button
-            type="button"
-            aria-label="Discard quoted selections"
-            title="Discard quoted selections"
+          <HoverAction
+            label="Discard quoted selections"
             onClick={() => setQuotes([])}
-            className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&_svg]:size-3"
           >
             <X aria-hidden="true" />
-          </button>
+          </HoverAction>
         </div>
       ) : null}
       {fileTabs[activeTabId] ? null : (
@@ -2137,13 +2206,24 @@ function PlaygroundExample({
         onSubmit={(event) => {
           event.preventDefault()
           const content = inputRef.current?.getContent()
-          const text = (content?.text ?? message).trim()
+          const text = (content?.text ?? "").trim()
           // Chips travel with the message: the bubble re-renders them with
           // their icons instead of flattening to plain text — and a chip
           // alone is a sendable message.
           const hasChips = Boolean(
             content?.parts.some((part) => part.type === "chip"),
           )
+          // Pasted-text payloads ride the message itself, so the chips keep
+          // working even if the composer-side store resets.
+          const pastedForMessage = Object.fromEntries(
+            (content?.parts ?? [])
+              .filter(
+                (part): part is Extract<ChatComposerContentPart, { type: "chip" }> =>
+                  part.type === "chip" && part.chip.kind === "pasted-text",
+              )
+              .map((part) => [part.chip.id, pastedTexts.current[part.chip.id]])
+              .filter(([, full]) => full !== undefined),
+          ) as Record<string, string>
           // With the annotation list open and one selected, the send is a
           // follow-up comment attaching to that annotation, not a message.
           if (quotesOpen && selectedQuote !== null) {
@@ -2156,7 +2236,6 @@ function PlaygroundExample({
               ),
             )
             inputRef.current?.clear()
-            setMessage("")
             return
           }
           if (
@@ -2173,14 +2252,19 @@ function PlaygroundExample({
               role: "user",
               text,
               parts: hasChips ? content?.parts : undefined,
+              pasted:
+                Object.keys(pastedForMessage).length > 0
+                  ? pastedForMessage
+                  : undefined,
               quotes: quotes.length > 0 ? quotes : undefined,
-              replyTo: replyTarget?.text,
+              replyTo: replyTarget
+                ? replyTarget.text || "Attachment"
+                : undefined,
               replyToId: replyTarget?.id,
               attachments: attachments.length > 0 ? attachments : undefined,
             },
           ])
           inputRef.current?.clear()
-          setMessage("")
           setAttachments([])
           setReplyTarget(null)
           setQuotes([])
@@ -2247,7 +2331,6 @@ function PlaygroundExample({
               and folders use the tile row above. */}
           <ChatComposerEditor
             ref={inputRef}
-            onContentChange={(content) => setMessage(content.text)}
             onChipPress={(chip) => {
               if (chip.kind === "pasted-text") {
                 const full = pastedTexts.current[chip.id]
@@ -2256,7 +2339,7 @@ function PlaygroundExample({
               }
               openChipFromLabel(chip.label, false)
             }}
-            pasteAttachmentMinLength={120}
+            pasteAttachmentMinLength={PASTE_CHIP_MIN_CHARS}
             onPasteAttachment={(pasted) => {
               const id = `pasted-${nextId.current++}`
               pastedTexts.current[id] = pasted
@@ -2728,11 +2811,22 @@ function prefersReducedMotion(canvasElement: HTMLElement) {
 }
 
 /** Waits for every entrance/rim animation under the frame to finish. */
-async function waitForSettledAnimations(canvasElement: HTMLElement) {
+async function waitForSettledAnimations(
+  canvasElement: HTMLElement,
+  { finiteOnly = false }: { finiteOnly?: boolean } = {},
+) {
   await waitFor(() => {
     const running = canvasElement
       .getAnimations({ subtree: true })
-      .filter((animation) => animation.playState === "running")
+      .filter(
+        (animation) =>
+          animation.playState === "running" &&
+          // Surfaces with perpetually busy avatars can never fully settle;
+          // finiteOnly waits out only the transitions the a11y color pass
+          // would otherwise sample mid-flight.
+          (!finiteOnly ||
+            animation.effect?.getTiming().iterations !== Infinity),
+      )
     expect(running).toHaveLength(0)
   }, { timeout: 4000 })
 }
@@ -3019,16 +3113,7 @@ export const Subagents: Story = {
     // play reads computed colors, so the finite animations must settle
     // first. The busy subagent avatars animate forever by design, so only
     // finite animations count here.
-    await waitFor(() => {
-      const running = canvasElement
-        .getAnimations({ subtree: true })
-        .filter(
-          (animation) =>
-            animation.playState === "running" &&
-            animation.effect?.getTiming().iterations !== Infinity,
-        )
-      expect(running).toHaveLength(0)
-    }, { timeout: 4000 })
+    await waitForSettledAnimations(canvasElement, { finiteOnly: true })
   },
 }
 
@@ -3073,16 +3158,7 @@ export const Annotations: Story = {
     // The a11y pass that follows reads computed colors, so the finite
     // animations must settle first; the busy subagent avatars animate
     // forever by design, so only finite animations count here.
-    await waitFor(() => {
-      const running = canvasElement
-        .getAnimations({ subtree: true })
-        .filter(
-          (animation) =>
-            animation.playState === "running" &&
-            animation.effect?.getTiming().iterations !== Infinity,
-        )
-      expect(running).toHaveLength(0)
-    }, { timeout: 4000 })
+    await waitForSettledAnimations(canvasElement, { finiteOnly: true })
   },
 }
 
