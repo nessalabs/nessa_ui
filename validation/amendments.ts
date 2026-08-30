@@ -158,4 +158,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-011",
+    kind: "correction",
+    contractId: "PKG-002",
+    baseRevision: "57449e2",
+    targets: [],
+    beforeFingerprint: "6dc49eb23673abadf3c1d1c14c1583c5db429e407706636cbd7be5446bb444eb",
+    afterFingerprint: "6dc49eb23673abadf3c1d1c14c1583c5db429e407706636cbd7be5446bb444eb",
+    rationale: "AMEND-009 recorded two things that are no longer true of the code, and the ledger is the wrong place to leave a false statement standing. It said a shadcn consumer loses seventeen fold symbols because the copied index.ts is now the contract entry: the contract entry moved to contract.ts and index.ts became a barrel re-exporting contract and transcript, so the registry consumer's surface is whole again and the published package still splits. AMEND-009 also described the wire.ts narrowing exemption, which AMEND-010 has since restated as the decoder name at any depth; that half needs no correction here. Correcting rather than rewriting, because AMEND-009 was accurate about its own transition and the history is append-only.",
+    compatibility: "No governed source changed, so the snapshot fingerprint is unmoved and this correction records a fact rather than a transition. The registry change restores API that AMEND-009's transition removed, which is additive for every consumer and reverts none of that transition's other effects. PARSE-003's enforced surface is untouched by this correction; AMEND-010 owns the decoder-boundary rule and this branch takes it unchanged.",
+    migration: "A registry consumer that migrated an import from lib/agent-stream to lib/agent-stream/transcript on AMEND-009's advice may keep it — the deep path still resolves — or move it back to the barrel; both work. Parser decoders follow AMEND-010's rule: wire.ts or frame.ts at any depth is the boundary, and everything past it uses the shared readers.",
+    supersedes: "AMEND-009",
+    pullRequest: null,
+  },
 ])

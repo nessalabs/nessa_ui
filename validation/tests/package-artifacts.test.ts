@@ -10,6 +10,8 @@ import {
   moduleSpecifiers,
   packageDeclarationIssues,
   parserPackageDeclarationIssues,
+  registryBarrelIssues,
+  starReexportSpecifiers,
 } from "../nessa/checks/package-artifacts.ts"
 
 const validPackage = {
@@ -116,8 +118,10 @@ test("React is recognized through every entry point that drags the framework in"
 })
 
 test("the contract entry is held away from the fold, transitively", () => {
+  // `contract.ts` is the entry, not `index.ts`: index.ts is the registry barrel
+  // and reaches the fold on purpose.
   const files = new Map([
-    ["packages/agent-stream/src/index.ts", 'export * from "./events"'],
+    ["packages/agent-stream/src/contract.ts", 'export * from "./events"'],
     ["packages/agent-stream/src/events.ts", "export const a = 1"],
     ["packages/agent-stream/src/transcript/index.ts", 'export * from "./fold"'],
     ["packages/agent-stream/src/transcript/fold.ts", "export const b = 2"],
@@ -130,15 +134,64 @@ test("the contract entry is held away from the fold, transitively", () => {
     assert.deepEqual(clean, [], "a contract entry that stops at the agent message reaches no fold module")
 
     // A direct re-export is the obvious violation.
-    files.set("packages/agent-stream/src/index.ts", 'export * from "./events"\nexport * from "./transcript"')
+    files.set("packages/agent-stream/src/contract.ts", 'export * from "./events"\nexport * from "./transcript"')
     assert.deepEqual(await foldReachableFromContract(context), ["packages/agent-stream/src/transcript/index.ts"])
 
     // An indirect one is the violation that would otherwise ship: nothing in
     // the entry names the fold, but the graph still reaches it.
-    files.set("packages/agent-stream/src/index.ts", 'export * from "./events"')
+    files.set("packages/agent-stream/src/contract.ts", 'export * from "./events"')
     files.set("packages/agent-stream/src/events.ts", 'import { b } from "./transcript/fold"\nexport const a = b')
     assert.deepEqual(await foldReachableFromContract(context), ["packages/agent-stream/src/transcript/fold.ts"])
   })
+})
+
+test("the registry barrel keeps both halves of the API for copied source", () => {
+  const barrel = 'export * from "./contract"\nexport * from "./transcript"'
+  assert.deepEqual(registryBarrelIssues(barrel), [])
+  // Comments and ordering are not the contract; the two re-exports are.
+  assert.deepEqual(registryBarrelIssues('/** doc */\nexport * from "./transcript"\nexport * from "./contract"'), [])
+  // An explicit extension names the same module.
+  assert.deepEqual(registryBarrelIssues('export * from "./contract.ts"\nexport * from "./transcript.ts"'), [])
+  // Trimming the barrel to the published package's shape is the regression
+  // this guards: a shadcn consumer has no exports map to reach the fold with.
+  assert.deepEqual(registryBarrelIssues('export * from "./contract"'), ["./transcript"])
+  assert.deepEqual(registryBarrelIssues('export * from "./transcript"'), ["./contract"])
+  assert.deepEqual(registryBarrelIssues("export const nothing = 1").sort(), ["./contract", "./transcript"])
+})
+
+test("only a star re-export carries the whole surface, so only it satisfies the barrel", () => {
+  // The near-misses. Each one *mentions* the module, which is why a check
+  // built on "is this specifier present" waves them through while sixteen of
+  // the seventeen fold symbols vanish from every consumer.
+  assert.deepEqual(
+    registryBarrelIssues('export * from "./contract"\nexport { buildTranscript } from "./transcript"'),
+    ["./transcript"],
+  )
+  assert.deepEqual(
+    registryBarrelIssues('export * from "./contract"\nimport "./transcript"'),
+    ["./transcript"],
+  )
+  assert.deepEqual(
+    registryBarrelIssues('export * from "./contract"\nexport type * from "./transcript"'),
+    ["./transcript"],
+  )
+  assert.deepEqual(
+    registryBarrelIssues('import "./contract"\nimport type { Transcript } from "./transcript"').sort(),
+    ["./contract", "./transcript"],
+  )
+})
+
+test("star re-export detection ignores every other way to name a module", () => {
+  const source = [
+    'export * from "./kept"',
+    'export * as namespaced from "./namespaced"',
+    'export { one } from "./named"',
+    'export type * from "./types-only"',
+    'import "./side-effect"',
+    'const dynamic = await import("./dynamic")',
+    'const required = require("./required")',
+  ].join("\n")
+  assert.deepEqual(starReexportSpecifiers(source, "sample.ts"), ["./kept"])
 })
 
 test("the built parser entries match the two-entry exports map", () => {

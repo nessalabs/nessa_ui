@@ -5,7 +5,7 @@
     "types": ["node"],
     "paths": {
       "@nessa-ui/react": ["../../packages/react/src/index.ts"],
-      "@nessa-ui/agent-stream": ["../../packages/agent-stream/src/index.ts"],
+      "@nessa-ui/agent-stream": ["../../packages/agent-stream/src/contract.ts"],
       "@nessa-ui/agent-stream/transcript": ["../../packages/agent-stream/src/transcript/index.ts"],
       "@/*": ["../../packages/react/src/*"]
     }

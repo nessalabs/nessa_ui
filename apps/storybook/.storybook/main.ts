@@ -39,7 +39,7 @@ const config: StorybookConfig = {
       ),
       "@nessa-ui/agent-stream": path.resolve(
         dirname,
-        "../../../packages/agent-stream/src/index.ts",
+        "../../../packages/agent-stream/src/contract.ts",
       ),
     }
     return config
