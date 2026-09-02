@@ -14,6 +14,7 @@
     "build:registry": "shadcn build",
     "build:storybook": "pnpm --filter @nessa-ui/storybook build",
     "check:package": "tsx validation/check-package.ts",
+    "check:chart-ramp": "tsx validation/tools/check-chart-ramp.ts",
     "check:registry": "tsx validation/check-registry.ts",
     "check:storybook-docs": "pnpm --filter @nessa-ui/storybook test:docs",
     "dev": "pnpm --filter @nessa-ui/storybook dev",

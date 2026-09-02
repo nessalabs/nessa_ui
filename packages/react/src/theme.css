@@ -85,6 +85,11 @@
   --nessa-chart-series-7-strong: oklch(0.5 0.1 305);
   --nessa-chart-series-8: oklch(0.8824 0.071 230);
   --nessa-chart-series-8-strong: oklch(0.72 0.1 230);
+  /* The ink for text written *on* a ramp fill — a pie wedge's inside label.
+     The ramp is pastel in both themes, so one near-black ink reads on every
+     slot (5.16:1 on the darkest fill, 15:1 on the palest); the near-white
+     `--foreground` a dark theme would otherwise use falls to 1.9:1. */
+  --nessa-chart-label-ink: oklch(0.205 0 0);
   --nessa-diff-addition: oklch(0.5 0.137 150);
   --nessa-diff-deletion: oklch(0.55 0.19 27);
   --nessa-invalid-ring: color-mix(in oklab, var(--destructive) 20%, transparent);
@@ -137,22 +142,23 @@
   --nessa-chat-rim-3: rgba(168, 85, 247, 0.62);
   --nessa-chat-rim-4: rgba(56, 189, 248, 0.85);
   --nessa-chat-rim-head: #ffffff;
-  --nessa-chart-series-1: oklch(0.3442 0.07 265);
-  --nessa-chart-series-1-strong: oklch(0.56 0.1 265);
-  --nessa-chart-series-2: oklch(0.3922 0.07 45);
-  --nessa-chart-series-2-strong: oklch(0.66 0.1 45);
-  --nessa-chart-series-3: oklch(0.3634 0.062 190);
-  --nessa-chart-series-3-strong: oklch(0.6 0.1 190);
-  --nessa-chart-series-4: oklch(0.421 0.07 85);
-  --nessa-chart-series-4-strong: oklch(0.72 0.1 85);
-  --nessa-chart-series-5: oklch(0.373 0.07 15);
-  --nessa-chart-series-5-strong: oklch(0.62 0.1 15);
-  --nessa-chart-series-6: oklch(0.3346 0.07 145);
-  --nessa-chart-series-6-strong: oklch(0.54 0.1 145);
-  --nessa-chart-series-7: oklch(0.3538 0.07 305);
-  --nessa-chart-series-7-strong: oklch(0.58 0.1 305);
-  --nessa-chart-series-8: oklch(0.4018 0.07 230);
-  --nessa-chart-series-8-strong: oklch(0.68 0.1 230);
+  --nessa-chart-series-1: oklch(0.6332 0.075 265);
+  --nessa-chart-series-1-strong: oklch(0.7032 0.1 265);
+  --nessa-chart-series-2: oklch(0.7256 0.075 45);
+  --nessa-chart-series-2-strong: oklch(0.7956 0.1 45);
+  --nessa-chart-series-3: oklch(0.6836 0.075 190);
+  --nessa-chart-series-3-strong: oklch(0.7536 0.1 190);
+  --nessa-chart-series-4: oklch(0.7676 0.075 85);
+  --nessa-chart-series-4-strong: oklch(0.8376 0.1 85);
+  --nessa-chart-series-5: oklch(0.7046 0.075 15);
+  --nessa-chart-series-5-strong: oklch(0.7746 0.1 15);
+  --nessa-chart-series-6: oklch(0.6584 0.075 145);
+  --nessa-chart-series-6-strong: oklch(0.7284 0.1 145);
+  --nessa-chart-series-7: oklch(0.65 0.075 305);
+  --nessa-chart-series-7-strong: oklch(0.72 0.1 305);
+  --nessa-chart-series-8: oklch(0.7824 0.071 230);
+  --nessa-chart-series-8-strong: oklch(0.8524 0.1 230);
+  --nessa-chart-label-ink: oklch(0.205 0 0);
   --nessa-diff-addition: oklch(0.77 0.17 152);
   --nessa-diff-deletion: oklch(0.7 0.19 25);
   --nessa-invalid-ring: color-mix(in oklab, var(--destructive) 40%, transparent);
