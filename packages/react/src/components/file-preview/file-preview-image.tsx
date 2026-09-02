@@ -17,13 +17,26 @@ function FilePreviewImage({ file }: FilePreviewRendererProps) {
   const [status, setStatus] = React.useState<"loading" | "loaded" | "error">(
     "loading",
   )
-  // Reset per src so a swapped file goes back through the loading state.
-  React.useEffect(() => setStatus("loading"), [file.src])
-  // A cached or instantly failing source can settle before React attaches the
-  // load/error listeners, so read the element's own state on mount too.
+  const imageRef = React.useRef<HTMLImageElement | null>(null)
+  // A cached, inline, or instantly failing source settles before React
+  // attaches the load/error listeners, so read the element's own state
+  // rather than waiting for an event that has already fired.
   const readSettledState = React.useCallback((node: HTMLImageElement | null) => {
+    imageRef.current = node
     if (node?.complete) setStatus(node.naturalWidth > 0 ? "loaded" : "error")
   }, [])
+  // Reset per src so a swapped file goes back through the loading state. The
+  // settled read happens here too: this effect runs after the ref callback,
+  // so resetting unconditionally would undo it and leave a settled image
+  // hidden behind its skeleton forever.
+  React.useEffect(() => {
+    const node = imageRef.current
+    if (node?.complete) {
+      setStatus(node.naturalWidth > 0 ? "loaded" : "error")
+      return
+    }
+    setStatus("loading")
+  }, [file.src])
 
   if (status === "error") {
     // Covers both a dead source and a format this engine cannot decode
