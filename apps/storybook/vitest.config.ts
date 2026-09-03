@@ -49,6 +49,10 @@ export default defineConfig({
         ],
         test: {
           name: "storybook-reduced-motion",
+          // Same budget as the main project. Playground-scale stories in
+          // this project already wait out token-duration fades (4s each);
+          // the default 15s is shorter than those waits plus the stream.
+          testTimeout: 30000,
           browser: {
             enabled: true,
             provider: playwright({}),
