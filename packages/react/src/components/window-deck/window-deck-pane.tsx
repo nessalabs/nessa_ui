@@ -552,6 +552,11 @@ function WindowDeckPane({
         // emphasized curve does — reads as the deck hesitating. Both stay
         // derived from the motion tokens, so reduced motion still zeroes them.
         "origin-center transition-[translate,scale,opacity] [transition-duration:calc(var(--nessa-motion-duration-slow)*1.5)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
+        // Promoted up front, not when the movement starts. A window carries
+        // real content, and leaving the compositor to raster it into its own
+        // layer on the first animated frame is a visible hitch at exactly the
+        // moment the deck is asking to be judged on its smoothness.
+        "[will-change:transform,opacity] motion-reduce:[will-change:auto]",
         // A discarded window is the exception: it accelerates away instead of
         // coasting, so it reads as thrown rather than as placed.
         leaving &&

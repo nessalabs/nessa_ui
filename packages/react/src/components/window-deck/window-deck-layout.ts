@@ -24,7 +24,7 @@ export interface WindowDeckViewport {
 export interface WindowDeckOverviewInsets {
   /** Space above the first row. */
   top: number
-  /** Space below the last row, where a host's dock or composer sits. */
+  /** Space below the last row, where a host's dock or composer would sit. */
   bottom: number
   /** Space at each side of the grid. */
   horizontal: number
@@ -46,7 +46,11 @@ export interface WindowDeckOverviewOptions {
   maxRows?: number
   /** Space between tiles, both axes. @defaultValue 28 */
   gap?: number
-  /** Space around the grid. @defaultValue 32 top, 96 bottom, responsive sides */
+  /**
+   * Space around the grid. Raise `bottom` when the host draws a dock or a
+   * composer over the deck, so the tiles are not laid out underneath it.
+   * @defaultValue 32 top and bottom, responsive sides
+   */
   insets?: Partial<WindowDeckOverviewInsets>
   /**
    * The smallest a tile may be scaled to before the deck reports that it has
@@ -113,7 +117,11 @@ function resolveInsets(
 
   return {
     top: insets?.top ?? 32,
-    bottom: insets?.bottom ?? (narrow ? 72 : 96),
+    // Symmetric by default. A deck is not assumed to have a dock or a
+    // composer under it; a host that puts one there says so, and everything
+    // else gets a grid that sits in the middle of its box rather than one
+    // pushed up against the top edge with a band of dead space below it.
+    bottom: insets?.bottom ?? 32,
     horizontal:
       insets?.horizontal ?? (narrow ? 20 : Math.max(48, viewportWidth * 0.07)),
   }

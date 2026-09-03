@@ -475,7 +475,7 @@ export const PhotosAndDismissal: Story = {
           </Button>
         </div>
         <div className="min-h-0 flex-1">
-          <WindowDeck {...args} paneWidth="min(620px, 76%)">
+          <WindowDeck {...args} paneWidth="min(620px, 76cqw)">
             {remaining.map((shot) => (
               <WindowDeckPane
                 key={shot.id}

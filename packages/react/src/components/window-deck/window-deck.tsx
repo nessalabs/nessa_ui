@@ -675,9 +675,21 @@ function WindowDeck({
     const duration = longestTransitionMs(pane)
     let timer: number | undefined
 
+    /**
+     * Ends the settle when the rail's own slide finishes, ignoring the
+     * transitions of everything inside it.
+     *
+     * @param event - The transition that ended.
+     */
+    const onRailSettled = (event: TransitionEvent) => {
+      if (event.target !== rail || event.propertyName !== "translate") return
+      finish()
+    }
+
     /** Hands the scroller back its snapping once nothing is transformed. */
     const finish = () => {
       if (timer !== undefined) window.clearTimeout(timer)
+      rail.removeEventListener("transitionend", onRailSettled)
       finishSettleRef.current = null
       rail.style.removeProperty("translate")
       rail.style.removeProperty("transition-property")
@@ -702,7 +714,14 @@ function WindowDeck({
 
     setSettling(true)
     finishSettleRef.current = finish
-    timer = window.setTimeout(finish, duration + 50)
+    // The rail's own movement is what the settle is waiting on, so it ends
+    // the settle; the timer is only a backstop for the cases a transition
+    // never reports — a hidden tab, an interrupted animation. Its margin is
+    // generous on purpose: finishing early re-enables snapping while the
+    // panes are still transformed, and the browser then snaps to a box that
+    // is still moving, which is a visible jump at the end of the return.
+    rail.addEventListener("transitionend", onRailSettled)
+    timer = window.setTimeout(finish, duration + 200)
 
     // An unmount, or another mode change, must not strand the rail at its
     // shift: the settle is finished outright rather than merely abandoned.
@@ -1102,7 +1121,7 @@ function WindowDeck({
             // The rail rides the same curve and duration as the panes: the
             // two are one movement, and any difference between them shows up
             // as the seam the settle exists to hide.
-            className="flex h-full w-max items-center gap-6 py-6 transition-[translate] [transition-duration:calc(var(--nessa-motion-duration-slow)*1.5)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none"
+            className="flex h-full w-max items-center gap-6 py-6 transition-[translate] [transition-duration:calc(var(--nessa-motion-duration-slow)*1.5)] [transition-timing-function:var(--nessa-motion-easing-standard)] [will-change:transform] motion-reduce:transition-none motion-reduce:[will-change:auto]"
           >
             {/*
               Real items rather than padding on the rail: a scroll container
