@@ -1358,7 +1358,9 @@ function WindowDeck({
 
   const liveContentId =
     resolvedMode === "overview"
-      ? (restoreRef.current ?? restorePaneId ?? activePaneId)
+      ? overviewStrip === null
+        ? activePaneId
+        : (restoreRef.current ?? restorePaneId ?? activePaneId)
       : activePaneId
 
   const shouldMountContent = React.useCallback(
