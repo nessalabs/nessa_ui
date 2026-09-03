@@ -648,8 +648,6 @@ export const DeclinedDismissal: Story = {
     await expect(document.activeElement).toBe(
       canvas.getByRole("button", { name: "Chart ramp" }),
     )
-    // The retained-grace timer must finish before the next story mounts.
-    await new Promise((resolve) => window.setTimeout(resolve, 1100))
   },
 }
 
