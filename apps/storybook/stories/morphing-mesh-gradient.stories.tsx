@@ -49,9 +49,9 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 /**
- * Apple-setup card layout: back control top-left, “Try” under the top
- * safe area, quote centred in the middle band, corner pills on the
- * bottom edge. Host must size the gradient frame — this card only fills.
+ * Apple-setup card layout: back control top-left, Try + quote as one
+ * centred cluster, corner pills on the bottom edge. The host sizes the
+ * gradient frame — this card only fills it.
  */
 function NessaSetupCard({
   inverted = false,
@@ -84,19 +84,10 @@ function NessaSetupCard({
         <ChevronLeft className="size-4" strokeWidth={2.25} />
       </button>
 
-      {/*
-        Top-safe “Try”, flex-centred quote, bottom-pinned actions —
-        matching the Apple setup modal rhythm instead of packing the
-        label into the same centred cluster as the quote.
-      */}
-      <p
-        className={`mt-10 text-center text-[0.95rem] font-normal sm:mt-11 ${tone.label}`}
-      >
-        Try
-      </p>
-      <div className="flex min-h-0 flex-1 items-center justify-center px-4 text-center">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-10 text-center">
+        <p className={`text-[0.95rem] font-normal ${tone.label}`}>Try</p>
         <p
-          className={`max-w-[22rem] text-balance text-[1.65rem] leading-snug font-semibold tracking-tight sm:max-w-[26rem] sm:text-[1.85rem] ${tone.quote}`}
+          className={`mt-2 max-w-[22rem] text-balance text-[1.65rem] leading-snug font-semibold tracking-tight sm:max-w-[26rem] sm:text-[1.85rem] ${tone.quote}`}
         >
           “Nessa, open the agent tray.”
         </p>
@@ -120,7 +111,7 @@ function NessaSetupCard({
   )
 }
 
-/** Stable modal frame — height-first so Storybook’s short canvas cannot clip the chrome. */
+/** Height-first modal frame so Storybook’s short canvas cannot clip the chrome. */
 const setupCardShell =
   "h-[min(32rem,70vh)] w-[min(40rem,calc(100vw-2rem))] rounded-[1.75rem] shadow-2xl"
 

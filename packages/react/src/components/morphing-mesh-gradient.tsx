@@ -562,12 +562,13 @@ function MorphingMeshGradient({
         })}
       </div>
       {/*
-        Fill the host box so absolute/flex children resolve percentages
-        against the gradient frame, not a collapsed in-flow wrapper.
+        Absolute fill — a lone in-flow grid child with height:100% does not
+        reliably stretch when the host’s height comes from className alone,
+        which left playground chrome sitting in the top half of the frame.
       */}
       <div
         data-slot="morphing-mesh-gradient-content"
-        className="relative z-[1] col-start-1 row-start-1 min-h-0 h-full w-full"
+        className="absolute inset-0 z-[1]"
       >
         {children}
       </div>
