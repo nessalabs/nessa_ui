@@ -365,6 +365,19 @@ export const OverviewAndBack: Story = {
     // Escape is the dismissal, and lands back where the deck came from.
     await userEvent.keyboard("{Meta>}g{/Meta}")
     await waitFor(() => expect(deck).toHaveAttribute("data-mode", "overview"))
+    // Re-opening centres the window the carousel is on now, not the one
+    // the first visit restored to, and keeps that window's tree mounted.
+    await expect(document.getElementById("calendar")).toHaveAttribute(
+      "data-content",
+      "live",
+    )
+    await waitFor(() => {
+      const box = viewport.getBoundingClientRect()
+      const tile = document.getElementById("calendar")!.getBoundingClientRect()
+
+      expect(tile.left).toBeGreaterThanOrEqual(box.left - 1)
+      expect(tile.right).toBeLessThanOrEqual(box.right + 1)
+    })
     await userEvent.keyboard("{Escape}")
     await waitFor(() => expect(deck).toHaveAttribute("data-mode", "carousel"))
     await waitFor(() =>
@@ -1067,5 +1080,16 @@ export const PreviewStrip: Story = {
     await waitFor(() => expect(deck.querySelector("[data-settling]")).toBeNull())
     await expect(canvas.getByText("live-11")).toBeVisible()
     await expect(canvas.queryByText("live-0")).toBeNull()
+
+    await userEvent.keyboard("{Meta>}g{/Meta}")
+    await waitFor(() => expect(deck).toHaveAttribute("data-mode", "overview"))
+    await expect(document.getElementById("pane-11")).toHaveAttribute(
+      "data-content",
+      "live",
+    )
+    await expect(canvas.queryByText("live-0")).toBeNull()
+    await userEvent.keyboard("{Escape}")
+    await waitFor(() => expect(deck).toHaveAttribute("data-mode", "carousel"))
+    await waitFor(() => expect(deck.querySelector("[data-settling]")).toBeNull())
   },
 }

@@ -426,7 +426,7 @@ function WindowDeckPane({
         if (Math.hypot(deltaX, deltaY) < ENGAGE_DISTANCE) return
         // Sideways travel in the overview is a scroll of the strip, not a
         // throw. A pane that cannot be dismissed still pans this way.
-        if (overview && Math.abs(deltaX) > Math.abs(deltaY)) {
+        if (overview && Math.abs(deltaX) > Math.abs(deltaY) * 1.25) {
           drag.engaged = true
           panning = true
           drag.offsetX = deltaX

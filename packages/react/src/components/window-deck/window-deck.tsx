@@ -712,11 +712,16 @@ function WindowDeck({
       viewport.scrollTo({ left: viewport.scrollLeft, behavior: "instant" })
       programmaticScrollRef.current = false
     }
+    // The window the carousel is on now, not the one a previous visit
+    // restored to. Leaving restore stale here would centre the strip — and
+    // mount the live tree — on a window the user already left.
+    const live = activePaneIdRef.current
     // A deck with no room for a strip stays a carousel: an overview whose
     // tiles cannot be read is one where the panes have not moved.
-    if (!measureTiles(restoreRef.current ?? activePaneIdRef.current)) return
+    if (!measureTiles(live)) return
+    setRestore(live)
     setMode("overview")
-  }, [measureTiles, setMode])
+  }, [measureTiles, setMode, setRestore])
 
   const closeOverview = React.useCallback(
     (paneId?: string) => {
@@ -1059,6 +1064,7 @@ function WindowDeck({
   React.useLayoutEffect(() => {
     if (resolvedMode !== "overview") {
       overviewStripRef.current = null
+      setOverviewStrip((current) => (current === null ? current : null))
       return
     }
     // A deck that opens in the overview must be centred before the tiles are
@@ -1074,9 +1080,8 @@ function WindowDeck({
     // that no longer pans. Centring runs only on the way in; a resize or a
     // dismissal keeps the current offset.
     const entering = overviewStripRef.current === null
-    if (
-      measureTiles(entering ? (restoreRef.current ?? activePaneId) : undefined)
-    ) {
+    if (entering && activePaneId !== undefined) setRestore(activePaneId)
+    if (measureTiles(entering ? activePaneId : undefined)) {
       forcedCarouselRef.current = false
       // A deck that opened straight into the overview has no earlier
       // carousel commit to have seeded the window it returns to.
@@ -1352,7 +1357,9 @@ function WindowDeck({
   }
 
   const liveContentId =
-    resolvedMode === "overview" ? (restorePaneId ?? activePaneId) : activePaneId
+    resolvedMode === "overview"
+      ? (restoreRef.current ?? restorePaneId ?? activePaneId)
+      : activePaneId
 
   const shouldMountContent = React.useCallback(
     (paneId: string) => contentMount === "always" || paneId === liveContentId,
@@ -1390,10 +1397,17 @@ function WindowDeck({
     if (paneHeight !== "auto") return
     const pane = paneElement(liveContentId)
     if (!pane) return
-    const height = pane.offsetHeight
-    if (height > 0) {
-      setMeasuredPaneHeight((current) => (current === height ? current : height))
+
+    const commit = (height: number) => {
+      if (height > 0) {
+        setMeasuredPaneHeight((current) => (current === height ? current : height))
+      }
     }
+
+    commit(pane.offsetHeight)
+    const observer = new ResizeObserver(() => commit(pane.offsetHeight))
+    observer.observe(pane)
+    return () => observer.disconnect()
   }, [liveContentId, paneElement, paneHeight, panes])
 
   const contextValue = React.useMemo(
@@ -1479,6 +1493,7 @@ function WindowDeck({
                   ? event.deltaX
                   : event.deltaY
               if (delta === 0) return
+              event.preventDefault()
               panOverview(delta)
               return
             }
