@@ -756,6 +756,26 @@
           "target": "lib/agent-stream/capabilities.ts"
         },
         {
+          "path": "packages/agent-stream/src/cursor/index.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/cursor/index.ts"
+        },
+        {
+          "path": "packages/agent-stream/src/cursor/stream/mapper.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/cursor/stream/mapper.ts"
+        },
+        {
+          "path": "packages/agent-stream/src/cursor/stream/mapping.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/cursor/stream/mapping.ts"
+        },
+        {
+          "path": "packages/agent-stream/src/cursor/stream/wire.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/cursor/stream/wire.ts"
+        },
+        {
           "path": "packages/agent-stream/src/claude/index.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/claude/index.ts"

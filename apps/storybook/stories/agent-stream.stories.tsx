@@ -6,6 +6,7 @@ import {
   Button,
   ClaudeStreamMapper,
   CodexStreamMapper,
+  CursorStreamMapper,
   AcpMapper,
   CodexAppServerMapper,
   OpencodeRunMapper,
@@ -114,6 +115,13 @@ import codexResumeOne from "./fixtures/agent-stream/codex/resume_turn1.jsonl?raw
 import codexResumeTwo from "./fixtures/agent-stream/codex/resume_turn2.jsonl?raw"
 import codexTools from "./fixtures/agent-stream/codex/tools.jsonl?raw"
 import codexWebsearch from "./fixtures/agent-stream/codex/websearch.jsonl?raw"
+
+import cursorPrinted from "./fixtures/agent-stream/cursor/printed.jsonl?raw"
+import cursorShell from "./fixtures/agent-stream/cursor/shell.jsonl?raw"
+import cursorSubagent from "./fixtures/agent-stream/cursor/subagent.jsonl?raw"
+import cursorTools from "./fixtures/agent-stream/cursor/tools.jsonl?raw"
+import acpCursorPrinted from "./fixtures/agent-stream/acp/cursor_printed.jsonl?raw"
+import acpCursorTools from "./fixtures/agent-stream/acp/cursor_tools.jsonl?raw"
 // What the interactive app-server answers that the one-way stream never sends.
 import codexAppServerCapabilities from "./fixtures/agent-stream/codex/appserver_capabilities.json"
 import opencodeCliAgents from "./fixtures/agent-stream/opencode/cli_agents.txt?raw"
@@ -141,7 +149,7 @@ import opencodeCliModels from "./fixtures/agent-stream/opencode/cli_models.txt?r
 import diskSubagent from "./fixtures/agent-stream/disk_subagent_a37fefefbc61e13e3.jsonl?raw"
 import diskWorkflowAgent from "./fixtures/agent-stream/disk_workflow_agent_a35ea63276cd501aa.jsonl?raw"
 
-type ProviderId = "claude" | "codex" | "opencode"
+type ProviderId = "claude" | "codex" | "cursor" | "opencode"
 
 /**
  * What a provider is, and what it supports.
@@ -215,6 +223,17 @@ const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
       "turn.started is a bare marker, and an item that is reported whole on completion says nothing when it opens.",
     supports: { workflowBoard: false, transcriptsOnDisk: true },
   },
+  cursor: {
+    id: "cursor",
+    label: "Cursor Agent",
+    command: "agent -p --output-format stream-json --stream-partial-output",
+    transports: transportsOf("cursor")!.transports,
+    createMapper: (transportId: string) =>
+      transportId === "acp" ? new AcpMapper() : new CursorStreamMapper(),
+    silentLinesNote:
+      "thinking/completed carries no text of its own — the deltas already built it — and a tool_call that this build has not named yet is left as unknown rather than guessed. On ACP, authenticate and available_commands_update are capability rather than conversation.",
+    supports: { workflowBoard: false, transcriptsOnDisk: false },
+  },
   opencode: {
     id: "opencode",
     label: "opencode",
@@ -287,6 +306,14 @@ const CAPTURES: readonly Capture[] = [
 
   { provider: "codex", transport: "app-server", id: "codex-appserver", label: "Tools", blurb: "The other Codex protocol. It carries the prompt in the client's own request and streams the answer as agentMessage deltas — neither of which `exec --json` does.", prompt: "Create notes.txt with two lines, then run 'wc -l notes.txt'.", source: codexAppServerTools },
   { provider: "codex", transport: "acp", id: "codex-acp", label: "Tools over ACP", blurb: "Codex through the ACP adapter, read by the same reader as Claude's and opencode's. Streams where exec does not, and reports its sandbox modes — read-only, auto, full-access.", prompt: "Create notes.txt with two lines, then run 'wc -l notes.txt'.", source: acpCodexTools },
+
+  // ---------- cursor ----------
+  { provider: "cursor", transport: "stream", id: "cursor-printed", label: "Plain text", blurb: "Timestamped assistant lines are text deltas; the final assistant line has no timestamp. Thinking streams the same way, then commits on thinking/completed.", prompt: "Reply with exactly the word hello and nothing else. Do not use tools.", source: cursorPrinted },
+  { provider: "cursor", transport: "stream", id: "cursor-tools", label: "Tools", blurb: "Edit and Read arrive as camelCase tool envelopes that open and settle — and Edit publishes a unified diff on completion.", prompt: "Create a file named hello.txt containing the text hi. Then read it back and confirm.", source: cursorTools },
+  { provider: "cursor", transport: "stream", id: "cursor-shell", label: "Shell + search", blurb: "A shell command reports its own exit code; Grep settles with structured match results.", prompt: "Run: echo hello-from-shell. Then search hello.txt for hi.", source: cursorShell },
+  { provider: "cursor", transport: "stream", id: "cursor-subagent", label: "Spawned agent", blurb: "Task spawns a Cursor agent whose own events never reach this stream — the parent only sees the call open, then the child's final report on completion.", prompt: "Use the Task tool to spawn a quick explore subagent that lists workspace root files.", source: cursorSubagent },
+  { provider: "cursor", transport: "acp", id: "cursor-acp-printed", label: "Plain text over ACP", blurb: "The same agent on ACP: authenticate with cursor_login, then session/new advertises models and modes. Chunks stream as agent_message_chunk / agent_thought_chunk.", prompt: "Reply with exactly the word hello and nothing else. Do not use tools.", source: acpCursorPrinted },
+  { provider: "cursor", transport: "acp", id: "cursor-acp-tools", label: "Tools over ACP", blurb: "Approvals land as session/request_permission (allow-once / allow-always / reject-once). Edit updates name locations and carry a diff content block.", prompt: "Create notes.txt with two lines, then run wc -l notes.txt.", source: acpCursorTools },
 
   // ---------- opencode ----------
   { provider: "opencode", transport: "run", id: "oc-printed", label: "Plain text", blurb: "Three lines for a whole turn. No init, no deltas, no terminator of its own — a step opens, a part carries the answer, a step finishes.", prompt: "Reply with exactly: hello world. Do not use any tools.", source: opencodePrinted },
@@ -1824,7 +1851,7 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
 }
 
 const meta = {
-  title: "Composites/AgentStream",
+  title: "Agents/AgentStream",
   component: Explorer,
   tags: ["autodocs", "test"],
   parameters: {
@@ -1914,6 +1941,12 @@ const STRUCTURE = `classDiagram
         +CODEX_EXEC_PROVENANCE 0.144.1
         parseCodexLine(line)
     }
+    class CursorStream {
+        <<cursor/stream/wire.ts>>
+        +CursorWireType
+        +CURSOR_STREAM_PROVENANCE 2026.09.02-c22c1a3
+        parseCursorLine(line)
+    }
     class CodexAppServer {
         <<codex/app-server/wire.ts>>
         +CodexAppServerNotification
@@ -1933,7 +1966,7 @@ const STRUCTURE = `classDiagram
         parseOpencodeSseLine(frame)
     }
     class Acp {
-        <<acp/ — one protocol, three agents>>
+        <<acp/ — one protocol, four agents>>
         +AcpMethod
         +AcpUpdate
         +ACP_PROVENANCE protocol 1
@@ -1961,6 +1994,7 @@ const STRUCTURE = `classDiagram
         ClaudeStreamMapper
         CodexStreamMapper
         CodexAppServerMapper
+        CursorStreamMapper
         OpencodeRunMapper
         OpencodeServerMapper
         AcpMapper
@@ -1971,6 +2005,7 @@ const STRUCTURE = `classDiagram
         CLAUDE_EVENT_MAPPING
         CODEX_EVENT_MAPPING
         CODEX_APP_SERVER_MAPPING
+        CURSOR_EVENT_MAPPING
         OPENCODE_RUN_MAPPING
         OPENCODE_SERVER_MAPPING
         ACP_MAPPING
@@ -2000,7 +2035,7 @@ const STRUCTURE = `classDiagram
     }
 
     class TransportDescriptor {
-        <<transports.ts — 9 transports>>
+        <<transports.ts — 11 transports>>
         +id
         +provenance WireProvenance
         +supports TransportSupport
@@ -2040,6 +2075,7 @@ const STRUCTURE = `classDiagram
     ClaudeStream --> Mappers
     CodexExec --> Mappers
     CodexAppServer --> Mappers
+    CursorStream --> Mappers
     OpencodeRun --> Mappers
     OpencodeServer --> Mappers
     Acp --> Mappers
@@ -2060,7 +2096,7 @@ const STRUCTURE = `classDiagram
 /**
  * The exchange only an interactive transport has.
  *
- * Three of the six wires are one-way: bytes arrive and a surface renders
+ * Four of the seven wires are one-way: bytes arrive and a surface renders
  * them. ACP is a conversation, and drawing it beside the one-way flow is the
  * clearest way to show why "does this agent support approvals" is a question
  * about the transport rather than the agent.
@@ -2069,7 +2105,7 @@ const DUPLEX = `sequenceDiagram
     autonumber
     participant UI as Surface
     participant Map as AcpMapper
-    participant Agent as Claude Code, Codex or opencode
+    participant Agent as Claude Code, Codex, Cursor or opencode
 
     UI->>Agent: session/prompt carrying the prompt text
     Note over Map: the client's own request is mapped —<br/>ACP is the one wire where what was<br/>asked is on the wire at all
@@ -2252,7 +2288,7 @@ function TransportMatrix() {
 
 export const Architecture: Story = {
   parameters: storyDocumentation(
-    "How the parser is put together, now that three agents and six wires have been read. Each transport owns its own envelope types, its own mapping table and its own mapper — they are separate protocols with separate versions, and opencode alone speaks three. Only what is genuinely identical is shared: opencode's `run` and `serve` carry the same message parts, so those are read once. Everything to the right of AgentEvent is agent-agnostic, which is what makes a fourth provider a new column here and no change to any component. The three diagrams are the structure, one line's journey on a one-way wire, and the exchange only an interactive one has.",
+    "How the parser is put together, now that four agents and seven wires have been read. Each transport owns its own envelope types, its own mapping table and its own mapper — they are separate protocols with separate versions, and opencode alone speaks three. Only what is genuinely identical is shared: opencode's `run` and `serve` carry the same message parts, so those are read once. Everything to the right of AgentEvent is agent-agnostic, which is what makes a fifth provider a new column here and no change to any component. The three diagrams are the structure, one line's journey on a one-way wire, and the exchange only an interactive one has.",
   ),
   args: {},
   render: () => (
@@ -2260,11 +2296,11 @@ export const Architecture: Story = {
       <section className="flex flex-col gap-2">
         <h3 className="text-sm font-medium">Layers, and what each one owns</h3>
         <p className="text-muted-foreground text-sm">
-          One direction of dependency, and one box per wire — six wires carrying nine transports across three agents. A transport supplies its own
+          One direction of dependency, and one box per wire — seven wires carrying eleven transports across four agents. A transport supplies its own
           envelope types, its own mapping table and its own mapper; everything from AgentEvent rightwards is shared and does not
           move. Only two things are shared further left, and both because they are genuinely the same: opencode&rsquo;s one-way
-          stream and its server bus carry identical message parts, and ACP is one protocol that Claude Code, Codex and opencode
-          all speak.
+          stream and its server bus carry identical message parts, and ACP is one protocol that Claude Code, Codex, Cursor Agent and
+          opencode all speak.
         </p>
         <MermaidDiagram chart={STRUCTURE} className="w-full" />
       </section>
@@ -2280,11 +2316,11 @@ export const Architecture: Story = {
       <section className="flex flex-col gap-2">
         <h3 className="text-sm font-medium">And the exchange only an interactive transport has</h3>
         <p className="text-muted-foreground text-sm">
-          Three of the six wires are one-way; the other three are conversations. ACP is the same conversation whichever agent is
+          Four of the seven wires are one-way; the other three are conversations. ACP is the same conversation whichever agent is
           behind it —
-          Claude Code, Codex and opencode all speak it, so one reader serves all three. The agent asks the client for permission
+          Claude Code, Codex, Cursor Agent and opencode all speak it, so one reader serves all four. The agent asks the client for permission
           and blocks until answered, which is why &ldquo;does this agent support approvals&rdquo; is a question about the
-          transport rather than the agent.
+          transport rather than the agent. Cursor has no HTTP <code>serve</code> bus — ACP is that interactive wire.
         </p>
         <MermaidDiagram chart={DUPLEX} className="w-full" />
       </section>

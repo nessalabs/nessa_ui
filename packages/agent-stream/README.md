@@ -1,7 +1,7 @@
 # @nessa-ui/agent-stream
 
 Parsers that normalize coding-agent CLI streams — Claude Code, Codex,
-opencode, and ACP — onto one event contract.
+Cursor Agent, opencode, and ACP — onto one event contract.
 
 No dependencies, no peer dependencies, no React. The package parses bytes into
 data; drawing that data is somebody else's job.
@@ -50,13 +50,13 @@ Provider surfaces are namespaced, not flattened — two providers want the same
 names, and a star-export collision would make adding a third a breaking change.
 
 ```ts
-import { acp, claude, codex, opencode } from "@nessa-ui/agent-stream"
+import { acp, claude, codex, cursor, opencode } from "@nessa-ui/agent-stream"
 ```
 
-The six mappers — and the `map*Stream` helpers that drive them over a whole
+The mappers — and the `map*Stream` helpers that drive them over a whole
 capture — are also exported flat, since reaching for a parser by name is the
 common case: `ClaudeStreamMapper`, `CodexStreamMapper`, `CodexAppServerMapper`,
-`OpencodeRunMapper`, `OpencodeServerMapper`, `AcpMapper`.
+`CursorStreamMapper`, `OpencodeRunMapper`, `OpencodeServerMapper`, `AcpMapper`.
 
 ## React
 

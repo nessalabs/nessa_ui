@@ -7,6 +7,7 @@ import type { WireProvenance } from "./events"
 import { CLAUDE_STREAM_PROVENANCE } from "./claude/stream/wire"
 import { CODEX_APP_SERVER_PROVENANCE } from "./codex/app-server/wire"
 import { CODEX_EXEC_PROVENANCE } from "./codex/exec/wire"
+import { CURSOR_STREAM_PROVENANCE } from "./cursor/stream/wire"
 import { OPENCODE_RUN_PROVENANCE } from "./opencode/run/wire"
 import { OPENCODE_SERVER_PROVENANCE } from "./opencode/server/wire"
 
@@ -101,6 +102,14 @@ const CODEX_ACP: WireProvenance = Object.freeze({
   version: "1.7.0",
   command: "npx @agentclientprotocol/codex-acp",
   capturedOn: "2026-08-29",
+})
+
+/** Cursor speaks ACP natively; the build is the same CLI as its stream-json transport. */
+const CURSOR_ACP: WireProvenance = Object.freeze({
+  cli: CURSOR_STREAM_PROVENANCE.cli,
+  version: CURSOR_STREAM_PROVENANCE.version,
+  command: "agent acp",
+  capturedOn: "2026-09-02",
 })
 
 /**
@@ -250,6 +259,57 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
           contextWindow: true,
         }),
         note: "Codex through the ACP adapter. Streams where `exec --json` does not, and `session/new` reports the sandbox modes — read-only, auto, full-access — that are its nearest thing to a permission mode.",
+      }),
+    ]),
+  }),
+  Object.freeze({
+    id: "cursor",
+    label: "Cursor Agent",
+    transports: Object.freeze([
+      Object.freeze({
+        id: "stream",
+        label: "stream-json",
+        command: "agent -p --output-format stream-json --stream-partial-output",
+        interactive: false,
+        provenance: CURSOR_STREAM_PROVENANCE,
+        supports: Object.freeze({
+          streaming: true,
+          // Init names the model and cwd, but not tools, skills or commands.
+          capabilities: false,
+          approvals: false,
+          steering: false,
+          namesModel: true,
+          // Edit completions publish a unified diff on the wire.
+          fileEdits: true,
+          sharedBus: false,
+          sessionControl: false,
+          contextWindow: false,
+        }),
+        note: "One-way Cursor Agent print mode. Timestamped assistant lines are text deltas; the final assistant line has no timestamp. Task spawns a child agent whose transcript never reaches this stream. There is no HTTP event bus — Cursor's interactive wire is ACP, not a serve.",
+      }),
+      Object.freeze({
+        id: "acp",
+        label: "acp",
+        command: "agent acp",
+        interactive: true,
+        provenance: CURSOR_ACP,
+        supports: Object.freeze({
+          streaming: true,
+          // session/new advertises models, modes and config options; available_commands_update lands on the stream.
+          capabilities: true,
+          // Captured: session/request_permission with allow-once / allow-always / reject-once.
+          approvals: true,
+          steering: null,
+          namesModel: true,
+          // Edit tool_call_update names locations and carries a diff content block.
+          fileEdits: true,
+          sharedBus: false,
+          // initialize advertises loadSession and session list; session/new and session/load open conversations.
+          sessionControl: true,
+          // No usage_update with a window size in the captures.
+          contextWindow: false,
+        }),
+        note: "Cursor Agent natively over ACP. Approvals block on session/request_permission; authenticate uses cursor_login. Extension methods (cursor/ask_question, cursor/create_plan, cursor/update_todos, cursor/task) exist in the docs but were not exercised in these captures.",
       }),
     ]),
   }),

@@ -6,7 +6,7 @@ Everything asserted here was observed in a capture, and every capture named is
 checked in under
 `apps/storybook/stories/fixtures/agent-stream/`. The reference implementation is
 `packages/agent-stream/src/`, and the Storybook story
-**Composites/AgentStream** renders each capture next to its raw bytes.
+**Agents/AgentStream** renders each capture next to its raw bytes.
 
 If you are an agent asked to build one of these: read this file, then read the
 fixtures. Do not design against remembered field names — the wire moves, and the
@@ -40,7 +40,7 @@ packages/agent-stream/src/
     index.ts       the fold's own entry                     ← "./transcript" export
     fold.ts        one-shot fold                            ← shared, optional
     builder.ts     incremental fold                         ← shared, optional
-  acp/             one protocol, three agents               ← protocol
+  acp/             one protocol, four agents                ← protocol
     frame.ts       JSON-RPC line decoder (no `type` field)
     wire.ts        methods, updates, tool kinds
     mapping.ts / mapper.ts
@@ -54,18 +54,20 @@ packages/agent-stream/src/
   codex/
     exec/          `codex exec --json`
     app-server/    `codex app-server`
+  cursor/
+    stream/        `agent -p --output-format stream-json`
+                   (interactive wire is shared `acp/`, not a serve)
   opencode/
     run/           `opencode run --format json`
     server/        `opencode serve` SSE bus
     parts.ts       payload run and serve both carry
 ```
 
-Three providers plus one shared protocol now exist, which is what turns the
-layering from a claim into a measurement. Adding Codex cost **one** addition to
-the shared contract — `file_edits`, for a capability Claude Code does not have
-— and nothing else moved: the fold, the grouping, the delta machinery and every
-component are reused untouched, and a test asserts the shared fold accepts
-Codex events with no provider knowledge at all.
+Four providers plus one shared protocol now exist, which is what turns the
+layering from a claim into a measurement. Adding Cursor cost **no** addition to
+the shared contract — Task spawns reuse `task_started`/`task_completed`, and
+Edit diffs reuse `file_edits` — and nothing else moved: the fold, the grouping,
+the delta machinery and every component are reused untouched.
 
 The Storybook story is a demo, not a shipped component.
 
@@ -556,8 +558,8 @@ opencode/
   store.ts       an exported session, read through the run mapper
   capabilities.ts  what the CLI's own listings answer
 
-acp/             beside every agent, not inside one — Claude Code, Codex and
-                 opencode all speak this protocol
+acp/             beside every agent, not inside one — Claude Code, Codex,
+                 Cursor Agent and opencode all speak this protocol
   frame.ts       JSON-RPC line decoder (no `type` field)
   wire.ts        methods, updates, tool kinds
   mapping.ts / mapper.ts
@@ -712,24 +714,28 @@ Capabilities come from a fourth place for the first two: `opencode models` and
 `opencode agent list` print them, and neither of those wires does. ACP answers
 for itself.
 
-### ACP: one protocol, three agents
+### ACP: one protocol, four agents
 
 This started as an opencode module and moved out, because it turned out not to
 be an opencode thing at all. Claude Code and Codex both speak ACP through Zed's
 adapters — `@zed-industries/claude-code-acp` and
-`@agentclientprotocol/codex-acp` — and the *same reader* maps all three
+`@agentclientprotocol/codex-acp` — while opencode and Cursor Agent speak it
+natively (`opencode acp`, `agent acp`). The *same reader* maps all four
 captures without a change. That is the strongest evidence in this repository
 that the contract is real rather than aspirational.
 
 It also moves capability off the agent and onto the transport in a way that is
 easy to state: Claude Code asks for permission over ACP without the stdio flag
-its own stream needs, and Codex streams tokens over ACP where `exec --json`
-sends none. Neither is a property of the agent.
+its own stream needs, Codex streams tokens over ACP where `exec --json`
+sends none, and Cursor's interactive approvals live here rather than on a
+HTTP `serve` bus (Cursor has none — ACP is that wire). None of these is a
+property of the agent alone.
 
 Two practical notes. The Claude adapter refuses to start inside another Claude
 Code session unless `CLAUDECODE` is unset. And an agent may extend the protocol
 under `_meta` — Codex sends a `session_info_update` doing exactly that — so a
 reader has to tolerate an extension rather than treat it as an unknown frame.
+Cursor requires `authenticate` with `cursor_login` after `initialize`.
 
 ### Which version each of these is true of
 
@@ -744,15 +750,17 @@ description was read from, next to the command that produces it:
 | codex-cli | exec | 0.144.1 | `codex exec --json` |
 | codex-cli | app-server | 0.144.1 | `codex app-server` |
 | codex-cli | acp | adapter 1.7.0 | `npx @agentclientprotocol/codex-acp` |
+| Cursor Agent | stream-json | 2026.09.02-c22c1a3 | `agent -p --output-format stream-json --stream-partial-output` |
+| Cursor Agent | acp | 2026.09.02-c22c1a3, **protocol 1** | `agent acp` |
 | opencode | run | 1.18.25 | `opencode run --format json` |
 | opencode | serve | 1.18.25, **API 1.0.0** | `opencode serve → GET /event` |
 | opencode | acp | 1.18.25, **protocol 1** | `opencode acp` |
 
-Nine transports over six wires, because two of them are the same wire twice:
+Eleven transports over seven wires, because two of them are the same wire twice:
 Claude's duplex mode is its own stream with stdin open, and ACP is one protocol
-shared by three agents. The modules follow that exactly — `claude/stream/`,
-`codex/exec/`, `codex/app-server/`, `opencode/run/`, `opencode/server/`, and
-`acp/` beside them rather than inside any one agent.
+shared by four agents. The modules follow that exactly — `claude/stream/`,
+`codex/exec/`, `codex/app-server/`, `cursor/stream/`, `opencode/run/`,
+`opencode/server/`, and `acp/` beside them rather than inside any one agent.
 
 Per *transport*, not per provider, because a provider can speak more than one
 protocol and they version independently — opencode's server declares its own
