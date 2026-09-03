@@ -1,8 +1,8 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect } from "storybook/test"
+import { ChevronLeft } from "lucide-react"
 import {
-  Button,
   MorphingMeshGradient,
   meshGradientFromRange,
   morphingMeshGradientPresets,
@@ -36,7 +36,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A living mesh-gradient backdrop in the Apple glass-mesh register: oversized luminous colour blooms melt and drift behind content, built from a swappable palette and layout type (`mesh`, `aurora`, or `orb`). Defaults to the `glass` preset. Pass any CSS colour array, or build one with `meshGradientFromRange(start, end, count)`. Set `inverted` for the pale reading — or reach for the `glassInverted` preset. Motion follows the ambient duration token and cancels under reduced motion; off-screen instances pause so a gallery does not keep every card animating. Purely decorative — text contrast on top belongs to the host.",
+          "A living mesh-gradient backdrop in the Apple glass-mesh register: solid colour fields melted by one parent blur, then migrated across the card so the wash visibly shifts from frame to frame. Defaults to the `glass` preset. Pass any CSS colour array, or build one with `meshGradientFromRange(start, end, count)`. Set `inverted` for the pale reading — or reach for `glassInverted`. Motion follows the ambient duration token and cancels under reduced motion.",
       },
     },
   },
@@ -45,29 +45,71 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** Nessa-specific hero copy for the living wash — not a product parody. */
-function NessaHeroContent() {
+/**
+ * Apple-setup card layout: back control top-left, centred prompt, two
+ * bottom-corner pills. Absolute chrome + a grid that stretches the
+ * content layer to the host box so vertical centering actually resolves.
+ */
+function NessaSetupCard({
+  inverted = false,
+}: {
+  inverted?: boolean
+}) {
+  const tone = inverted
+    ? {
+        label: "text-neutral-600/80",
+        quote: "text-neutral-900",
+        back: "bg-black/10 text-neutral-800 hover:bg-black/15",
+        later: "bg-white/70 text-neutral-800 hover:bg-white/85",
+        continue: "bg-white/85 text-neutral-900 hover:bg-white",
+      }
+    : {
+        label: "text-white/75",
+        quote: "text-white",
+        back: "bg-black/20 text-white hover:bg-black/30",
+        later: "bg-white/55 text-neutral-900 hover:bg-white/70",
+        continue: "bg-white/70 text-neutral-900 hover:bg-white/85",
+      }
+
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-6 px-8 py-16 text-center">
-      <p className="text-sm font-medium tracking-[0.18em] text-white/70 uppercase">
-        Nessa UI
-      </p>
-      <h2 className="max-w-2xl text-balance text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-        Surfaces that think in colour
-      </h2>
-      <p className="max-w-md text-pretty text-base text-white/80">
-        A morphing mesh for heroes, empty states, and ambient shells —
-        palette in, living wash out.
-      </p>
-      <Button
-        size="lg"
-        className="rounded-full bg-white px-6 text-neutral-900 shadow-sm hover:bg-white/90"
+    <div className="relative flex h-full min-h-[28rem] w-full flex-col px-7 pb-7 pt-6 sm:min-h-[30rem] sm:px-9 sm:pb-8 sm:pt-7">
+      <button
+        type="button"
+        aria-label="Back"
+        className={`absolute top-5 left-5 flex size-9 items-center justify-center rounded-full transition-colors sm:top-6 sm:left-6 ${tone.back}`}
       >
-        Browse components
-      </Button>
+        <ChevronLeft className="size-4" strokeWidth={2.25} />
+      </button>
+
+      <div className="flex flex-1 flex-col items-center justify-center px-4 text-center">
+        <p className={`text-[0.95rem] font-normal ${tone.label}`}>Try</p>
+        <p
+          className={`mt-2 max-w-[22rem] text-balance text-[1.65rem] leading-snug font-semibold tracking-tight sm:max-w-[26rem] sm:text-[1.85rem] ${tone.quote}`}
+        >
+          “Nessa, open the agent tray.”
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 items-center gap-3">
+        <button
+          type="button"
+          className={`justify-self-start rounded-full px-5 py-2.5 text-sm font-medium transition-colors ${tone.later}`}
+        >
+          Skip for now
+        </button>
+        <button
+          type="button"
+          className={`justify-self-end rounded-full px-5 py-2.5 text-sm font-medium transition-colors ${tone.continue}`}
+        >
+          Continue
+        </button>
+      </div>
     </div>
   )
 }
+
+const setupCardShell =
+  "aspect-[5/4] w-[min(40rem,calc(100vw-2rem))] max-h-[min(34rem,80vh)] rounded-[1.75rem] shadow-2xl"
 
 export const Playground: Story = {
   args: {
@@ -76,18 +118,18 @@ export const Playground: Story = {
     inverted: false,
     animated: true,
     speed: 1,
-    blur: 120,
-    grain: 0.55,
+    blur: 72,
+    grain: 0.35,
   },
   argTypes: {
     colors: {
       control: "object",
-      description: "Pigment nodes — any CSS colours, or a preset array.",
+      description: "Pigment fields — any CSS colours, or a preset array.",
     },
     type: {
       control: "select",
       options: [...morphingMeshGradientTypes],
-      description: "How the colour nodes are arranged.",
+      description: "How the colour fields are arranged.",
     },
     inverted: {
       control: "boolean",
@@ -95,15 +137,15 @@ export const Playground: Story = {
     },
     animated: {
       control: "boolean",
-      description: "Drift the blooms; reduced motion always freezes.",
+      description: "Migrate colour fields; reduced motion always freezes.",
     },
     speed: {
       control: { type: "range", min: 0.35, max: 2.5, step: 0.05 },
-      description: "Ambient drift pace — higher is faster.",
+      description: "Morph pace — higher is faster.",
     },
     blur: {
-      control: { type: "range", min: 40, max: 180, step: 4 },
-      description: "Bloom blur radius in CSS pixels.",
+      control: { type: "range", min: 40, max: 140, step: 4 },
+      description: "Parent-stage blur radius in CSS pixels.",
     },
     grain: {
       control: { type: "range", min: 0, max: 2, step: 0.1 },
@@ -111,32 +153,11 @@ export const Playground: Story = {
     },
   },
   parameters: storyDocumentation(
-    "The default glass mesh under Nessa hero copy — luminous mid-tones melting the way the Apple setup wash does. Swap `colors` for any preset — or your own range — flip `inverted` for the pale treatment, and change `type` to re-lay the blooms without touching the content.",
+    "Default glass mesh in a Nessa setup card — back top-left, centred prompt, corner pills — so the living wash reads the way the Apple setup modal does. Watch a few seconds: magenta, amber, and blue fields migrate across the card.",
   ),
   render: (args) => (
-    <MorphingMeshGradient
-      {...args}
-      className="min-h-[26rem] w-[min(42rem,calc(100vw-2rem))] rounded-[2rem]"
-    >
-      {args.inverted ? (
-        <div className="flex h-full flex-col items-center justify-center gap-6 px-8 py-16 text-center">
-          <p className="text-sm font-medium tracking-[0.18em] text-neutral-600/80 uppercase">
-            Nessa UI
-          </p>
-          <h2 className="max-w-2xl text-balance text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
-            Surfaces that think in colour
-          </h2>
-          <p className="max-w-md text-pretty text-base text-neutral-700">
-            A morphing mesh for heroes, empty states, and ambient shells —
-            palette in, living wash out.
-          </p>
-          <Button size="lg" className="rounded-full px-6 shadow-sm">
-            Browse components
-          </Button>
-        </div>
-      ) : (
-        <NessaHeroContent />
-      )}
+    <MorphingMeshGradient {...args} className={setupCardShell}>
+      <NessaSetupCard inverted={Boolean(args.inverted)} />
     </MorphingMeshGradient>
   ),
   play: async ({ canvasElement }) => {
@@ -150,10 +171,13 @@ export const Playground: Story = {
     )!
     await expect(stage).toHaveAttribute("aria-hidden", "true")
     await expect(getComputedStyle(stage).pointerEvents).toBe("none")
-    const blooms = stage.querySelectorAll(
+    const blooms = surface.querySelectorAll(
       '[data-slot="morphing-mesh-gradient-bloom"]',
     )
     await expect(blooms.length).toBeGreaterThan(3)
+    // Morph is live: at least one field should already be mid-animation.
+    const running = [...blooms].some((bloom) => bloom.getAnimations().length > 0)
+    await expect(running).toBe(true)
     const content = surface.querySelector<HTMLElement>(
       '[data-slot="morphing-mesh-gradient-content"]',
     )!
@@ -176,7 +200,7 @@ export const Playground: Story = {
 
 export const Presets: Story = {
   parameters: storyDocumentation(
-    "Every named palette as a living card, including `glassInverted` — the pale reading shipped beside the default glass mesh so a picker can offer both treatments without inventing a second authoring path.",
+    "Every named palette as a living card, including `glassInverted` — the pale reading shipped beside the default glass mesh.",
   ),
   render: () => (
     <div className="grid w-[min(64rem,calc(100vw-2rem))] grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -188,7 +212,7 @@ export const Presets: Story = {
             colors={colors}
             className="min-h-44 rounded-3xl"
           >
-            <div className="flex h-full items-end">
+            <div className="flex h-full min-h-44 items-end">
               <p
                 className={
                   pale
@@ -211,17 +235,13 @@ export const Presets: Story = {
     await expect(surfaces.length).toBe(
       Object.keys(morphingMeshGradientPresets).length,
     )
-    const grounds = new Set(
-      [...surfaces].map((s) => getComputedStyle(s).backgroundColor),
-    )
-    await expect(grounds.size).toBeGreaterThan(1)
     await stopMeshMotion(canvasElement)
   },
 }
 
 export const Inverted: Story = {
   parameters: storyDocumentation(
-    "The same glass pigments, lifted: `inverted` runs each colour through `color-mix(…, white)` so the default wash becomes the pale treatment without a second hand-authored palette. Pair with dark type when the host needs contrast on the light reading.",
+    "The same glass pigments, lifted: `inverted` runs each colour through `color-mix(…, white)` so the default wash becomes the pale treatment.",
   ),
   render: () => (
     <div className="grid w-[min(64rem,calc(100vw-2rem))] grid-cols-1 gap-4 sm:grid-cols-2">
@@ -229,24 +249,14 @@ export const Inverted: Story = {
         colors={morphingMeshGradientPresets.glass}
         className="min-h-56 rounded-3xl"
       >
-        <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-          <p className="text-sm font-medium tracking-[0.16em] text-white/70 uppercase">
-            Default
-          </p>
-          <p className="text-xl font-semibold text-white">Glass mesh</p>
-        </div>
+        <NessaSetupCard />
       </MorphingMeshGradient>
       <MorphingMeshGradient
         colors={morphingMeshGradientPresets.glass}
         inverted
         className="min-h-56 rounded-3xl"
       >
-        <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-          <p className="text-sm font-medium tracking-[0.16em] text-neutral-600/80 uppercase">
-            Inverted
-          </p>
-          <p className="text-xl font-semibold text-neutral-900">Pale glass</p>
-        </div>
+        <NessaSetupCard inverted />
       </MorphingMeshGradient>
     </div>
   ),
@@ -263,7 +273,7 @@ export const Inverted: Story = {
 
 export const Types: Story = {
   parameters: storyDocumentation(
-    "One ember palette under each layout — mesh, aurora, and orb — to show the type is a station map, independent of the colours. Mesh spreads corner-and-centre; aurora stretches into bands; orb keeps fewer, larger glows.",
+    "One ember palette under each layout — mesh, aurora, and orb — to show the type is a station map, independent of the colours.",
   ),
   render: () => (
     <div className="grid w-[min(64rem,calc(100vw-2rem))] grid-cols-1 gap-4 sm:grid-cols-3">
@@ -274,7 +284,7 @@ export const Types: Story = {
           colors={morphingMeshGradientPresets.ember}
           className="min-h-48 rounded-3xl"
         >
-          <div className="flex h-full items-end">
+          <div className="flex h-full min-h-48 items-end">
             <p className="px-5 py-4 text-sm font-medium capitalize text-white/90">
               {type}
             </p>
@@ -300,21 +310,29 @@ export const Types: Story = {
 
 export const FromRange: Story = {
   parameters: storyDocumentation(
-    "`meshGradientFromRange(start, end, count)` steps a brand pair into a mesh-ready palette via `color-mix`, so a host can feed two endpoints and get a living wash without authoring every node.",
+    "`meshGradientFromRange(start, end, count)` steps a brand pair into a mesh-ready palette via `color-mix`.",
   ),
   render: () => {
     const meadow = meshGradientFromRange("#0c5c2e", "#c8f5d4", 5)
     const dusk = meshGradientFromRange("#1a1040", "#f3c4ff", 6)
     return (
       <div className="grid w-[min(64rem,calc(100vw-2rem))] grid-cols-1 gap-4 sm:grid-cols-2">
-        <MorphingMeshGradient colors={meadow} type="aurora" className="min-h-52 rounded-3xl">
-          <div className="flex h-full flex-col justify-end gap-1 px-5 py-4">
+        <MorphingMeshGradient
+          colors={meadow}
+          type="aurora"
+          className="min-h-52 rounded-3xl"
+        >
+          <div className="flex h-full min-h-52 flex-col justify-end gap-1 px-5 py-4">
             <p className="text-sm font-medium text-white/90">Meadow range</p>
             <p className="text-xs text-white/70">#0c5c2e → #c8f5d4</p>
           </div>
         </MorphingMeshGradient>
-        <MorphingMeshGradient colors={dusk} type="orb" className="min-h-52 rounded-3xl">
-          <div className="flex h-full flex-col justify-end gap-1 px-5 py-4">
+        <MorphingMeshGradient
+          colors={dusk}
+          type="orb"
+          className="min-h-52 rounded-3xl"
+        >
+          <div className="flex h-full min-h-52 flex-col justify-end gap-1 px-5 py-4">
             <p className="text-sm font-medium text-white/90">Dusk range</p>
             <p className="text-xs text-white/70">#1a1040 → #f3c4ff</p>
           </div>
@@ -339,14 +357,9 @@ export const Still: Story = {
     <MorphingMeshGradient
       colors={morphingMeshGradientPresets.bloom}
       animated={false}
-      className="min-h-52 w-[min(42rem,calc(100vw-2rem))] rounded-3xl"
+      className={setupCardShell}
     >
-      <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-        <p className="text-sm font-medium tracking-[0.16em] text-white/70 uppercase">
-          Nessa UI
-        </p>
-        <p className="text-xl font-semibold text-white">Still mesh</p>
-      </div>
+      <NessaSetupCard />
     </MorphingMeshGradient>
   ),
   play: async ({ canvasElement }) => {

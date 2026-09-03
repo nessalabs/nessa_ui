@@ -38,11 +38,11 @@ function finite(value: number, fallback: number, floor = 0): number {
 
 /**
  * Softens a pigment toward white while keeping its hue. Used when
- * `inverted` is set so a deep aurora becomes the pale glass treatment
+ * `inverted` is set so a deep wash becomes the pale glass treatment
  * without requiring the host to hand-author a second palette.
  */
 function invertMeshColor(color: string): string {
-  return `color-mix(in oklab, ${color} 36%, white)`
+  return `color-mix(in oklab, ${color} 42%, white)`
 }
 
 /**
@@ -68,9 +68,9 @@ function meshGradientFromRange(
 
 /**
  * How the colour nodes are laid out. `"mesh"` is the default Apple-setup
- * reading: oversized corner-and-centre blooms that melt together.
- * `"aurora"` stretches them into horizontal bands. `"orb"` keeps fewer,
- * larger nodes around the centre for a softer glow.
+ * reading: solid colour fields melted by one parent blur. `"aurora"`
+ * stretches them into horizontal bands. `"orb"` keeps fewer, larger
+ * nodes around the centre.
  */
 export type MorphingMeshGradientType = "mesh" | "aurora" | "orb"
 
@@ -82,271 +82,301 @@ const morphingMeshGradientTypes = Object.freeze([
 ] as const satisfies readonly MorphingMeshGradientType[])
 
 /**
- * Named palettes for the morphing wash. Colours are luminous mid-tones —
- * the Apple glass-mesh reading — not dark Material grounds. Pass
- * `inverted` to lift the same hues further toward white. They are
- * starting points; any CSS colour array works the same way.
+ * Named palettes — saturated colour *fields*, not pastel washes. The
+ * melt comes from a single parent blur over solid blooms, so pigments
+ * stay vivid the way Apple's setup mesh does. Pass `inverted` to lift
+ * the same hues toward white.
  *
- * Order matches the default mesh stations: top-left, top-right, centre,
- * bottom-left, bottom-right, mid wash.
+ * Order matches the default mesh stations: top-left, top-right,
+ * centre-right glow, bottom-left, bottom-right, mid.
  */
 const morphingMeshGradientPresets = Object.freeze({
   /**
-   * Default glass mesh — tuned to the Apple setup wash: magenta top-left,
-   * soft lavender top-right, warm amber centre glow, deep indigo
-   * bottom-left, peach bottom-right, muted sky edge.
+   * Default — matched to the Apple setup mesh: rose/magenta top-left,
+   * violet top-right, warm amber centre-right glow, cerulean
+   * bottom-left, peach bottom-right, soft indigo mid.
    */
-  glass: ["#b24d6e", "#9a86b8", "#d89848", "#3a4d82", "#e8c078", "#6b88b0"],
-  /** Cool violet → magenta edge → soft amber undertow → lavender floor. */
-  aurora: ["#6a4aa8", "#b85a9a", "#e8b86a", "#7a9ab8", "#c8b4d8", "#8e6ab8"],
-  /** Warm coral → lilac → gold → terracotta. */
-  ember: ["#d46a5c", "#a878b8", "#e8b86a", "#c47848", "#f0d090", "#8a6a98"],
-  /** Burnt dusk: copper, magenta, amber, earth violet. */
-  dusk: ["#c45a48", "#9a6ab0", "#e0a050", "#8a5840", "#d4b070", "#6a4a88"],
+  glass: ["#c23d68", "#7a5fb0", "#e08a3a", "#3a7ec8", "#f0c070", "#5a4a9a"],
+  /** Cool violet → magenta → amber undertow. */
+  aurora: ["#5c3d9e", "#c44d8a", "#e0a050", "#4a88c0", "#d8b8e0", "#7a5ab0"],
+  /** Warm coral → lilac → gold. */
+  ember: ["#d45540", "#9a68b8", "#f0a830", "#c07040", "#f0d080", "#8a5890"],
+  /** Burnt dusk: copper, magenta, amber, violet. */
+  dusk: ["#c04838", "#8a4aa0", "#e09030", "#7a4838", "#d4a868", "#5a3880"],
   /** Soft bloom: magenta, peach, lavender, indigo. */
-  bloom: ["#d07098", "#f0b8a0", "#c8a0d8", "#6a70b0", "#e8c8b0", "#90a0d0"],
-  /** Horizon: sky, lavender, rose, amber. */
-  horizon: ["#e8a0a8", "#b8a0d0", "#70b0d8", "#e0a858", "#8090c0", "#f0d080"],
+  bloom: ["#d05088", "#f0a890", "#b880d0", "#4868b0", "#f0c8b0", "#8090d0"],
+  /** Horizon: rose, violet, sky, amber. */
+  horizon: ["#e090a0", "#9070c0", "#50a0d8", "#e09840", "#7080b8", "#f0c870"],
   /**
-   * Pale glass reading of `glass`. Prefer this preset when the host wants
-   * the light treatment without also setting `inverted`.
+   * Pale reading of `glass`. Prefer this preset when the host wants the
+   * light treatment without also setting `inverted`.
    */
   glassInverted: [
-    "color-mix(in oklab, #b24d6e 36%, white)",
-    "color-mix(in oklab, #9a86b8 36%, white)",
-    "color-mix(in oklab, #d89848 36%, white)",
-    "color-mix(in oklab, #3a4d82 36%, white)",
-    "color-mix(in oklab, #e8c078 36%, white)",
-    "color-mix(in oklab, #6b88b0 36%, white)",
+    "color-mix(in oklab, #c23d68 42%, white)",
+    "color-mix(in oklab, #7a5fb0 42%, white)",
+    "color-mix(in oklab, #e08a3a 42%, white)",
+    "color-mix(in oklab, #3a7ec8 42%, white)",
+    "color-mix(in oklab, #f0c070 42%, white)",
+    "color-mix(in oklab, #5a4a9a 42%, white)",
   ],
 } as const satisfies Record<string, readonly [string, ...string[]]>)
 
 type MeshNode = {
-  /** Starting placement as CSS `left` / `top` percentages of the frame. */
+  /** Placement as CSS `left` / `top` percentages of the stage. */
   left: number
   top: number
-  /** Blob size as a percentage of the frame — oversized so edges melt. */
-  size: number
-  /** Drift keyframes as translate/scale pairs, in % of the blob itself. */
+  /** Width as a percentage of the stage. */
+  width: number
+  /** Height as a percentage of the stage — ellipses, not circles. */
+  height: number
+  /** Drift keyframes as translate/scale pairs. */
   drift: ReadonlyArray<{ transform: string }>
 }
 
 /**
- * Node stations per layout type. Positions are percentages of the frame;
- * sizes run well past 100% so neighbouring blooms overlap into one wash.
- * Drifts are de-phased and large enough to read as a slow morph.
+ * Solid colour-field stations. Drift paths are large on purpose — the
+ * reference frames are pigment pools migrating across the card (amber
+ * sweeping in, magenta yielding, blue rising), not a subtle breathe.
+ * Translates are % of each field's own size so a ~40% move visibly
+ * repositions the colour.
  */
 const meshLayouts = Object.freeze({
   mesh: [
     {
-      left: -28,
-      top: -34,
-      size: 118,
+      left: -18,
+      top: -28,
+      width: 72,
+      height: 78,
       drift: [
         { transform: "translate(0%, 0%) scale(1)" },
-        { transform: "translate(18%, 12%) scale(1.12)" },
-        { transform: "translate(-8%, 16%) scale(0.94)" },
+        { transform: "translate(42%, 28%) scale(1.18)" },
+        { transform: "translate(18%, 48%) scale(0.9)" },
+        { transform: "translate(-12%, 22%) scale(1.08)" },
+      ],
+    },
+    {
+      left: 42,
+      top: -32,
+      width: 70,
+      height: 74,
+      drift: [
+        { transform: "translate(0%, 0%) scale(1.02)" },
+        { transform: "translate(-38%, 32%) scale(0.88)" },
+        { transform: "translate(-18%, 50%) scale(1.16)" },
+        { transform: "translate(16%, 12%) scale(0.94)" },
       ],
     },
     {
       left: 28,
-      top: -40,
-      size: 124,
-      drift: [
-        { transform: "translate(0%, 0%) scale(1.04)" },
-        { transform: "translate(-16%, 14%) scale(0.9)" },
-        { transform: "translate(10%, 6%) scale(1.14)" },
-      ],
-    },
-    {
-      left: 4,
-      top: -10,
-      size: 148,
+      top: 8,
+      width: 86,
+      height: 90,
       drift: [
         { transform: "translate(0%, 0%) scale(1)" },
-        { transform: "translate(10%, -10%) scale(1.1)" },
-        { transform: "translate(-12%, 8%) scale(0.92)" },
+        { transform: "translate(-32%, -24%) scale(1.14)" },
+        { transform: "translate(22%, 18%) scale(0.86)" },
+        { transform: "translate(-8%, 28%) scale(1.1)" },
       ],
     },
     {
-      left: -36,
-      top: 18,
-      size: 120,
+      left: -22,
+      top: 38,
+      width: 68,
+      height: 72,
       drift: [
         { transform: "translate(0%, 0%) scale(0.98)" },
-        { transform: "translate(14%, -8%) scale(1.16)" },
-        { transform: "translate(6%, 12%) scale(1.02)" },
+        { transform: "translate(44%, -36%) scale(1.2)" },
+        { transform: "translate(28%, -8%) scale(0.9)" },
+        { transform: "translate(8%, 18%) scale(1.06)" },
       ],
     },
     {
-      left: 22,
-      top: 16,
-      size: 128,
+      left: 48,
+      top: 42,
+      width: 66,
+      height: 70,
       drift: [
-        { transform: "translate(0%, 0%) scale(1.06)" },
-        { transform: "translate(-12%, -10%) scale(0.9)" },
-        { transform: "translate(8%, 8%) scale(1.12)" },
+        { transform: "translate(0%, 0%) scale(1.04)" },
+        { transform: "translate(-40%, -34%) scale(0.88)" },
+        { transform: "translate(-22%, -12%) scale(1.18)" },
+        { transform: "translate(12%, 10%) scale(0.94)" },
       ],
     },
     {
-      left: -10,
-      top: 32,
-      size: 110,
+      left: 8,
+      top: 18,
+      width: 58,
+      height: 62,
       drift: [
         { transform: "translate(0%, 0%) scale(1)" },
-        { transform: "translate(12%, -12%) scale(1.14)" },
-        { transform: "translate(-10%, 6%) scale(0.94)" },
+        { transform: "translate(36%, -40%) scale(1.22)" },
+        { transform: "translate(-28%, 24%) scale(0.88)" },
+        { transform: "translate(20%, 16%) scale(1.1)" },
       ],
     },
   ],
   aurora: [
     {
-      left: -30,
-      top: -48,
-      size: 140,
+      left: -24,
+      top: -40,
+      width: 90,
+      height: 70,
       drift: [
         { transform: "translate(0%, 0%) scale(1)" },
-        { transform: "translate(20%, 8%) scale(1.1)" },
-        { transform: "translate(-6%, 10%) scale(0.94)" },
+        { transform: "translate(36%, 18%) scale(1.12)" },
+        { transform: "translate(12%, 36%) scale(0.9)" },
+        { transform: "translate(-10%, 14%) scale(1.06)" },
       ],
     },
     {
-      left: 10,
-      top: -42,
-      size: 136,
+      left: 20,
+      top: -36,
+      width: 88,
+      height: 68,
       drift: [
-        { transform: "translate(0%, 0%) scale(1.04)" },
-        { transform: "translate(-14%, 12%) scale(0.9)" },
-        { transform: "translate(10%, 4%) scale(1.12)" },
+        { transform: "translate(0%, 0%) scale(1.02)" },
+        { transform: "translate(-34%, 28%) scale(0.9)" },
+        { transform: "translate(18%, 20%) scale(1.14)" },
+        { transform: "translate(-8%, 8%) scale(0.96)" },
       ],
     },
     {
-      left: 36,
-      top: -28,
-      size: 130,
+      left: 40,
+      top: -8,
+      width: 84,
+      height: 72,
       drift: [
         { transform: "translate(0%, 0%) scale(1)" },
-        { transform: "translate(-16%, 10%) scale(1.1)" },
-        { transform: "translate(8%, -4%) scale(0.92)" },
+        { transform: "translate(-40%, 22%) scale(1.12)" },
+        { transform: "translate(14%, -16%) scale(0.88)" },
+        { transform: "translate(-12%, 10%) scale(1.06)" },
       ],
     },
     {
-      left: -28,
-      top: 4,
-      size: 128,
+      left: -20,
+      top: 20,
+      width: 82,
+      height: 70,
       drift: [
         { transform: "translate(0%, 0%) scale(0.98)" },
-        { transform: "translate(16%, 8%) scale(1.14)" },
-        { transform: "translate(4%, -6%) scale(1)" },
+        { transform: "translate(38%, -20%) scale(1.16)" },
+        { transform: "translate(16%, 18%) scale(0.9)" },
+        { transform: "translate(6%, -8%) scale(1.04)" },
       ],
     },
     {
-      left: 18,
-      top: 10,
-      size: 134,
+      left: 24,
+      top: 28,
+      width: 86,
+      height: 74,
       drift: [
-        { transform: "translate(0%, 0%) scale(1.06)" },
-        { transform: "translate(-10%, -8%) scale(0.9)" },
-        { transform: "translate(8%, 10%) scale(1.12)" },
+        { transform: "translate(0%, 0%) scale(1.04)" },
+        { transform: "translate(-30%, -24%) scale(0.88)" },
+        { transform: "translate(16%, 20%) scale(1.14)" },
+        { transform: "translate(-10%, 6%) scale(0.96)" },
       ],
     },
   ],
   orb: [
     {
-      left: -18,
-      top: -28,
-      size: 130,
+      left: -12,
+      top: -20,
+      width: 78,
+      height: 82,
       drift: [
         { transform: "translate(0%, 0%) scale(1)" },
-        { transform: "translate(12%, 10%) scale(1.12)" },
-        { transform: "translate(-8%, 6%) scale(0.94)" },
+        { transform: "translate(30%, 24%) scale(1.16)" },
+        { transform: "translate(-14%, 18%) scale(0.9)" },
+        { transform: "translate(10%, -8%) scale(1.08)" },
       ],
     },
     {
-      left: 8,
-      top: -16,
-      size: 142,
+      left: 18,
+      top: -8,
+      width: 88,
+      height: 92,
       drift: [
-        { transform: "translate(0%, 0%) scale(1.05)" },
-        { transform: "translate(-10%, 8%) scale(0.9)" },
-        { transform: "translate(8%, -6%) scale(1.14)" },
+        { transform: "translate(0%, 0%) scale(1.04)" },
+        { transform: "translate(-28%, 20%) scale(0.88)" },
+        { transform: "translate(16%, -14%) scale(1.18)" },
+        { transform: "translate(-8%, 8%) scale(0.94)" },
       ],
     },
     {
-      left: -24,
-      top: 8,
-      size: 124,
+      left: -16,
+      top: 24,
+      width: 74,
+      height: 78,
       drift: [
         { transform: "translate(0%, 0%) scale(0.98)" },
-        { transform: "translate(12%, -6%) scale(1.12)" },
-        { transform: "translate(4%, 10%) scale(1)" },
+        { transform: "translate(32%, -22%) scale(1.14)" },
+        { transform: "translate(8%, 20%) scale(0.9)" },
+        { transform: "translate(-6%, 6%) scale(1.06)" },
       ],
     },
     {
-      left: 20,
-      top: 12,
-      size: 128,
+      left: 32,
+      top: 28,
+      width: 76,
+      height: 80,
       drift: [
-        { transform: "translate(0%, 0%) scale(1.06)" },
-        { transform: "translate(-10%, 8%) scale(0.9)" },
-        { transform: "translate(6%, -8%) scale(1.1)" },
+        { transform: "translate(0%, 0%) scale(1.04)" },
+        { transform: "translate(-30%, 18%) scale(0.88)" },
+        { transform: "translate(12%, -20%) scale(1.16)" },
+        { transform: "translate(-6%, 4%) scale(0.96)" },
       ],
     },
   ],
 } as const satisfies Record<MorphingMeshGradientType, readonly MeshNode[]>)
 
 /**
- * Film grain as a repeating tile: monochrome fractal noise rendered by an
- * SVG filter and inlined as a data URI, so there is no asset to fetch.
- * Finer base frequency than a print tile — the Apple glass finish is a
- * soft dither, not a coarse film grain.
+ * Fine soft dither — Apple's mesh carries a whisper of grain, not a
+ * print finish. Inlined SVG so there is no asset to fetch.
  */
-const grainTexture = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)'/%3E%3C/svg%3E")`
+const grainTexture = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E")`
 
 export interface MorphingMeshGradientProps extends React.ComponentProps<"div"> {
   /**
-   * The pigment nodes, assigned in order to the layout stations (top-left,
-   * top-right, centre, …). Each colour becomes an oversized soft bloom;
-   * with fewer colours than stations the layout cycles, with more the
-   * surplus is unused. Defaults to `morphingMeshGradientPresets.glass`.
-   * Build a custom range with `meshGradientFromRange(start, end, count)`.
+   * The pigment fields, assigned in order to the layout stations
+   * (top-left, top-right, centre-right, …). Each colour is a solid
+   * ellipse melted by the parent blur. Defaults to
+   * `morphingMeshGradientPresets.glass`. Build a custom range with
+   * `meshGradientFromRange(start, end, count)`.
    */
   colors?: readonly string[]
   /**
-   * How the colour nodes are arranged: `"mesh"` (oversized corner-and-
-   * centre melt, the default), `"aurora"` (horizontal bands), or `"orb"`
-   * (large centred glows).
+   * How the colour fields are arranged: `"mesh"` (default Apple-setup
+   * melt), `"aurora"` (horizontal bands), or `"orb"` (centred glows).
    */
   type?: MorphingMeshGradientType
   /**
-   * Lifts every pigment toward white via `color-mix`, producing the pale
-   * glass reading of the same hues. Always applied when true — including
-   * over an already-light palette such as `glassInverted`, which will
-   * wash further. Prefer either this flag on a deep preset, or the light
-   * preset alone, not both.
+   * Lifts every pigment toward white via `color-mix`. Always applied
+   * when true — including over an already-light palette such as
+   * `glassInverted`. Prefer either this flag on a deep preset, or the
+   * light preset alone, not both.
    */
   inverted?: boolean
   /**
-   * When true (the default), the blooms drift on de-phased ambient
-   * cycles. Under `prefers-reduced-motion` the wash still paints but
-   * stays still, regardless of this prop.
+   * When true (the default), colour fields migrate across the card on
+   * de-phased cycles — the morph the reference frames capture. Under
+   * `prefers-reduced-motion` the wash still paints but stays still.
    */
   animated?: boolean
   /**
-   * Multiplier on ambient drift pace. `1` is the default morph; higher
-   * values hurry it, lower values slow it. Values at or below `0` freeze
-   * the wash the same way `animated={false}` does.
+   * Multiplier on morph pace. `1` is the default; higher values hurry
+   * the colour shift, lower values slow it. Values at or below `0`
+   * freeze the wash the same way `animated={false}` does.
    */
   speed?: number
   /**
-   * Gaussian blur radius applied to each bloom, in CSS pixels. The
-   * default `120` is the soft Apple-setup melt; lower values keep more
-   * distinct colour islands, higher values dissolve them further.
+   * Gaussian blur radius on each solid colour field, in CSS pixels. The
+   * default `72` melts neighbouring fields together while keeping the
+   * transform animation on the same element so the morph stays visible.
    */
   blur?: number
   /**
-   * How much film grain sits over the frame. `0.55` is the default soft
-   * glass dither; `0` removes it. The grain covers the whole surface —
+   * How much soft dither sits over the frame. `0.35` is the default
+   * whisper; `0` removes it. The grain covers the whole surface —
    * content included — in soft-light blend.
    */
   grain?: number
@@ -354,16 +384,16 @@ export interface MorphingMeshGradientProps extends React.ComponentProps<"div"> {
 
 /**
  * A morphing mesh-gradient backdrop in the Apple glass-mesh register:
- * oversized luminous colour blooms melt into one another and drift
- * behind content. Built from a swappable palette and layout type. Use it
- * anywhere a living wash belongs — heroes, empty states, modal cards,
- * full-bleed backgrounds — by giving the root a size through `className`
- * and dropping children on top.
+ * solid colour fields, each softly blurred, migrating across the card so
+ * the wash visibly shifts hue from frame to frame. Use it anywhere a
+ * living wash belongs — heroes, empty states, modal cards, full-bleed
+ * backgrounds — by giving the root a size through `className` and
+ * dropping children on top.
  *
- * The wash is purely decorative: blooms are hidden from the accessibility
- * tree and inert to the pointer. Text contrast on top belongs to the host.
- * Motion follows `--nessa-motion-duration-ambient` and cancels under
- * `prefers-reduced-motion`, leaving the settled paint visible.
+ * The wash is purely decorative: the stage is hidden from the
+ * accessibility tree and inert to the pointer. Text contrast on top
+ * belongs to the host. Motion follows `--nessa-motion-duration-ambient`
+ * and cancels under `prefers-reduced-motion`.
  *
  * The root owns its `display` (a grid whose sole item is the content
  * layer) — lay content out with an inner wrapper rather than passing
@@ -375,8 +405,8 @@ function MorphingMeshGradient({
   inverted = false,
   animated = true,
   speed = 1,
-  blur = 120,
-  grain = 0.55,
+  blur = 72,
+  grain = 0.35,
   className,
   style,
   children,
@@ -394,14 +424,12 @@ function MorphingMeshGradient({
   const palette = inverted
     ? paletteSource.map(invertMeshColor)
     : paletteSource
-  const blurRadius = finite(blur, 120)
-  const grainStrength = finite(grain, 0.55)
+  const blurRadius = finite(blur, 72)
+  const grainStrength = finite(grain, 0.35)
   const speedFactor = finite(speed, 1)
   const shouldAnimate =
     animated && !reducedMotion && speedFactor > 0 && visible
 
-  // Pause off-screen so a showcase grid of morphing washes does not keep
-  // every card's WAAPI cycles alive while the host scrolls past them.
   React.useEffect(() => {
     const node = stageRef.current
     if (node === null || typeof IntersectionObserver === "undefined") return
@@ -421,17 +449,15 @@ function MorphingMeshGradient({
       3200,
     )
     if (baseDuration === 0) return
-    // Higher `speed` shortens the period — same polarity as RandomAvatar —
-    // so a host that already tunes other ambient surfaces keeps one mental
-    // model. Floor the divisor so a tiny positive speed cannot explode.
-    // The morph itself is deliberately slow: Apple's wash drifts, it does
-    // not pulse.
-    const duration = (baseDuration * 4.2) / finite(speedFactor, 1, 0.05)
+    // ~3.5–4.5s half-cycle at speed=1: colour fields should clearly
+    // migrate within a couple of seconds of watching, matching the
+    // frame-to-frame shift in the reference stills.
+    const duration = (baseDuration * 1.15) / finite(speedFactor, 1, 0.05)
     const animations = Array.from(node.children, (child, index) => {
       const station = layout[index % layout.length]!
       return (child as HTMLElement).animate([...station.drift], {
-        duration: duration * (1.1 + (index % 5) * 0.28),
-        delay: -(index * duration * 0.22),
+        duration: duration * (1.05 + (index % 5) * 0.2),
+        delay: -(index * duration * 0.25),
         easing: "ease-in-out",
         direction: "alternate",
         iterations: Infinity,
@@ -441,14 +467,13 @@ function MorphingMeshGradient({
     return () => animations.forEach((animation) => animation.cancel())
   }, [shouldAnimate, layout, speedFactor, palette.length])
 
-  // Ground leans on the amber centre so the floor stays warm and
-  // luminous — matching Apple's amber-glow mesh — rather than a cool
-  // Material slab of the darkest pigment.
+  // Warm amber-leaning floor so the melt has a luminous base rather than
+  // a dark hole behind the blurred fields.
   const groundAnchor = paletteSource[2] ?? paletteSource[0]!
-  const groundEdge = paletteSource[3] ?? paletteSource[0]!
+  const groundEdge = paletteSource[5] ?? paletteSource[1] ?? paletteSource[0]!
   const ground = inverted
-    ? `color-mix(in oklab, ${groundAnchor} 30%, white)`
-    : `color-mix(in oklab, ${groundAnchor} 62%, ${groundEdge})`
+    ? `color-mix(in oklab, ${groundAnchor} 32%, white)`
+    : `color-mix(in oklab, ${groundAnchor} 48%, ${groundEdge})`
 
   return (
     <div
@@ -464,19 +489,23 @@ function MorphingMeshGradient({
       style={
         {
           "--nessa-mesh-ground": ground,
+          "--nessa-mesh-blur": `${blurRadius}px`,
           ...style,
         } as React.CSSProperties
       }
       {...props}
     >
+      {/*
+        Blur lives on each solid field, not the parent. A filtered parent
+        flattens its children into one cached layer, so their transforms
+        stop reading as motion — which is why the morph looked static.
+        Solid fills + per-field blur keep chroma and let WAAPI travel.
+      */}
       <div
         ref={stageRef}
         data-slot="morphing-mesh-gradient-stage"
         aria-hidden="true"
-        // The stage is oversized and recentred so bloom edges never hard-
-        // clip against the frame — the melt continues past the crop. A
-        // light saturate keeps mid-tone pigments vivid after heavy blur.
-        className="pointer-events-none absolute -inset-[20%] overflow-visible saturate-[1.28]"
+        className="pointer-events-none absolute -inset-[35%] overflow-visible saturate-[1.35]"
       >
         {layout.map((station, index) => {
           const color = palette[index % palette.length]!
@@ -484,27 +513,17 @@ function MorphingMeshGradient({
             <div
               key={`${type}-${index}`}
               data-slot="morphing-mesh-gradient-bloom"
-              // Paint and blur ride custom properties so STYLE-003 stays
-              // geometry-only on the style attribute; the utilities own
-              // the declarations.
               className={cn(
-                "absolute rounded-full will-change-transform",
-                "bg-[image:var(--nessa-mesh-bloom)]",
+                "absolute rounded-full bg-[var(--nessa-mesh-field)] will-change-transform",
                 "[filter:blur(var(--nessa-mesh-blur))]",
               )}
               style={
                 {
                   left: `${station.left}%`,
                   top: `${station.top}%`,
-                  width: `${station.size}%`,
-                  height: `${station.size}%`,
-                  // Saturated core held longer, then a long dissolve —
-                  // neighbouring blooms melt into one wash without
-                  // washing the chroma out of the colour fields.
-                  "--nessa-mesh-bloom": `radial-gradient(closest-side, ${color} 0%, ${color} 52%, color-mix(in oklab, ${color} 45%, transparent) 74%, transparent 100%)`,
-                  "--nessa-mesh-blur": `${blurRadius}px`,
-                  // Seed the first keyframe as the inline transform so the
-                  // first paint matches the WAAPI start and never snaps.
+                  width: `${station.width}%`,
+                  height: `${station.height}%`,
+                  "--nessa-mesh-field": color,
                   transform: station.drift[0]!.transform,
                 } as React.CSSProperties
               }
@@ -512,7 +531,7 @@ function MorphingMeshGradient({
           )
         })}
       </div>
-      <div data-slot="morphing-mesh-gradient-content" className="relative">
+      <div data-slot="morphing-mesh-gradient-content" className="relative min-h-0">
         {children}
       </div>
       {grainStrength > 0 ? (
@@ -521,12 +540,12 @@ function MorphingMeshGradient({
           aria-hidden="true"
           className={cn(
             "pointer-events-none absolute inset-0 mix-blend-soft-light",
-            "bg-[image:var(--nessa-mesh-grain)] bg-[length:180px_180px]",
+            "bg-[image:var(--nessa-mesh-grain)] bg-[length:160px_160px]",
           )}
           style={
             {
               "--nessa-mesh-grain": grainTexture,
-              opacity: Math.min(1, 0.42 * grainStrength),
+              opacity: Math.min(1, 0.28 * grainStrength),
             } as React.CSSProperties
           }
         />
