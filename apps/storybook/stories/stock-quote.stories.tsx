@@ -14,7 +14,7 @@ import { candleSeries, priceSeries, SESSION_START } from "./market-demo-data"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/StockQuote",
+  title: "Charts/StockQuote",
   component: StockQuote,
   tags: ["autodocs", "test"],
   parameters: {

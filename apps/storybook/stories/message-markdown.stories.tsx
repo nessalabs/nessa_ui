@@ -66,7 +66,7 @@ so with $r = 0.05/12$ and $n = 120$ months the multiplier is about
 $155.3$, and the classic identity $e^{i\\pi} + 1 = 0$ still holds.`
 
 const meta = {
-  title: "Components/MessageMarkdown",
+  title: "Conversation/MessageMarkdown",
   component: MessageMarkdown,
   args: { children: richMarkdown },
   tags: ["autodocs", "test"],

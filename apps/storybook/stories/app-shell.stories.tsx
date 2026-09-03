@@ -57,7 +57,7 @@ import {
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Composites/AppShell",
+  title: "Shell/AppShell",
   component: AppShell,
   tags: ["autodocs", "test"],
   parameters: {

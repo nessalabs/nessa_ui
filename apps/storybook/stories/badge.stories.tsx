@@ -4,7 +4,7 @@ import { Badge } from "@nessa-ui/react"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/Badge",
+  title: "Primitives/Badge",
   component: Badge,
   tags: ["autodocs", "test"],
   parameters: {

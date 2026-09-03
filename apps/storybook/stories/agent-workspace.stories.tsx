@@ -45,7 +45,7 @@ import { GitBranch, Hash, Lock, Pin, Plus, Settings } from "lucide-react"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Composites/AgentWorkspace",
+  title: "Agents/AgentWorkspace",
   tags: ["autodocs", "test"],
   parameters: {
     layout: "fullscreen",

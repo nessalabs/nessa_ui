@@ -6,7 +6,7 @@ import { TimelineHeader, TimelineHeaderCell } from "@nessa-ui/react"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/TimelineHeader",
+  title: "Agents/TimelineHeader",
   component: TimelineHeader,
   tags: ["autodocs", "test"],
   parameters: {

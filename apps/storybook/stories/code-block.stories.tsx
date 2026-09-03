@@ -46,7 +46,7 @@ export function useReveal(text: string): StreamState {
 }`
 
 const meta = {
-  title: "Components/CodeBlock",
+  title: "Files/CodeBlock",
   component: CodeBlock,
   tags: ["autodocs", "test"],
   parameters: {

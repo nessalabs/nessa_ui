@@ -49,7 +49,7 @@ function ThreadFrame({ children }: { children: React.ReactNode }) {
 }
 
 const meta = {
-  title: "Components/Message",
+  title: "Conversation/Message",
   component: Message,
   tags: ["autodocs", "test"],
   parameters: {

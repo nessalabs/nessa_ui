@@ -11,7 +11,7 @@ import {
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/FilePreview",
+  title: "Files/FilePreview",
   component: FilePreview,
   tags: ["autodocs", "test"],
   parameters: {

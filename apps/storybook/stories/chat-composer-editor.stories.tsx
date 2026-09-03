@@ -219,7 +219,7 @@ function InlineComposerExample() {
 }
 
 const meta = {
-  title: "Components/ChatComposerEditor",
+  title: "Conversation/ChatComposerEditor",
   component: ChatComposerEditor,
   tags: ["autodocs", "test"],
   parameters: {

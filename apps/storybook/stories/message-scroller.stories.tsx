@@ -116,7 +116,7 @@ function LiveTranscriptExample() {
 }
 
 const meta = {
-  title: "Components/MessageScroller",
+  title: "Conversation/MessageScroller",
   component: MessageScroller,
   tags: ["autodocs", "test"],
   parameters: {

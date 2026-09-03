@@ -30,7 +30,7 @@ import {
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/ContextMenu",
+  title: "Primitives/ContextMenu",
   component: ContextMenu,
   tags: ["autodocs", "test"],
   parameters: {

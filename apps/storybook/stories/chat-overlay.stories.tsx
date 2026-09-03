@@ -14,7 +14,7 @@ import {
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/ChatOverlay",
+  title: "Conversation/ChatOverlay",
   component: ChatOverlay,
   tags: ["autodocs", "test"],
   // The examples drive the overlay from their own state; args exist so the

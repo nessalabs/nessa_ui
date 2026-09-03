@@ -197,7 +197,7 @@ function StoryFrame({
 }
 
 const meta = {
-  title: "Components/EventCalendar",
+  title: "Data/EventCalendar",
   component: EventCalendar,
   tags: ["autodocs", "test"],
   parameters: {

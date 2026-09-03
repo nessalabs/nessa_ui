@@ -226,7 +226,7 @@ async function verifyComposerThemeSurfaces(
 }
 
 const meta = {
-  title: "Components/ChatComposer",
+  title: "Conversation/ChatComposer",
   component: ChatComposer,
   tags: ["autodocs", "test"],
   parameters: {

@@ -13,7 +13,7 @@ import { candleSeries, priceSeries, SESSION_START } from "./market-demo-data"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/PriceChart",
+  title: "Charts/PriceChart",
   component: PriceChart,
   tags: ["autodocs", "test"],
   parameters: {

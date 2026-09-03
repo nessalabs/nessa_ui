@@ -144,7 +144,7 @@ function PlanChart(props: Partial<GanttChartProps>) {
 }
 
 const meta = {
-  title: "Components/GanttChart",
+  title: "Charts/GanttChart",
   component: GanttChart,
   tags: ["autodocs", "test"],
   parameters: {

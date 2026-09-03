@@ -14,7 +14,7 @@ import {
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/SankeyChart",
+  title: "Charts/SankeyChart",
   component: FlowChart,
   tags: ["autodocs", "test"],
   parameters: {

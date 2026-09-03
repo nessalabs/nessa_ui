@@ -6,7 +6,7 @@ import { Checkbox } from "@nessa-ui/react"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/Checkbox",
+  title: "Primitives/Checkbox",
   component: Checkbox,
   tags: ["autodocs", "test"],
   parameters: {

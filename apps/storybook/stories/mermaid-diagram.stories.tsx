@@ -31,7 +31,7 @@ const sequence = `sequenceDiagram
   D->>D: fade in new characters`
 
 const meta = {
-  title: "Components/MermaidDiagram",
+  title: "Charts/MermaidDiagram",
   component: MermaidDiagram,
   tags: ["autodocs", "test"],
   parameters: {

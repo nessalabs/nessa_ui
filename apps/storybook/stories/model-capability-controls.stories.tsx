@@ -332,7 +332,7 @@ function LiveMotionPreferenceExample() {
 }
 
 const meta = {
-  title: "Components/ModelCapabilityControls",
+  title: "Conversation/ModelCapabilityControls",
   component: ModelThinkingControl,
   tags: ["autodocs", "test", "reduced-motion"],
   args: { levels },

@@ -132,7 +132,7 @@ function RowActionsExample() {
 }
 
 const meta = {
-  title: "Components/FileDiffList",
+  title: "Agents/Tools/FileDiffList",
   component: FileDiffCard,
   tags: ["autodocs", "test"],
   parameters: {

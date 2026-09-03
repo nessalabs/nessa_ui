@@ -34,40 +34,40 @@ try {
   const index = await indexResponse.json()
   const entryIds = new Set(Object.keys(index.entries))
   const expectedSidebarEntries = [
-    "components-sidebar-examples--documentation",
-    "components-sidebar-examples--chat-navigation",
-    "components-sidebar-examples--light",
-    "components-sidebar-examples--icon-collapsed",
-    "components-sidebar-examples--mobile-icon-collapsed",
-    "components-sidebar-examples--non-collapsible",
-    "components-sidebar-examples--mobile-overlay",
-    "components-sidebar-examples--stress-500-rows",
-    "components-sidebar-primitives--documentation",
-    "components-sidebar-primitives--provider-sidebar-and-inset",
-    "components-sidebar-primitives--header",
-    "components-sidebar-primitives--content",
-    "components-sidebar-primitives--group",
-    "components-sidebar-primitives--footer",
-    "components-sidebar-primitives--trigger",
-    "components-sidebar-primitives--rail",
-    "components-sidebar-primitives-menu--documentation",
-    "components-sidebar-primitives-menu--menu",
-    "components-sidebar-primitives-menu--menu-item",
-    "components-sidebar-primitives-menu--menu-skeleton",
-    "components-sidebar-primitives-menu--nested-menu",
-    "components-sidebar-primitives-menu--nested-menu-guides",
-    "components-sidebar-primitives-menu--collapsible-submenu",
-    "components-sidebar-primitives-menu--trailing-action",
-    "components-sidebar-compositions--documentation",
-    "components-sidebar-compositions--rich-chat-row",
-    "components-sidebar-compositions--nested-navigation",
-    "components-sidebar-compositions--hover-actions",
-    "components-sidebar-compositions--logical-direction",
-    "components-sidebar-compositions--rail-behavior",
-    "components-sidebar-compositions--inset-variant",
+    "shell-sidebar-examples--documentation",
+    "shell-sidebar-examples--chat-navigation",
+    "shell-sidebar-examples--light",
+    "shell-sidebar-examples--icon-collapsed",
+    "shell-sidebar-examples--mobile-icon-collapsed",
+    "shell-sidebar-examples--non-collapsible",
+    "shell-sidebar-examples--mobile-overlay",
+    "shell-sidebar-examples--stress-500-rows",
+    "shell-sidebar-primitives--documentation",
+    "shell-sidebar-primitives--provider-sidebar-and-inset",
+    "shell-sidebar-primitives--header",
+    "shell-sidebar-primitives--content",
+    "shell-sidebar-primitives--group",
+    "shell-sidebar-primitives--footer",
+    "shell-sidebar-primitives--trigger",
+    "shell-sidebar-primitives--rail",
+    "shell-sidebar-primitives-menu--documentation",
+    "shell-sidebar-primitives-menu--menu",
+    "shell-sidebar-primitives-menu--menu-item",
+    "shell-sidebar-primitives-menu--menu-skeleton",
+    "shell-sidebar-primitives-menu--nested-menu",
+    "shell-sidebar-primitives-menu--nested-menu-guides",
+    "shell-sidebar-primitives-menu--collapsible-submenu",
+    "shell-sidebar-primitives-menu--trailing-action",
+    "shell-sidebar-compositions--documentation",
+    "shell-sidebar-compositions--rich-chat-row",
+    "shell-sidebar-compositions--nested-navigation",
+    "shell-sidebar-compositions--hover-actions",
+    "shell-sidebar-compositions--logical-direction",
+    "shell-sidebar-compositions--rail-behavior",
+    "shell-sidebar-compositions--inset-variant",
   ]
   const actualSidebarEntries = [...entryIds]
-    .filter((id) => id.startsWith("components-sidebar-"))
+    .filter((id) => id.startsWith("shell-sidebar-"))
     .sort()
   const expectedSortedSidebarEntries = [...expectedSidebarEntries].sort()
   if (
@@ -184,9 +184,9 @@ try {
 
     if (
       [
-        "components-sidebar-primitives--documentation",
-        "components-sidebar-primitives-menu--documentation",
-        "components-sidebar-compositions--documentation",
+        "shell-sidebar-primitives--documentation",
+        "shell-sidebar-primitives-menu--documentation",
+        "shell-sidebar-compositions--documentation",
       ].includes(entry.id)
     ) {
       const catalogGeometry = await managerFrame
@@ -226,7 +226,7 @@ try {
       }
     }
 
-    if (entry.id === "components-sidebar-primitives-menu--documentation") {
+    if (entry.id === "shell-sidebar-primitives-menu--documentation") {
       const menuControlsTable = managerFrame.locator("table").filter({
         has: managerFrame.locator('input[name="rowCount"]'),
       })
@@ -302,7 +302,7 @@ try {
   }
 
   await page.goto(
-    `${baseUrl}/iframe.html?id=components-input--documentation&viewMode=docs&globals=theme:dark`,
+    `${baseUrl}/iframe.html?id=primitives-input--documentation&viewMode=docs&globals=theme:dark`,
     { waitUntil: "networkidle" },
   )
   const darkInputDocumentation = await page
@@ -419,7 +419,7 @@ try {
   }
 
   await page.goto(
-    `${baseUrl}/iframe.html?id=components-sidebar-compositions--hover-actions&viewMode=story`,
+    `${baseUrl}/iframe.html?id=shell-sidebar-compositions--hover-actions&viewMode=story`,
     { waitUntil: "networkidle" },
   )
   const hoverRow = page.getByTestId("hover-action-row")
@@ -465,7 +465,7 @@ try {
   })
   try {
     await coarsePage.goto(
-      `${baseUrl}/iframe.html?id=components-sidebar-compositions--hover-actions&viewMode=story`,
+      `${baseUrl}/iframe.html?id=shell-sidebar-compositions--hover-actions&viewMode=story`,
       { waitUntil: "networkidle" },
     )
     const coarseTrailing = coarsePage

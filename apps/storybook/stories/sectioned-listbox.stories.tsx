@@ -383,7 +383,7 @@ function renderCommandItem(
 }
 
 const meta = {
-  title: "Components/SectionedListbox",
+  title: "Primitives/SectionedListbox",
   component: SectionedListbox,
   tags: ["autodocs", "test"],
   args: {

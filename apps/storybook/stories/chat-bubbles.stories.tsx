@@ -341,7 +341,7 @@ function MarkdownStreamingExample() {
 }
 
 const meta = {
-  title: "Components/ChatBubbles",
+  title: "Conversation/ChatBubbles",
   component: ChatMessage,
   args: { tone: "received" },
   tags: ["autodocs", "test"],

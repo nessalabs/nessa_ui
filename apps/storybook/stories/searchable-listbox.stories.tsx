@@ -102,7 +102,7 @@ function SearchableListboxExample() {
 }
 
 const meta = {
-  title: "Components/SearchableListbox",
+  title: "Primitives/SearchableListbox",
   component: SearchableListbox,
   tags: ["autodocs", "test"],
   args: {

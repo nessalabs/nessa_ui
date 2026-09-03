@@ -61,7 +61,7 @@ function PrimitiveFrame(props: PrimitiveFrameProps) {
 }
 
 const meta = {
-  title: "Components/Sidebar/Primitives",
+  title: "Shell/Sidebar/Primitives",
   component: Sidebar,
   subcomponents: {
     SidebarProvider,

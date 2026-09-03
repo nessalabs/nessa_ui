@@ -78,7 +78,7 @@ function MenuPrimitiveFrame({
 }
 
 const meta = {
-  title: "Components/Sidebar/Primitives/Menu",
+  title: "Shell/Sidebar/Primitives/Menu",
   component: SidebarMenu,
   subcomponents: {
     SidebarMenuItem,

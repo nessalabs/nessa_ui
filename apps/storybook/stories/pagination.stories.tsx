@@ -14,7 +14,7 @@ import {
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/Pagination",
+  title: "Primitives/Pagination",
   component: Pagination,
   tags: ["autodocs", "test"],
   parameters: {

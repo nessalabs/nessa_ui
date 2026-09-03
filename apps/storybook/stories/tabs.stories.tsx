@@ -7,7 +7,7 @@ import { Inbox, MessageSquare, Sparkles } from "lucide-react"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/Tabs",
+  title: "Primitives/Tabs",
   component: Tabs,
   tags: ["autodocs", "test"],
   parameters: {

@@ -649,7 +649,7 @@ function MobileOverlayDemo() {
 }
 
 const meta = {
-  title: "Components/Sidebar/Examples",
+  title: "Shell/Sidebar/Examples",
   component: Sidebar,
   tags: ["autodocs", "test"],
   decorators: [sidebarStoryDecorator],

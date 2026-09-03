@@ -11,7 +11,7 @@ import {
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/GradientSurface",
+  title: "Primitives/GradientSurface",
   component: GradientSurface,
   tags: ["autodocs", "test"],
   parameters: {
