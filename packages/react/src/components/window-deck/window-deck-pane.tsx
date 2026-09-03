@@ -255,9 +255,9 @@ function WindowDeckPane({
 
     onDismissRef.current?.(dismissal)
     reportRef.current(dismissal.paneId, "left")
-    // The click that ends a throw never arrives once the pane is playing its
-    // exit, so the guard is cleared here rather than waiting for one.
-    suppressClickRef.current = false
+    // Leave suppressClickRef set. Under reduced motion the exit is
+    // synchronous and the click that ends a throw is still in the queue;
+    // clearing the guard here would open the pane the user just threw.
     setLeaving(false)
     setOffset({ x: 0, y: 0 })
     setRetained((current) => current + 1)
@@ -298,17 +298,31 @@ function WindowDeckPane({
       setDragging(false)
       setLeaving(true)
       setOffset(away)
-
-      const duration = longestTransitionMs(element)
-
-      if (duration === 0) {
-        completeDismissal()
-        return
-      }
-      window.setTimeout(completeDismissal, duration + 50)
     },
-    [completeDismissal],
+    [],
   )
+
+  // Timed from the leaving class after it has committed, so the duration is
+  // the throw's own curve — not the coast the pane was on when dismiss()
+  // ran — and a theme that zeroes motion completes at once.
+  React.useLayoutEffect(() => {
+    if (!leaving) return
+
+    const element = elementRef.current
+
+    if (!element) return
+
+    const duration = longestTransitionMs(element)
+
+    if (duration === 0) {
+      completeDismissal()
+      return
+    }
+
+    const timer = window.setTimeout(completeDismissal, duration + 50)
+
+    return () => window.clearTimeout(timer)
+  }, [completeDismissal, leaving])
 
   // The deck asks for a dismissal when the keyboard is used, so a thrown
   // pane and a dismissed one leave along the same path.
@@ -484,7 +498,7 @@ function WindowDeckPane({
         dismissible && onDismiss !== undefined ? "" : undefined
       }
       role={openable ? "button" : "group"}
-      tabIndex={openable ? 0 : undefined}
+      tabIndex={openable ? 0 : -1}
       aria-label={label}
       // In the overview the deck marks the window Escape returns to; in the
       // carousel it marks the window the deck is centred on. Either way the
@@ -552,11 +566,11 @@ function WindowDeckPane({
         // emphasized curve does — reads as the deck hesitating. Both stay
         // derived from the motion tokens, so reduced motion still zeroes them.
         "origin-center transition-[translate,scale,opacity] [transition-duration:calc(var(--nessa-motion-duration-slow)*1.5)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
-        // Promoted up front, not when the movement starts. A window carries
-        // real content, and leaving the compositor to raster it into its own
-        // layer on the first animated frame is a visible hitch at exactly the
-        // moment the deck is asking to be judged on its smoothness.
-        "[will-change:transform,opacity] motion-reduce:[will-change:auto]",
+        // Promoted for the movement, not for the pane's whole life. Twenty
+        // windows of chat would otherwise stay as twenty compositor layers.
+        // Overview, settle, drag, and leave are the commits that need it.
+        (overview || settling || dragging || leaving) &&
+          "[will-change:transform,opacity] motion-reduce:[will-change:auto]",
         // A discarded window is the exception: it accelerates away instead of
         // coasting, so it reads as thrown rather than as placed.
         leaving &&

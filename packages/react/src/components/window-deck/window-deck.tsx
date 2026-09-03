@@ -21,6 +21,7 @@ import {
 } from "./window-deck-layout"
 import { longestTransitionMs } from "./window-deck-motion"
 import {
+  isEditableShortcutTarget,
   matchesWindowDeckShortcut,
   resolveWindowDeckShortcuts,
   type WindowDeckShortcuts,
@@ -49,7 +50,8 @@ interface WindowDeckLabels {
 
 /** The announcements a host may replace, and the strings they default to. */
 const windowDeckDefaultLabels: WindowDeckLabels = {
-  overviewOpened: (paneCount) => `Overview, ${paneCount} windows`,
+  overviewOpened: (paneCount) =>
+    paneCount === 1 ? "Overview, 1 window" : `Overview, ${paneCount} windows`,
   overviewClosed: (paneName) => `${paneName}, full view`,
   paneDismissed: (paneName) => `${paneName} dismissed`,
 }
@@ -168,21 +170,38 @@ function hasScrollableAncestor(
   target: EventTarget | null,
   boundary: HTMLElement,
 ): boolean {
-  let node = target instanceof HTMLElement ? target : null
+  // Element, not HTMLElement: an SVG icon inside a scrolling list is still
+  // a descendant of that list, and walking from null would steal its wheel.
+  let node = target instanceof Element ? target : null
 
   while (node && node !== boundary) {
-    const overflowY = window.getComputedStyle(node).overflowY
+    if (node instanceof HTMLElement) {
+      const overflowY = window.getComputedStyle(node).overflowY
 
-    if (
-      (overflowY === "auto" || overflowY === "scroll") &&
-      node.scrollHeight > node.clientHeight + 1
-    ) {
-      return true
+      if (
+        (overflowY === "auto" || overflowY === "scroll") &&
+        node.scrollHeight > node.clientHeight + 1
+      ) {
+        return true
+      }
     }
     node = node.parentElement
   }
 
   return false
+}
+
+/**
+ * Whether focus is sitting on the document itself rather than on a control.
+ * That is the case a dismissal left behind; a host that moved focus to a
+ * toast or a dialog has an element of its own and must keep it.
+ */
+function isDocumentFocus(owner: Document, active: Element | null): boolean {
+  return (
+    active === null ||
+    active === owner.body ||
+    active === owner.documentElement
+  )
 }
 
 /**
@@ -302,6 +321,17 @@ function WindowDeck({
   const panesRef = React.useRef(panes)
   const activePaneIdRef = React.useRef<string | undefined>(undefined)
   const mountedRef = React.useRef(true)
+  // Written synchronously in the settle layout effect so the same commit's
+  // passive effects — and the keymap — can see that a return is in flight
+  // before `settling` has rendered.
+  const settlingRef = React.useRef(false)
+  const scrollReleaseTimerRef = React.useRef<number | undefined>(undefined)
+  // Ids that have actually registered. An unresolved defaultActivePane is
+  // "not yet mounted", not "gone", and must not be rewritten to paneIds[0].
+  const seenPaneIdsRef = React.useRef(new Set<string>())
+  // The removal effect already told the host the neighbour. The dead-id
+  // correction must not follow it with paneIds[0] in the same flush.
+  const correctedFromRemovalRef = React.useRef(false)
 
   panesRef.current = panes
 
@@ -318,6 +348,8 @@ function WindowDeck({
       : paneIds[0]
 
   activePaneIdRef.current = activePaneId
+
+  for (const id of paneIds) seenPaneIdsRef.current.add(id)
 
   // Read by value, so a host writing `overviewLayout={{ columns: 2 }}` inline
   // does not hand the measurement a new identity on every render.
@@ -337,12 +369,19 @@ function WindowDeck({
   )
 
   React.useEffect(() => {
+    // StrictMode remounts run cleanup then setup again — re-arm so a settle
+    // that finishes after the simulated unmount can still clear `settling`.
+    mountedRef.current = true
     const timers = retainedTimersRef.current
 
     return () => {
       mountedRef.current = false
       for (const timer of timers.values()) window.clearTimeout(timer)
       timers.clear()
+      if (scrollReleaseTimerRef.current !== undefined) {
+        window.clearTimeout(scrollReleaseTimerRef.current)
+        scrollReleaseTimerRef.current = undefined
+      }
     }
   }, [])
 
@@ -360,8 +399,14 @@ function WindowDeck({
       ]),
     )
 
-    return () =>
+    return () => {
       setPanes((current) => current.filter((entry) => entry.id !== pane.id))
+      // A request that named this instance must not survive to dismiss a
+      // pane remounted under the same id.
+      setDismissRequest((current) =>
+        current?.paneId === pane.id ? undefined : current,
+      )
+    }
   }, [])
 
   const setActive = React.useCallback(
@@ -408,6 +453,11 @@ function WindowDeck({
       scrollTokenRef.current += 1
       const token = scrollTokenRef.current
 
+      if (scrollReleaseTimerRef.current !== undefined) {
+        window.clearTimeout(scrollReleaseTimerRef.current)
+        scrollReleaseTimerRef.current = undefined
+      }
+
       programmaticScrollRef.current = true
       viewport.scrollTo({ left: target, behavior })
 
@@ -416,6 +466,10 @@ function WindowDeck({
         // Detached first and unconditionally: a superseded release that
         // returned early would leave its listener on the viewport for good.
         viewport.removeEventListener("scrollend", release)
+        if (scrollReleaseTimerRef.current !== undefined) {
+          window.clearTimeout(scrollReleaseTimerRef.current)
+          scrollReleaseTimerRef.current = undefined
+        }
         if (scrollTokenRef.current !== token) return
         programmaticScrollRef.current = false
       }
@@ -423,7 +477,10 @@ function WindowDeck({
       viewport.addEventListener("scrollend", release)
       // Not every browser fires scrollend, and an instant scroll may finish
       // before the listener is attached, so a timer closes the window too.
-      window.setTimeout(release, behavior === "smooth" ? 700 : 0)
+      scrollReleaseTimerRef.current = window.setTimeout(
+        release,
+        behavior === "smooth" ? 700 : 0,
+      )
     },
     [paneElement],
   )
@@ -475,6 +532,14 @@ function WindowDeck({
   }, [overviewOptions])
 
   const openOverview = React.useCallback(() => {
+    const viewport = viewportRef.current
+
+    // A smooth scroll still in flight would be measured as a moving
+    // scrollLeft, and the remaining travel would shift the whole grid.
+    if (viewport) {
+      viewport.scrollTo({ left: viewport.scrollLeft, behavior: "instant" })
+      programmaticScrollRef.current = false
+    }
     // A deck with no room for a grid stays a carousel: an overview whose
     // tiles cannot fit is one where the panes have not moved, snapping is
     // off, and everything past the fold is unreachable.
@@ -587,7 +652,10 @@ function WindowDeck({
           : undefined
 
       if (restoreRef.current === paneId) setRestore(neighbour)
-      if (removal.wasActive && neighbour !== undefined) setActive(neighbour)
+      if (removal.wasActive && neighbour !== undefined) {
+        correctedFromRemovalRef.current = true
+        setActive(neighbour)
+      }
     }
 
     if (removed.length === 0) return
@@ -597,12 +665,15 @@ function WindowDeck({
       removed.map((entry) => labels.paneDismissed(entry.name)).join(", "),
     )
 
-    // Focus is only rescued when the removal actually dropped it out of the
-    // deck: a host that moved focus somewhere of its own must keep it.
+    // Rescue only when focus fell to the document. A host that moved it to
+    // a toast, a dialog, or an undo control is not "dropped"; stealing it
+    // back would be the bug the comment used to claim we avoided.
     const root = rootRef.current
 
     if (root === null) return
-    if (root.contains(root.ownerDocument.activeElement)) return
+    if (!isDocumentFocus(root.ownerDocument, root.ownerDocument.activeElement)) {
+      return
+    }
 
     const neighbour = removed[0].neighbour
       ? paneElement(removed[0].neighbour)
@@ -628,7 +699,24 @@ function WindowDeck({
     if (resolvedMode === "overview") {
       // Whichever route opened the overview, the window the deck came from
       // is the one a dismissal returns to.
-      if (previous !== "overview") setRestore(activePaneId)
+      if (previous !== "overview") {
+        const restoreId = activePaneIdRef.current
+        setRestore(restoreId)
+        const restore = paneElement(restoreId)
+        const root = rootRef.current
+        const active = root?.ownerDocument.activeElement ?? null
+
+        // Opening the overview inerts every pane's content, which drops
+        // keyboard focus onto the document. Put it on the restore tile so
+        // Enter, Delete, and the next Tab have a target.
+        if (
+          restore &&
+          root &&
+          (isDocumentFocus(root.ownerDocument, active) || !restore.contains(active))
+        ) {
+          restore.focus({ preventScroll: true })
+        }
+      }
       // The deck is in the overview, so any close that was requested did not
       // happen; a landing left armed here would settle a later close onto
       // the wrong window.
@@ -637,7 +725,9 @@ function WindowDeck({
     }
     if (previous !== "overview") return
 
-    const landing = pendingSettleRef.current ?? activePaneId
+    // Read through the ref so a controlled host echoing the landing id a
+    // commit later does not re-run this effect and finish the settle mid-slide.
+    const landing = pendingSettleRef.current ?? activePaneIdRef.current
     pendingSettleRef.current = undefined
 
     const viewport = viewportRef.current
@@ -665,33 +755,53 @@ function WindowDeck({
     rail.style.transitionProperty = "none"
     viewport.scrollLeft = centeredScrollLeft(viewport, pane)
     const settled = viewport.scrollLeft
-    rail.style.translate = `${settled - before}px`
+    const shift = settled - before
+    rail.style.translate = `${shift}px`
     // Reading layout is the flush: it forces the shift to be computed, so the
     // line below has a value to transition from.
     void rail.getBoundingClientRect()
     rail.style.removeProperty("transition-property")
     rail.style.translate = "0px"
+    pane.focus({ preventScroll: true })
 
     const duration = longestTransitionMs(pane)
+    const railMoved = Math.abs(shift) >= 1
     let timer: number | undefined
 
     /**
-     * Ends the settle when the rail's own slide finishes, ignoring the
-     * transitions of everything inside it.
+     * Ends the settle when the movement it is waiting on finishes.
+     *
+     * Escape lands on the window the scroller already centred, so the rail
+     * shift is zero and never fires `transitionend`. That path waits on the
+     * landing pane's own return instead.
      *
      * @param event - The transition that ended.
      */
-    const onRailSettled = (event: TransitionEvent) => {
-      if (event.target !== rail || event.propertyName !== "translate") return
+    const onSettled = (event: TransitionEvent) => {
+      if (railMoved) {
+        if (event.target !== rail || event.propertyName !== "translate") return
+      } else if (
+        event.target !== pane ||
+        (event.propertyName !== "translate" &&
+          event.propertyName !== "scale" &&
+          event.propertyName !== "opacity")
+      ) {
+        return
+      }
       finish()
     }
 
     /** Hands the scroller back its snapping once nothing is transformed. */
     const finish = () => {
       if (timer !== undefined) window.clearTimeout(timer)
-      rail.removeEventListener("transitionend", onRailSettled)
+      rail.removeEventListener("transitionend", onSettled)
+      pane.removeEventListener("transitionend", onSettled)
       finishSettleRef.current = null
+      // Suppress the rail's own curve so finishing mid-slide — an open that
+      // cancelled this settle — snaps rather than animating under the grid.
+      rail.style.transitionProperty = "none"
       rail.style.removeProperty("translate")
+      void rail.getBoundingClientRect()
       rail.style.removeProperty("transition-property")
       viewport.style.removeProperty("scroll-behavior")
       viewport.style.removeProperty("scroll-snap-type")
@@ -699,11 +809,10 @@ function WindowDeck({
       // before the panes are untransformed makes the browser jump to a
       // neighbour. Restoring the offset keeps that handover invisible.
       viewport.scrollLeft = settled
+      settlingRef.current = false
       // Skipped only for a real unmount. This cleanup also runs on an
-      // ordinary dependency change — a controlled host answering the close
-      // with a later commit is enough — and skipping the write there would
-      // latch the deck settling: non-interactive, unscrollable, and with no
-      // other writer able to clear it.
+      // ordinary dependency change — a mode change that cancelled the settle
+      // — and skipping the write there would latch the deck settling.
       if (mountedRef.current) setSettling(false)
     }
 
@@ -712,15 +821,16 @@ function WindowDeck({
       return
     }
 
+    settlingRef.current = true
     setSettling(true)
     finishSettleRef.current = finish
-    // The rail's own movement is what the settle is waiting on, so it ends
-    // the settle; the timer is only a backstop for the cases a transition
-    // never reports — a hidden tab, an interrupted animation. Its margin is
-    // generous on purpose: finishing early re-enables snapping while the
-    // panes are still transformed, and the browser then snaps to a box that
-    // is still moving, which is a visible jump at the end of the return.
-    rail.addEventListener("transitionend", onRailSettled)
+    // The movement that actually runs is what the settle waits on; the
+    // timer is only a backstop for the cases a transition never reports —
+    // a hidden tab, an interrupted animation. Its margin is generous on
+    // purpose: finishing early re-enables snapping while the panes are
+    // still transformed, and the browser then snaps to a box that is still
+    // moving.
+    ;(railMoved ? rail : pane).addEventListener("transitionend", onSettled)
     timer = window.setTimeout(finish, duration + 200)
 
     // An unmount, or another mode change, must not strand the rail at its
@@ -728,7 +838,7 @@ function WindowDeck({
     return () => {
       if (finishSettleRef.current === finish) finish()
     }
-  }, [activePaneId, paneElement, resolvedMode, setRestore])
+  }, [paneElement, resolvedMode, setRestore])
 
 
 
@@ -757,6 +867,9 @@ function WindowDeck({
   React.useEffect(() => {
     if (activePane !== undefined || uncontrolledActive === undefined) return
     if (paneIds.length === 0 || paneIds.includes(uncontrolledActive)) return
+    // Not yet mounted. A defaultActivePane behind Suspense is unresolved,
+    // not gone, and rewriting it to the first registered pane loses it.
+    if (!seenPaneIdsRef.current.has(uncontrolledActive)) return
     // Functional, so a selection a dismissal has already queued wins: that
     // one names the neighbour of the window that left, which is where the
     // user was, and this one only exists to unstick a dead id.
@@ -774,6 +887,13 @@ function WindowDeck({
   // is what re-tiles the grid over the gap a dismissal leaves.
   React.useLayoutEffect(() => {
     if (resolvedMode !== "overview") return
+    // A deck that opens in the overview must be centred before the tiles are
+    // measured: otherwise every x is off by the landing pane's scrollLeft
+    // and the grid slides sideways a frame later.
+    if (!centeredRef.current && panes.length > 0) {
+      centeredRef.current = true
+      centerPane(activePaneId, "instant")
+    }
     // A host may put the deck into the overview itself, so the guard that
     // keeps an unreadable grid off the screen lives here rather than only in
     // the shortcut: without it the panes sit untransformed in a scroller
@@ -790,13 +910,21 @@ function WindowDeck({
     if (panes.length === 0 || forcedCarouselRef.current) return
     // Latched, so a host that answers onModeChange by re-rendering without
     // changing the mode is asked once rather than on every render it causes.
+    // The mode effect has already recorded "overview"; rewind that so the
+    // forced close does not play a settle for a grid that never appeared.
     forcedCarouselRef.current = true
+    previousModeRef.current = "carousel"
     setMode("carousel")
-  }, [activePaneId, measureTiles, panes, resolvedMode, setMode, setRestore])
+  }, [activePaneId, centerPane, measureTiles, panes, resolvedMode, setMode, setRestore])
 
   React.useEffect(() => {
     if (requestedActive === undefined || activePaneId === undefined) return
     if (requestedActive === activePaneId || !paneIds.length) return
+    if (!seenPaneIdsRef.current.has(requestedActive)) return
+    if (correctedFromRemovalRef.current) {
+      correctedFromRemovalRef.current = false
+      return
+    }
     onActivePaneChange?.(activePaneId)
   }, [activePaneId, onActivePaneChange, paneIds.length, requestedActive])
 
@@ -845,7 +973,7 @@ function WindowDeck({
   // A selection made anywhere but the scroller — a shortcut, a tile, the
   // host — brings its pane to the middle.
   React.useEffect(() => {
-    if (resolvedMode !== "carousel" || settling) return
+    if (resolvedMode !== "carousel" || settling || settlingRef.current) return
     if (fromScrollRef.current) {
       fromScrollRef.current = false
       return
@@ -970,6 +1098,11 @@ function WindowDeck({
         : 0
 
     if (step === 0) return
+    // Cmd/Ctrl+Arrow is line-start / word-jump inside a composer. The
+    // matcher still reports the chord so a host can rebind it; the deck
+    // itself must not steal it while the user is typing, and must not
+    // retarget a settle that is still sliding.
+    if (isEditableShortcutTarget(event) || settlingRef.current) return
 
     const shortcut = step === 1 ? keymap.nextPane : keymap.previousPane
     claim(shortcut === false ? undefined : shortcut.preventDefault)
@@ -1121,7 +1254,11 @@ function WindowDeck({
             // The rail rides the same curve and duration as the panes: the
             // two are one movement, and any difference between them shows up
             // as the seam the settle exists to hide.
-            className="flex h-full w-max items-center gap-6 py-6 transition-[translate] [transition-duration:calc(var(--nessa-motion-duration-slow)*1.5)] [transition-timing-function:var(--nessa-motion-easing-standard)] [will-change:transform] motion-reduce:transition-none motion-reduce:[will-change:auto]"
+            className={cn(
+              "flex h-full w-max items-center gap-6 py-6 transition-[translate] [transition-duration:calc(var(--nessa-motion-duration-slow)*1.5)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
+              settling &&
+                "[will-change:transform] motion-reduce:[will-change:auto]",
+            )}
           >
             {/*
               Real items rather than padding on the rail: a scroll container

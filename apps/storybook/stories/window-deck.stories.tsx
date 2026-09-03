@@ -7,6 +7,7 @@ import {
   ChatBubble,
   ChatMessage,
   ChatMessageReceipt,
+  Input,
   RandomAvatar,
   TaskList,
   TaskListItem,
@@ -299,6 +300,11 @@ export const OverviewAndBack: Story = {
 
     await userEvent.keyboard("{Meta>}g{/Meta}")
     await waitFor(() => expect(deck).toHaveAttribute("data-mode", "overview"))
+    // Opening the overview inerts the pane content, so focus is moved onto
+    // the restore tile rather than left on the document.
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute("id", "studio"),
+    )
 
     // Every window is a tile: an addressable target with its own name.
     const calendarTile = canvas.getByRole("button", { name: "Calendar" })
@@ -319,7 +325,7 @@ export const OverviewAndBack: Story = {
       viewport.offsetLeft -
       (viewport.clientWidth - landing.offsetWidth) / 2
 
-await expect(Math.abs(viewport.scrollLeft - centred)).toBeLessThan(2)
+    await expect(Math.abs(viewport.scrollLeft - centred)).toBeLessThan(2)
 
     // The settle finishes on the chosen window, and hands interaction back.
     await waitFor(() =>
@@ -342,6 +348,9 @@ await expect(Math.abs(viewport.scrollLeft - centred)).toBeLessThan(2)
         "data-active",
         "",
       ),
+    )
+    await waitFor(() =>
+      expect(deck!.querySelector("[data-settling]")).toBeNull(),
     )
   },
 }
@@ -424,9 +433,12 @@ export const ControlledWithACustomKeymap: Story = {
           paneBox.left + paneBox.width / 2 - (viewportBox.left + viewportBox.width / 2),
         )
 
-expect(offset).toBeLessThan(4)
+        expect(offset).toBeLessThan(4)
       },
       { timeout: 3000 },
+    )
+    await waitFor(() =>
+      expect(deck!.querySelector("[data-settling]")).toBeNull(),
     )
   },
 }
@@ -636,6 +648,8 @@ export const DeclinedDismissal: Story = {
     await expect(document.activeElement).toBe(
       canvas.getByRole("button", { name: "Chart ramp" }),
     )
+    // The retained-grace timer must finish before the next story mounts.
+    await new Promise((resolve) => window.setTimeout(resolve, 1100))
   },
 }
 
@@ -700,6 +714,7 @@ export const RapidToggling: Story = {
       },
       { timeout: 3000 },
     )
+    await waitFor(() => expect(deck.querySelector("[data-settling]")).toBeNull())
   },
 }
 
@@ -762,17 +777,30 @@ export const WithoutMotion: Story = {
     await userEvent.keyboard("{Meta>}g{/Meta}")
     await waitFor(() => expect(deck).toHaveAttribute("data-mode", "overview"))
 
-    // With no transition there is no transitionend, so a dismissal that
-    // waited for one would never complete and would leave an invisible,
-    // unreachable tile holding a cell in the grid.
-    const tile = canvas.getByRole("button", { name: "Chart ramp" })
+    // A throw under zero-duration motion must not also count as a tap that
+    // opens the thrown tile and leaves the overview.
+    const thrown = canvas.getByRole("button", { name: "Chart ramp" })
+    const box = thrown.getBoundingClientRect()
+    const from = {
+      clientX: Math.round(box.left + box.width / 2),
+      clientY: Math.round(box.top + box.height / 2),
+    }
 
-    tile.focus()
-    await userEvent.keyboard("{Delete}")
-    await waitFor(() => expect(canvas.getByText("3 studies")).toBeVisible())
+    await userEvent.pointer([
+      { keys: "[MouseLeft>]", target: thrown, coords: from },
+      { target: thrown, coords: { ...from, clientY: from.clientY - 35 } },
+      { target: thrown, coords: { ...from, clientY: from.clientY - 140 } },
+      {
+        keys: "[/MouseLeft]",
+        target: thrown,
+        coords: { ...from, clientY: from.clientY - 140 },
+      },
+    ])
     await waitFor(() =>
       expect(canvas.queryByRole("button", { name: "Chart ramp" })).toBeNull(),
     )
+    await expect(deck).toHaveAttribute("data-mode", "overview")
+    await waitFor(() => expect(canvas.getByText("3 studies")).toBeVisible())
 
     // The deck opened on "success", so dismissing it has to hand selection to
     // its neighbour. Falling back to the first window would look the same
@@ -848,6 +876,13 @@ export const DeferredHostUpdates: Story = {
       () => expect(viewport).not.toHaveAttribute("data-settling"),
       { timeout: 3000 },
     )
+    await waitFor(() => {
+      const rail = deck.querySelector<HTMLElement>(
+        '[data-slot="window-deck-rail"]',
+      )!
+
+      expect(rail.style.translate).toBe("")
+    })
     await waitFor(() =>
       expect(document.getElementById("notes")).toHaveAttribute(
         "data-active",
@@ -864,6 +899,62 @@ export const DeferredHostUpdates: Story = {
         "data-active",
         "",
       ),
+    )
+    await waitFor(() =>
+      expect(viewport).not.toHaveAttribute("data-settling"),
+    )
+  },
+}
+
+/**
+ * Proves the deck does not steal the composer's own Mod+Arrow chords.
+ */
+export const ShortcutsLeaveTheComposer: Story = {
+  args: {},
+  parameters: storyDocumentation(
+    "Mod+ArrowLeft and Mod+ArrowRight are line-start and word-jump inside a field. The deck must leave those chords with the composer and keep the window the user is typing in.",
+  ),
+  render: (args) => (
+    <div className="h-[720px] w-full bg-background">
+      <WindowDeck defaultActivePane="compose" {...args}>
+        <WindowDeckPane id="compose" label="Compose">
+          <div className="p-4">
+            <Input
+              aria-label="Draft"
+              defaultValue="hello world"
+            />
+          </div>
+        </WindowDeckPane>
+        <WindowDeckPane id="other" label="Other">
+          <p className="p-4 nessa-text-3">The other window.</p>
+        </WindowDeckPane>
+      </WindowDeck>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const draft = canvas.getByLabelText("Draft") as HTMLInputElement
+
+    draft.focus()
+    draft.setSelectionRange(draft.value.length, draft.value.length)
+    await userEvent.keyboard("{Meta>}{ArrowLeft}{/Meta}")
+    await expect(document.getElementById("compose")).toHaveAttribute(
+      "data-active",
+      "",
+    )
+    await expect(document.activeElement).toBe(draft)
+    await userEvent.keyboard("{Meta>}g{/Meta}")
+    const deck = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="window-deck"]',
+    )!
+
+    await waitFor(() => expect(deck).toHaveAttribute("data-mode", "overview"))
+    await userEvent.keyboard("{Escape}")
+    await waitFor(() => expect(deck).toHaveAttribute("data-mode", "carousel"))
+    await waitFor(() => expect(deck.querySelector("[data-settling]")).toBeNull())
+    await expect(document.getElementById("compose")).toHaveAttribute(
+      "data-active",
+      "",
     )
   },
 }
