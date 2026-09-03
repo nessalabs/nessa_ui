@@ -89,6 +89,13 @@ interface WindowDeckPaneProps
    * the pane back where it was.
    */
   onDismiss?: (dismissal: WindowDeckDismissal) => void
+  /**
+   * Cheap stand-in shown when the pane's full content is not mounted — in
+   * the overview strip, and nowhere else. The live window keeps rendering
+   * `children`; a host that needs every tree alive passes
+   * `contentMount="always"` on the deck instead.
+   */
+  preview?: React.ReactNode
 }
 
 /** A dismissal gesture in progress. */
@@ -164,7 +171,9 @@ function readThrow(
  * Its content is whatever the host composes into it — a conversation, a
  * calendar, a board, a photograph, an offer card — and the pane supplies the
  * frame, the optional header and footer chrome, the tile behaviour, and the
- * throw that dismisses it.
+ * throw that dismisses it. Full `children` mount only while this pane is
+ * the live window; pass `preview` for the cheap stand-in the overview
+ * strip shows for everyone else.
  *
  * @param props - The pane id and accessible name, its chrome, its dismissal
  * contract, and native container properties.
@@ -183,6 +192,7 @@ function WindowDeckPane({
   dismissible = true,
   dismissDirections = DEFAULT_DIRECTIONS,
   onDismiss,
+  preview,
   className,
   style,
   children,
@@ -193,11 +203,16 @@ function WindowDeckPane({
     activePaneId,
     dismissRequest,
     mode,
+    overviewPanning,
+    paneIds,
+    panOverview,
     registerPane,
     reportDismissal,
     restorePaneId,
     selectPane,
     settling,
+    shouldMountContent,
+    shouldMountPreview,
     tileFor,
   } = useWindowDeck()
   const elementRef = React.useRef<HTMLDivElement>(null)
@@ -212,6 +227,9 @@ function WindowDeckPane({
   const active = activePaneId === id
   const tile = overview ? tileFor(id) : undefined
   const throwable = dismissible && onDismiss !== undefined && overview
+  const contentMounted = shouldMountContent(id)
+  const previewMounted = !contentMounted && shouldMountPreview(id)
+  const body = contentMounted ? children : previewMounted ? preview : null
 
   React.useLayoutEffect(() => {
     const element = elementRef.current
@@ -360,13 +378,17 @@ function WindowDeckPane({
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     props.onPointerDown?.(event)
-    if (!throwable || leaving || event.defaultPrevented) return
+    if (leaving || event.defaultPrevented) return
+    // Overview tiles always listen: sideways travel pans the strip even on
+    // a pane that cannot be thrown. Carousel panes only listen to dismiss.
+    if (!throwable && !overview) return
     // A second finger must not restart the drag the first one is running,
     // which would snap the pane back under the user's hand.
     if (endDragRef.current) return
     if (event.pointerType === "mouse" && event.button !== 0) return
 
     suppressClickRef.current = false
+    let panning = false
 
     const drag: DragState = {
       pointerId: event.pointerId,
@@ -403,9 +425,26 @@ function WindowDeckPane({
 
       if (!drag.engaged) {
         if (Math.hypot(deltaX, deltaY) < ENGAGE_DISTANCE) return
+        // Sideways travel in the overview is a scroll of the strip, not a
+        // throw. A pane that cannot be dismissed still pans this way.
+        if (overview && Math.abs(deltaX) > Math.abs(deltaY)) {
+          drag.engaged = true
+          panning = true
+          drag.offsetX = deltaX
+          suppressClickRef.current = true
+          panOverview(-deltaX)
+          return
+        }
+        if (!throwable) return
         drag.engaged = true
         suppressClickRef.current = true
         setDragging(true)
+      } else if (panning) {
+        const travelled = deltaX - drag.offsetX
+        drag.offsetX = deltaX
+        drag.offsetY = deltaY
+        panOverview(-travelled)
+        return
       }
 
       const directions = directionsRef.current
@@ -438,8 +477,8 @@ function WindowDeckPane({
     const finish = (native: PointerEvent) => {
       if (native.pointerId !== drag.pointerId) return
       stop()
-      if (!drag.engaged) {
-        suppressClickRef.current = false
+      if (!drag.engaged || panning) {
+        if (!drag.engaged) suppressClickRef.current = false
         return
       }
 
@@ -497,9 +536,16 @@ function WindowDeckPane({
       data-dismissible={
         dismissible && onDismiss !== undefined ? "" : undefined
       }
+      data-content={
+        contentMounted ? "live" : previewMounted ? "preview" : "empty"
+      }
       role={openable ? "button" : "group"}
       tabIndex={openable ? 0 : -1}
       aria-label={label}
+      aria-setsize={paneIds.length || undefined}
+      aria-posinset={
+        paneIds.length === 0 ? undefined : paneIds.indexOf(id) + 1
+      }
       // In the overview the deck marks the window Escape returns to; in the
       // carousel it marks the window the deck is centred on. Either way the
       // state is carried semantically, not by opacity alone.
@@ -571,6 +617,9 @@ function WindowDeckPane({
         // Overview, settle, drag, and leave are the commits that need it.
         (overview || settling || dragging || leaving) &&
           "[will-change:transform,opacity] motion-reduce:[will-change:auto]",
+        // Panning the strip updates every tile's translate each tick; easing
+        // those writes would make the page lag the hand.
+        overview && overviewPanning && "transition-none",
         // A discarded window is the exception: it accelerates away instead of
         // coasting, so it reads as thrown rather than as placed.
         leaving &&
@@ -619,7 +668,7 @@ function WindowDeckPane({
           contentClassName,
         )}
       >
-        {children}
+        {body}
       </div>
       {footer ? (
         <div

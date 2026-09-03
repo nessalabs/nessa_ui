@@ -11,10 +11,16 @@ import {
   composeRefs,
   sortByDocumentPosition,
   type RegisteredWindowDeckPane,
+  type WindowDeckContentMount,
   type WindowDeckMode,
 } from "./window-deck-context"
 import {
-  computeOverviewTiles,
+  clampOverviewScroll,
+  computeOverviewLayout,
+  overviewPreviewInView,
+  overviewScrollToCentre,
+  overviewScrollToReveal,
+  type WindowDeckOverviewLayout,
   type WindowDeckOverviewOptions,
   type WindowDeckRect,
   type WindowDeckTile,
@@ -91,14 +97,31 @@ interface WindowDeckProps extends React.ComponentProps<"div"> {
   paneWidth?: string
   /**
    * Height of one window, as a CSS length. Panes are the same size by
-   * default, which is what keeps the overview a grid of equals; pass "auto"
-   * to let each pane take its content's height instead.
+   * default, which is what keeps the overview a strip of equals; pass "auto"
+   * to let each pane take its content's height instead. With the default
+   * `contentMount`, unmounted frames reuse the live window's measured height
+   * so the rail does not collapse around empty neighbours.
    * @defaultValue "100%"
    */
   paneHeight?: string
   /**
-   * Column, row, gap, and inset overrides for the overview grid. The deck
-   * reads this by value, so an object written inline is safe.
+   * Which pane trees stay mounted. `active` keeps only the live window's
+   * content alive — overview tiles show `preview` (or empty chrome) and far
+   * panes stay frames. `always` mounts every tree, for hosts whose hidden
+   * windows must keep running work.
+   * @defaultValue "active"
+   */
+  contentMount?: WindowDeckContentMount
+  /**
+   * How many overview tiles the viewport shows at once. Extra windows
+   * extend the strip to the side; scroll or arrow to reach them. Clamped
+   * further if the viewport cannot hold that many readable tiles.
+   * @defaultValue 8
+   */
+  overviewVisibleCount?: number
+  /**
+   * Gap, inset, and visible-count overrides for the overview strip. The
+   * deck reads this by value, so an object written inline is safe.
    */
   overviewLayout?: WindowDeckOverviewOptions
   /**
@@ -206,11 +229,17 @@ function isDocumentFocus(owner: Document, active: Element | null): boolean {
 
 /**
  * A deck of windows the user moves between: a horizontal carousel that
- * centres one window at a time, and an overview that pulls every window back
- * into a grid of tiles so the whole set is visible at once. Mod+G switches
+ * centres one window at a time, and an overview that shrinks the live
+ * window into a strip of preview tiles. The viewport shows a capped page
+ * of those tiles; the rest of the strip scrolls sideways. Mod+G switches
  * between the two; clicking or pressing Enter on a tile returns to the
  * carousel on that window, and a tile whose host made it dismissible can be
  * thrown off the deck.
+ *
+ * Only the live window mounts its full content tree. Overview tiles and
+ * carousel neighbours are frames — host-supplied `preview` nodes, or empty
+ * chrome — so opening the overview does not mount every pane. Pass
+ * `contentMount="always"` when hidden windows must keep running work.
  *
  * The deck is content-agnostic. Each `WindowDeckPane` is a frame the host
  * composes any Nessa components into — a conversation, a calendar, a board, a
@@ -238,6 +267,8 @@ function WindowDeck({
   shortcuts,
   paneWidth = "min(880px, 82cqw)",
   paneHeight = "100%",
+  contentMount = "active",
+  overviewVisibleCount,
   overviewLayout,
   wheelNavigation = true,
   labels: labelsProp,
@@ -254,6 +285,14 @@ function WindowDeck({
   const [uncontrolledMode, setUncontrolledMode] =
     React.useState<WindowDeckMode>(defaultMode)
   const [tiles, setTiles] = React.useState<Record<string, WindowDeckTile>>({})
+  const [overviewStrip, setOverviewStrip] = React.useState<WindowDeckOverviewLayout | null>(
+    null,
+  )
+  const [overviewScroll, setOverviewScroll] = React.useState(0)
+  const [overviewPanning, setOverviewPanning] = React.useState(false)
+  const [measuredPaneHeight, setMeasuredPaneHeight] = React.useState<number | undefined>(
+    undefined,
+  )
   const [settling, setSettling] = React.useState(false)
   // Nonced, so a request that never completed cannot dismiss a later pane
   // that happens to mount under the same id.
@@ -326,6 +365,9 @@ function WindowDeck({
   // before `settling` has rendered.
   const settlingRef = React.useRef(false)
   const scrollReleaseTimerRef = React.useRef<number | undefined>(undefined)
+  const overviewPanTimerRef = React.useRef<number | undefined>(undefined)
+  const overviewScrollRef = React.useRef(0)
+  const overviewStripRef = React.useRef<WindowDeckOverviewLayout | null>(null)
   // Ids that have actually registered. An unresolved defaultActivePane is
   // "not yet mounted", not "gone", and must not be rewritten to paneIds[0].
   const seenPaneIdsRef = React.useRef(new Set<string>())
@@ -351,21 +393,33 @@ function WindowDeck({
 
   for (const id of paneIds) seenPaneIdsRef.current.add(id)
 
-  // Read by value, so a host writing `overviewLayout={{ columns: 2 }}` inline
-  // does not hand the measurement a new identity on every render.
-  const { columns, maxRows, gap, insets, minScale } = overviewLayout ?? {}
+  // Read by value, so a host writing `overviewLayout={{ maxVisible: 4 }}`
+  // inline does not hand the measurement a new identity on every render.
+  const { columns, maxVisible, gap, insets, minScale, minTileWidth } =
+    overviewLayout ?? {}
   const insetTop = insets?.top
   const insetBottom = insets?.bottom
   const insetHorizontal = insets?.horizontal
   const overviewOptions = React.useMemo<WindowDeckOverviewOptions>(
     () => ({
       columns,
-      maxRows,
+      maxVisible: overviewVisibleCount ?? maxVisible,
       gap,
       minScale,
+      minTileWidth,
       insets: { top: insetTop, bottom: insetBottom, horizontal: insetHorizontal },
     }),
-    [columns, gap, insetBottom, insetHorizontal, insetTop, maxRows, minScale],
+    [
+      columns,
+      gap,
+      insetBottom,
+      insetHorizontal,
+      insetTop,
+      maxVisible,
+      minScale,
+      minTileWidth,
+      overviewVisibleCount,
+    ],
   )
 
   React.useEffect(() => {
@@ -381,6 +435,10 @@ function WindowDeck({
       if (scrollReleaseTimerRef.current !== undefined) {
         window.clearTimeout(scrollReleaseTimerRef.current)
         scrollReleaseTimerRef.current = undefined
+      }
+      if (overviewPanTimerRef.current !== undefined) {
+        window.clearTimeout(overviewPanTimerRef.current)
+        overviewPanTimerRef.current = undefined
       }
       // StrictMode's effect remount clears the 0ms release timer; without
       // this the lock stays set and scroll-driven selection never resumes.
@@ -489,22 +547,61 @@ function WindowDeck({
   )
 
   /**
-   * Measures the deck and lays every pane out on the overview grid.
+   * Writes the strip's current scroll and the tile transforms that already
+   * have that offset baked in, so a pane's CSS translate is the painted
+   * position rather than a second layer the settle would fight.
+   *
+   * @param layout - The strip measured at scroll 0.
+   * @param scroll - How far the strip has been panned.
+   * @param paneOrder - Registered panes in visual order.
+   */
+  const applyOverviewScroll = React.useCallback(
+    (
+      layout: WindowDeckOverviewLayout,
+      scroll: number,
+      paneOrder: readonly RegisteredWindowDeckPane[],
+    ) => {
+      overviewScrollRef.current = scroll
+      overviewStripRef.current = layout
+      setOverviewScroll(scroll)
+      setOverviewStrip(layout)
+
+      const next = Object.fromEntries(
+        paneOrder.map((pane, index) => [
+          pane.id,
+          {
+            ...layout.tiles[index],
+            x: layout.tiles[index].x - scroll,
+          },
+        ]),
+      )
+
+      setTiles((existing) => (sameTiles(existing, next) ? existing : next))
+    },
+    [],
+  )
+
+  /**
+   * Measures the deck and lays every pane out on the overview strip.
    *
    * Measurement is taken from layout geometry rather than from painted
    * rectangles: the carousel already scales the unfocused panes, and a tile
-   * transform replaces that scale rather than compounding with it.
+   * transform replaces that scale rather than compounding with it. When the
+   * live window sits past the first page, the strip is panned so that tile
+   * is on screen before the first overview frame paints.
    *
+   * @param centrePaneId - When given, pan so this tile sits in the middle.
+   * Resize and re-tile keep the current offset, clamped to the new strip.
    * @returns Whether the deck has room to present an overview at all.
    */
-  const measureTiles = React.useCallback(() => {
+  const measureTiles = React.useCallback((centrePaneId?: string) => {
     const viewport = viewportRef.current
     const current = panesRef.current
 
     if (!viewport || current.length === 0) return false
 
     // A close may still be settling. Its rail shift is a transform on the
-    // panes' parent, so leaving it in flight would push the whole grid
+    // panes' parent, so leaving it in flight would push the whole strip
     // sideways by however far the rail still had to travel. Finishing it now
     // also cancels its timer, which would otherwise fire after this
     // measurement and reset the scroller underneath the tiles.
@@ -516,23 +613,95 @@ function WindowDeck({
       width: pane.element.offsetWidth,
       height: pane.element.offsetHeight,
     }))
-    const placements = computeOverviewTiles(
+    const layout = computeOverviewLayout(
       rects,
       { width: viewport.clientWidth, height: viewport.clientHeight },
       overviewOptions,
     )
 
-    if (placements === null) return false
+    if (layout === null) return false
 
-    const next = Object.fromEntries(
-      current.map((pane, index) => [pane.id, placements[index]]),
-    )
+    const focusIndex = current.findIndex((pane) => pane.id === centrePaneId)
+    const scroll =
+      centrePaneId !== undefined && focusIndex >= 0
+        ? overviewScrollToCentre(
+            layout.centres[focusIndex].x,
+            layout.contentWidth,
+            viewport.clientWidth,
+          )
+        : clampOverviewScroll(
+            overviewScrollRef.current,
+            layout.contentWidth,
+            viewport.clientWidth,
+          )
 
-    // A resize observer reports the size it starts with, so an unchanged
-    // measurement must not churn a new object through every pane.
-    setTiles((existing) => (sameTiles(existing, next) ? existing : next))
+    applyOverviewScroll(layout, scroll, current)
     return true
-  }, [overviewOptions])
+  }, [applyOverviewScroll, overviewOptions])
+
+  /**
+   * Pans the overview strip by a pointer or wheel delta.
+   *
+   * @param deltaX - How far to move the strip, in pixels. Positive reveals
+   * tiles to the right.
+   */
+  const panOverview = React.useCallback(
+    (deltaX: number) => {
+      const viewport = viewportRef.current
+      const layout = overviewStripRef.current
+      const current = panesRef.current
+
+      if (!viewport || !layout || current.length === 0) return
+
+      const next = clampOverviewScroll(
+        overviewScrollRef.current + deltaX,
+        layout.contentWidth,
+        viewport.clientWidth,
+      )
+
+      if (next === overviewScrollRef.current) return
+
+      if (overviewPanTimerRef.current !== undefined) {
+        window.clearTimeout(overviewPanTimerRef.current)
+      }
+      setOverviewPanning(true)
+      overviewPanTimerRef.current = window.setTimeout(() => {
+        overviewPanTimerRef.current = undefined
+        if (mountedRef.current) setOverviewPanning(false)
+      }, 120)
+      applyOverviewScroll(layout, next, current)
+    },
+    [applyOverviewScroll],
+  )
+
+  /**
+   * Scrolls the overview so the named tile is fully on screen, leaving the
+   * offset alone when it already is.
+   *
+   * @param paneId - The tile to reveal.
+   */
+  const revealOverviewTile = React.useCallback(
+    (paneId: string | undefined) => {
+      const viewport = viewportRef.current
+      const layout = overviewStripRef.current
+      const current = panesRef.current
+      const index = current.findIndex((pane) => pane.id === paneId)
+
+      if (!viewport || !layout || index < 0) return
+
+      const next = overviewScrollToReveal(
+        layout.centres[index].x,
+        layout.tileWidth,
+        layout.contentWidth,
+        viewport.clientWidth,
+        overviewScrollRef.current,
+      )
+
+      if (next === overviewScrollRef.current) return
+      applyOverviewScroll(layout, next, current)
+    },
+    [applyOverviewScroll],
+  )
 
   const openOverview = React.useCallback(() => {
     const viewport = viewportRef.current
@@ -543,10 +712,9 @@ function WindowDeck({
       viewport.scrollTo({ left: viewport.scrollLeft, behavior: "instant" })
       programmaticScrollRef.current = false
     }
-    // A deck with no room for a grid stays a carousel: an overview whose
-    // tiles cannot fit is one where the panes have not moved, snapping is
-    // off, and everything past the fold is unreachable.
-    if (!measureTiles()) return
+    // A deck with no room for a strip stays a carousel: an overview whose
+    // tiles cannot be read is one where the panes have not moved.
+    if (!measureTiles(restoreRef.current ?? activePaneIdRef.current)) return
     setMode("overview")
   }, [measureTiles, setMode])
 
@@ -889,19 +1057,26 @@ function WindowDeck({
   // before the frame is painted whichever way it opened. `panes` in the deps
   // is what re-tiles the grid over the gap a dismissal leaves.
   React.useLayoutEffect(() => {
-    if (resolvedMode !== "overview") return
+    if (resolvedMode !== "overview") {
+      overviewStripRef.current = null
+      return
+    }
     // A deck that opens in the overview must be centred before the tiles are
     // measured: otherwise every x is off by the landing pane's scrollLeft
-    // and the grid slides sideways a frame later.
+    // and the strip slides sideways a frame later.
     if (!centeredRef.current && panes.length > 0) {
       centeredRef.current = true
       centerPane(activePaneId, "instant")
     }
     // A host may put the deck into the overview itself, so the guard that
-    // keeps an unreadable grid off the screen lives here rather than only in
-    // the shortcut: without it the panes sit untransformed in a scroller
-    // that no longer scrolls, and everything past the fold is unreachable.
-    if (measureTiles()) {
+    // keeps an unreadable strip off the screen lives here rather than only
+    // in the shortcut: without it the panes sit untransformed in a scroller
+    // that no longer pans. Centring runs only on the way in; a resize or a
+    // dismissal keeps the current offset.
+    const entering = overviewStripRef.current === null
+    if (
+      measureTiles(entering ? (restoreRef.current ?? activePaneId) : undefined)
+    ) {
       forcedCarouselRef.current = false
       // A deck that opened straight into the overview has no earlier
       // carousel commit to have seeded the window it returns to.
@@ -1122,7 +1297,10 @@ function WindowDeck({
     if (next === undefined) return
     // In the overview the shortcut moves the tile the user is on, so the
     // keyboard and the pointer address the same set of targets.
-    if (resolvedMode === "overview") paneElement(next)?.focus()
+    if (resolvedMode === "overview") {
+      paneElement(next)?.focus()
+      revealOverviewTile(next)
+    }
     fromScrollRef.current = false
     setActive(next)
   }
@@ -1173,29 +1351,82 @@ function WindowDeck({
     })
   }
 
+  const liveContentId =
+    resolvedMode === "overview" ? (restorePaneId ?? activePaneId) : activePaneId
+
+  const shouldMountContent = React.useCallback(
+    (paneId: string) => contentMount === "always" || paneId === liveContentId,
+    [contentMount, liveContentId],
+  )
+
+  const shouldMountPreview = React.useCallback(
+    (paneId: string) => {
+      if (contentMount === "always" || resolvedMode !== "overview") return false
+      if (paneId === liveContentId) return false
+      const layout = overviewStrip
+      const viewport = viewportRef.current
+      if (!layout || !viewport) return false
+      const index = paneIds.indexOf(paneId)
+      if (index < 0) return false
+
+      return overviewPreviewInView(
+        layout.centres[index].x,
+        layout.tileWidth,
+        overviewScroll,
+        viewport.clientWidth,
+      )
+    },
+    [
+      contentMount,
+      liveContentId,
+      overviewScroll,
+      overviewStrip,
+      paneIds,
+      resolvedMode,
+    ],
+  )
+
+  React.useLayoutEffect(() => {
+    if (paneHeight !== "auto") return
+    const pane = paneElement(liveContentId)
+    if (!pane) return
+    const height = pane.offsetHeight
+    if (height > 0) {
+      setMeasuredPaneHeight((current) => (current === height ? current : height))
+    }
+  }, [liveContentId, paneElement, paneHeight, panes])
+
   const contextValue = React.useMemo(
     () => ({
       activePaneId,
       dismissRequest,
       mode: resolvedMode,
+      overviewPanning,
       paneIds,
+      panOverview,
       registerPane,
       reportDismissal,
       restorePaneId,
       selectPane,
       settling,
+      shouldMountContent,
+      shouldMountPreview,
       tileFor: (paneId: string) => tiles[paneId],
     }),
     [
       activePaneId,
       dismissRequest,
+      overviewPanning,
       paneIds,
+      panOverview,
       registerPane,
       reportDismissal,
       resolvedMode,
       restorePaneId,
       selectPane,
       settling,
+      shouldMountContent,
+      shouldMountPreview,
       tiles,
     ],
   )
@@ -1207,6 +1438,7 @@ function WindowDeck({
         ref={composedRef}
         data-slot="window-deck"
         data-mode={resolvedMode}
+        data-content-mount={contentMount}
         // Focusable only as the landing place for focus a dismissal
         // dropped; it is not a tab stop of its own.
         tabIndex={-1}
@@ -1214,7 +1446,10 @@ function WindowDeck({
           {
             ...style,
             "--nessa-window-deck-pane-width": paneWidth,
-            "--nessa-window-deck-pane-height": paneHeight,
+            "--nessa-window-deck-pane-height":
+              paneHeight === "auto" && measuredPaneHeight !== undefined
+                ? `${measuredPaneHeight}px`
+                : paneHeight,
           } as React.CSSProperties
         }
         className={cn("relative isolate h-full w-full", className)}
@@ -1223,15 +1458,33 @@ function WindowDeck({
           ref={viewportRef}
           data-slot="window-deck-viewport"
           data-settling={settling ? "" : undefined}
+          data-overview-overflow={
+            resolvedMode === "overview" &&
+            overviewStrip !== null &&
+            overviewStrip.centres.length > overviewStrip.visibleCount
+              ? ""
+              : undefined
+          }
           onScroll={handleScroll}
           onWheel={(event) => {
             const viewport = viewportRef.current
 
+            if (!viewport || settling) return
+
+            if (resolvedMode === "overview") {
+              const layout = overviewStripRef.current
+              if (!layout || layout.contentWidth <= viewport.clientWidth) return
+              const delta =
+                Math.abs(event.deltaX) > Math.abs(event.deltaY)
+                  ? event.deltaX
+                  : event.deltaY
+              if (delta === 0) return
+              panOverview(delta)
+              return
+            }
+
             if (
               !wheelNavigation ||
-              resolvedMode !== "carousel" ||
-              settling ||
-              !viewport ||
               Math.abs(event.deltaY) <= Math.abs(event.deltaX) ||
               hasScrollableAncestor(event.target, viewport)
             ) {
@@ -1245,9 +1498,9 @@ function WindowDeck({
           }}
           className={cn(
             "h-full w-full overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-            // The carousel is a snapping scroller. The overview stops
-            // scrolling entirely: every window is on screen, and a snap
-            // computed from tile transforms would drag the deck sideways.
+            // The carousel is a snapping scroller. The overview pans the
+            // strip through tile transforms rather than the scroller: a snap
+            // computed from those transforms would drag the deck sideways.
             // A container, so the end spacers can be sized against the deck's
             // own width rather than against the rail's intrinsic one.
             "@container",
