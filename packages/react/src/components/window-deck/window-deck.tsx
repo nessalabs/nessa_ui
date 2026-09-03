@@ -382,6 +382,9 @@ function WindowDeck({
         window.clearTimeout(scrollReleaseTimerRef.current)
         scrollReleaseTimerRef.current = undefined
       }
+      // StrictMode's effect remount clears the 0ms release timer; without
+      // this the lock stays set and scroll-driven selection never resumes.
+      programmaticScrollRef.current = false
     }
   }, [])
 
@@ -466,11 +469,11 @@ function WindowDeck({
         // Detached first and unconditionally: a superseded release that
         // returned early would leave its listener on the viewport for good.
         viewport.removeEventListener("scrollend", release)
+        if (scrollTokenRef.current !== token) return
         if (scrollReleaseTimerRef.current !== undefined) {
           window.clearTimeout(scrollReleaseTimerRef.current)
           scrollReleaseTimerRef.current = undefined
         }
-        if (scrollTokenRef.current !== token) return
         programmaticScrollRef.current = false
       }
 
@@ -919,7 +922,13 @@ function WindowDeck({
 
   React.useEffect(() => {
     if (requestedActive === undefined || activePaneId === undefined) return
-    if (requestedActive === activePaneId || !paneIds.length) return
+    if (!paneIds.length) return
+    if (requestedActive === activePaneId) {
+      // The host already holds a live id — including the neighbour a
+      // dismissal just selected — so the one-shot skip is spent.
+      correctedFromRemovalRef.current = false
+      return
+    }
     if (!seenPaneIdsRef.current.has(requestedActive)) return
     if (correctedFromRemovalRef.current) {
       correctedFromRemovalRef.current = false
