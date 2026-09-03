@@ -54,7 +54,9 @@ function ChatTrayChip({ item, className, ...props }: ChatTrayChipProps) {
     </>
   )
   const chipClassName = cn(
-    "inline-flex min-w-0 max-w-52 shrink-0 items-center gap-1 rounded-2xl border border-border bg-transparent px-3 py-1 font-sans nessa-text-2 leading-4 text-muted-foreground transition-colors",
+    // Shrink so a row of chips can share a narrow composer: labels truncate
+    // under pressure instead of blowing past the tray's width.
+    "inline-flex min-w-0 max-w-52 shrink items-center gap-1 rounded-2xl border border-border bg-transparent px-3 py-1 font-sans nessa-text-2 leading-4 text-muted-foreground transition-colors",
     className,
   )
   if (!props.onClick) {
@@ -136,7 +138,7 @@ function ChatTray({
       data-slot="chat-tray"
       role="group"
       aria-label={label}
-      className={cn("flex max-w-full items-center gap-1.5", className)}
+      className={cn("flex w-full min-w-0 max-w-full items-center gap-1.5", className)}
       {...props}
     >
       {shown.map((item) => (
