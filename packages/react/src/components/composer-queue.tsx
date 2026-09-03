@@ -10,6 +10,7 @@ import {
   useSensors,
   type DragEndEvent,
   type Announcements,
+  type Modifier,
 } from "@dnd-kit/core"
 import {
   arrayMove,
@@ -22,6 +23,36 @@ import { CSS } from "@dnd-kit/utilities"
 import { ArrowUp, CornerDownRight, Ellipsis, GripVertical, Trash2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+
+/** Sortable rows stay on the vertical axis — sideways drag is not a reorder. */
+const restrictToVerticalAxis: Modifier = ({ transform }) => ({
+  ...transform,
+  x: 0,
+})
+
+/**
+ * Keeps a dragged row inside its list's box.
+ *
+ * Without this, a row can be pulled past the last item into empty space under
+ * the sheet — the queue looks unbounded even though dropping there does nothing.
+ * Reads the list off a ref at drag time so the first render's null never sticks.
+ */
+function restrictToListElement(
+  listRef: React.RefObject<HTMLElement | null>,
+): Modifier {
+  return ({ transform, draggingNodeRect, containerNodeRect }) => {
+    // Prefer dnd-kit's measured parent rect when present — it already tracked
+    // the list; falling back to a live read covers the first frame.
+    const bound = containerNodeRect ?? listRef.current?.getBoundingClientRect()
+    if (!draggingNodeRect || !bound) return transform
+    let { y } = transform
+    const top = draggingNodeRect.top + y
+    const bottom = draggingNodeRect.bottom + y
+    if (top < bound.top) y += bound.top - top
+    if (bottom > bound.bottom) y -= bottom - bound.bottom
+    return { ...transform, y }
+  }
+}
 
 export type ComposerDeliveryModeValue = "queue" | "steer"
 
@@ -115,11 +146,17 @@ function ComposerQueue({
   className,
   ...props
 }: ComposerQueueProps) {
+  const listRef = React.useRef<HTMLOListElement>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
+  )
+
+  const modifiers = React.useMemo(
+    () => [restrictToVerticalAxis, restrictToListElement(listRef)],
+    [],
   )
 
   const handleDragEnd = React.useCallback(
@@ -137,12 +174,14 @@ function ComposerQueue({
     <ComposerQueueAppearanceContext.Provider value={appearance}>
       <DndContext
         sensors={sensors}
+        modifiers={modifiers}
         collisionDetection={closestCenter}
         accessibility={{ announcements: composerQueueAnnouncements }}
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
           <ol
+            ref={listRef}
             data-slot="composer-queue"
             data-appearance={appearance}
             aria-label="Pending messages"
@@ -150,7 +189,9 @@ function ComposerQueue({
               "m-0 grid list-none p-0",
               appearance === "card"
                 ? "overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-sm"
-                : "overflow-visible bg-transparent text-foreground",
+                : // Plain lists keep overflow visible so a dragged row's shadow
+                  // is not clipped by the list box.
+                  "overflow-visible bg-transparent text-foreground",
               className,
             )}
             {...props}

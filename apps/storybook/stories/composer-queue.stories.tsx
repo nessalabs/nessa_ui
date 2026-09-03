@@ -34,7 +34,7 @@ function QueueExample({ withComposer = false }: { withComposer?: boolean }) {
   const [status, setStatus] = React.useState("Two messages pending")
 
   return (
-    <div className="grid w-[min(60rem,calc(100vw-2rem))] gap-2 rounded-[2rem] bg-neutral-950 p-8">
+    <div className="grid w-[min(60rem,calc(100vw-2rem))] gap-2 rounded-[2rem] bg-background p-8">
       <p className="sr-only" role="status">{status}</p>
       <ComposerQueue
         itemIds={items.map((item) => item.id)}
@@ -84,7 +84,7 @@ function QueueExample({ withComposer = false }: { withComposer?: boolean }) {
 }
 
 const meta = {
-  title: "Components/ComposerQueue",
+  title: "Conversation/ComposerQueue",
   component: ComposerQueue,
   tags: ["autodocs", "test"],
   args: {
@@ -204,7 +204,7 @@ export const IndependentQueueIdentities: Story = {
     "Independent queue instances may reuse host-local sortable IDs without emitting duplicate global DOM IDs.",
   ),
   render: () => (
-    <div className="grid w-[min(60rem,calc(100vw-2rem))] gap-4 rounded-[2rem] bg-neutral-950 p-8">
+    <div className="grid w-[min(60rem,calc(100vw-2rem))] gap-4 rounded-[2rem] bg-background p-8">
       {(["Primary queue message", "Secondary queue message"] as const).map(
         (label) => (
           <ComposerQueue key={label} itemIds={["one"]} onReorder={() => undefined}>
@@ -231,7 +231,6 @@ export const ActiveRunComposition: Story = {
     "Compose the queue above a compact ChatComposer during an active run; switching delivery mode changes host intent without disabling text entry.",
   ),
   render: () => <QueueExample withComposer />,
-  globals: { theme: "dark" },
 }
 
 function QueuedSheetExample() {
