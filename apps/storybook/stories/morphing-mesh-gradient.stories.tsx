@@ -79,7 +79,7 @@ function NessaSetupCard({
       <button
         type="button"
         aria-label="Back"
-        className={`absolute top-5 left-5 z-[1] flex size-9 items-center justify-center rounded-full transition-colors sm:top-6 sm:left-6 ${tone.back}`}
+        className={`absolute top-5 left-5 z-10 flex size-9 items-center justify-center rounded-full transition-colors sm:top-6 sm:left-6 ${tone.back}`}
       >
         <ChevronLeft className="size-4" strokeWidth={2.25} />
       </button>

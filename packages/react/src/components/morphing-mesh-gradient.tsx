@@ -568,7 +568,7 @@ function MorphingMeshGradient({
       */}
       <div
         data-slot="morphing-mesh-gradient-content"
-        className="absolute inset-0 z-[1]"
+        className="absolute inset-0 z-10"
       >
         {children}
       </div>
@@ -577,7 +577,7 @@ function MorphingMeshGradient({
           data-slot="morphing-mesh-gradient-grain"
           aria-hidden="true"
           className={cn(
-            "pointer-events-none absolute inset-0 z-[2] mix-blend-soft-light",
+            "pointer-events-none absolute inset-0 z-20 mix-blend-soft-light",
             "bg-[image:var(--nessa-mesh-grain)] bg-[length:160px_160px]",
           )}
           style={
