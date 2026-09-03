@@ -255,10 +255,10 @@ test("every public sidebar menu primitive is rendered in the menu Storybook cata
 
 test("sidebar Storybook catalog separates primitives, compositions, and examples", async () => {
   const storyTitles = new Map([
-    ["apps/storybook/stories/sidebar.stories.tsx", "Components/Sidebar/Examples"],
-    ["apps/storybook/stories/sidebar-primitives.stories.tsx", "Components/Sidebar/Primitives"],
-    ["apps/storybook/stories/sidebar-compositions.stories.tsx", "Components/Sidebar/Compositions"],
-    ["apps/storybook/stories/sidebar-menu.stories.tsx", "Components/Sidebar/Primitives/Menu"],
+    ["apps/storybook/stories/sidebar.stories.tsx", "Shell/Sidebar/Examples"],
+    ["apps/storybook/stories/sidebar-primitives.stories.tsx", "Shell/Sidebar/Primitives"],
+    ["apps/storybook/stories/sidebar-compositions.stories.tsx", "Shell/Sidebar/Compositions"],
+    ["apps/storybook/stories/sidebar-menu.stories.tsx", "Shell/Sidebar/Primitives/Menu"],
   ])
   const storyNames = await Promise.all([...storyTitles].map(async ([relativePath, title]) => {
     const absolutePath = path.join(root, relativePath)

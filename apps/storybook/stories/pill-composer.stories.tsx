@@ -3418,7 +3418,7 @@ async function waitForSettledAnimations(
 }
 
 const meta = {
-  title: "Components/PillComposer",
+  title: "Conversation/PillComposer",
   component: PillComposer,
   tags: ["autodocs", "test"],
   parameters: {
@@ -3695,9 +3695,11 @@ export const AgentSurfaces: Story = {
     await expect(thoughtDialog).toHaveAttribute("data-expanded", "false")
     await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
     await userEvent.click(canvas.getByRole("button", { name: "Done" }))
-    await expect(
-      canvas.queryByRole("dialog", { name: "Thought 1s" }),
-    ).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        canvas.queryByRole("dialog", { name: "Thought 1s" }),
+      ).not.toBeInTheDocument(),
+    )
     const cue = canvas.getByRole("button", { name: agentExplored })
     await expect(cue).toHaveAttribute("aria-haspopup", "dialog")
     await expect(cue).toHaveAttribute("aria-expanded", "false")
@@ -3714,9 +3716,11 @@ export const AgentSurfaces: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Minimize" }))
     await expect(activityDialog).toHaveAttribute("data-expanded", "false")
     await userEvent.click(canvas.getByRole("button", { name: "Done" }))
-    await expect(
-      canvas.queryByRole("dialog", { name: agentExplored }),
-    ).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        canvas.queryByRole("dialog", { name: agentExplored }),
+      ).not.toBeInTheDocument(),
+    )
     await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
     await userEvent.click(canvas.getByRole("button", { name: "Queued 2" }))
     await expect(canvas.getByRole("dialog", { name: "Queued" })).toBeVisible()
@@ -3768,6 +3772,12 @@ export const AgentSurfaces: Story = {
     await expect(project).toBeVisible()
     await expect(canvas.getByText("Cursor Cloud")).toBeVisible()
     await userEvent.click(canvas.getByRole("button", { name: "Close" }))
+    // The sheet slides out before it unmounts, and the composer under it is
+    // inert until it has gone — a click and a keystroke aimed at it in the
+    // meantime land nowhere.
+    await waitFor(() =>
+      expect(canvasElement.querySelector("[data-slot=sheet]")).toBeNull(),
+    )
     const input = canvas.getByRole("textbox", { name: "Message" })
     await userEvent.click(input)
     await userEvent.type(input, "/hist")
@@ -3908,9 +3918,11 @@ export const Annotations: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Expand" }))
     await expect(annotations).toHaveAttribute("data-expanded", "true")
     await userEvent.click(canvas.getByRole("button", { name: "Done" }))
-    await expect(
-      canvas.getByRole("button", { name: "+ 6 others" }),
-    ).toBeInTheDocument()
+    // The sheet slides out before it unmounts, and the composer behind it
+    // stays inert until it has gone.
+    await waitFor(() =>
+      expect(canvas.getByRole("button", { name: "+ 6 others" })).toBeInTheDocument(),
+    )
     // The a11y pass that follows reads computed colors, so the finite
     // animations must settle first; the busy subagent avatars animate
     // forever by design, so only finite animations count here.

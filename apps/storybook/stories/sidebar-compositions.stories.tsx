@@ -63,7 +63,7 @@ function CompositionFrame({ children, description }: CompositionFrameProps) {
 }
 
 const meta = {
-  title: "Components/Sidebar/Compositions",
+  title: "Shell/Sidebar/Compositions",
   component: Sidebar,
   tags: ["autodocs", "test"],
   decorators: [sidebarStoryDecorator],

@@ -14,7 +14,7 @@ function MathFrame({ children }: { children: React.ReactNode }) {
 }
 
 const meta = {
-  title: "Components/MathBlock",
+  title: "Files/MathBlock",
   component: MathBlock,
   tags: ["autodocs", "test"],
   parameters: {

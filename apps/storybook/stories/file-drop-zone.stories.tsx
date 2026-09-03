@@ -19,7 +19,7 @@ import { ImagePlus, Paperclip } from "lucide-react"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/FileDropZone",
+  title: "Files/FileDropZone",
   component: FileDropZone,
   tags: ["autodocs", "test"],
   // Every story renders its own host, so the required callback is only here

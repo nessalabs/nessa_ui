@@ -80,7 +80,7 @@ function DetailsExample({ openByDefault = false }: { openByDefault?: boolean }) 
 }
 
 const meta = {
-  title: "Components/AgentDetails",
+  title: "Agents/AgentDetails",
   component: AgentDetails,
   tags: ["autodocs", "test"],
   args: {
@@ -121,8 +121,10 @@ export const Playground: Story = {
       canvasElement.querySelector('[role="status"]'),
     ).toHaveTextContent("Pin")
     await userEvent.click(canvas.getByRole("button", { name: "Close" }))
-    await expect(
-      canvas.queryByRole("dialog", { name: "Agent details" }),
-    ).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        canvas.queryByRole("dialog", { name: "Agent details" }),
+      ).not.toBeInTheDocument(),
+    )
   },
 }

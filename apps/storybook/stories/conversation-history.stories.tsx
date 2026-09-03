@@ -53,7 +53,7 @@ function HistoryExample() {
 }
 
 const meta = {
-  title: "Components/ConversationHistory",
+  title: "Conversation/ConversationHistory",
   component: ConversationHistory,
   tags: ["autodocs", "test"],
   args: {

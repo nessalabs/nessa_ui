@@ -7,8 +7,9 @@ import type { JsonValue } from "../json"
  *
  * Deliberately not a [`WireProvenance`]: unlike every other wire here, this
  * module is not true of one build of one CLI. Three different agents speak it
- * — Claude Code and Codex through adapters, opencode natively — so the build
- * belongs to each of them and lives on their transport descriptors instead.
+ * — Claude Code and Codex through adapters, opencode and Cursor Agent
+ * natively — so the build belongs to each of them and lives on their
+ * transport descriptors instead.
  *
  * ACP is also the one wire that does not need a constant to answer the
  * question: `initialize` replies with `agentInfo: { name, version }`, so a
@@ -26,6 +27,8 @@ export const ACP_PROTOCOL_VERSION = 1
  */
 export const AcpMethod = Object.freeze({
   Initialize: "initialize",
+  /** Cursor's ACP requires this after initialize; other agents skip it. */
+  Authenticate: "authenticate",
   SessionNew: "session/new",
   SessionLoad: "session/load",
   SessionPrompt: "session/prompt",
@@ -59,12 +62,12 @@ export const AcpUpdate = Object.freeze({
   CurrentModeUpdate: "current_mode_update",
   UsageUpdate: "usage_update",
   /**
-   * A session's own status, sent by Codex's adapter.
+   * A session's own status.
    *
-   * Its payload is entirely under `_meta.codex`, which is the protocol's
-   * escape hatch for things one agent knows and the protocol does not. A
-   * reader must tolerate it rather than treat an agent-specific extension as
-   * an unknown frame.
+   * Codex's adapter puts its payload under `_meta.codex`; Cursor may send a
+   * top-level `title` instead. Both are agent-specific extensions the protocol
+   * does not define, so a reader must tolerate them rather than treat them as
+   * unknown frames.
    */
   SessionInfoUpdate: "session_info_update",
 } as const)

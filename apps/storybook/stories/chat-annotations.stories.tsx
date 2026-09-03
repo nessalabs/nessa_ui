@@ -36,7 +36,7 @@ const seeded: ChatAnnotation[] = [
 ]
 
 const meta = {
-  title: "Components/ChatAnnotations",
+  title: "Conversation/ChatAnnotations",
   component: ChatAnnotationThread,
   tags: ["autodocs", "test"],
   args: { annotation: seeded[0]! },

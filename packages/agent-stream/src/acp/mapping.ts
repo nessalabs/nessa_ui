@@ -16,6 +16,10 @@ export const ACP_MAPPING: Readonly<Record<string, MappingEntry>> = Object.freeze
     emits: [],
     note: "the handshake. Its reply carries the agent's name, version and negotiated capabilities, which is capability rather than conversation",
   },
+  [AcpMethod.Authenticate]: {
+    emits: [],
+    note: "Cursor's login step after initialize; other agents skip it. Capability, not conversation",
+  },
   [AcpMethod.SessionNew]: {
     emits: [AgentEventType.SessionStarted],
     note: "opens a session; the reply names it and carries the config options, including the model in force and every model it could switch to",
@@ -64,7 +68,7 @@ export const ACP_MAPPING: Readonly<Record<string, MappingEntry>> = Object.freeze
   },
   [`${AcpMethod.SessionUpdate}/${AcpUpdate.ToolCallUpdate}`]: {
     emits: [AgentEventType.ToolCallCompleted, AgentEventType.FileEdits],
-    note: "the call moves; a terminal status settles it, and the locations it names are the files it touched",
+    note: "the call moves; a terminal status settles it. Paths may arrive mid-flight as locations or on a completed diff content block",
   },
   [`${AcpMethod.SessionUpdate}/${AcpUpdate.Plan}`]: {
     emits: [AgentEventType.PlanUpdated],
@@ -97,8 +101,7 @@ export function acpMappingFor(kind: string): MappingEntry | null {
  * ACP's tool kinds, mapped to ours.
  *
  * The protocol already normalized this, so the mapping is a rename rather than
- * a guess — the one wire of the three where a call's kind is not inferred from
- * a tool's name.
+ * a guess — the one wire where a call's kind is not inferred from a tool's name.
  */
 export const ACP_TOOL_KIND: Readonly<Record<AcpToolKind, ToolKind>> = Object.freeze({
   [AcpToolKind.Read]: "file_read",

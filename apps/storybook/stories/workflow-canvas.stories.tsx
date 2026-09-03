@@ -36,7 +36,7 @@ import {
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/WorkflowCanvas",
+  title: "Agents/WorkflowCanvas",
   component: WorkflowCanvas,
   tags: ["autodocs", "test"],
   parameters: {

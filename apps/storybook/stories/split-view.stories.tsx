@@ -13,7 +13,7 @@ import {
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/SplitView",
+  title: "Shell/SplitView",
   component: SplitView,
   tags: ["autodocs", "test"],
   parameters: {

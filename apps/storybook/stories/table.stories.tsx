@@ -31,7 +31,7 @@ import { SearchIcon } from "./icons/nucleo"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/Table",
+  title: "Data/Table",
   component: Table,
   tags: ["autodocs", "test"],
   parameters: {

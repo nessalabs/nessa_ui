@@ -11,7 +11,7 @@ import {
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/TranscriptDivider",
+  title: "Agents/TranscriptDivider",
   component: TranscriptDivider,
   tags: ["autodocs", "test"],
   parameters: {

@@ -23,7 +23,7 @@ const items: ChatTrayItem[] = [
 ]
 
 const meta = {
-  title: "Components/ChatTray",
+  title: "Conversation/ChatTray",
   component: ChatTray,
   tags: ["autodocs", "test"],
   args: { items },

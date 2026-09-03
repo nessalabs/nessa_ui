@@ -14,7 +14,7 @@ import {
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/Kanban",
+  title: "Data/Kanban",
   component: KanbanBoard,
   tags: ["autodocs", "test"],
   parameters: {

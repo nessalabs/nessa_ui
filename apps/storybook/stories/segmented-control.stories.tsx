@@ -6,7 +6,7 @@ import { SegmentedControl, SegmentedControlOption } from "@nessa-ui/react"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/SegmentedControl",
+  title: "Primitives/SegmentedControl",
   component: SegmentedControl,
   tags: ["autodocs", "test"],
   parameters: {

@@ -577,8 +577,13 @@ test("every transport declares what it supports, and what nobody has established
 
   for (const { provider, transport } of flat) {
     // Every transport names the build it was read from, so a consumer can tell
-    // whether its parser matches the process it is talking to.
-    assert.match(transport.provenance.version, /^\d+\.\d+\.\d+$/, `${provider}/${transport.id}`)
+    // whether its parser matches the process it is talking to. Cursor Agent
+    // stamps a date-sha build (`2026.09.02-c22c1a3`) rather than semver.
+    assert.match(
+      transport.provenance.version,
+      /^(\d+\.\d+\.\d+|20\d{2}\.\d{2}\.\d{2}-[0-9a-f]+)$/,
+      `${provider}/${transport.id}`,
+    )
     assert.ok(transport.provenance.command.length > 0)
     assert.ok(transport.note.length > 0)
     for (const [feature, value] of Object.entries(transport.supports)) {

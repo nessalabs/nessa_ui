@@ -1,7 +1,7 @@
 /** @responsibility Turns Agent Client Protocol frames into normalized agent events. */
 
 import type { AgentEvent, AgentStreamMapper, FileEdit, MapperOptions, PlanStep, SessionInfo } from "../events"
-import { PlanStepStatus } from "../events"
+import { FileChange, PlanStepStatus } from "../events"
 import { asArray, asNumber, asObject, asRecord, asString } from "../json"
 import type { JsonValue } from "../json"
 import { EventSink } from "../emitter"
@@ -82,6 +82,22 @@ export class AcpMapper implements AgentStreamMapper {
    * from the frame that opened it.
    */
   private readonly titles = new Map<string, string>()
+  /**
+   * Paths a call named before it settled.
+   *
+   * Cursor (and possibly others) send `locations` on a mid-flight update and
+   * omit them on the terminal one. Without this the completion has nothing to
+   * publish as `file_edits`.
+   */
+  private readonly locations = new Map<string, readonly string[]>()
+  /**
+   * Diff content blocks seen before the terminal update.
+   *
+   * Claude and Codex ship the `diff` on an open `tool_call` frame and leave
+   * the completed update empty. Remembering the blocks lets settlement emit
+   * `file_edits` with the real change kind and hunk.
+   */
+  private readonly editContent = new Map<string, JsonValue>()
 
   constructor(options: MapperOptions = {}) {
     this.emit = new EventSink(options.startSeq ?? 0)
@@ -201,6 +217,11 @@ export class AcpMapper implements AgentStreamMapper {
         const title = asString(update.title)
         if (kindName !== null) this.kinds.set(callId, kindName)
         if (title !== null) this.titles.set(callId, title)
+        // Claude and Codex name edit paths (and ship the diff) on an open
+        // `tool_call` frame; the later completed update carries neither.
+        const named = acpNamedPaths(update)
+        if (named.length > 0) this.locations.set(callId, named)
+        rememberEditContent(this.editContent, callId, update)
         const events: AgentEvent[] = [
           this.emit.build(
             {
@@ -244,12 +265,26 @@ export class AcpMapper implements AgentStreamMapper {
       case AcpUpdate.ToolCallUpdate: {
         const callId = asString(update.toolCallId) ?? "unknown"
         const status = asString(update.status)
-        const title = asString(update.title) ?? this.titles.get(callId) ?? null
+        const title = asString(update.title)
+        // Write-once: ACP renames the call as it runs (`task` → description,
+        // `websearch` → query). Overwriting would lose what the call *is* and
+        // drop `task_completed` / kind sharpening on later frames.
+        if (title !== null && !this.titles.has(callId)) this.titles.set(callId, title)
+        const kindName = asString(update.kind)
+        if (kindName !== null) this.kinds.set(callId, kindName)
+
+        // Remember paths named mid-flight; Cursor sends locations before the
+        // terminal update and leaves them off the completion.
+        const named = acpNamedPaths(update)
+        if (named.length > 0) this.locations.set(callId, named)
+        rememberEditContent(this.editContent, callId, update)
+
+        const rememberedTitle = this.titles.get(callId) ?? title
 
         // opencode's plan rides on `todowrite`'s *input*, and arrives while the
         // call is still running rather than on its result. Waiting for a
         // terminal status would drop every plan update this wire sends.
-        if (this.titles.get(callId) === ACP_TOOL_NAME.TodoWrite) {
+        if (rememberedTitle === ACP_TOOL_NAME.TodoWrite) {
           const steps = acpPlanOf(asRecord(update.rawInput))
           if (steps.length > 0) return [this.emit.build({ type: "plan_updated", steps }, raw, null)]
         }
@@ -257,6 +292,8 @@ export class AcpMapper implements AgentStreamMapper {
         // state the other two transports never publish, and treating it as a
         // result would close a row that is still running.
         if (status !== AcpToolStatus.Completed && status !== AcpToolStatus.Failed) return []
+        const rawOutput = asRecord(update.rawOutput)
+        const exitCode = asNumber(rawOutput.exitCode)
         const events: AgentEvent[] = [
           this.emit.build(
             {
@@ -264,7 +301,9 @@ export class AcpMapper implements AgentStreamMapper {
               callId,
               result: {
                 text: acpContent(update),
-                isError: status === AcpToolStatus.Failed,
+                // Cursor reports failure as a non-zero exit on a `completed`
+                // update rather than as ACP's `failed` status.
+                isError: status === AcpToolStatus.Failed || (exitCode !== null && exitCode !== 0),
                 structured: update.rawOutput ?? null,
                 images: [],
               },
@@ -273,10 +312,19 @@ export class AcpMapper implements AgentStreamMapper {
             null,
           ),
         ]
-        const edits = acpEdits(update, this.kinds.get(callId) ?? asString(update.kind))
+        const edits = acpEdits(
+          {
+            ...update,
+            // Prefer the terminal content when present; otherwise the open-frame
+            // diff Claude/Codex already sent.
+            content: asArray(update.content).length > 0 ? update.content : (this.editContent.get(callId) ?? null),
+          },
+          this.kinds.get(callId) ?? asString(update.kind),
+          this.locations.get(callId) ?? [],
+        )
         if (edits.length > 0) events.push(this.emit.build({ type: "file_edits", callId, edits }, raw, null))
 
-        if (this.titles.get(callId) === ACP_TOOL_NAME.Task) {
+        if (rememberedTitle === ACP_TOOL_NAME.Task) {
           const text = acpContent(update)
           events.push(
             this.emit.build(
@@ -293,6 +341,10 @@ export class AcpMapper implements AgentStreamMapper {
             ),
           )
         }
+        this.locations.delete(callId)
+        this.editContent.delete(callId)
+        this.titles.delete(callId)
+        this.kinds.delete(callId)
         return events
       }
 
@@ -440,21 +492,150 @@ function acpContent(update: Record<string, JsonValue>): string {
   for (const entry of asArray(update.content)) {
     const block = asRecord(entry)
     const text = asString(block.text) ?? asString(asRecord(block.content).text)
-    if (text !== null) parts.push(text)
+    if (text !== null) {
+      parts.push(text)
+      continue
+    }
+    if (asString(block.type) === "diff") {
+      const after = cursorDiffBody(asString(block.newText))
+      if (after !== null && after.length > 0) parts.push(after)
+    }
   }
-  return parts.join("")
+  if (parts.length > 0) return parts.join("")
+  // Cursor puts shell output on `rawOutput` rather than in content blocks.
+  // Keep stderr when present — a failing shell often has both, and dropping
+  // stderr leaves the error detail only on `structured`.
+  const raw = asRecord(update.rawOutput)
+  const stdout = asString(raw.stdout)
+  const stderr = asString(raw.stderr)
+  const streams = [stdout, stderr].filter((part): part is string => part !== null && part.length > 0)
+  if (streams.length === 0) return ""
+  if (streams.length === 1) return streams[0]!
+  const head = streams[0]!
+  return head.endsWith("\n") ? head + streams[1]! : `${head}\n${streams[1]!}`
+}
+
+/**
+ * Cursor's ACP `diff` block ships mangled unified-diff *header lines* in
+ * `oldText` / `newText`, not the file contents themselves:
+ *   oldText: "-- /dev/null"
+ *   newText: "++ b//path\\nactual\\nlines"
+ * Strip that remnant so consumers see the body, not `++ b//…`.
+ */
+function cursorDiffBody(newText: string | null): string | null {
+  if (newText === null) return null
+  if (newText.startsWith("++ b/") || newText.startsWith("+++ b/")) {
+    const nl = newText.indexOf("\n")
+    return nl === -1 ? "" : newText.slice(nl + 1)
+  }
+  return newText
+}
+
+/** Whether a Cursor/ACP before-blob names a create rather than an in-place edit. */
+function acpIsCreate(oldText: string | null): boolean {
+  if (oldText === null || oldText === "") return true
+  // Exact Cursor mangled header, or a real unified-diff null-file line — not
+  // a substring match, which would mislabel any edit whose prior text mentions
+  // `/dev/null`.
+  return oldText === "-- /dev/null" || oldText === "--- /dev/null"
+}
+
+/** Paths named on an ACP update: `locations` plus any `diff` content blocks. */
+function acpNamedPaths(update: Record<string, JsonValue>): string[] {
+  const named: string[] = []
+  const seen = new Set<string>()
+  const put = (path: string) => {
+    if (seen.has(path)) return
+    seen.add(path)
+    named.push(path)
+  }
+  for (const entry of asArray(update.locations)) {
+    const path = asString(asRecord(entry).path)
+    if (path !== null) put(path)
+  }
+  for (const entry of asArray(update.content)) {
+    const block = asRecord(entry)
+    if (asString(block.type) !== "diff") continue
+    const path = asString(block.path)
+    if (path !== null) put(path)
+  }
+  return named
+}
+
+/** Keep the latest `diff` content blocks for a call until it settles. */
+function rememberEditContent(
+  store: Map<string, JsonValue>,
+  callId: string,
+  update: Record<string, JsonValue>,
+): void {
+  const content = asArray(update.content)
+  if (!content.some((entry) => asString(asRecord(entry).type) === "diff")) return
+  store.set(callId, update.content as JsonValue)
+}
+
+/**
+ * Build a minimal unified diff from ACP before/after blobs when we can.
+ *
+ * Cursor's mangled headers are detected and the body is re-hunked. When the
+ * blobs are opaque (or empty after stripping), return null rather than a
+ * fake header consumers would try to parse.
+ */
+function acpDiffBody(path: string, oldText: string | null, newText: string | null): string | null {
+  const create = acpIsCreate(oldText)
+  // In-place edit without a real before-blob: path only, no fabricated diff.
+  if (!create) return null
+  const body = cursorDiffBody(newText)
+  if (body === null || body === "") return null
+  const lines = body.split("\n")
+  // Drop a trailing empty segment from a final newline so the hunk length matches.
+  if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop()
+  const hunk = [`@@ -0,0 +1,${lines.length} @@`, ...lines.map((line) => `+${line}`)]
+  // Absolute paths already start with `/`; `b/${path}` would become `b//tmp/…`.
+  const plus = path.startsWith("/") ? path.slice(1) : path
+  return ["--- /dev/null", `+++ b/${plus}`, ...hunk].join("\n")
 }
 
 /** The files a call touched, which ACP names as locations rather than leaving to a tool's input. */
-function acpEdits(update: Record<string, JsonValue>, kind: string | null): readonly FileEdit[] {
+function acpEdits(
+  update: Record<string, JsonValue>,
+  kind: string | null,
+  remembered: readonly string[],
+): readonly FileEdit[] {
   if (kind !== "edit" && kind !== "delete" && kind !== "move") return []
-  const edits: FileEdit[] = []
+  const byPath = new Map<string, FileEdit>()
+  const put = (path: string, change: FileChange, unifiedDiff: string | null) => {
+    const prev = byPath.get(path)
+    if (prev === undefined) {
+      byPath.set(path, { path, change, unifiedDiff })
+      return
+    }
+    byPath.set(path, {
+      path,
+      // Prefer add/delete over a path-only update once a diff arrives.
+      change: change === FileChange.Update && prev.change !== FileChange.Update ? prev.change : change,
+      unifiedDiff: unifiedDiff ?? prev.unifiedDiff,
+    })
+  }
+  const defaultChange: FileChange = kind === "delete" ? FileChange.Delete : FileChange.Update
   for (const entry of asArray(update.locations)) {
     const path = asString(asRecord(entry).path)
-    if (path === null) continue
-    edits.push({ path, change: kind === "delete" ? "delete" : "update", unifiedDiff: null })
+    if (path !== null) put(path, defaultChange, null)
   }
-  return edits
+  for (const path of remembered) put(path, defaultChange, null)
+  // Cursor's completed edit often carries a `diff` content block with the path
+  // and no locations on that same frame.
+  for (const entry of asArray(update.content)) {
+    const block = asRecord(entry)
+    if (asString(block.type) !== "diff") continue
+    const path = asString(block.path)
+    if (path === null) continue
+    const oldText = asString(block.oldText)
+    const newText = asString(block.newText)
+    const change =
+      kind === "delete" ? FileChange.Delete : acpIsCreate(oldText) ? FileChange.Add : FileChange.Update
+    put(path, change, acpDiffBody(path, oldText, newText))
+  }
+  return [...byPath.values()]
 }
 
 /** Maps a whole ACP capture in one pass. */

@@ -55,7 +55,7 @@ function checkGlyph(input: HTMLElement) {
 }
 
 const meta = {
-  title: "Components/Questionnaire",
+  title: "Conversation/Questionnaire",
   component: Questionnaire,
   tags: ["autodocs", "test"],
   parameters: {

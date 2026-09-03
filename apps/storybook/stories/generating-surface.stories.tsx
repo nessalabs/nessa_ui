@@ -20,7 +20,7 @@ const generatedPage = `<main class="hero">
 </main>`
 
 const meta = {
-  title: "Components/GeneratingSurface",
+  title: "Agents/GeneratingSurface",
   component: GeneratingSurface,
   tags: ["autodocs", "test"],
   parameters: {

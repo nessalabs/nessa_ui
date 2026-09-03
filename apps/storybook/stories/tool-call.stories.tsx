@@ -66,7 +66,7 @@ const editAfter = `export function formatDuration(seconds: number) {
 const openFileSpy = fn()
 
 const meta = {
-  title: "Components/ToolCall",
+  title: "Agents/Tools/ToolCall",
   component: ToolCall,
   tags: ["autodocs", "test"],
   parameters: {

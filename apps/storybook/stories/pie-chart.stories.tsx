@@ -13,7 +13,7 @@ import {
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/PieChart",
+  title: "Charts/PieChart",
   component: PieChart,
   tags: ["autodocs", "test"],
   parameters: {

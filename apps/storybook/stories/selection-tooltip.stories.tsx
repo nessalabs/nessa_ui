@@ -27,7 +27,7 @@ import { ChatAddIcon, CommentIcon } from "./icons/nucleo"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/SelectionTooltip",
+  title: "Conversation/SelectionTooltip",
   component: SelectionTooltip,
   tags: ["autodocs", "test"],
   parameters: {

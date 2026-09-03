@@ -14,7 +14,7 @@ import {
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/Card",
+  title: "Primitives/Card",
   component: Card,
   subcomponents: {
     CardHeader,

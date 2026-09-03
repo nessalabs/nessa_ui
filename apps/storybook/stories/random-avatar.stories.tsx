@@ -12,7 +12,7 @@ import {
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/RandomAvatar",
+  title: "Primitives/RandomAvatar",
   component: RandomAvatar,
   tags: ["autodocs", "test"],
   parameters: {

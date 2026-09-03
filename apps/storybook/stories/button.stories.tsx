@@ -5,7 +5,7 @@ import { ArrowRight, Plus } from "lucide-react"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/Button",
+  title: "Primitives/Button",
   component: Button,
   tags: ["autodocs", "test"],
   parameters: {

@@ -127,8 +127,8 @@ elide the symbol. Mapper classes and their `map*Stream` helpers are the
 exception: those are also exported flat from the contract entry so a host can
 write `new ClaudeStreamMapper()` without a stutter.
 
-`claude/` and `codex/` are two worked examples. Copy their shape, not their
-vocabulary — and read both before assuming a rule generalizes: what looks like
+`claude/`, `codex/` and `cursor/` are worked examples. Copy their shape, not their
+vocabulary — and read more than one before assuming a rule generalizes: what looks like
 a property of agents is often a property of the one you started with.
 
 Three contracts are enforced by `pnpm validate`, so the check will tell you if
@@ -146,6 +146,11 @@ claude -p --output-format stream-json --include-partial-messages --verbose \
 Put the prompt **before** `--allowed-tools`; the flag is variadic and swallows
 it otherwise. Design against captures, never against remembered field names —
 the wire moves, and a fixture is what tells you where it moved to.
+
+Cursor Agent's one-way stream is `agent -p --output-format stream-json
+--stream-partial-output`. Its interactive wire is **`agent acp`** (JSON-RPC over
+stdio) — there is no HTTP `serve` / event bus. Drive ACP with a small client that
+answers `session/request_permission`, and record both directions.
 
 opencode's one-way stream is `opencode run --format json`; its streaming wire is
 the SSE bus at `GET /event` on `opencode serve`. Root the sandbox in a git repo

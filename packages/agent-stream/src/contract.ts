@@ -82,6 +82,7 @@ export {
 export * as acp from "./acp"
 export * as claude from "./claude"
 export * as codex from "./codex"
+export * as cursor from "./cursor"
 export * as opencode from "./opencode"
 
 // Mapper classes and their one-shot helpers are also exported flat, because
@@ -89,6 +90,7 @@ export * as opencode from "./opencode"
 // stutters.
 export { ClaudeStreamMapper, mapClaudeStream } from "./claude"
 export { CodexAppServerMapper, CodexStreamMapper, mapCodexAppServerStream, mapCodexStream } from "./codex"
+export { CursorStreamMapper, mapCursorStream } from "./cursor"
 export { AcpMapper, mapAcpStream } from "./acp"
 export {
   OpencodeRunMapper,

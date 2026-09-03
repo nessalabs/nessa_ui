@@ -4,6 +4,12 @@ import * as React from "react"
 import { Dialog } from "radix-ui"
 import { X } from "lucide-react"
 
+import {
+  longestTransitionMs,
+  openerFromFocus,
+  restoreFocusToOpener,
+  useDragGesture,
+} from "@/lib/overlay-panel"
 import { cn } from "@/lib/utils"
 
 import { Button } from "./button"
@@ -65,36 +71,6 @@ function useDrawer(consumer: string) {
 
 function isHorizontal(side: DrawerSide) {
   return side === "right" || side === "left"
-}
-
-/**
- * How long the element's transition of one property runs, in milliseconds, so
- * the exit is timed from the drawer's own CSS rather than a duplicated
- * constant. The motion-duration tokens collapse to 0ms under reduced motion,
- * which this reads back as an immediate unmount.
- */
-function transitionMs(node: HTMLElement, property: string) {
-  const style = getComputedStyle(node)
-  const list = (value: string) => value.split(",").map((entry) => entry.trim())
-  const milliseconds = (entry: string) => {
-    const parsed = Number.parseFloat(entry)
-    if (!Number.isFinite(parsed)) return 0
-    return entry.endsWith("ms") ? parsed : parsed * 1000
-  }
-  const properties = list(style.transitionProperty)
-  const durations = list(style.transitionDuration)
-  const delays = list(style.transitionDelay)
-  return properties.reduce((longest, candidate, index) => {
-    // Only the slide keeps the panel mounted. A host className that replaces
-    // the transition property — `transition-none`, `transition-colors` —
-    // means there is no slide to wait for, however long the duration says.
-    if (candidate !== property && candidate !== "all") return longest
-    // CSS repeats the shorter of the property and duration lists rather
-    // than padding it, so the index wraps.
-    const duration = milliseconds(durations[index % durations.length] ?? "0s")
-    const delay = milliseconds(delays[index % delays.length] ?? "0s")
-    return Math.max(longest, duration + delay)
-  }, 0)
 }
 
 /**
@@ -247,8 +223,8 @@ function useDrawerPresence(
     // overlay's fade through `overlayClassName` must not have its backdrop
     // destroyed at partial opacity when the panel's slide ends first.
     const duration = Math.max(
-      transitionMs(panel, "translate"),
-      overlay ? transitionMs(overlay, "opacity") : 0,
+      longestTransitionMs(panel, "translate"),
+      overlay ? longestTransitionMs(overlay, "opacity") : 0,
     )
     if (duration === 0) {
       setPresent(false)
@@ -538,13 +514,6 @@ function DrawerContent({
     return () => observer.disconnect()
   }, [measure, panelNode])
 
-  const [resizing, setResizing] = React.useState(false)
-  const gestureRef = React.useRef<{
-    pointerId: number
-    origin: number
-    size: number
-  } | null>(null)
-
   const applySize = React.useCallback(
     (next: number) => {
       const clamped = Math.round(
@@ -569,83 +538,35 @@ function DrawerContent({
   // panel is pinned to. Both pointer and keyboard resizing use this sign.
   const growthPerPixel = side === "right" || side === "bottom" ? -1 : 1
 
-  const handleRef = React.useRef<HTMLDivElement>(null)
-
-  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    // One gesture at a time: a second finger landing on the handle must not
-    // drive the resize from the first finger's origin.
-    if (event.button !== 0 || gestureRef.current) return
-    measure()
-    if (!panelNode) return
-    const box = panelNode.getBoundingClientRect()
-    gestureRef.current = {
-      pointerId: event.pointerId,
-      origin: horizontal ? event.clientX : event.clientY,
-      size: horizontal ? box.width : box.height,
-    }
-    try {
-      // Capture keeps the cursor and the hover state on the handle for the
-      // whole drag. It is an affordance, not the mechanism: the gesture is
-      // driven by document listeners, so a pointer id the platform refuses
-      // to capture (synthetic events in tests) still resizes, and still ends.
-      event.currentTarget.setPointerCapture(event.pointerId)
-    } catch {
-      // Capture is optional; the document listeners below are not.
-    }
-    setResizing(true)
-  }
-
-  // The drag is followed on the document, not on the handle: a 12px strip is
-  // left behind by the first fast movement, and a capture the platform
-  // refused would otherwise strand a gesture that can never be ended.
-  // Read through a ref so the listeners below are attached once per gesture:
-  // an inline `onSizeChange` changes `applySize`'s identity on every render,
-  // and every drag step is a render.
-  const applySizeRef = React.useRef(applySize)
-  React.useLayoutEffect(() => {
-    applySizeRef.current = applySize
+  // The size the panel had when the press landed. Every move is measured
+  // from it rather than from the previous move, so a clamped step cannot
+  // accumulate drift over the drag.
+  const gestureSizeRef = React.useRef(0)
+  const {
+    dragging: resizing,
+    start: startResize,
+    cancel: cancelResize,
+  } = useDragGesture({
+    axis: horizontal ? "x" : "y",
+    onStart: () => {
+      measure()
+      if (!panelNode) return false
+      const box = panelNode.getBoundingClientRect()
+      gestureSizeRef.current = horizontal ? box.width : box.height
+    },
+    onMove: ({ delta }) =>
+      applySize(gestureSizeRef.current + delta * growthPerPixel),
   })
-
-  React.useEffect(() => {
-    if (!resizing || !panelNode) return
-    const ownerDocument = panelNode.ownerDocument
-    const move = (event: PointerEvent) => {
-      const gesture = gestureRef.current
-      if (!gesture || gesture.pointerId !== event.pointerId) return
-      const position = horizontal ? event.clientX : event.clientY
-      applySizeRef.current(
-        gesture.size + (position - gesture.origin) * growthPerPixel,
-      )
-    }
-    const end = (event: PointerEvent) => {
-      if (gestureRef.current?.pointerId !== event.pointerId) return
-      gestureRef.current = null
-      setResizing(false)
-      const handle = handleRef.current
-      if (handle?.hasPointerCapture(event.pointerId)) {
-        handle.releasePointerCapture(event.pointerId)
-      }
-    }
-    ownerDocument.addEventListener("pointermove", move)
-    ownerDocument.addEventListener("pointerup", end)
-    ownerDocument.addEventListener("pointercancel", end)
-    return () => {
-      ownerDocument.removeEventListener("pointermove", move)
-      ownerDocument.removeEventListener("pointerup", end)
-      ownerDocument.removeEventListener("pointercancel", end)
-    }
-  }, [growthPerPixel, horizontal, panelNode, resizing])
 
   // A drawer dismissed mid-drag — Escape, an outside press, a host closing
   // it — unmounts the handle while it still holds the pointer, so no pointer
-  // event ever reaches `endGesture`. Without this the gesture would outlive
-  // the panel: the next hover over a reopened handle would resize from a
-  // stale origin, having never seen a press.
+  // event ever reaches the end of the gesture. Without this the gesture would
+  // outlive the panel: the next hover over a reopened handle would resize
+  // from a stale origin, having never seen a press.
   React.useEffect(() => {
     if (panelNode && resizable) return
-    gestureRef.current = null
-    setResizing(false)
-  }, [panelNode, resizable])
+    cancelResize()
+  }, [cancelResize, panelNode, resizable])
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const step = event.shiftKey ? resizeCoarseStep : resizeStep
@@ -684,17 +605,7 @@ function DrawerContent({
         forceMount
         ref={composedRef}
         onOpenAutoFocus={(event) => {
-          const ownerDocument = panelNode?.ownerDocument
-          const active = ownerDocument?.activeElement
-          // The body is where focus sits when nothing has it — a programmatic
-          // open, `defaultOpen`, or a browser that does not focus a button on
-          // click (Safari, Firefox). It is not an opener to return to.
-          const opener =
-            active instanceof HTMLElement &&
-            active !== ownerDocument?.body &&
-            active !== ownerDocument?.documentElement
-              ? active
-              : null
+          const opener = openerFromFocus(panelNode?.ownerDocument)
           openerRef.current = opener
           // Read now, not in a state updater: an updater runs during the
           // render it schedules, by which point the focus move below has
@@ -750,15 +661,12 @@ function DrawerContent({
             onReturnFocus()
             return
           }
-          opener.focus()
           // Claimed only if it took. Radix prevents this event's default and
           // focuses its own trigger, and it composes with
           // `checkForDefaultPrevented`, so preventing here *replaces* that
           // restore rather than following it — worth doing only when focus
           // actually moved.
-          if (opener.ownerDocument.activeElement === opener) {
-            event.preventDefault()
-          }
+          if (restoreFocusToOpener(opener)) event.preventDefault()
         }}
         data-slot="drawer-content"
         data-side={side}
@@ -831,8 +739,7 @@ function DrawerContent({
               side === "top" && "bottom-0 before:bottom-0",
               side === "bottom" && "top-0 before:top-0",
             )}
-            ref={handleRef}
-            onPointerDown={handlePointerDown}
+            onPointerDown={startResize}
             onKeyDown={handleKeyDown}
             onDoubleClick={() => setSize(initialSize)}
           />

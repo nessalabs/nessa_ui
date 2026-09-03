@@ -1,0 +1,9 @@
+{"type":"system","subtype":"init","apiKeySource":"login","cwd":"/private/tmp/cursor-agent-capture","session_id":"172a6260-eae2-44a0-bcff-f60b5e1767a6","model":"Auto","permissionMode":"default"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Reply with exactly the word hello and nothing else. Do not use tools."}]},"session_id":"172a6260-eae2-44a0-bcff-f60b5e1767a6"}
+{"type":"thinking","subtype":"delta","text":"I will reply with exactly","session_id":"172a6260-eae2-44a0-bcff-f60b5e1767a6","timestamp_ms":1788390151356}
+{"type":"thinking","subtype":"delta","text":" the word \"hello\" and","session_id":"172a6260-eae2-44a0-bcff-f60b5e1767a6","timestamp_ms":1788390151357}
+{"type":"thinking","subtype":"delta","text":" nothing else.","session_id":"172a6260-eae2-44a0-bcff-f60b5e1767a6","timestamp_ms":1788390151357}
+{"type":"thinking","subtype":"completed","session_id":"172a6260-eae2-44a0-bcff-f60b5e1767a6","timestamp_ms":1788390151357}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"hello"}]},"session_id":"172a6260-eae2-44a0-bcff-f60b5e1767a6","timestamp_ms":1788390151357}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"hello"}]},"session_id":"172a6260-eae2-44a0-bcff-f60b5e1767a6"}
+{"type":"result","subtype":"success","duration_ms":2722,"duration_api_ms":2722,"is_error":false,"result":"hello","session_id":"172a6260-eae2-44a0-bcff-f60b5e1767a6","request_id":"7e551155-9a67-462c-88e5-71441473e69e","usage":{"inputTokens":10937,"outputTokens":37,"cacheReadTokens":5376,"cacheWriteTokens":0}}

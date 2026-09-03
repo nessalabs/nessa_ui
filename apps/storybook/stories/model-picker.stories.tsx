@@ -149,7 +149,7 @@ async function expectKimiTheme(
 }
 
 const meta = {
-  title: "Components/ModelPicker",
+  title: "Conversation/ModelPicker",
   component: ModelPicker,
   tags: ["autodocs", "test"],
   args: {

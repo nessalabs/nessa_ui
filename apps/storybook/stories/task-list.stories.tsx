@@ -15,7 +15,7 @@ import {
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/TaskList",
+  title: "Agents/TaskList",
   component: TaskList,
   tags: ["autodocs", "test"],
   parameters: {

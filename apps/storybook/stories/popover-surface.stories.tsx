@@ -5,7 +5,7 @@ import { Button, PopoverSurface } from "@nessa-ui/react"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/PopoverSurface",
+  title: "Primitives/PopoverSurface",
   component: PopoverSurface,
   tags: ["autodocs", "test"],
   parameters: {

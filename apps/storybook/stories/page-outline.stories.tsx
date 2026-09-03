@@ -6,7 +6,7 @@ import { PageOutline, type PageOutlineItemData } from "@nessa-ui/react"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/PageOutline",
+  title: "Data/PageOutline",
   component: PageOutline,
   tags: ["autodocs", "test"],
   parameters: {

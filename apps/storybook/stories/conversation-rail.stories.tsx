@@ -194,7 +194,7 @@ function ScrollSyncExample() {
 }
 
 const meta = {
-  title: "Components/ConversationRail",
+  title: "Conversation/ConversationRail",
   component: ConversationRail,
   tags: ["autodocs", "test"],
   parameters: {

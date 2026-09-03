@@ -23,7 +23,7 @@ import { Archive, Copy, PencilLine, Share2, Trash2 } from "lucide-react"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/DropdownMenu",
+  title: "Primitives/DropdownMenu",
   component: DropdownMenu,
   tags: ["autodocs", "test"],
   parameters: {

@@ -45,6 +45,23 @@ const preview: Preview = {
       page: NessaDocsPage,
     },
     layout: "centered",
+    options: {
+      storySort: {
+        order: [
+          "Nessa UI",
+          "Agents",
+          ["AgentStream", "AgentWorkspace", "AgentActivity", "AgentDetails", "WorkflowCanvas", "TaskList", "TimelineHeader", "GeneratingSurface", "TranscriptDivider", "Tools"],
+          "Conversation",
+          "Charts",
+          "Data",
+          "Files",
+          "Shell",
+          ["AppShell", "SplitView", "Sheet", "Drawer", "Sidebar"],
+          "Primitives",
+          "Foundation",
+        ],
+      },
+    },
   },
   globalTypes: {
     theme: {

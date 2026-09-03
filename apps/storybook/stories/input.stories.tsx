@@ -4,7 +4,7 @@ import { Input } from "@nessa-ui/react"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/Input",
+  title: "Primitives/Input",
   component: Input,
   tags: ["autodocs", "test"],
   parameters: {

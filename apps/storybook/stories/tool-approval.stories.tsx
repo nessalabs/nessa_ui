@@ -207,7 +207,7 @@ function DockedApprovalExample() {
 }
 
 const meta = {
-  title: "Components/ToolApproval",
+  title: "Agents/Tools/ToolApproval",
   component: ToolApproval,
   tags: ["autodocs", "test"],
   parameters: {

@@ -19,7 +19,7 @@ const sampleValue = {
 }
 
 const meta = {
-  title: "Components/JsonTree",
+  title: "Data/JsonTree",
   component: JsonTree,
   tags: ["autodocs", "test"],
   args: { value: sampleValue },

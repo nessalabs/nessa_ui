@@ -26,7 +26,7 @@ import { Building2, Mail, Move3d, Phone, Sparkles } from "lucide-react"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/Drawer",
+  title: "Shell/Drawer",
   component: Drawer,
   // The sizing, resizing, and close-affordance contract lives on
   // DrawerContent, so autodocs must document the parts, not just the root.

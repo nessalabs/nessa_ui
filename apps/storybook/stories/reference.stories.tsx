@@ -86,7 +86,7 @@ function StoryFrame({
 }
 
 const meta = {
-  title: "Components/Reference",
+  title: "Conversation/Reference",
   component: Reference,
   tags: ["autodocs", "test"],
   parameters: {

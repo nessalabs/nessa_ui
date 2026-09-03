@@ -75,7 +75,7 @@ function TabsExample() {
 }
 
 const meta = {
-  title: "Components/ChatTabs",
+  title: "Conversation/ChatTabs",
   component: ChatTabs,
   args: { tabs: [], value: null, onValueChange: () => undefined },
   tags: ["autodocs", "test"],

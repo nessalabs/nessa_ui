@@ -14,7 +14,7 @@ import {
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
-  title: "Components/RadarChart",
+  title: "Charts/RadarChart",
   component: RadarChart,
   tags: ["autodocs", "test"],
   parameters: {
