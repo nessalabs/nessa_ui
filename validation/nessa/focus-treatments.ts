@@ -75,6 +75,7 @@ type FocusComponent =
   | "table/table"
   | "table/table-toolbar"
   | "split-view/split-view-separator"
+  | "window-deck/window-deck-pane"
   | "workflow-canvas/workflow-canvas"
   | "workflow-canvas/workflow-canvas-node"
   | "app-shell/app-shell-dock"
@@ -175,6 +176,17 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     state: "focus-visible",
     className: "focus-visible:outline-ring",
     count: 6,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The pane itself is the only target: it is a tile the user opens in the
+  // overview, and its content carries its own focus treatments.
+  {
+    component: "window-deck/window-deck-pane",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -556,6 +568,10 @@ export const focusGeometryClasses = Object.freeze([
   { component: "kanban/kanban-column", className: "focus-visible:outline-2", count: 1 },
   { component: "kanban/kanban-column", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "kanban/kanban-card", className: "focus-visible:-outline-offset-2", count: 1 },
+  // The pane sits inside the deck's clipping scroller, so its outline draws
+  // inset — an outset ring on the edge pane would be cut off.
+  { component: "window-deck/window-deck-pane", className: "focus-visible:outline-2", count: 1 },
+  { component: "window-deck/window-deck-pane", className: "focus-visible:-outline-offset-2", count: 1 },
   { component: "workflow-canvas/workflow-canvas", className: "focus-visible:outline-2", count: 1 },
   { component: "workflow-canvas/workflow-canvas", className: "focus-visible:-outline-offset-2", count: 1 },
   { component: "workflow-canvas/workflow-canvas-node", className: "focus-visible:outline-2", count: 3 },

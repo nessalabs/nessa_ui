@@ -2254,6 +2254,53 @@
           "target": "components/ui/stock-quote.tsx"
         }
       ]
+    },
+    {
+      "name": "window-deck",
+      "type": "registry:ui",
+      "title": "WindowDeck",
+      "description": "A deck of windows the user moves between: a snapping horizontal carousel, and a keyboard-toggled overview that pulls every window back into a grid of tiles which can be thrown away. Each pane is a frame for any Nessa composition.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+      {
+        "path": "packages/react/src/components/window-deck/index.ts",
+        "type": "registry:ui",
+        "target": "components/window-deck/index.ts"
+      },
+      {
+        "path": "packages/react/src/components/window-deck/window-deck.tsx",
+        "type": "registry:ui",
+        "target": "components/window-deck/window-deck.tsx"
+      },
+      {
+        "path": "packages/react/src/components/window-deck/window-deck-pane.tsx",
+        "type": "registry:ui",
+        "target": "components/window-deck/window-deck-pane.tsx"
+      },
+      {
+        "path": "packages/react/src/components/window-deck/window-deck-context.ts",
+        "type": "registry:ui",
+        "target": "components/window-deck/window-deck-context.ts"
+      },
+      {
+        "path": "packages/react/src/components/window-deck/window-deck-layout.ts",
+        "type": "registry:ui",
+        "target": "components/window-deck/window-deck-layout.ts"
+      },
+      {
+        "path": "packages/react/src/components/window-deck/window-deck-motion.ts",
+        "type": "registry:ui",
+        "target": "components/window-deck/window-deck-motion.ts"
+      },
+      {
+        "path": "packages/react/src/components/window-deck/window-deck-shortcuts.ts",
+        "type": "registry:ui",
+        "target": "components/window-deck/window-deck-shortcuts.ts"
+      }
+      ]
     }
   ]
 }
