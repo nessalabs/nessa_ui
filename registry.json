@@ -544,7 +544,7 @@
       "name": "morphing-mesh-gradient",
       "type": "registry:ui",
       "title": "Morphing Mesh Gradient",
-      "description": "A living mesh-gradient backdrop \u2014 soft colour blooms that drift and blend from a swappable palette, layout type (mesh, aurora, orb), and an inverted pale-glass reading.",
+      "description": "A living mesh-gradient backdrop in the Apple glass-mesh register \u2014 oversized luminous colour blooms that melt and drift from a swappable palette, layout type (mesh, aurora, orb), and an inverted pale reading.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"

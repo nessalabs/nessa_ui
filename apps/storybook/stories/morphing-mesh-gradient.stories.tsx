@@ -36,7 +36,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A living mesh-gradient backdrop: soft colour blooms drift and blend behind content, built from a swappable palette and layout type (`mesh`, `aurora`, or `orb`). Pass any CSS colour array, or build one with `meshGradientFromRange(start, end, count)`. Set `inverted` for the pale glass reading of the same hues — or reach for the `auroraInverted` preset. Motion follows the ambient duration token and cancels under reduced motion; off-screen instances pause so a gallery does not keep every card animating. Purely decorative — text contrast on top belongs to the host.",
+          "A living mesh-gradient backdrop in the Apple glass-mesh register: oversized luminous colour blooms melt and drift behind content, built from a swappable palette and layout type (`mesh`, `aurora`, or `orb`). Defaults to the `glass` preset. Pass any CSS colour array, or build one with `meshGradientFromRange(start, end, count)`. Set `inverted` for the pale reading — or reach for the `glassInverted` preset. Motion follows the ambient duration token and cancels under reduced motion; off-screen instances pause so a gallery does not keep every card animating. Purely decorative — text contrast on top belongs to the host.",
       },
     },
   },
@@ -71,13 +71,13 @@ function NessaHeroContent() {
 
 export const Playground: Story = {
   args: {
-    colors: morphingMeshGradientPresets.aurora,
+    colors: morphingMeshGradientPresets.glass,
     type: "mesh",
     inverted: false,
     animated: true,
     speed: 1,
-    blur: 72,
-    grain: 0,
+    blur: 120,
+    grain: 0.55,
   },
   argTypes: {
     colors: {
@@ -102,16 +102,16 @@ export const Playground: Story = {
       description: "Ambient drift pace — higher is faster.",
     },
     blur: {
-      control: { type: "range", min: 24, max: 120, step: 4 },
+      control: { type: "range", min: 40, max: 180, step: 4 },
       description: "Bloom blur radius in CSS pixels.",
     },
     grain: {
       control: { type: "range", min: 0, max: 2, step: 0.1 },
-      description: "Film grain over the frame; 0 removes it.",
+      description: "Soft glass dither over the frame; 0 removes it.",
     },
   },
   parameters: storyDocumentation(
-    "The default aurora mesh under Nessa hero copy. Swap `colors` for any preset — or your own range — flip `inverted` for the pale glass treatment, and change `type` to re-lay the blooms without touching the content.",
+    "The default glass mesh under Nessa hero copy — luminous mid-tones melting the way the Apple setup wash does. Swap `colors` for any preset — or your own range — flip `inverted` for the pale treatment, and change `type` to re-lay the blooms without touching the content.",
   ),
   render: (args) => (
     <MorphingMeshGradient
@@ -176,12 +176,12 @@ export const Playground: Story = {
 
 export const Presets: Story = {
   parameters: storyDocumentation(
-    "Every named palette as a living card, including `auroraInverted` — the pale glass reading shipped beside the deep aurora so a picker can offer both treatments without inventing a second authoring path.",
+    "Every named palette as a living card, including `glassInverted` — the pale reading shipped beside the default glass mesh so a picker can offer both treatments without inventing a second authoring path.",
   ),
   render: () => (
     <div className="grid w-[min(64rem,calc(100vw-2rem))] grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {Object.entries(morphingMeshGradientPresets).map(([name, colors]) => {
-        const pale = name === "auroraInverted"
+        const pale = name === "glassInverted"
         return (
           <MorphingMeshGradient
             key={name}
@@ -221,23 +221,23 @@ export const Presets: Story = {
 
 export const Inverted: Story = {
   parameters: storyDocumentation(
-    "The same aurora pigments, lifted: `inverted` runs each colour through `color-mix(…, white)` so a deep wash becomes the pale glass treatment without a second hand-authored palette. Pair with dark type when the host needs contrast on the light reading.",
+    "The same glass pigments, lifted: `inverted` runs each colour through `color-mix(…, white)` so the default wash becomes the pale treatment without a second hand-authored palette. Pair with dark type when the host needs contrast on the light reading.",
   ),
   render: () => (
     <div className="grid w-[min(64rem,calc(100vw-2rem))] grid-cols-1 gap-4 sm:grid-cols-2">
       <MorphingMeshGradient
-        colors={morphingMeshGradientPresets.aurora}
+        colors={morphingMeshGradientPresets.glass}
         className="min-h-56 rounded-3xl"
       >
         <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
           <p className="text-sm font-medium tracking-[0.16em] text-white/70 uppercase">
             Default
           </p>
-          <p className="text-xl font-semibold text-white">Deep aurora</p>
+          <p className="text-xl font-semibold text-white">Glass mesh</p>
         </div>
       </MorphingMeshGradient>
       <MorphingMeshGradient
-        colors={morphingMeshGradientPresets.aurora}
+        colors={morphingMeshGradientPresets.glass}
         inverted
         className="min-h-56 rounded-3xl"
       >
