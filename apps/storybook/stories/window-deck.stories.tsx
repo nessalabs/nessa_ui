@@ -33,7 +33,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A deck of windows the user moves between. The carousel snaps one window to the middle at a time and lets its neighbours recede; Mod+G pulls every window back into an overview of tiles, and choosing a tile returns the deck to the carousel on that window. The return is the part worth knowing about: the scroller jumps to the landing window and the rail is shifted by the same distance in the same frame, so the composite is pixel-identical and the only thing that animates is one spring back to zero. Panes are content-agnostic frames — compose any Nessa components into them — and both the focused pane and the presentation mode may be controlled or left to the deck. The keymap follows the design system's shortcut descriptors, so a host rebinds an action, disables one with false, or turns off keyboard control entirely.",
+          "A deck of windows the user moves between. The carousel snaps one window to the middle at a time and lets its neighbours recede; Mod+G shrinks the live window into a strip of preview tiles. The viewport shows a capped page of those tiles — the rest scroll sideways — and choosing a tile returns the deck to the carousel on that window. Only the live window mounts its full content; everyone else is a frame or a host-supplied preview, so a large deck does not remount every pane on the way into the overview. The return is the part worth knowing about: the scroller jumps to the landing window and the rail is shifted by the same distance in the same frame, so the composite is pixel-identical and the only thing that animates is one spring back to zero. Panes are content-agnostic frames — compose any Nessa components into them — and both the focused pane and the presentation mode may be controlled or left to the deck.",
       },
     },
   },
@@ -98,6 +98,9 @@ function DeckExample(props: React.ComponentProps<typeof WindowDeck>) {
         <WindowDeckPane
           id="messages"
           label="Messages"
+          preview={
+            <p className="p-4 nessa-text-2 text-muted-foreground">Nessa crew</p>
+          }
           header={
             <PaneHeader
               icon={MessageCircle}
@@ -118,6 +121,11 @@ function DeckExample(props: React.ComponentProps<typeof WindowDeck>) {
         <WindowDeckPane
           id="rollout"
           label="Rollout"
+          preview={
+            <p className="p-4 nessa-text-2 text-muted-foreground">
+              @nessa-ui/react
+            </p>
+          }
           header={
             <PaneHeader
               icon={PanelsTopLeft}
@@ -143,6 +151,11 @@ function DeckExample(props: React.ComponentProps<typeof WindowDeck>) {
         <WindowDeckPane
           id="studio"
           label="Studio"
+          preview={
+            <p className="p-4 nessa-text-2 text-muted-foreground">
+              nessa-ui preview
+            </p>
+          }
           header={
             <PaneHeader
               icon={PenTool}
@@ -183,6 +196,9 @@ function DeckExample(props: React.ComponentProps<typeof WindowDeck>) {
         <WindowDeckPane
           id="calendar"
           label="Calendar"
+          preview={
+            <p className="p-4 nessa-text-2 text-muted-foreground">Week 43</p>
+          }
           header={
             <PaneHeader
               icon={CalendarDays}
@@ -215,6 +231,9 @@ function DeckExample(props: React.ComponentProps<typeof WindowDeck>) {
         <WindowDeckPane
           id="crew"
           label="Crew"
+          preview={
+            <p className="p-4 nessa-text-2 text-muted-foreground">Maintainers</p>
+          }
           header={
             <PaneHeader icon={MessageCircle} name="Crew" subtitle="Maintainers" />
           }
@@ -235,6 +254,11 @@ function DeckExample(props: React.ComponentProps<typeof WindowDeck>) {
         <WindowDeckPane
           id="notes"
           label="Notes"
+          preview={
+            <p className="p-4 nessa-text-2 text-muted-foreground">
+              Component backlog
+            </p>
+          }
           header={
             <PaneHeader
               icon={PanelsTopLeft}
@@ -270,7 +294,7 @@ function DeckExample(props: React.ComponentProps<typeof WindowDeck>) {
 export const Default: Story = {
   args: {},
   parameters: storyDocumentation(
-    "Six windows of different content in one deck. The centred window is live and its neighbours recede; a vertical wheel gesture over the deck moves it sideways, while content that scrolls on its own keeps its own gesture. Press Mod+G for the overview.",
+    "Six windows of different content in one deck. The centred window is live and its neighbours recede; a vertical wheel gesture over the deck moves it sideways, while content that scrolls on its own keeps its own gesture. Press Mod+G for the overview — a page of preview tiles, not every live tree remounted.",
   ),
   render: (args) => <DeckExample {...args} />,
 }
@@ -279,7 +303,7 @@ export const Default: Story = {
 export const OverviewAndBack: Story = {
   args: {},
   parameters: storyDocumentation(
-    "Mod+G opens the overview, where every window becomes a tile the pointer and the keyboard can open. Choosing a tile returns the deck to the carousel focused on that window; Escape leaves the overview on the window the deck came from.",
+    "Mod+G opens the overview, where the live window keeps its content and every other window becomes a preview tile. Choosing a tile returns the deck to the carousel focused on that window; Escape leaves the overview on the window the deck came from.",
   ),
   render: (args) => <DeckExample {...args} />,
   play: async ({ canvasElement }) => {
@@ -341,6 +365,19 @@ export const OverviewAndBack: Story = {
     // Escape is the dismissal, and lands back where the deck came from.
     await userEvent.keyboard("{Meta>}g{/Meta}")
     await waitFor(() => expect(deck).toHaveAttribute("data-mode", "overview"))
+    // Re-opening centres the window the carousel is on now, not the one
+    // the first visit restored to, and keeps that window's tree mounted.
+    await expect(document.getElementById("calendar")).toHaveAttribute(
+      "data-content",
+      "live",
+    )
+    await waitFor(() => {
+      const box = viewport.getBoundingClientRect()
+      const tile = document.getElementById("calendar")!.getBoundingClientRect()
+
+      expect(tile.left).toBeGreaterThanOrEqual(box.left - 1)
+      expect(tile.right).toBeLessThanOrEqual(box.right + 1)
+    })
     await userEvent.keyboard("{Escape}")
     await waitFor(() => expect(deck).toHaveAttribute("data-mode", "carousel"))
     await waitFor(() =>
@@ -459,6 +496,23 @@ const shots = [
   { id: "destructive", label: "Destructive ramp", from: "#fda4af", to: "#7f1d1d" },
 ]
 
+/** One study as a fill — used as live content and as the overview preview. */
+function PhotoShot({
+  shot,
+  live = false,
+}: {
+  shot: (typeof shots)[number]
+  live?: boolean
+}) {
+  return (
+    <img
+      src={demoPhoto(shot.from, shot.to)}
+      alt={live ? shot.label : ""}
+      className="size-full rounded-xl object-cover"
+    />
+  )
+}
+
 /**
  * The same deck carrying photographs rather than windows: one frame at a
  * time, the whole roll in the overview, and a throw upward to discard one.
@@ -496,6 +550,7 @@ export const PhotosAndDismissal: Story = {
                 chrome={false}
                 scrollable={false}
                 dismissDirections={["up", "down"]}
+                preview={<PhotoShot shot={shot} />}
                 onDismiss={(dismissal) => {
                   setLast(
                     `${shot.label} — ${dismissal.direction}, by ${dismissal.reason}`,
@@ -505,11 +560,7 @@ export const PhotosAndDismissal: Story = {
                   )
                 }}
               >
-                <img
-                  src={demoPhoto(shot.from, shot.to)}
-                  alt={shot.label}
-                  className="size-full rounded-xl object-cover"
-                />
+                <PhotoShot shot={shot} live />
               </WindowDeckPane>
             ))}
           </WindowDeck>
@@ -608,13 +659,10 @@ export const DeclinedDismissal: Story = {
                 label={shot.label}
                 chrome={false}
                 scrollable={false}
+                preview={<PhotoShot shot={shot} />}
                 onDismiss={() => setRefusals((current) => current + 1)}
               >
-                <img
-                  src={demoPhoto(shot.from, shot.to)}
-                  alt={shot.label}
-                  className="size-full rounded-xl object-cover"
-                />
+                <PhotoShot shot={shot} live />
               </WindowDeckPane>
             ))}
           </WindowDeck>
@@ -656,7 +704,7 @@ export const DeclinedDismissal: Story = {
 export const RapidToggling: Story = {
   args: {},
   parameters: storyDocumentation(
-    "The overview and the carousel are toggled faster than the transition between them completes. Each open must measure the deck as it is laid out rather than as it is currently painted — the rail is mid-slide, and reading its painted position would push the whole grid off to one side — and each open must cancel the settle still running underneath it, whose timer would otherwise reset the scroller under the new grid.",
+    "The overview and the carousel are toggled faster than the transition between them completes. Each open must measure the deck as it is laid out rather than as it is currently painted — the rail is mid-slide, and reading its painted position would push the whole strip off to one side — and each open must cancel the settle still running underneath it, whose timer would otherwise reset the scroller under the new strip.",
   ),
   render: (args) => <DeckExample {...args} />,
   play: async ({ canvasElement }) => {
@@ -680,17 +728,15 @@ export const RapidToggling: Story = {
     }
     await waitFor(() => expect(deck).toHaveAttribute("data-mode", "overview"))
 
-    // Every tile is inside the deck, not pushed off by a rail that was still
-    // travelling when the grid was measured.
+    // The restore tile is inside the deck, not pushed off by a rail that
+    // was still travelling when the strip was measured. Far tiles may sit
+    // off to the side — that is the strip, not a measurement bug.
     await waitFor(() => {
       const box = viewport.getBoundingClientRect()
+      const tile = document.getElementById("studio")!.getBoundingClientRect()
 
-      for (const id of ["messages", "rollout", "studio", "calendar", "crew", "notes"]) {
-        const tile = document.getElementById(id)!.getBoundingClientRect()
-
-        expect(tile.left).toBeGreaterThanOrEqual(box.left - 1)
-        expect(tile.right).toBeLessThanOrEqual(box.right + 1)
-      }
+      expect(tile.left).toBeGreaterThanOrEqual(box.left - 1)
+      expect(tile.right).toBeLessThanOrEqual(box.right + 1)
     })
 
     // And the way back still lands centred, with nothing left transformed.
@@ -748,17 +794,14 @@ export const WithoutMotion: Story = {
                 label={shot.label}
                 chrome={false}
                 scrollable={false}
+                preview={<PhotoShot shot={shot} />}
                 onDismiss={() =>
                   setRemaining((current) =>
                     current.filter((entry) => entry.id !== shot.id),
                   )
                 }
               >
-                <img
-                  src={demoPhoto(shot.from, shot.to)}
-                  alt={shot.label}
-                  className="size-full rounded-xl object-cover"
-                />
+                <PhotoShot shot={shot} live />
               </WindowDeckPane>
             ))}
           </WindowDeck>
@@ -954,5 +997,99 @@ export const ShortcutsLeaveTheComposer: Story = {
       "data-active",
       "",
     )
+  },
+}
+
+const manyWindows = Array.from({ length: 12 }, (_, index) => ({
+  id: `pane-${index}`,
+  label: `Window ${index + 1}`,
+  live: `live-${index}`,
+  preview: `preview-${index}`,
+}))
+
+/**
+ * Proves a deep deck opens the overview without mounting every tree, and
+ * that the strip scrolls to tiles past the first page.
+ */
+export const PreviewStrip: Story = {
+  args: {},
+  parameters: storyDocumentation(
+    "Twelve windows, four preview tiles on screen. Opening the overview does not mount the other live trees; the rest of the strip sits off to the side, and choosing a far tile mounts only that window.",
+  ),
+  render: (args) => (
+    <div className="h-[720px] w-full bg-background">
+      <WindowDeck
+        {...args}
+        defaultActivePane="pane-0"
+        overviewVisibleCount={4}
+      >
+        {manyWindows.map((pane) => (
+          <WindowDeckPane
+            key={pane.id}
+            id={pane.id}
+            label={pane.label}
+            preview={<p className="p-4 nessa-text-2">{pane.preview}</p>}
+          >
+            <p className="p-4 nessa-text-3">{pane.live}</p>
+          </WindowDeckPane>
+        ))}
+      </WindowDeck>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const deck = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="window-deck"]',
+    )!
+
+    await expect(deck).toHaveAttribute("data-content-mount", "active")
+    await expect(canvas.getByText("live-0")).toBeVisible()
+    await expect(canvas.queryByText("live-5")).toBeNull()
+    await expect(canvas.queryByText("preview-5")).toBeNull()
+
+    await userEvent.keyboard("{Meta>}g{/Meta}")
+    await waitFor(() => expect(deck).toHaveAttribute("data-mode", "overview"))
+    await waitFor(() =>
+      expect(
+        deck.querySelector("[data-slot='window-deck-viewport']"),
+      ).toHaveAttribute("data-overview-overflow", ""),
+    )
+
+    // The live window stays mounted; a window past the first page is still
+    // only a frame, not its full tree.
+    await expect(canvas.getByText("live-0")).toBeVisible()
+    await expect(canvas.queryByText("live-5")).toBeNull()
+    await expect(document.getElementById("pane-0")).toHaveAttribute(
+      "data-content",
+      "live",
+    )
+    await expect(document.getElementById("pane-1")).toHaveAttribute(
+      "data-content",
+      "preview",
+    )
+
+    const farTile = canvas.getByRole("button", { name: "Window 12" })
+    await userEvent.click(farTile)
+    await waitFor(() => expect(deck).toHaveAttribute("data-mode", "carousel"))
+    await waitFor(() =>
+      expect(document.getElementById("pane-11")).toHaveAttribute(
+        "data-active",
+        "",
+      ),
+    )
+    await waitFor(() => expect(deck.querySelector("[data-settling]")).toBeNull())
+    await expect(canvas.getByText("live-11")).toBeVisible()
+    await expect(canvas.queryByText("live-0")).toBeNull()
+
+    await userEvent.keyboard("{Meta>}g{/Meta}")
+    await waitFor(() => expect(deck).toHaveAttribute("data-mode", "overview"))
+    await expect(document.getElementById("pane-11")).toHaveAttribute(
+      "data-content",
+      "live",
+    )
+    await expect(canvas.queryByText("live-0")).toBeNull()
+    await userEvent.keyboard("{Escape}")
+    await waitFor(() => expect(deck).toHaveAttribute("data-mode", "carousel"))
+    await waitFor(() => expect(deck.querySelector("[data-settling]")).toBeNull())
   },
 }

@@ -2259,7 +2259,7 @@
       "name": "window-deck",
       "type": "registry:ui",
       "title": "WindowDeck",
-      "description": "A deck of windows the user moves between: a snapping horizontal carousel, and a keyboard-toggled overview that pulls every window back into a grid of tiles which can be thrown away. Each pane is a frame for any Nessa composition.",
+      "description": "A deck of windows the user moves between: a snapping horizontal carousel, and a keyboard-toggled overview that shows a scrolling strip of preview tiles. Only the live window mounts its full content. Each pane is a frame for any Nessa composition.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
