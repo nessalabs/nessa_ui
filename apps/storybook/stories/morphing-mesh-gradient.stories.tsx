@@ -185,7 +185,10 @@ export const Playground: Story = {
       surface.getBoundingClientRect().height,
       0,
     )
-    const action = surface.querySelector("button")!
+    const action = [...surface.querySelectorAll("button")].find((button) =>
+      button.textContent?.includes("Continue"),
+    )!
+    await expect(action).toBeTruthy()
     action.scrollIntoView({ block: "center" })
     const target = action.getBoundingClientRect()
     const hit = document.elementFromPoint(
@@ -193,7 +196,9 @@ export const Playground: Story = {
       target.top + target.height / 2,
     )
     await expect(hit).not.toBeNull()
-    await expect(hit).toBe(action)
+    // `elementFromPoint` may land on nested text; the decorative layers
+    // must still let the click reach the control.
+    await expect(action.contains(hit) || hit === action).toBe(true)
     await stopMeshMotion(surface)
   },
 }
