@@ -204,7 +204,6 @@ function WindowDeckPane({
     dismissRequest,
     mode,
     overviewPanning,
-    paneIds,
     panOverview,
     registerPane,
     reportDismissal,
@@ -542,10 +541,6 @@ function WindowDeckPane({
       role={openable ? "button" : "group"}
       tabIndex={openable ? 0 : -1}
       aria-label={label}
-      aria-setsize={paneIds.length || undefined}
-      aria-posinset={
-        paneIds.length === 0 ? undefined : paneIds.indexOf(id) + 1
-      }
       // In the overview the deck marks the window Escape returns to; in the
       // carousel it marks the window the deck is centred on. Either way the
       // state is carried semantically, not by opacity alone.
