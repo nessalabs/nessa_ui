@@ -20,15 +20,18 @@ import { storyDocumentation } from "./story-documentation"
  */
 async function stopMeshMotion(root: ParentNode, canvasElement: HTMLElement) {
   if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
+  // Cancel on the canvas, not only the blooms: a late-started WAAPI or a
+  // grain/content transition must not keep the main thread busy for the
+  // next story's opacity waits.
+  canvasElement.getAnimations({ subtree: true }).forEach((animation) => {
+    animation.cancel()
+  })
   root
     .querySelectorAll<HTMLElement>('[data-slot="morphing-mesh-gradient-bloom"]')
     .forEach((bloom) => {
       bloom.getAnimations().forEach((animation) => animation.cancel())
     })
-  const host = root instanceof Element ? root : root.querySelector("*")
-  if (host) {
-    await expect(host.getAnimations({ subtree: true })).toHaveLength(0)
-  }
+  await expect(canvasElement.getAnimations({ subtree: true })).toHaveLength(0)
 }
 
 const meta = {
