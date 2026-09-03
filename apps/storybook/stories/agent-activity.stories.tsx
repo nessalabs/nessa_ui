@@ -59,7 +59,7 @@ function ToolRows() {
 }
 
 const meta = {
-  title: "Components/AgentActivity",
+  title: "Agents/AgentActivity",
   component: AgentActivity,
   tags: ["autodocs", "test"],
   parameters: {
@@ -163,9 +163,11 @@ export const Playground: Story = {
       expect(canvas.getByRole("button", { name: /read/i })).toBeVisible(),
     )
     await userEvent.click(canvas.getByRole("button", { name: "Done" }))
-    await expect(
-      canvas.queryByRole("dialog", { name: explored }),
-    ).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        canvas.queryByRole("dialog", { name: explored }),
+      ).not.toBeInTheDocument(),
+    )
     await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
     await userEvent.click(canvas.getByRole("button", { name: thought }))
     await expect(canvas.getByRole("dialog", { name: thought })).toBeVisible()
@@ -174,9 +176,11 @@ export const Playground: Story = {
     )
     await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
     await userEvent.click(canvas.getByRole("button", { name: "Done" }))
-    await expect(
-      canvas.queryByRole("dialog", { name: thought }),
-    ).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        canvas.queryByRole("dialog", { name: thought }),
+      ).not.toBeInTheDocument(),
+    )
   },
 }
 
@@ -279,9 +283,11 @@ export const LiveAndCard: Story = {
       ).toBeVisible(),
     )
     await userEvent.click(canvas.getByRole("button", { name: "Done" }))
-    await expect(
-      canvas.queryByRole("dialog", { name: "Exploring…" }),
-    ).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        canvas.queryByRole("dialog", { name: "Exploring…" }),
+      ).not.toBeInTheDocument(),
+    )
     await expect(group).toHaveAttribute("data-status", "complete")
     await expect(group).not.toHaveAttribute("aria-busy")
     await expect(

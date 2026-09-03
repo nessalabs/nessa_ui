@@ -320,6 +320,19 @@
       ]
     },
     {
+      "name": "overlay-panel",
+      "type": "registry:lib",
+      "title": "Overlay panel internals",
+      "description": "The mechanics shared by Nessa's overlay panels: reading duration and easing out of the motion tokens, timing an exit from the panel's own transition, returning focus to whatever opened the panel, and a pointer drag that survives leaving the small target it started on.",
+      "files": [
+        {
+          "path": "packages/react/src/lib/overlay-panel.ts",
+          "type": "registry:lib",
+          "target": "lib/overlay-panel.ts"
+        }
+      ]
+    },
+    {
       "name": "button",
       "type": "registry:ui",
       "title": "Button",
@@ -476,7 +489,7 @@
       "name": "generating-surface",
       "type": "registry:ui",
       "title": "Generating Surface",
-      "description": "An ambient placeholder for content that takes a while to generate — drifting smoke and a shimmering status label reserve the space, then morph into the finished content when generation completes.",
+      "description": "An ambient placeholder for content that takes a while to generate \u2014 drifting smoke and a shimmering status label reserve the space, then morph into the finished content when generation completes.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -531,7 +544,7 @@
       "name": "mermaid-diagram",
       "type": "registry:ui",
       "title": "Mermaid Diagram",
-      "description": "Mermaid diagrams — flowcharts, sequence diagrams, and every other Mermaid grammar — rendered to SVG with app-wide light and dark theming and a fullscreen pan-and-zoom viewer.",
+      "description": "Mermaid diagrams \u2014 flowcharts, sequence diagrams, and every other Mermaid grammar \u2014 rendered to SVG with app-wide light and dark theming and a fullscreen pan-and-zoom viewer.",
       "dependencies": [
         "lucide-react",
         "mermaid"
@@ -1168,7 +1181,7 @@
       "name": "chat-tray",
       "type": "registry:ui",
       "title": "Chat Tray",
-      "description": "One row for everything attached to the message being written — quoted passages, large pastes, files, skills — as kind-glyph chips that collapse their tail into a count so the row stays one line however much it holds.",
+      "description": "One row for everything attached to the message being written \u2014 quoted passages, large pastes, files, skills \u2014 as kind-glyph chips that collapse their tail into a count so the row stays one line however much it holds.",
       "dependencies": [
         "lucide-react"
       ],
@@ -1313,7 +1326,7 @@
       "name": "file-drop-zone",
       "type": "registry:ui",
       "title": "File Drop Zone",
-      "description": "A wrapper that gives any children file drag-and-drop: nested-child drag tracking, accept, size and count rules, recursive folder expansion, and refusals reported with their reason — handing the host a filtered File list to store and render as attachments however it likes. It draws nothing and owns no controls, and asChild merges the whole protocol onto the child element.",
+      "description": "A wrapper that gives any children file drag-and-drop: nested-child drag tracking, accept, size and count rules, recursive folder expansion, and refusals reported with their reason \u2014 handing the host a filtered File list to store and render as attachments however it likes. It draws nothing and owns no controls, and asChild merges the whole protocol onto the child element.",
       "dependencies": [
         "radix-ui"
       ],
@@ -1333,12 +1346,13 @@
       "name": "sheet",
       "type": "registry:ui",
       "title": "Sheet",
-      "description": "A bottom sheet that rises over its nearest positioned ancestor: a modal dialog with a backdrop, a grab bar, a header of close or expand plus a centered title and optional Done, and a scrolling body. The drawer lifts a short way from the bottom on open; dragging the grab bar up or SheetExpand interpolates height into a filled extra-details surface over the same ancestor. Pass modal={false} for a contained extra-details surface that leaves surrounding chrome reachable.",
+      "description": "A bottom sheet that rises over its nearest positioned ancestor: a modal dialog with a backdrop, a grab bar, a header of close or expand plus a centered title and optional Done, and a scrolling body. The drawer lifts a short way from the bottom on open and slides back out on dismissal; dragging the grab bar stretches the panel in place, bottom edge pinned, into a filled extra-details surface over the same ancestor. Pass modal={false} for a contained extra-details surface that leaves surrounding chrome reachable.",
       "dependencies": [
         "lucide-react"
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/overlay-panel",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1353,7 +1367,7 @@
       "name": "agent-activity",
       "type": "registry:ui",
       "title": "Agent Activity",
-      "description": "Collapsed agent work in a transcript: a quiet cue that opens the extra-details sheet with that beat’s thinking and tool calls, a named-task card for a delegated run, and a standalone thought or live Exploring line. Hosts pass a RandomAvatar on exploring cues and named cards — busy while that agent is working, still once it is not. The cue does not expand inline — hosts own the Sheet (open/defaultOpen/onOpenChange are gone). Put AgentActivityContent in the sheet body, not under the trigger.",
+      "description": "Collapsed agent work in a transcript: a quiet cue that opens the extra-details sheet with that beat\u2019s thinking and tool calls, a named-task card for a delegated run, and a standalone thought or live Exploring line. Hosts pass a RandomAvatar on exploring cues and named cards \u2014 busy while that agent is working, still once it is not. The cue does not expand inline \u2014 hosts own the Sheet (open/defaultOpen/onOpenChange are gone). Put AgentActivityContent in the sheet body, not under the trigger.",
       "dependencies": [
         "lucide-react"
       ],
@@ -1582,7 +1596,7 @@
       "name": "timeline-header",
       "type": "registry:ui",
       "title": "Timeline header",
-      "description": "The band a horizontal scale lives on: pixel-offset cells with hairline dividers, and labels that pin at a chosen inset while any part of their cell is in view — the GanttChart's two-tier time header, extracted for any horizontally scrolled surface.",
+      "description": "The band a horizontal scale lives on: pixel-offset cells with hairline dividers, and labels that pin at a chosen inset while any part of their cell is in view \u2014 the GanttChart's two-tier time header, extracted for any horizontally scrolled surface.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -1764,7 +1778,7 @@
       "name": "workflow-canvas",
       "type": "registry:ui",
       "title": "WorkflowCanvas",
-      "description": "An infinite (or bounded) pan-and-zoom workflow canvas with draggable nodes that render any content, side handles for drawing connections, and edges that follow their endpoint nodes — built to stay responsive with thousands of nodes.",
+      "description": "An infinite (or bounded) pan-and-zoom workflow canvas with draggable nodes that render any content, side handles for drawing connections, and edges that follow their endpoint nodes \u2014 built to stay responsive with thousands of nodes.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -1856,6 +1870,7 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/button",
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/overlay-panel",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1892,7 +1907,7 @@
       "name": "page-outline",
       "type": "registry:ui",
       "title": "Page outline",
-      "description": "A scroll-spy section outline drawn along a rail that jogs to trace the heading hierarchy, with a comet pulse — or a host-supplied marker — that travels the rail to the section being read. Sections come from props or are derived from the headings of rendered content such as a markdown surface, and an auto-collapse mode folds deep branches away except where the reader has settled.",
+      "description": "A scroll-spy section outline drawn along a rail that jogs to trace the heading hierarchy, with a comet pulse \u2014 or a host-supplied marker \u2014 that travels the rail to the section being read. Sections come from props or are derived from the headings of rendered content such as a markdown surface, and an auto-collapse mode folds deep branches away except where the reader has settled.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
@@ -2202,7 +2217,7 @@
       "name": "stock-quote",
       "type": "registry:ui",
       "title": "Stock quote",
-      "description": "A brokerage-style quote panel: ticker, name and trading status, the price in large type with its change in the market's colour, a scrubbable and zoomable price chart with line and candle views, range controls that switch windows on their own, an after-hours line, and a strip of key figures — built for agents streaming live market data into a card or a full-width page.",
+      "description": "A brokerage-style quote panel: ticker, name and trading status, the price in large type with its change in the market's colour, a scrubbable and zoomable price chart with line and candle views, range controls that switch windows on their own, an after-hours line, and a strip of key figures \u2014 built for agents streaming live market data into a card or a full-width page.",
       "dependencies": [
         "lucide-react"
       ],
