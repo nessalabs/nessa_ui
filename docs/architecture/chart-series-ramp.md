@@ -30,11 +30,25 @@ per-component decision:
 - **RadarChart** — an outline is a two-pixel line, so `radarChartPalette`
   takes the **strong** step and dilutes that same colour for its area wash.
 
-Both steps are tokens, so each theme carries its own pair: a pale tint on the
-light surface, a deep one on the dark. Nothing in a component corrects a
-colour at the point of use — an earlier revision mixed the line colour toward
-`--foreground` to rescue a too-pale palette, and that workaround is exactly
-what per-theme steps remove.
+Both steps are tokens, so each theme carries its own pair. **The ramp is pastel
+in both themes**: soft, low-chroma tints, stepped in lightness, on the light
+surface and on the dark one. The dark theme used to invert instead — deep,
+near-surface fills — which read as a different palette rather than the same one
+seen at night, so a chart changed identity with the theme toggle. The dark fills
+now sit at L 0.63–0.78 against the 0.145 ground (5.7:1 to 10.1:1), and each
+`-strong` step is its own fill's lighter, more chromatic sibling, because a
+two-pixel line on a dark ground has to carry over its own wash.
+
+Nothing in a component corrects a colour at the point of use — an earlier
+revision mixed the line colour toward `--foreground` to rescue a too-pale
+palette, and that workaround is exactly what per-theme steps remove.
+
+One thing does follow the fill rather than the surface. Text written **on** a
+fill — `PieChart`'s `labels="inside"` — takes `--nessa-chart-label-ink`, a
+near-black that reads on every slot of a pastel ramp in either theme (5.2:1 on
+the darkest fill, 15:1 on the palest). A dark theme's own near-white
+`--foreground` would sit at 1.9:1 there. Labels written on the page, outside the
+marks, stay on the surface's foreground as before.
 
 `N` runs 1..8: blue, orange, aqua, sand, rose, moss, violet, sky.
 
@@ -141,10 +155,13 @@ The values are generated and checked, not chosen by eye. To change them:
 
 1. Edit both `packages/react/src/theme.css` and the `nessa-base` entry in
    `registry.json`; `pnpm validate` fails on `TOKEN-003` if they drift.
-2. Re-run the categorical validator against **both** surfaces — light
-   `oklch(1 0 0)` and dark `oklch(0.145 0 0)` — and clear the lightness band,
-   chroma floor, adjacent CVD separation (ΔE ≥ 8), and the normal-vision
-   floor (ΔE ≥ 15) in each. A contrast warning is the relief rule above, not
+2. Run `pnpm check:chart-ramp`. It reads the shipped values out of
+   `theme.css`, simulates deutan and protan vision, and prints the adjacent
+   CIEDE2000 separations for both surfaces — light `oklch(1 0 0)` and dark
+   `oklch(0.145 0 0)` — beside each slot's contrast against its own ground. It
+   fails when a dark pair separates worse than the light ramp's pair at the
+   same position, since the light ramp's ordering is the one the gates were
+   cleared against. A contrast reading below 3:1 is the relief rule above, not
    a blocker.
 3. Re-run `pnpm build:registry`, then `pnpm validate`.
 

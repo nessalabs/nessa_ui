@@ -72,6 +72,21 @@ export const ImagePreview: Story = {
     const canvas = within(canvasElement)
     const image = await canvas.findByRole("img", { name: "team-photo.png" })
     await waitFor(() => expect(image).toBeVisible())
+    // The settled contract, whichever way the source arrives: once the image
+    // has decoded the skeleton is gone and the picture is painted rather than
+    // held transparent. A source that decodes before React attaches its load
+    // listener has to reach the same state by the renderer reading the
+    // element itself — that path is a server-rendered mount, which this
+    // client-only canvas cannot stage.
+    await waitFor(async () => {
+      await expect(image.closest('[data-slot="file-preview-image"]')).not.toHaveAttribute(
+        "aria-busy",
+      )
+      await expect(getComputedStyle(image).opacity).toBe("1")
+    })
+    await expect(
+      canvasElement.querySelector('[data-slot="file-preview-image-skeleton"]'),
+    ).toBeNull()
     await expect(canvas.getByText("team-photo.png")).toBeVisible()
     await expect(canvas.getByText("1.2 MB")).toBeVisible()
     const download = canvas.getByRole("link", {

@@ -753,7 +753,11 @@ function PieChart({
                   className={cn(
                     LABEL_CLASSES,
                     labels === "inside"
-                      ? "-translate-x-1/2 items-center text-center"
+                      // Written on the wedge rather than on the page, so it
+                      // takes the ramp's own ink instead of the surface's
+                      // foreground — which is near-white on a dark theme and
+                      // would sit at 1.9:1 on a pastel fill.
+                      ? "-translate-x-1/2 items-center text-center text-(--nessa-chart-label-ink) data-[emphasis=active]:text-(--nessa-chart-label-ink)"
                       : right
                         ? "items-start text-left"
                         : "-translate-x-full items-end text-right",
