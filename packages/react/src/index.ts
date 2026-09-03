@@ -274,6 +274,14 @@ export {
   type GradientSurfaceProps,
 } from "./components/gradient-surface"
 export {
+  MorphingMeshGradient,
+  meshGradientFromRange,
+  morphingMeshGradientPresets,
+  morphingMeshGradientTypes,
+  type MorphingMeshGradientProps,
+  type MorphingMeshGradientType,
+} from "./components/morphing-mesh-gradient"
+export {
   MermaidDiagram,
   type MermaidDiagramProps,
 } from "./components/mermaid-diagram"
