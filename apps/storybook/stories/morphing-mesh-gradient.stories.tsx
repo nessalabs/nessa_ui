@@ -49,9 +49,9 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 /**
- * Apple-setup card layout: back control top-left, centred prompt, two
- * bottom-corner pills. Absolute chrome + a grid that stretches the
- * content layer to the host box so vertical centering actually resolves.
+ * Apple-setup card layout: back control top-left, “Try” under the top
+ * safe area, quote centred in the middle band, corner pills on the
+ * bottom edge. Host must size the gradient frame — this card only fills.
  */
 function NessaSetupCard({
   inverted = false,
@@ -75,25 +75,34 @@ function NessaSetupCard({
       }
 
   return (
-    <div className="relative flex h-full min-h-[28rem] w-full flex-col px-7 pb-7 pt-6 sm:min-h-[30rem] sm:px-9 sm:pb-8 sm:pt-7">
+    <div className="relative flex h-full w-full flex-col px-6 pb-6 pt-5 sm:px-8 sm:pb-7 sm:pt-6">
       <button
         type="button"
         aria-label="Back"
-        className={`absolute top-5 left-5 flex size-9 items-center justify-center rounded-full transition-colors sm:top-6 sm:left-6 ${tone.back}`}
+        className={`absolute top-5 left-5 z-[1] flex size-9 items-center justify-center rounded-full transition-colors sm:top-6 sm:left-6 ${tone.back}`}
       >
         <ChevronLeft className="size-4" strokeWidth={2.25} />
       </button>
 
-      <div className="flex flex-1 flex-col items-center justify-center px-4 text-center">
-        <p className={`text-[0.95rem] font-normal ${tone.label}`}>Try</p>
+      {/*
+        Top-safe “Try”, flex-centred quote, bottom-pinned actions —
+        matching the Apple setup modal rhythm instead of packing the
+        label into the same centred cluster as the quote.
+      */}
+      <p
+        className={`mt-10 text-center text-[0.95rem] font-normal sm:mt-11 ${tone.label}`}
+      >
+        Try
+      </p>
+      <div className="flex min-h-0 flex-1 items-center justify-center px-4 text-center">
         <p
-          className={`mt-2 max-w-[22rem] text-balance text-[1.65rem] leading-snug font-semibold tracking-tight sm:max-w-[26rem] sm:text-[1.85rem] ${tone.quote}`}
+          className={`max-w-[22rem] text-balance text-[1.65rem] leading-snug font-semibold tracking-tight sm:max-w-[26rem] sm:text-[1.85rem] ${tone.quote}`}
         >
           “Nessa, open the agent tray.”
         </p>
       </div>
 
-      <div className="grid grid-cols-2 items-center gap-3">
+      <div className="grid shrink-0 grid-cols-2 items-center gap-3">
         <button
           type="button"
           className={`justify-self-start rounded-full px-5 py-2.5 text-sm font-medium transition-colors ${tone.later}`}
@@ -111,8 +120,9 @@ function NessaSetupCard({
   )
 }
 
+/** Stable modal frame — height-first so Storybook’s short canvas cannot clip the chrome. */
 const setupCardShell =
-  "aspect-[5/4] w-[min(40rem,calc(100vw-2rem))] max-h-[min(34rem,80vh)] rounded-[1.75rem] shadow-2xl"
+  "h-[min(32rem,70vh)] w-[min(40rem,calc(100vw-2rem))] rounded-[1.75rem] shadow-2xl"
 
 export const Playground: Story = {
   args: {
@@ -188,6 +198,19 @@ export const Playground: Story = {
       surface.getBoundingClientRect().height,
       0,
     )
+    const back = surface.querySelector<HTMLButtonElement>(
+      'button[aria-label="Back"]',
+    )!
+    const tryLabel = [...surface.querySelectorAll("p")].find((node) =>
+      node.textContent?.trim() === "Try",
+    )!
+    const surfaceBox = surface.getBoundingClientRect()
+    const backBox = back.getBoundingClientRect()
+    const tryBox = tryLabel.getBoundingClientRect()
+    // Chrome stays inside the rounded frame — not clipped at the top edge.
+    await expect(backBox.top).toBeGreaterThan(surfaceBox.top + 12)
+    await expect(tryBox.top).toBeGreaterThan(surfaceBox.top + 36)
+    await expect(tryBox.bottom).toBeLessThan(surfaceBox.bottom - 80)
     const action = [...surface.querySelectorAll("button")].find((button) =>
       button.textContent?.includes("Continue"),
     )!
@@ -255,14 +278,14 @@ export const Inverted: Story = {
     <div className="grid w-[min(64rem,calc(100vw-2rem))] grid-cols-1 gap-4 sm:grid-cols-2">
       <MorphingMeshGradient
         colors={morphingMeshGradientPresets.glass}
-        className="min-h-56 rounded-3xl"
+        className="h-[min(28rem,60vh)] rounded-3xl"
       >
         <NessaSetupCard />
       </MorphingMeshGradient>
       <MorphingMeshGradient
         colors={morphingMeshGradientPresets.glass}
         inverted
-        className="min-h-56 rounded-3xl"
+        className="h-[min(28rem,60vh)] rounded-3xl"
       >
         <NessaSetupCard inverted />
       </MorphingMeshGradient>

@@ -561,7 +561,14 @@ function MorphingMeshGradient({
           )
         })}
       </div>
-      <div data-slot="morphing-mesh-gradient-content" className="relative min-h-0">
+      {/*
+        Fill the host box so absolute/flex children resolve percentages
+        against the gradient frame, not a collapsed in-flow wrapper.
+      */}
+      <div
+        data-slot="morphing-mesh-gradient-content"
+        className="relative z-[1] col-start-1 row-start-1 min-h-0 h-full w-full"
+      >
         {children}
       </div>
       {grainStrength > 0 ? (
@@ -569,7 +576,7 @@ function MorphingMeshGradient({
           data-slot="morphing-mesh-gradient-grain"
           aria-hidden="true"
           className={cn(
-            "pointer-events-none absolute inset-0 mix-blend-soft-light",
+            "pointer-events-none absolute inset-0 z-[2] mix-blend-soft-light",
             "bg-[image:var(--nessa-mesh-grain)] bg-[length:160px_160px]",
           )}
           style={
