@@ -541,6 +541,23 @@
       ]
     },
     {
+      "name": "morphing-mesh-gradient",
+      "type": "registry:ui",
+      "title": "Morphing Mesh Gradient",
+      "description": "A living mesh-gradient backdrop \u2014 soft colour blooms that drift and blend from a swappable palette, layout type (mesh, aurora, orb), and an inverted pale-glass reading.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/morphing-mesh-gradient.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/morphing-mesh-gradient.tsx"
+        }
+      ]
+    },
+    {
       "name": "mermaid-diagram",
       "type": "registry:ui",
       "title": "Mermaid Diagram",
