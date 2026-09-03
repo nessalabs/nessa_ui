@@ -15,8 +15,11 @@ import { storyDocumentation } from "./story-documentation"
  * Cancels every bloom's ambient WAAPI so a play test does not leave
  * Infinity cycles running into the rest of the suite, then asserts the
  * settled end state rather than treating cancel as fire-and-forget.
+ * No-ops outside the vitest/webdriver runner so the Storybook canvas
+ * stays live for humans watching the morph.
  */
-async function stopMeshMotion(root: ParentNode) {
+async function stopMeshMotion(root: ParentNode, canvasElement: HTMLElement) {
+  if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
   root
     .querySelectorAll<HTMLElement>('[data-slot="morphing-mesh-gradient-bloom"]')
     .forEach((bloom) => {
@@ -36,7 +39,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A living mesh-gradient backdrop in the Apple glass-mesh register: solid colour fields melted by one parent blur, then migrated across the card so the wash visibly shifts from frame to frame. Defaults to the `glass` preset. Pass any CSS colour array, or build one with `meshGradientFromRange(start, end, count)`. Set `inverted` for the pale reading — or reach for `glassInverted`. Motion follows the ambient duration token and cancels under reduced motion.",
+          "A living mesh-gradient backdrop in the Apple glass-mesh register: solid colour fields softly blurred, circulating on closed-loop paths so the wash dissolves forward continuously (no ping-pong reverse). Defaults to the `glass` preset. Pass any CSS colour array, or build one with `meshGradientFromRange(start, end, count)`. Set `inverted` for the pale reading — or reach for `glassInverted`. Motion follows the ambient duration token and cancels under reduced motion.",
       },
     },
   },
@@ -199,7 +202,7 @@ export const Playground: Story = {
     // `elementFromPoint` may land on nested text; the decorative layers
     // must still let the click reach the control.
     await expect(action.contains(hit) || hit === action).toBe(true)
-    await stopMeshMotion(surface)
+    await stopMeshMotion(surface, canvasElement)
   },
 }
 
@@ -240,7 +243,7 @@ export const Presets: Story = {
     await expect(surfaces.length).toBe(
       Object.keys(morphingMeshGradientPresets).length,
     )
-    await stopMeshMotion(canvasElement)
+    await stopMeshMotion(canvasElement, canvasElement)
   },
 }
 
@@ -272,7 +275,7 @@ export const Inverted: Story = {
     await expect(surfaces.length).toBe(2)
     await expect(surfaces[0]).not.toHaveAttribute("data-inverted")
     await expect(surfaces[1]).toHaveAttribute("data-inverted", "true")
-    await stopMeshMotion(canvasElement)
+    await stopMeshMotion(canvasElement, canvasElement)
   },
 }
 
@@ -309,7 +312,7 @@ export const Types: Story = {
       )
       await expect(blooms.length).toBeGreaterThan(2)
     }
-    await stopMeshMotion(canvasElement)
+    await stopMeshMotion(canvasElement, canvasElement)
   },
 }
 
@@ -350,7 +353,7 @@ export const FromRange: Story = {
       '[data-slot="morphing-mesh-gradient"]',
     )
     await expect(surfaces.length).toBe(2)
-    await stopMeshMotion(canvasElement)
+    await stopMeshMotion(canvasElement, canvasElement)
   },
 }
 

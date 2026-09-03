@@ -129,16 +129,19 @@ type MeshNode = {
   width: number
   /** Height as a percentage of the stage — ellipses, not circles. */
   height: number
-  /** Drift keyframes as translate/scale pairs. */
-  drift: ReadonlyArray<{ transform: string }>
+  /**
+   * Closed-loop drift keyframes (last pose matches first). Include
+   * opacity so fields gently dissolve as they migrate.
+   */
+  drift: ReadonlyArray<{ transform: string; opacity: number }>
 }
 
 /**
- * Solid colour-field stations. Drift paths are large on purpose — the
- * reference frames are pigment pools migrating across the card (amber
- * sweeping in, magenta yielding, blue rising), not a subtle breathe.
- * Translates are % of each field's own size so a ~40% move visibly
- * repositions the colour.
+ * Solid colour-field stations. Each drift is a *closed loop* — the last
+ * keyframe matches the first — so WAAPI can run `direction: "normal"`
+ * forever without the ping-pong reverse that reads as "stop and come
+ * back". Paths wander through nearby space like pigment dissolving;
+ * staggered periods keep the composition from phase-locking.
  */
 const meshLayouts = Object.freeze({
   mesh: [
@@ -148,10 +151,12 @@ const meshLayouts = Object.freeze({
       width: 72,
       height: 78,
       drift: [
-        { transform: "translate(0%, 0%) scale(1)" },
-        { transform: "translate(42%, 28%) scale(1.18)" },
-        { transform: "translate(18%, 48%) scale(0.9)" },
-        { transform: "translate(-12%, 22%) scale(1.08)" },
+        { transform: "translate(0%, 0%) scale(1)", opacity: 0.92 },
+        { transform: "translate(34%, 18%) scale(1.14)", opacity: 1 },
+        { transform: "translate(22%, 42%) scale(0.94)", opacity: 0.88 },
+        { transform: "translate(-16%, 30%) scale(1.08)", opacity: 1 },
+        { transform: "translate(-22%, 8%) scale(0.96)", opacity: 0.9 },
+        { transform: "translate(0%, 0%) scale(1)", opacity: 0.92 },
       ],
     },
     {
@@ -160,10 +165,12 @@ const meshLayouts = Object.freeze({
       width: 70,
       height: 74,
       drift: [
-        { transform: "translate(0%, 0%) scale(1.02)" },
-        { transform: "translate(-38%, 32%) scale(0.88)" },
-        { transform: "translate(-18%, 50%) scale(1.16)" },
-        { transform: "translate(16%, 12%) scale(0.94)" },
+        { transform: "translate(0%, 0%) scale(1.02)", opacity: 0.9 },
+        { transform: "translate(-30%, 24%) scale(0.92)", opacity: 1 },
+        { transform: "translate(-38%, 46%) scale(1.12)", opacity: 0.86 },
+        { transform: "translate(-8%, 28%) scale(0.96)", opacity: 1 },
+        { transform: "translate(18%, 10%) scale(1.08)", opacity: 0.92 },
+        { transform: "translate(0%, 0%) scale(1.02)", opacity: 0.9 },
       ],
     },
     {
@@ -172,10 +179,12 @@ const meshLayouts = Object.freeze({
       width: 86,
       height: 90,
       drift: [
-        { transform: "translate(0%, 0%) scale(1)" },
-        { transform: "translate(-32%, -24%) scale(1.14)" },
-        { transform: "translate(22%, 18%) scale(0.86)" },
-        { transform: "translate(-8%, 28%) scale(1.1)" },
+        { transform: "translate(0%, 0%) scale(1)", opacity: 1 },
+        { transform: "translate(-26%, -18%) scale(1.1)", opacity: 0.9 },
+        { transform: "translate(16%, -8%) scale(0.9)", opacity: 1 },
+        { transform: "translate(24%, 22%) scale(1.08)", opacity: 0.88 },
+        { transform: "translate(-10%, 20%) scale(0.96)", opacity: 1 },
+        { transform: "translate(0%, 0%) scale(1)", opacity: 1 },
       ],
     },
     {
@@ -184,10 +193,12 @@ const meshLayouts = Object.freeze({
       width: 68,
       height: 72,
       drift: [
-        { transform: "translate(0%, 0%) scale(0.98)" },
-        { transform: "translate(44%, -36%) scale(1.2)" },
-        { transform: "translate(28%, -8%) scale(0.9)" },
-        { transform: "translate(8%, 18%) scale(1.06)" },
+        { transform: "translate(0%, 0%) scale(0.98)", opacity: 0.88 },
+        { transform: "translate(28%, -28%) scale(1.12)", opacity: 1 },
+        { transform: "translate(40%, -10%) scale(0.94)", opacity: 0.9 },
+        { transform: "translate(18%, 14%) scale(1.06)", opacity: 1 },
+        { transform: "translate(-12%, 8%) scale(0.96)", opacity: 0.92 },
+        { transform: "translate(0%, 0%) scale(0.98)", opacity: 0.88 },
       ],
     },
     {
@@ -196,10 +207,12 @@ const meshLayouts = Object.freeze({
       width: 66,
       height: 70,
       drift: [
-        { transform: "translate(0%, 0%) scale(1.04)" },
-        { transform: "translate(-40%, -34%) scale(0.88)" },
-        { transform: "translate(-22%, -12%) scale(1.18)" },
-        { transform: "translate(12%, 10%) scale(0.94)" },
+        { transform: "translate(0%, 0%) scale(1.04)", opacity: 0.9 },
+        { transform: "translate(-32%, -26%) scale(0.92)", opacity: 1 },
+        { transform: "translate(-20%, -8%) scale(1.12)", opacity: 0.86 },
+        { transform: "translate(10%, -18%) scale(0.96)", opacity: 1 },
+        { transform: "translate(16%, 8%) scale(1.06)", opacity: 0.92 },
+        { transform: "translate(0%, 0%) scale(1.04)", opacity: 0.9 },
       ],
     },
     {
@@ -208,10 +221,12 @@ const meshLayouts = Object.freeze({
       width: 58,
       height: 62,
       drift: [
-        { transform: "translate(0%, 0%) scale(1)" },
-        { transform: "translate(36%, -40%) scale(1.22)" },
-        { transform: "translate(-28%, 24%) scale(0.88)" },
-        { transform: "translate(20%, 16%) scale(1.1)" },
+        { transform: "translate(0%, 0%) scale(1)", opacity: 0.94 },
+        { transform: "translate(28%, -32%) scale(1.14)", opacity: 1 },
+        { transform: "translate(-18%, -16%) scale(0.92)", opacity: 0.88 },
+        { transform: "translate(-24%, 20%) scale(1.08)", opacity: 1 },
+        { transform: "translate(14%, 16%) scale(0.96)", opacity: 0.9 },
+        { transform: "translate(0%, 0%) scale(1)", opacity: 0.94 },
       ],
     },
   ],
@@ -222,10 +237,11 @@ const meshLayouts = Object.freeze({
       width: 90,
       height: 70,
       drift: [
-        { transform: "translate(0%, 0%) scale(1)" },
-        { transform: "translate(36%, 18%) scale(1.12)" },
-        { transform: "translate(12%, 36%) scale(0.9)" },
-        { transform: "translate(-10%, 14%) scale(1.06)" },
+        { transform: "translate(0%, 0%) scale(1)", opacity: 0.92 },
+        { transform: "translate(30%, 14%) scale(1.1)", opacity: 1 },
+        { transform: "translate(16%, 32%) scale(0.94)", opacity: 0.88 },
+        { transform: "translate(-12%, 18%) scale(1.06)", opacity: 1 },
+        { transform: "translate(0%, 0%) scale(1)", opacity: 0.92 },
       ],
     },
     {
@@ -234,10 +250,11 @@ const meshLayouts = Object.freeze({
       width: 88,
       height: 68,
       drift: [
-        { transform: "translate(0%, 0%) scale(1.02)" },
-        { transform: "translate(-34%, 28%) scale(0.9)" },
-        { transform: "translate(18%, 20%) scale(1.14)" },
-        { transform: "translate(-8%, 8%) scale(0.96)" },
+        { transform: "translate(0%, 0%) scale(1.02)", opacity: 0.9 },
+        { transform: "translate(-28%, 22%) scale(0.92)", opacity: 1 },
+        { transform: "translate(14%, 18%) scale(1.1)", opacity: 0.88 },
+        { transform: "translate(-8%, 6%) scale(0.96)", opacity: 1 },
+        { transform: "translate(0%, 0%) scale(1.02)", opacity: 0.9 },
       ],
     },
     {
@@ -246,10 +263,11 @@ const meshLayouts = Object.freeze({
       width: 84,
       height: 72,
       drift: [
-        { transform: "translate(0%, 0%) scale(1)" },
-        { transform: "translate(-40%, 22%) scale(1.12)" },
-        { transform: "translate(14%, -16%) scale(0.88)" },
-        { transform: "translate(-12%, 10%) scale(1.06)" },
+        { transform: "translate(0%, 0%) scale(1)", opacity: 1 },
+        { transform: "translate(-32%, 18%) scale(1.08)", opacity: 0.9 },
+        { transform: "translate(12%, -12%) scale(0.92)", opacity: 1 },
+        { transform: "translate(-10%, 8%) scale(1.04)", opacity: 0.92 },
+        { transform: "translate(0%, 0%) scale(1)", opacity: 1 },
       ],
     },
     {
@@ -258,10 +276,11 @@ const meshLayouts = Object.freeze({
       width: 82,
       height: 70,
       drift: [
-        { transform: "translate(0%, 0%) scale(0.98)" },
-        { transform: "translate(38%, -20%) scale(1.16)" },
-        { transform: "translate(16%, 18%) scale(0.9)" },
-        { transform: "translate(6%, -8%) scale(1.04)" },
+        { transform: "translate(0%, 0%) scale(0.98)", opacity: 0.9 },
+        { transform: "translate(30%, -16%) scale(1.12)", opacity: 1 },
+        { transform: "translate(14%, 14%) scale(0.94)", opacity: 0.88 },
+        { transform: "translate(-8%, -6%) scale(1.04)", opacity: 1 },
+        { transform: "translate(0%, 0%) scale(0.98)", opacity: 0.9 },
       ],
     },
     {
@@ -270,10 +289,11 @@ const meshLayouts = Object.freeze({
       width: 86,
       height: 74,
       drift: [
-        { transform: "translate(0%, 0%) scale(1.04)" },
-        { transform: "translate(-30%, -24%) scale(0.88)" },
-        { transform: "translate(16%, 20%) scale(1.14)" },
-        { transform: "translate(-10%, 6%) scale(0.96)" },
+        { transform: "translate(0%, 0%) scale(1.04)", opacity: 0.92 },
+        { transform: "translate(-24%, -18%) scale(0.92)", opacity: 1 },
+        { transform: "translate(14%, 16%) scale(1.1)", opacity: 0.88 },
+        { transform: "translate(-8%, 4%) scale(0.96)", opacity: 1 },
+        { transform: "translate(0%, 0%) scale(1.04)", opacity: 0.92 },
       ],
     },
   ],
@@ -284,10 +304,11 @@ const meshLayouts = Object.freeze({
       width: 78,
       height: 82,
       drift: [
-        { transform: "translate(0%, 0%) scale(1)" },
-        { transform: "translate(30%, 24%) scale(1.16)" },
-        { transform: "translate(-14%, 18%) scale(0.9)" },
-        { transform: "translate(10%, -8%) scale(1.08)" },
+        { transform: "translate(0%, 0%) scale(1)", opacity: 0.92 },
+        { transform: "translate(24%, 18%) scale(1.12)", opacity: 1 },
+        { transform: "translate(-10%, 14%) scale(0.94)", opacity: 0.88 },
+        { transform: "translate(8%, -6%) scale(1.06)", opacity: 1 },
+        { transform: "translate(0%, 0%) scale(1)", opacity: 0.92 },
       ],
     },
     {
@@ -296,10 +317,11 @@ const meshLayouts = Object.freeze({
       width: 88,
       height: 92,
       drift: [
-        { transform: "translate(0%, 0%) scale(1.04)" },
-        { transform: "translate(-28%, 20%) scale(0.88)" },
-        { transform: "translate(16%, -14%) scale(1.18)" },
-        { transform: "translate(-8%, 8%) scale(0.94)" },
+        { transform: "translate(0%, 0%) scale(1.04)", opacity: 1 },
+        { transform: "translate(-22%, 16%) scale(0.92)", opacity: 0.9 },
+        { transform: "translate(12%, -10%) scale(1.12)", opacity: 1 },
+        { transform: "translate(-6%, 6%) scale(0.96)", opacity: 0.92 },
+        { transform: "translate(0%, 0%) scale(1.04)", opacity: 1 },
       ],
     },
     {
@@ -308,10 +330,11 @@ const meshLayouts = Object.freeze({
       width: 74,
       height: 78,
       drift: [
-        { transform: "translate(0%, 0%) scale(0.98)" },
-        { transform: "translate(32%, -22%) scale(1.14)" },
-        { transform: "translate(8%, 20%) scale(0.9)" },
-        { transform: "translate(-6%, 6%) scale(1.06)" },
+        { transform: "translate(0%, 0%) scale(0.98)", opacity: 0.9 },
+        { transform: "translate(26%, -16%) scale(1.1)", opacity: 1 },
+        { transform: "translate(6%, 16%) scale(0.94)", opacity: 0.88 },
+        { transform: "translate(-6%, 4%) scale(1.04)", opacity: 1 },
+        { transform: "translate(0%, 0%) scale(0.98)", opacity: 0.9 },
       ],
     },
     {
@@ -320,10 +343,11 @@ const meshLayouts = Object.freeze({
       width: 76,
       height: 80,
       drift: [
-        { transform: "translate(0%, 0%) scale(1.04)" },
-        { transform: "translate(-30%, 18%) scale(0.88)" },
-        { transform: "translate(12%, -20%) scale(1.16)" },
-        { transform: "translate(-6%, 4%) scale(0.96)" },
+        { transform: "translate(0%, 0%) scale(1.04)", opacity: 0.92 },
+        { transform: "translate(-24%, 14%) scale(0.92)", opacity: 1 },
+        { transform: "translate(10%, -16%) scale(1.1)", opacity: 0.88 },
+        { transform: "translate(-4%, 4%) scale(0.96)", opacity: 1 },
+        { transform: "translate(0%, 0%) scale(1.04)", opacity: 0.92 },
       ],
     },
   ],
@@ -384,11 +408,11 @@ export interface MorphingMeshGradientProps extends React.ComponentProps<"div"> {
 
 /**
  * A morphing mesh-gradient backdrop in the Apple glass-mesh register:
- * solid colour fields, each softly blurred, migrating across the card so
- * the wash visibly shifts hue from frame to frame. Use it anywhere a
- * living wash belongs — heroes, empty states, modal cards, full-bleed
- * backgrounds — by giving the root a size through `className` and
- * dropping children on top.
+ * solid colour fields, each softly blurred, circulating on closed-loop
+ * paths so the wash dissolves forward continuously — no ping-pong
+ * reverse. Use it anywhere a living wash belongs — heroes, empty
+ * states, modal cards, full-bleed backgrounds — by giving the root a
+ * size through `className` and dropping children on top.
  *
  * The wash is purely decorative: the stage is hidden from the
  * accessibility tree and inert to the pointer. Text contrast on top
@@ -449,17 +473,20 @@ function MorphingMeshGradient({
       3200,
     )
     if (baseDuration === 0) return
-    // ~3.5–4.5s half-cycle at speed=1: colour fields should clearly
-    // migrate within a couple of seconds of watching, matching the
-    // frame-to-frame shift in the reference stills.
-    const duration = (baseDuration * 1.15) / finite(speedFactor, 1, 0.05)
+    // Continuous closed-loop morph — not alternate. Alternate reverses at
+    // the end of each cycle and reads as "stop and come back"; a loop
+    // whose last keyframe matches the first dissolves forward forever.
+    // ~10–16s periods, heavily de-phased, so fields never lock step.
+    const duration = (baseDuration * 3.2) / finite(speedFactor, 1, 0.05)
     const animations = Array.from(node.children, (child, index) => {
       const station = layout[index % layout.length]!
       return (child as HTMLElement).animate([...station.drift], {
-        duration: duration * (1.05 + (index % 5) * 0.2),
-        delay: -(index * duration * 0.25),
-        easing: "ease-in-out",
-        direction: "alternate",
+        duration: duration * (1.15 + (index % 6) * 0.38),
+        delay: -(index * duration * 0.31),
+        // Soft continuous easing — avoids the hard decelerate-at-ends
+        // of ease-in-out that makes reverse points feel sticky.
+        easing: "cubic-bezier(0.45, 0.05, 0.55, 0.95)",
+        direction: "normal",
         iterations: Infinity,
         fill: "both",
       })
@@ -524,7 +551,10 @@ function MorphingMeshGradient({
                   width: `${station.width}%`,
                   height: `${station.height}%`,
                   "--nessa-mesh-field": color,
+                  // Seed the first keyframe so the first paint matches
+                  // the WAAPI start and never snaps.
                   transform: station.drift[0]!.transform,
+                  opacity: station.drift[0]!.opacity,
                 } as React.CSSProperties
               }
             />
