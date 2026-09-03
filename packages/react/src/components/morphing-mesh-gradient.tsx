@@ -509,7 +509,10 @@ function MorphingMeshGradient({
       data-inverted={inverted ? "true" : undefined}
       data-animated={shouldAnimate ? "true" : "false"}
       className={cn(
-        "relative isolate grid overflow-hidden",
+        // `overflow-clip` (not hidden): a living backdrop must clip blooms
+        // without becoming a scrollport. `overflow-hidden` still scrolls, so
+        // a child's scrollIntoView can yank absolute chrome out of frame.
+        "relative isolate grid overflow-clip",
         "bg-[var(--nessa-mesh-ground)]",
         className,
       )}

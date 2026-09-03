@@ -170,6 +170,7 @@ export const Playground: Story = {
     )!
     await expect(surface).toHaveAttribute("data-type", "mesh")
     await expect(surface).toHaveAttribute("data-animated", "true")
+    await expect(getComputedStyle(surface).overflow).toBe("clip")
     const stage = surface.querySelector<HTMLElement>(
       '[data-slot="morphing-mesh-gradient-stage"]',
     )!
@@ -185,17 +186,19 @@ export const Playground: Story = {
     const content = surface.querySelector<HTMLElement>(
       '[data-slot="morphing-mesh-gradient-content"]',
     )!
-    await expect(content.getBoundingClientRect().height).toBeCloseTo(
-      surface.getBoundingClientRect().height,
-      0,
-    )
+    const surfaceBox = surface.getBoundingClientRect()
+    const contentBox = content.getBoundingClientRect()
+    await expect(contentBox.height).toBeCloseTo(surfaceBox.height, 0)
+    // Absolute chrome must share the host's box — a scrolled overflow
+    // port would shift content.top while leaving surface.top put.
+    await expect(contentBox.top).toBeCloseTo(surfaceBox.top, 0)
+    await expect(contentBox.left).toBeCloseTo(surfaceBox.left, 0)
     const back = surface.querySelector<HTMLButtonElement>(
       'button[aria-label="Back"]',
     )!
     const tryLabel = [...surface.querySelectorAll("p")].find((node) =>
       node.textContent?.trim() === "Try",
     )!
-    const surfaceBox = surface.getBoundingClientRect()
     const backBox = back.getBoundingClientRect()
     const tryBox = tryLabel.getBoundingClientRect()
     // Chrome stays inside the rounded frame — not clipped at the top edge.
@@ -206,7 +209,9 @@ export const Playground: Story = {
       button.textContent?.includes("Continue"),
     )!
     await expect(action).toBeTruthy()
-    action.scrollIntoView({ block: "center" })
+    // Do not scrollIntoView here: even with overflow-clip, scrolling an
+    // ancestor must not be required for the hit-test — the control is
+    // already inside the framed card.
     const target = action.getBoundingClientRect()
     const hit = document.elementFromPoint(
       target.left + target.width / 2,
