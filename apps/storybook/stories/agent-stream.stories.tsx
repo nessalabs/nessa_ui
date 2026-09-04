@@ -8,6 +8,7 @@ import {
   ClaudeMessagesMapper,
   CodexStreamMapper,
   CursorStreamMapper,
+  KiroChatMapper,
   AcpMapper,
   CodexAppServerMapper,
   OpencodeRunMapper,
@@ -151,6 +152,9 @@ import cursorSubagent from "./fixtures/agent-stream/cursor/subagent.jsonl?raw"
 import cursorTools from "./fixtures/agent-stream/cursor/tools.jsonl?raw"
 import acpCursorPrinted from "./fixtures/agent-stream/acp/cursor_printed.jsonl?raw"
 import acpCursorTools from "./fixtures/agent-stream/acp/cursor_tools.jsonl?raw"
+import kiroPrinted from "./fixtures/agent-stream/kiro/printed.jsonl?raw"
+import kiroTools from "./fixtures/agent-stream/kiro/tools.jsonl?raw"
+import kiroFailing from "./fixtures/agent-stream/kiro/failing.jsonl?raw"
 // What the interactive app-server answers that the one-way stream never sends.
 import codexAppServerCapabilities from "./fixtures/agent-stream/codex/appserver_capabilities.json"
 import opencodeCliAgents from "./fixtures/agent-stream/opencode/cli_agents.txt?raw"
@@ -181,7 +185,7 @@ import openaiAgentsAgentTool from "./fixtures/agent-stream/openai-agents/agent-t
 import diskSubagent from "./fixtures/agent-stream/disk_subagent_a37fefefbc61e13e3.jsonl?raw"
 import diskWorkflowAgent from "./fixtures/agent-stream/disk_workflow_agent_a35ea63276cd501aa.jsonl?raw"
 
-type ProviderId = "openai" | "claude" | "codex" | "cursor" | "opencode"
+type ProviderId = "openai" | "claude" | "codex" | "cursor" | "opencode" | "kiro"
 
 /**
  * What a provider is, and what it supports.
@@ -308,6 +312,17 @@ const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
     // and Codex's cannot be read at all.
     supports: { workflowBoard: false, transcriptsOnDisk: true },
   },
+  kiro: {
+    id: "kiro",
+    label: "Kiro CLI",
+    command: "kiro-cli chat --no-interactive --trust-all-tools --output-format stream-json",
+    transports: transportsOf("kiro")!.transports,
+    createMapper: (transportId: string) =>
+      transportId === "acp" ? new AcpMapper() : new KiroChatMapper(),
+    silentLinesNote:
+      "tool_call_update lines with in_progress or pending status produce no event — the opened row covers them. Known _kiro.dev/* extension lines are suppressed the same way; unrecognised ones arrive as unknown.",
+    supports: { workflowBoard: false, transcriptsOnDisk: false },
+  },
 }
 
 interface Capture {
@@ -423,9 +438,38 @@ const CAPTURES: readonly Capture[] = [
   { provider: "opencode", transport: "acp", id: "oc-acp-subagent", label: "Subagent", blurb: "A delegation, which ACP labels with the protocol's own `think` kind. The child session id is named only inside the result text — the one place this wire puts it.", prompt: "Use a subagent to find out what files are in this directory, then tell me what it found.", source: opencodeAcpSubagent },
   { provider: "opencode", transport: "acp", id: "oc-acp-websearch", label: "Web search", blurb: "A search call, renamed by the agent as it goes: it opens as `websearch` and settles under the query it ran.", prompt: "Search the web for the current version of the TypeScript compiler.", source: opencodeAcpWebsearch },
   { provider: "opencode", transport: "acp", id: "oc-acp-permission", label: "Approval", blurb: "The agent asks the client for permission and blocks until answered, listing the options it will accept. Answered allow here, so the write went through.", prompt: "Create a file at /tmp/acp-outside-probe.txt, then tell me whether it worked. (Answered: allow once)", source: opencodeAcpPermission },
+
+  // ---------- kiro ----------
+  { provider: "kiro", transport: "chat", id: "kiro-printed", label: "Plain text", blurb: "A simple streamed answer: system/init opens the session, two assistant chunks arrive with streaming:true, the committed message replaces them, and turn_end terminates with usage. Synthetic — no live CLI in this environment.", prompt: "Print exactly: hello world. Do not use any tools.", source: kiroPrinted },
+  { provider: "kiro", transport: "chat", id: "kiro-tools", label: "Tools", blurb: "A file write followed by a bash command. The write settles with a diff content block so the mapper emits file_edits; the shell command settles with stdout and a zero exit code. Synthetic — no live CLI.", prompt: "Create a file notes.txt containing two lines, then run wc -l on it.", source: kiroTools },
+  { provider: "kiro", transport: "chat", id: "kiro-failing", label: "Failed command", blurb: "A bash call that exits with code 1. The tool_call_update arrives with status:failed; the mapper marks the result isError:true and carries the stderr text. Synthetic — no live CLI.", prompt: "Run: cat /nonexistent/definitely-missing-file", source: kiroFailing },
 ]
 
-const LINES = new Map(CAPTURES.map((capture) => [capture.id, capture.source.split("\n").filter((line) => line.trim().length > 0)]))
+/**
+ * A capture's non-blank lines, split on first use and remembered.
+ *
+ * Lazy rather than a map built at module scope. Eagerly splitting every
+ * capture cost the split itself plus a second retained copy of the whole
+ * corpus — the raw source on `CAPTURES` and the line array beside it — for
+ * ~2MB of fixtures, in each of the three browser projects, whether or not a
+ * story ever selected that capture. A story renders one capture at a time, so
+ * all but one of those was paid for nothing.
+ *
+ * This matters beyond this file: the runner shares one browser across story
+ * files, so work done here is main-thread time taken from whatever else is
+ * running, which is how a heavy file turns a *different* file's timing-
+ * sensitive assertion red on a slow machine.
+ */
+const LINE_CACHE = new Map<string, readonly string[]>()
+
+function linesOf(captureId: string): readonly string[] {
+  const cached = LINE_CACHE.get(captureId)
+  if (cached !== undefined) return cached
+  const source = CAPTURES.find((entry) => entry.id === captureId)?.source ?? ""
+  const lines = source.split("\n").filter((line) => line.trim().length > 0)
+  LINE_CACHE.set(captureId, lines)
+  return lines
+}
 
 interface LiveState {
   readonly events: readonly AgentEvent[]
@@ -534,7 +578,7 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
     finished: boolean
   } | null>(null)
 
-  const lines = LINES.get(captureId) ?? []
+  const lines = linesOf(captureId)
   let current = state.current
   if (current === null || current.captureId !== captureId || current.count > count) {
     current = {
@@ -1593,7 +1637,7 @@ function InspectorView({
   const selected = pane === "events" ? selectedByPane.events : selectedByPane.raw
   const setSelected = (index: number) =>
     setSelectedByPane((current) => ({ ...current, [pane === "events" ? "events" : "raw"]: index }))
-  const lines = (LINES.get(captureId) ?? []).slice(0, count)
+  const lines = linesOf(captureId).slice(0, count)
   const line = lines[Math.min(selected, Math.max(lines.length - 1, 0))]
   const decoded = line === undefined ? null : (JSON.parse(line) as unknown)
   const selectedEvent = events[Math.min(selected, Math.max(events.length - 1, 0))]
@@ -1840,7 +1884,7 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
     // switch — land on the new provider's first one.
     setTransportId(PROVIDERS[next as ProviderId].transports[0]!.id)
   }
-  const lines = selected === undefined ? [] : (LINES.get(selected.id) ?? [])
+  const lines = selected === undefined ? [] : linesOf(selected.id)
   const [count, setCount] = React.useState(autoplay ? 0 : lines.length)
   const [playing, setPlaying] = React.useState(autoplay)
 
@@ -1848,7 +1892,7 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
   // screen without `captureId` changing at all, and the replay has to follow
   // what is rendered rather than what was clicked.
   React.useEffect(() => {
-    const next = selected === undefined ? 0 : (LINES.get(selected.id)?.length ?? 0)
+    const next = selected === undefined ? 0 : linesOf(selected.id).length
     setCount(autoplay ? 0 : next)
     setPlaying(autoplay)
   }, [selected?.id, autoplay])
