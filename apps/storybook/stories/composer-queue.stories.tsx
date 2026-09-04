@@ -20,7 +20,7 @@ import {
   SheetHeader,
   SheetTitle,
   type ComposerDeliveryModeValue,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import { Mic, Plus } from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"

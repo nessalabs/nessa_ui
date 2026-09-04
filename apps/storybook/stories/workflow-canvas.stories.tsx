@@ -31,7 +31,7 @@ import {
   useWorkflowCanvasEdgeGeometry,
   type WorkflowCanvasConnection,
   type WorkflowCanvasConnectionEnd,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

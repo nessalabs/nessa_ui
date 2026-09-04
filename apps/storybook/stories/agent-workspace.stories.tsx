@@ -39,7 +39,7 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import { GitBranch, Hash, Lock, Pin, Plus, Settings } from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"

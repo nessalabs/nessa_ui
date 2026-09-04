@@ -1,4 +1,4 @@
-import { SidebarSide, useSidebar } from "@nessa-ui/react"
+import { SidebarSide, useSidebar } from "@nessalabs/ui"
 
 import { SidebarLeftIcon, SidebarRightIcon } from "./nucleo"
 

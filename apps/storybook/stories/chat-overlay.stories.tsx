@@ -9,7 +9,7 @@ import {
   ChatOverlayBody,
   ChatOverlaySummary,
   ChatTabs,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

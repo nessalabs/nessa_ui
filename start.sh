@@ -41,7 +41,7 @@ nessa_storybook_host="${NESSA_STORYBOOK_HOST:-127.0.0.1}"
 nessa_storybook_port="${NESSA_STORYBOOK_PORT:-6006}"
 
 echo "Starting Nessa UI Storybook at http://${nessa_storybook_host}:${nessa_storybook_port}"
-exec pnpm --filter @nessa-ui/storybook exec storybook dev \
+exec pnpm --filter @nessalabs/storybook exec storybook dev \
   --host "$nessa_storybook_host" \
   --port "$nessa_storybook_port" \
   "$@"

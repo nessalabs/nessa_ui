@@ -821,17 +821,17 @@ export {
   type WorkspaceLayout,
 } from "./lib/app-shell-layout"
 /**
- * Re-exported, not owned. The parser lives in `@nessa-ui/agent-stream`, which
+ * Re-exported, not owned. The parser lives in `@nessalabs/agent-stream`, which
  * has no dependencies and no React, so a Node process or a non-React host can
  * consume it without this package's rendering tree. Both entries are re-exported
  * here so an existing React host sees no change; new code should import from
- * `@nessa-ui/agent-stream` directly.
+ * `@nessalabs/agent-stream` directly.
  *
  * Two star-exports are safe only because the surfaces are disjoint: the main
  * entry stops at the agent message and the subpath carries the fold alone.
  */
-export * from "@nessa-ui/agent-stream"
-export * from "@nessa-ui/agent-stream/transcript"
+export * from "@nessalabs/agent-stream"
+export * from "@nessalabs/agent-stream/transcript"
 export {
   WorkflowCanvas,
   WorkflowCanvasConnectionLine,

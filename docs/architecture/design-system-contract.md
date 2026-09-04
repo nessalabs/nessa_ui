@@ -1,7 +1,7 @@
 # Nessa Design System Core Contract
 
 Status: **Normative guiding contract for all Nessa design-system work**  
-Scope: `@nessa-ui/react`, the Nessa shadcn registry, Storybook, tests, and consumer documentation  
+Scope: `@nessalabs/ui`, the Nessa shadcn registry, Storybook, tests, and consumer documentation  
 Persistence owner: consuming application  
 Runtime baseline: React 19
 
@@ -955,7 +955,7 @@ import {
   NessaIconProvider,
   NessaColorMode,
   NessaScale,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 ```
 
 Only the explicitly server-safe helper uses a subpath:
@@ -963,15 +963,15 @@ Only the explicitly server-safe helper uses a subpath:
 ```tsx
 import {
   getNessaThemeAttributes,
-} from "@nessa-ui/react/theme/server"
+} from "@nessalabs/ui/theme/server"
 ```
 
 CSS exports remain:
 
 ```text
-@nessa-ui/react/styles.css
-@nessa-ui/react/theme.css
-@nessa-ui/react/app.css
+@nessalabs/ui/styles.css
+@nessalabs/ui/theme.css
+@nessalabs/ui/app.css
 ```
 
 Build per file with `bundle: false`. Compile every `src/**/*.ts` and `src/**/*.tsx` module so internal relative imports remain available. Each hook/provider module preserves its own `"use client"` directive. The root index re-exports public APIs but is not collapsed into one client-only bundle.
@@ -990,7 +990,7 @@ A Next App Router fixture must prove that a Server Component can import presenta
 
 ### The parser package
 
-`@nessa-ui/agent-stream` is published beside `@nessa-ui/react` and converts an
+`@nessalabs/agent-stream` is published beside `@nessalabs/ui` and converts an
 agent CLI's bytes into a normalized event log. It renders nothing, so it
 declares no dependencies, no optional or bundled dependencies, and no peer
 dependencies, imports React through no spelling, and carries no `"use client"`
@@ -1009,10 +1009,10 @@ and mapper layers and stops at the agent message; the optional fold — turns,
 tool groups, delegated runs — is reached only through `./transcript`. The root
 entry must not reach the fold, by re-export or through any transitive relative
 import: the fold's two modules import each other's values, and
-`@nessa-ui/react` re-exports both entries with `export *`, where a name carried
+`@nessalabs/ui` re-exports both entries with `export *`, where a name carried
 by both is ambiguous and is elided silently rather than reported.
 
-`@nessa-ui/react` re-exports both entries, so its own public surface is
+`@nessalabs/ui` re-exports both entries, so its own public surface is
 unchanged and a React host needs no migration.
 
 The shadcn registry copies source and has no exports map, so a registry
@@ -1202,10 +1202,10 @@ registry.json
 public/r/
 ```
 
-Two packages are published. `@nessa-ui/react` owns the CSS contracts and the
-React runtime floor; `@nessa-ui/agent-stream` owns neither and declares nothing
+Two packages are published. `@nessalabs/ui` owns the CSS contracts and the
+React runtime floor; `@nessalabs/agent-stream` owns neither and declares nothing
 to install, so PKG-001, PKG-002 and PKG-003 read a different required-artifact
-list for each. Because `@nessa-ui/react` depends on the parser with
+list for each. Because `@nessalabs/ui` depends on the parser with
 `workspace:*`, the parser publishes first and both publish through `pnpm`,
 which rewrites that range — `npm publish` would ship the literal `workspace:*`
 and produce an uninstallable tarball.
@@ -1216,7 +1216,7 @@ and produce an uninstallable tarball.
 
 The shadcn CLI merges that `css` payload into the global stylesheet selected by `components.json`, so Tailwind sees it exactly once without a manual import. A clean fixture installs `nessa-base` using only the documented command, then builds and proves the selectors exist. Installing the same version twice is idempotent. An unmodified clean upgrade produces one updated rule set; consumer-modified CSS follows the CLI's normal conflict/overwrite flow and is never silently replaced by Nessa.
 
-Add a `registry:ui` item named `nessa-provider` with a dependency on `nessa-base`. It copies provider, theme, icon, and hook modules to `components/nessa/` using relative imports and retaining `"use client"` where required. Registry consumers never require `@nessa-ui/react` at runtime.
+Add a `registry:ui` item named `nessa-provider` with a dependency on `nessa-base`. It copies provider, theme, icon, and hook modules to `components/nessa/` using relative imports and retaining `"use client"` where required. Registry consumers never require `@nessalabs/ui` at runtime.
 
 Add Accordion as its own `registry:ui` item depending on `nessa-provider`, `nessa-base`, and any required Radix primitive. Its copied source exercises the same semantic icon resolution contract as the package build.
 
@@ -1442,7 +1442,7 @@ pnpm test:consumer:vite
 pnpm test:consumer:next
 pnpm test:consumer:registry
 pnpm build:storybook
-npm pack --dry-run --json --workspace @nessa-ui/react
+npm pack --dry-run --json --workspace @nessalabs/ui
 git diff --check
 ```
 

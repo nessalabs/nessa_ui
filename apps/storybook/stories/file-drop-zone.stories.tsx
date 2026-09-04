@@ -13,7 +13,7 @@ import {
   ChatComposerSubmit,
   FileDropZone,
   type FileDropRejection,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import { ImagePlus, Paperclip } from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"

@@ -10,7 +10,7 @@ import {
   TaskList,
   TaskListItem,
   type TaskListItemStatus,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

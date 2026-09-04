@@ -70,7 +70,7 @@ import {
   type Transcript,
   type TransportDescriptor,
   type WorkItem,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import {
   BashIcon,

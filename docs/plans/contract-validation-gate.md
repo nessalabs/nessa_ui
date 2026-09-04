@@ -348,7 +348,7 @@ Add contributor scripts:
 - `actions/setup-node@820762786026740c76f36085b0efc47a31fe5020` (`v7.0.0`) with pnpm cache keyed by `pnpm-lock.yaml`;
 - explicit `node --version` and `pnpm --version` assertions;
 - `pnpm install --frozen-lockfile`;
-- `pnpm --filter @nessa-ui/storybook exec playwright install --with-deps chromium` before tests;
+- `pnpm --filter @nessalabs/storybook exec playwright install --with-deps chromium` before tests;
 - `pnpm validate:full`, with `NESSA_VALIDATION_BASE_REF` set to the pull-request base SHA or previous push SHA so nested pnpm scripts receive the exact comparison revision.
 
 Actions are pinned to full commit SHAs with release tags in comments. The artifact-validation workflow uses ordinary `pull_request`/`push`, never `pull_request_target`; permissions are `contents: read` and `pull-requests: read`, superseded commits are cancelled through deterministic concurrency groups, and no publication credentials are available. Browser installation is CI provisioning and may use the network; the validation runner itself remains offline.

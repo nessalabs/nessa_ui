@@ -6,7 +6,7 @@ import {
   GradientSurface,
   gradientSurfacePatterns,
   gradientSurfacePresets,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

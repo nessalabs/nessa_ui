@@ -3,7 +3,7 @@
 Nessa UI is the open design system for Nessa products. It builds on the
 shadcn/ui source model and provides two ways to adopt the same components:
 
-- install `@nessa-ui/react` as a conventional React package;
+- install `@nessalabs/ui` as a conventional React package;
 - copy owned source into an application through the `@nessa` shadcn registry.
 
 Storybook is the visual workshop and living component documentation.
@@ -47,17 +47,17 @@ The repository uses pnpm, while consumers can use their package manager of
 choice:
 
 ```bash
-pnpm add @nessa-ui/react @fontsource-variable/geist @fontsource-variable/geist-mono
-npm install @nessa-ui/react @fontsource-variable/geist @fontsource-variable/geist-mono
-yarn add @nessa-ui/react @fontsource-variable/geist @fontsource-variable/geist-mono
-bun add @nessa-ui/react @fontsource-variable/geist @fontsource-variable/geist-mono
+pnpm add @nessalabs/ui @fontsource-variable/geist @fontsource-variable/geist-mono
+npm install @nessalabs/ui @fontsource-variable/geist @fontsource-variable/geist-mono
+yarn add @nessalabs/ui @fontsource-variable/geist @fontsource-variable/geist-mono
+bun add @nessalabs/ui @fontsource-variable/geist @fontsource-variable/geist-mono
 ```
 
 ```tsx
-import { Button } from "@nessa-ui/react"
+import { Button } from "@nessalabs/ui"
 import "@fontsource-variable/geist"
 import "@fontsource-variable/geist-mono"
-import "@nessa-ui/react/styles.css"
+import "@nessalabs/ui/styles.css"
 
 export function Example() {
   return <Button>Continue</Button>
@@ -68,8 +68,8 @@ The default stylesheet includes Nessa tokens and component utilities without
 resetting the host application. Import it before the application's stylesheet;
 Nessa's named cascade layer lets host Tailwind utilities remain authoritative.
 Nessa-owned applications can opt into Tailwind Preflight and global body
-defaults with `@nessa-ui/react/app.css`. A token-only entry is available at
-`@nessa-ui/react/theme.css`.
+defaults with `@nessalabs/ui/app.css`. A token-only entry is available at
+`@nessalabs/ui/theme.css`.
 
 Package consumers customize the system by overriding semantic variables after
 the Nessa import. Registry consumers own the copied variables directly:
@@ -121,7 +121,7 @@ follow [AGENTS.md](./AGENTS.md).
 ## Naming
 
 - Brand: **Nessa UI**
-- npm: `@nessa-ui/react`
+- npm: `@nessalabs/ui`
 - shadcn registry namespace: `@nessa`
 - repository: `nessalabs/nessa_ui`
 

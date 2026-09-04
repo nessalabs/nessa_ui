@@ -16,7 +16,7 @@ import {
   FileDiffListItemActions,
   FileDiffListToggle,
   FileDiffPath,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import { Copy, SquareArrowOutUpRight, Undo2 } from "lucide-react"
 
 import { FileCopyIcon } from "./icons/nucleo"

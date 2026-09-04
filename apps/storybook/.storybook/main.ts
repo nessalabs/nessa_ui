@@ -26,18 +26,18 @@ const config: StorybookConfig = {
     config.resolve.alias = {
       ...(config.resolve.alias ?? {}),
       "@": path.resolve(dirname, "../../../packages/react/src"),
-      "@nessa-ui/react": path.resolve(
+      "@nessalabs/ui": path.resolve(
         dirname,
         "../../../packages/react/src/index.ts",
       ),
       // Ordered, not alphabetical: a Vite string alias is a prefix
       // replacement, so the bare package name would also swallow the subpath
       // and resolve it to `index.ts/transcript`. The longer key goes first.
-      "@nessa-ui/agent-stream/transcript": path.resolve(
+      "@nessalabs/agent-stream/transcript": path.resolve(
         dirname,
         "../../../packages/agent-stream/src/transcript/index.ts",
       ),
-      "@nessa-ui/agent-stream": path.resolve(
+      "@nessalabs/agent-stream": path.resolve(
         dirname,
         "../../../packages/agent-stream/src/contract.ts",
       ),

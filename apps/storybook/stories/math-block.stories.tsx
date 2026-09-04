@@ -1,7 +1,7 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, waitFor } from "storybook/test"
-import { MathBlock } from "@nessa-ui/react"
+import { MathBlock } from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

@@ -109,7 +109,7 @@ export function packageDeclarationIssues(pkg: PackageJson): string[] {
 /**
  * The parser package's declarations, which are the layering made enforceable.
  *
- * `@nessa-ui/agent-stream` stops at the agent message and draws nothing, so its
+ * `@nessalabs/agent-stream` stops at the agent message and draws nothing, so its
  * independence is not a style preference — a declared dependency or a React
  * peer would put the rendering tree back in front of any Node process, server
  * component, or non-React host that wants only the event log. The exports map
@@ -170,7 +170,7 @@ const FOLD_ROOT = "packages/agent-stream/src/transcript/"
  * invisible. The fold's two modules import each other's *values*
  * (`fold.ts` takes `TranscriptBuilder`, `builder.ts` takes `assembleTurn`), so
  * pulling them into the contract entry drags that cycle across an entry
- * boundary. Worse, `@nessa-ui/react` re-exports both entries with `export *`;
+ * boundary. Worse, `@nessalabs/ui` re-exports both entries with `export *`;
  * a name exported by two of those is ambiguous, and ES semantics elide it
  * *silently*, so the React package would drop every fold symbol from its
  * public API with a green typecheck and no error anywhere but a consumer's
@@ -288,7 +288,7 @@ export const packageArtifactsCheck = defineCheck({
     }
     for (const reached of await foldReachableFromContract(context)) {
       findings.push(context.fail(
-        "The contract entry must not reach the fold: re-exporting it inlines the transcript/builder cycle and makes @nessa-ui/react's two star-exports ambiguous, which elides every fold symbol from its public API without an error.",
+        "The contract entry must not reach the fold: re-exporting it inlines the transcript/builder cycle and makes @nessalabs/ui's two star-exports ambiguous, which elides every fold symbol from its public API without an error.",
         { contractId: "PKG-002", path: reached },
       ))
     }

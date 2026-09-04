@@ -16,7 +16,7 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
   ContextMenuTrigger,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import {
   EditIcon,

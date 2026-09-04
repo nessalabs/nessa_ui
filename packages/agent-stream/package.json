@@ -1,5 +1,5 @@
 {
-  "name": "@nessa-ui/agent-stream",
+  "name": "@nessalabs/agent-stream",
   "version": "0.1.0",
   "description": "Dependency-free parsers that normalize coding-agent CLI streams into one event contract.",
   "license": "MIT",

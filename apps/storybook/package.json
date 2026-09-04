@@ -1,5 +1,5 @@
 {
-  "name": "@nessa-ui/storybook",
+  "name": "@nessalabs/storybook",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",
     "@fontsource-variable/geist-mono": "^5.3.0",
-    "@nessa-ui/react": "workspace:*",
+    "@nessalabs/ui": "workspace:*",
     "lucide-react": "^0.468.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"

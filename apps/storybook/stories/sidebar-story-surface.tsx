@@ -11,7 +11,7 @@ import {
   SidebarInset,
   SidebarMenu,
   SidebarProvider,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 export const sidebarStorySurfaceStyle = {
   "--background": "var(--sidebar)",

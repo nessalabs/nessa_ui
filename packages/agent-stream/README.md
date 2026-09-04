@@ -1,4 +1,4 @@
-# @nessa-ui/agent-stream
+# @nessalabs/agent-stream
 
 Parsers that normalize agent streams — OpenAI Agents SDK, Claude Code, the
 Claude Agent SDK and Messages API, Codex, Cursor Agent, opencode, and ACP —
@@ -10,7 +10,7 @@ data; drawing that data is somebody else's job.
 ## Installation
 
 ```sh
-npm install @nessa-ui/agent-stream
+npm install @nessalabs/agent-stream
 ```
 
 ## The two entries
@@ -25,7 +25,7 @@ The main entry stops at the normalized event log. A host that wants to draw its
 own transcript takes `AgentEvent[]` and goes.
 
 ```ts
-import { ClaudeStreamMapper, type AgentEvent } from "@nessa-ui/agent-stream"
+import { ClaudeStreamMapper, type AgentEvent } from "@nessalabs/agent-stream"
 
 const mapper = new ClaudeStreamMapper()
 for await (const line of lines) {
@@ -37,7 +37,7 @@ The fold is optional and ships behind its own subpath, because grouping events
 into turns and collapsing tool runs is a layout decision, not a parsing one.
 
 ```ts
-import { buildTranscript, TranscriptBuilder } from "@nessa-ui/agent-stream/transcript"
+import { buildTranscript, TranscriptBuilder } from "@nessalabs/agent-stream/transcript"
 
 const transcript = buildTranscript(events)
 ```
@@ -51,7 +51,7 @@ Provider surfaces are namespaced, not flattened — two providers want the same
 names, and a star-export collision would make adding a third a breaking change.
 
 ```ts
-import { acp, claude, codex, cursor, openai, opencode } from "@nessa-ui/agent-stream"
+import { acp, claude, codex, cursor, openai, opencode } from "@nessalabs/agent-stream"
 ```
 
 The mappers — and the `map*Stream` helpers that drive them over a whole
@@ -130,5 +130,5 @@ that needs nothing from the host: they complete from the stream itself.
 
 ## React
 
-`@nessa-ui/react` re-exports everything here, so an existing React host needs no
+`@nessalabs/ui` re-exports everything here, so an existing React host needs no
 change. New code should import from this package directly.

@@ -3,7 +3,7 @@
 /**
  * Not an entry point of the published package — deliberately.
  *
- * `@nessa-ui/agent-stream` ships two entries and its layering is the exports
+ * `@nessalabs/agent-stream` ships two entries and its layering is the exports
  * map: `.` is `contract.ts` and stops at the agent message, `./transcript` is
  * the fold. A shadcn consumer gets neither, because the registry copies source
  * and copied source has no exports map. For that consumer the barrel *is* the

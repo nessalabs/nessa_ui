@@ -12,7 +12,7 @@ import {
   type EventCalendarEvent,
   type EventCalendarEventRenderContext,
   type EventCalendarQuickCreateContext,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

@@ -24,7 +24,7 @@ import {
   TableToolbar,
   TableViewOptions,
   type TableSortDirection,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import { ChevronRight, FilterX } from "lucide-react"
 
 import { SearchIcon } from "./icons/nucleo"

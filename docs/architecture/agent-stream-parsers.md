@@ -134,14 +134,14 @@ about a CLI release; the event model is a fact about your product.
 
 ### The layering is a package boundary, not a convention
 
-The three layers ship as `@nessa-ui/agent-stream`, which has no dependencies,
+The three layers ship as `@nessalabs/agent-stream`, which has no dependencies,
 no peer dependencies, and no React. Its two entries cut the stack at the
 contract:
 
 | Entry | Layers | For |
 | --- | --- | --- |
-| `@nessa-ui/agent-stream` | wire + mapper | anything that wants the event log and draws its own shape |
-| `@nessa-ui/agent-stream/transcript` | the fold | hosts that want the default turns-and-groups shape |
+| `@nessalabs/agent-stream` | wire + mapper | anything that wants the event log and draws its own shape |
+| `@nessalabs/agent-stream/transcript` | the fold | hosts that want the default turns-and-groups shape |
 
 The shadcn registry is the exception, and deliberately so. It copies source, and
 copied source has no exports map, so a registry consumer has exactly one
@@ -152,13 +152,13 @@ npm surface is a layering decision; deleting half the API from projects that
 already installed the item would just be a break.
 
 Splitting it this way is what makes the rule above enforceable rather than
-advisory. While the parser lived inside `@nessa-ui/react`, reaching it meant
+advisory. While the parser lived inside `@nessalabs/ui`, reaching it meant
 taking a `react >=19` peer dependency and a rendering tree — mermaid, katex,
 react-markdown, radix — and every built module carried a `"use client"`
 directive, so a Node process or a server component could not use the parser
 its own architecture diagram said was framework-free.
 
-`@nessa-ui/react` re-exports both entries, so a React host sees no change.
+`@nessalabs/ui` re-exports both entries, so a React host sees no change.
 
 ### What state the mapper actually needs
 

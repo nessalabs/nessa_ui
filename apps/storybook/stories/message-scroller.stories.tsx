@@ -12,7 +12,7 @@ import {
   MessageScrollerContent,
   MessageScrollerViewport,
   MessageStreamText,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

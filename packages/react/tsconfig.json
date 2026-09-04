@@ -4,8 +4,8 @@
     "baseUrl": "./src",
     "paths": {
       "@/*": ["./*"],
-      "@nessa-ui/agent-stream": ["../../agent-stream/src/contract.ts"],
-      "@nessa-ui/agent-stream/transcript": ["../../agent-stream/src/transcript/index.ts"]
+      "@nessalabs/agent-stream": ["../../agent-stream/src/contract.ts"],
+      "@nessalabs/agent-stream/transcript": ["../../agent-stream/src/transcript/index.ts"]
     }
   },
   "include": ["src", "tsup.config.ts"]
