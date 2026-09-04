@@ -20,15 +20,18 @@ import { storyDocumentation } from "./story-documentation"
  */
 async function stopMeshMotion(root: ParentNode, canvasElement: HTMLElement) {
   if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
+  // Cancel on the canvas, not only the blooms: a late-started WAAPI or a
+  // grain/content transition must not keep the main thread busy for the
+  // next story's opacity waits.
+  canvasElement.getAnimations({ subtree: true }).forEach((animation) => {
+    animation.cancel()
+  })
   root
     .querySelectorAll<HTMLElement>('[data-slot="morphing-mesh-gradient-bloom"]')
     .forEach((bloom) => {
       bloom.getAnimations().forEach((animation) => animation.cancel())
     })
-  const host = root instanceof Element ? root : root.querySelector("*")
-  if (host) {
-    await expect(host.getAnimations({ subtree: true })).toHaveLength(0)
-  }
+  await expect(canvasElement.getAnimations({ subtree: true })).toHaveLength(0)
 }
 
 const meta = {
@@ -49,9 +52,9 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 /**
- * Apple-setup card layout: back control top-left, centred prompt, two
- * bottom-corner pills. Absolute chrome + a grid that stretches the
- * content layer to the host box so vertical centering actually resolves.
+ * Apple-setup card layout: back control top-left, Try + quote as one
+ * centred cluster, corner pills on the bottom edge. The host sizes the
+ * gradient frame — this card only fills it.
  */
 function NessaSetupCard({
   inverted = false,
@@ -75,16 +78,16 @@ function NessaSetupCard({
       }
 
   return (
-    <div className="relative flex h-full min-h-[28rem] w-full flex-col px-7 pb-7 pt-6 sm:min-h-[30rem] sm:px-9 sm:pb-8 sm:pt-7">
+    <div className="relative flex h-full w-full flex-col px-6 pb-6 pt-5 sm:px-8 sm:pb-7 sm:pt-6">
       <button
         type="button"
         aria-label="Back"
-        className={`absolute top-5 left-5 flex size-9 items-center justify-center rounded-full transition-colors sm:top-6 sm:left-6 ${tone.back}`}
+        className={`absolute top-5 left-5 z-10 flex size-9 items-center justify-center rounded-full transition-colors sm:top-6 sm:left-6 ${tone.back}`}
       >
         <ChevronLeft className="size-4" strokeWidth={2.25} />
       </button>
 
-      <div className="flex flex-1 flex-col items-center justify-center px-4 text-center">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-10 text-center">
         <p className={`text-[0.95rem] font-normal ${tone.label}`}>Try</p>
         <p
           className={`mt-2 max-w-[22rem] text-balance text-[1.65rem] leading-snug font-semibold tracking-tight sm:max-w-[26rem] sm:text-[1.85rem] ${tone.quote}`}
@@ -93,7 +96,7 @@ function NessaSetupCard({
         </p>
       </div>
 
-      <div className="grid grid-cols-2 items-center gap-3">
+      <div className="grid shrink-0 grid-cols-2 items-center gap-3">
         <button
           type="button"
           className={`justify-self-start rounded-full px-5 py-2.5 text-sm font-medium transition-colors ${tone.later}`}
@@ -111,8 +114,9 @@ function NessaSetupCard({
   )
 }
 
+/** Height-first modal frame so Storybook’s short canvas cannot clip the chrome. */
 const setupCardShell =
-  "aspect-[5/4] w-[min(40rem,calc(100vw-2rem))] max-h-[min(34rem,80vh)] rounded-[1.75rem] shadow-2xl"
+  "h-[min(32rem,70vh)] w-[min(40rem,calc(100vw-2rem))] rounded-[1.75rem] shadow-2xl"
 
 export const Playground: Story = {
   args: {
@@ -169,6 +173,7 @@ export const Playground: Story = {
     )!
     await expect(surface).toHaveAttribute("data-type", "mesh")
     await expect(surface).toHaveAttribute("data-animated", "true")
+    await expect(getComputedStyle(surface).overflow).toBe("clip")
     const stage = surface.querySelector<HTMLElement>(
       '[data-slot="morphing-mesh-gradient-stage"]',
     )!
@@ -184,15 +189,32 @@ export const Playground: Story = {
     const content = surface.querySelector<HTMLElement>(
       '[data-slot="morphing-mesh-gradient-content"]',
     )!
-    await expect(content.getBoundingClientRect().height).toBeCloseTo(
-      surface.getBoundingClientRect().height,
-      0,
-    )
+    const surfaceBox = surface.getBoundingClientRect()
+    const contentBox = content.getBoundingClientRect()
+    await expect(contentBox.height).toBeCloseTo(surfaceBox.height, 0)
+    // Absolute chrome must share the host's box — a scrolled overflow
+    // port would shift content.top while leaving surface.top put.
+    await expect(contentBox.top).toBeCloseTo(surfaceBox.top, 0)
+    await expect(contentBox.left).toBeCloseTo(surfaceBox.left, 0)
+    const back = surface.querySelector<HTMLButtonElement>(
+      'button[aria-label="Back"]',
+    )!
+    const tryLabel = [...surface.querySelectorAll("p")].find((node) =>
+      node.textContent?.trim() === "Try",
+    )!
+    const backBox = back.getBoundingClientRect()
+    const tryBox = tryLabel.getBoundingClientRect()
+    // Chrome stays inside the rounded frame — not clipped at the top edge.
+    await expect(backBox.top).toBeGreaterThan(surfaceBox.top + 12)
+    await expect(tryBox.top).toBeGreaterThan(surfaceBox.top + 36)
+    await expect(tryBox.bottom).toBeLessThan(surfaceBox.bottom - 80)
     const action = [...surface.querySelectorAll("button")].find((button) =>
       button.textContent?.includes("Continue"),
     )!
     await expect(action).toBeTruthy()
-    action.scrollIntoView({ block: "center" })
+    // Do not scrollIntoView here: even with overflow-clip, scrolling an
+    // ancestor must not be required for the hit-test — the control is
+    // already inside the framed card.
     const target = action.getBoundingClientRect()
     const hit = document.elementFromPoint(
       target.left + target.width / 2,
@@ -255,14 +277,14 @@ export const Inverted: Story = {
     <div className="grid w-[min(64rem,calc(100vw-2rem))] grid-cols-1 gap-4 sm:grid-cols-2">
       <MorphingMeshGradient
         colors={morphingMeshGradientPresets.glass}
-        className="min-h-56 rounded-3xl"
+        className="h-[min(28rem,60vh)] rounded-3xl"
       >
         <NessaSetupCard />
       </MorphingMeshGradient>
       <MorphingMeshGradient
         colors={morphingMeshGradientPresets.glass}
         inverted
-        className="min-h-56 rounded-3xl"
+        className="h-[min(28rem,60vh)] rounded-3xl"
       >
         <NessaSetupCard inverted />
       </MorphingMeshGradient>

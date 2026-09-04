@@ -509,7 +509,10 @@ function MorphingMeshGradient({
       data-inverted={inverted ? "true" : undefined}
       data-animated={shouldAnimate ? "true" : "false"}
       className={cn(
-        "relative isolate grid overflow-hidden",
+        // `overflow-clip` (not hidden): a living backdrop must clip blooms
+        // without becoming a scrollport. `overflow-hidden` still scrolls, so
+        // a child's scrollIntoView can yank absolute chrome out of frame.
+        "relative isolate grid overflow-clip",
         "bg-[var(--nessa-mesh-ground)]",
         className,
       )}
@@ -561,7 +564,15 @@ function MorphingMeshGradient({
           )
         })}
       </div>
-      <div data-slot="morphing-mesh-gradient-content" className="relative min-h-0">
+      {/*
+        Absolute fill — a lone in-flow grid child with height:100% does not
+        reliably stretch when the host’s height comes from className alone,
+        which left playground chrome sitting in the top half of the frame.
+      */}
+      <div
+        data-slot="morphing-mesh-gradient-content"
+        className="absolute inset-0 z-10"
+      >
         {children}
       </div>
       {grainStrength > 0 ? (
@@ -569,7 +580,7 @@ function MorphingMeshGradient({
           data-slot="morphing-mesh-gradient-grain"
           aria-hidden="true"
           className={cn(
-            "pointer-events-none absolute inset-0 mix-blend-soft-light",
+            "pointer-events-none absolute inset-0 z-20 mix-blend-soft-light",
             "bg-[image:var(--nessa-mesh-grain)] bg-[length:160px_160px]",
           )}
           style={
