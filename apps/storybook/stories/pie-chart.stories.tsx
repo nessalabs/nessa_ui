@@ -8,7 +8,7 @@ import {
   PopoverSurface,
   type PieChartLayoutIssue,
   type PieChartSlice,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

@@ -17,7 +17,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import { Archive, Copy, PencilLine, Share2, Trash2 } from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"

@@ -112,7 +112,7 @@ test("React is recognized through every entry point that drags the framework in"
   for (const specifier of ["react", "react-dom", "react/jsx-runtime", "react-dom/client"]) {
     assert.equal(isReactSpecifier(specifier), true, specifier)
   }
-  for (const specifier of ["./events", "preact", "react-is", "@nessa-ui/react"]) {
+  for (const specifier of ["./events", "preact", "react-is", "@nessalabs/ui"]) {
     assert.equal(isReactSpecifier(specifier), false, specifier)
   }
 })

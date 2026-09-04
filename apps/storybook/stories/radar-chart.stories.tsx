@@ -9,7 +9,7 @@ import {
   type RadarChartAxis,
   type RadarChartLayoutIssue,
   type RadarChartSeries,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

@@ -1,7 +1,7 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, userEvent, waitFor, within } from "storybook/test"
-import { ChatTray, type ChatTrayItem } from "@nessa-ui/react"
+import { ChatTray, type ChatTrayItem } from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

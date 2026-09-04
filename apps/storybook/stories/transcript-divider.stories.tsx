@@ -6,7 +6,7 @@ import {
   MessageBubble,
   MessageContent,
   TranscriptDivider,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

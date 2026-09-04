@@ -20,7 +20,7 @@ import {
   SidebarRail,
   SidebarTrigger,
   useSidebar,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import {
   Archive,
   Folder,

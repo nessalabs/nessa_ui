@@ -7,7 +7,7 @@ import {
   ConversationRailMarker,
   ConversationRailPreview,
   ConversationRailTrigger,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

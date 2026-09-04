@@ -35,7 +35,7 @@ function Introduction() {
       <section className="space-y-4">
         <h2 className="text-xl font-semibold">Install</h2>
         <pre className="overflow-x-auto rounded-lg bg-foreground p-4 font-mono text-sm text-background">
-          <code>pnpm add @nessa-ui/react</code>
+          <code>pnpm add @nessalabs/ui</code>
         </pre>
       </section>
     </main>

@@ -151,7 +151,7 @@ export const parserHygieneCheck = defineCheck({
       for (const comparison of handRolledNarrowing(ast)) {
         findings.push(
           context.fail(
-            `Hand-rolled narrowing at line ${line(ast, comparison)}: use the named readers in @nessa-ui/agent-stream's json.ts (asString, asNumber, asRecord, asOneOf) so every wire value is narrowed one way, in one place.`,
+            `Hand-rolled narrowing at line ${line(ast, comparison)}: use the named readers in @nessalabs/agent-stream's json.ts (asString, asNumber, asRecord, asOneOf) so every wire value is narrowed one way, in one place.`,
             { contractId: "PARSE-003", path: filePath },
           ),
         )

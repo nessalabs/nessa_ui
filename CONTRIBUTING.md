@@ -27,14 +27,14 @@ pnpm is the contributor tool for this repository.
 
 ## Publishing order
 
-Two packages are published: `@nessa-ui/agent-stream`, which is framework-free
-and depends on nothing, and `@nessa-ui/react`, which depends on it with
+Two packages are published: `@nessalabs/agent-stream`, which is framework-free
+and depends on nothing, and `@nessalabs/ui`, which depends on it with
 `workspace:*`.
 
 Publish the parser first, and publish both with `pnpm publish`. Only pnpm
 rewrites `workspace:*` into a real version range on pack; `npm publish` ships
 the literal string and produces a tarball nobody can install. Releasing
-`@nessa-ui/react` before the parser version it names exists on the registry
+`@nessalabs/ui` before the parser version it names exists on the registry
 breaks installs the same way.
 
 ## Protected-main workflow
@@ -133,8 +133,8 @@ change that is invisible on one can be breaking on another:
 
 | Surface | What a consumer holds |
 | --- | --- |
-| `@nessa-ui/react` (npm) | the package's exports map and its public exports |
-| `@nessa-ui/agent-stream` (npm) | its two entries, `.` and `./transcript` |
+| `@nessalabs/ui` (npm) | the package's exports map and its public exports |
+| `@nessalabs/agent-stream` (npm) | its two entries, `.` and `./transcript` |
 | shadcn registry | **copied source**, so the barrel a file lands at *is* the API |
 
 The registry is the one that catches people out. A registry consumer has no

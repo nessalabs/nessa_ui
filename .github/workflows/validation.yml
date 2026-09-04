@@ -41,6 +41,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Provision Chromium
-        run: pnpm --filter @nessa-ui/storybook exec playwright install --with-deps chromium
+        run: pnpm --filter @nessalabs/storybook exec playwright install --with-deps chromium
       - name: Run full contract gate
         run: pnpm validate:full

@@ -1,7 +1,7 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, waitFor, within } from "storybook/test"
-import { TimelineHeader, TimelineHeaderCell } from "@nessa-ui/react"
+import { TimelineHeader, TimelineHeaderCell } from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

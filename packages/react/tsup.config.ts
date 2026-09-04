@@ -4,10 +4,10 @@ export default defineConfig({
   clean: false,
   dts: true,
   entry: ["src/index.ts"],
-  // `@nessa-ui/agent-stream` is a declared dependency, so tsup externalizes it
+  // `@nessalabs/agent-stream` is a declared dependency, so tsup externalizes it
   // anyway; naming it here states the intent, because inlining it would put the
   // parser back inside the module tree that `ensure-use-client.mjs` stamps.
-  external: ["react", "react-dom", "@nessa-ui/agent-stream"],
+  external: ["react", "react-dom", "@nessalabs/agent-stream"],
   format: ["esm"],
   minify: false,
   // Rollup's tree-shake pass strips leading directives, so the client

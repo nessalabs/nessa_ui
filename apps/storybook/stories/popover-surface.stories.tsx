@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, within } from "storybook/test"
-import { Button, PopoverSurface } from "@nessa-ui/react"
+import { Button, PopoverSurface } from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

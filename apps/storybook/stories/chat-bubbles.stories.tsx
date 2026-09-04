@@ -17,7 +17,7 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import { Folder, Paperclip } from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"

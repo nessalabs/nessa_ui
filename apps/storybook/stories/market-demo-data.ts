@@ -1,4 +1,4 @@
-import type { PriceChartBar } from "@nessa-ui/react"
+import type { PriceChartBar } from "@nessalabs/ui"
 
 /**
  * A deterministic pseudo-random walk. Stories must render the same bars on

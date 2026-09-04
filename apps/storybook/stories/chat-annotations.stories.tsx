@@ -8,7 +8,7 @@ import {
   ChatBubble,
   ChatMessage,
   type ChatAnnotation,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

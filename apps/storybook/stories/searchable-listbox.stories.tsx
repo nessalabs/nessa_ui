@@ -5,7 +5,7 @@ import { expect, userEvent, waitFor, within } from "storybook/test"
 import {
   SearchableListbox,
   type SearchableListboxRenderState,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

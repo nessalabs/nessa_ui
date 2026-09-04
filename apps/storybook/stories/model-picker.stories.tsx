@@ -6,7 +6,7 @@ import {
   ModelPicker,
   type ModelPickerGroup,
   type ModelPickerValue,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 import { KimiModelIcon } from "./icons/model/kimi-model-icon"

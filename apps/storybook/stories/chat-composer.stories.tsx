@@ -18,7 +18,7 @@ import {
   type ChatComposerBorderMode,
   type ModelPickerGroup,
   type ModelPickerValue,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import { Mic, Plus, Shield } from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"

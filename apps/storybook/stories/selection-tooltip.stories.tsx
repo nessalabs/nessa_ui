@@ -21,7 +21,7 @@ import {
   SelectionTooltipSeparator,
   SelectionTooltipShelf,
   useSelectionTooltip,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { ChatAddIcon, CommentIcon } from "./icons/nucleo"
 import { storyDocumentation } from "./story-documentation"

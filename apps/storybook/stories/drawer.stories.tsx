@@ -20,7 +20,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
   type DrawerSide,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import { Building2, Mail, Move3d, Phone, Sparkles } from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"

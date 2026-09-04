@@ -7,7 +7,7 @@ import {
   meshGradientFromRange,
   morphingMeshGradientPresets,
   morphingMeshGradientTypes,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

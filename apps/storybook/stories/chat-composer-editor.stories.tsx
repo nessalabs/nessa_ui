@@ -12,7 +12,7 @@ import {
   SectionedListbox,
   type ChatComposerContent,
   type ChatComposerEditorHandle,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import { Plus } from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"

@@ -13,7 +13,7 @@ import {
   TaskListItem,
   WindowDeck,
   WindowDeckPane,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import {
   CalendarDays,
   MessageCircle,
@@ -123,14 +123,14 @@ function DeckExample(props: React.ComponentProps<typeof WindowDeck>) {
           label="Rollout"
           preview={
             <p className="p-4 nessa-text-2 text-muted-foreground">
-              @nessa-ui/react
+              @nessalabs/ui
             </p>
           }
           header={
             <PaneHeader
               icon={PanelsTopLeft}
               name="Rollout"
-              subtitle="@nessa-ui/react"
+              subtitle="@nessalabs/ui"
             />
           }
         >

@@ -6,7 +6,7 @@ import {
   CodeBlockProvider,
   MessageMarkdown,
   type CodeBlockMode,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

@@ -7,7 +7,7 @@ import {
   waitFor,
   within,
 } from "storybook/test"
-import { PriceChart } from "@nessa-ui/react"
+import { PriceChart } from "@nessalabs/ui"
 
 import { candleSeries, priceSeries, SESSION_START } from "./market-demo-data"
 import { storyDocumentation } from "./story-documentation"

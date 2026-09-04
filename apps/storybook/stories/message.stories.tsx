@@ -23,7 +23,7 @@ import {
   MessageThread,
   MessageThreadReplies,
   MessageThreadSummary,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import {
   Check,
   Copy,
