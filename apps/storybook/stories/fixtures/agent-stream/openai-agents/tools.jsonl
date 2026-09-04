@@ -1,0 +1,8 @@
+{"data":{"type":"response_started"},"type":"raw_model_stream_event"}
+{"data":{"type":"response_done","response":{"id":"scripted-response-1","usage":{"requests":1,"inputTokens":0,"outputTokens":0,"totalTokens":0},"output":[{"type":"function_call","name":"lookup","callId":"call_1","id":"fc_1","status":"completed","arguments":"{\"q\":\"weather\"}"}]}},"type":"raw_model_stream_event"}
+{"name":"tool_called","item":{"type":"tool_call_item","rawItem":{"id":"fc_1","type":"function_call","callId":"call_1","name":"lookup","status":"completed","arguments":"{\"q\":\"weather\"}"},"agent":{"name":"Researcher"}},"type":"run_item_stream_event"}
+{"name":"tool_output","item":{"type":"tool_call_output_item","rawItem":{"type":"function_call_result","name":"lookup","callId":"call_1","status":"completed","output":{"type":"text","text":"{\"q\":\"weather\",\"result\":\"sunny\"}"}},"agent":{"name":"Researcher"},"output":"{\"q\":\"weather\",\"result\":\"sunny\"}","executionStatus":"executed"},"type":"run_item_stream_event"}
+{"data":{"type":"response_started"},"type":"raw_model_stream_event"}
+{"data":{"type":"output_text_delta","itemId":"msg_1","delta":"Sunny"},"type":"raw_model_stream_event"}
+{"data":{"type":"response_done","response":{"id":"scripted-response-2","usage":{"requests":1,"inputTokens":0,"outputTokens":0,"totalTokens":0},"output":[{"type":"message","role":"assistant","status":"completed","id":"msg_1","content":[{"type":"output_text","text":"Sunny"}]}]}},"type":"raw_model_stream_event"}
+{"name":"message_output_created","item":{"type":"message_output_item","rawItem":{"id":"msg_1","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"Sunny"}]},"agent":{"name":"Researcher"}},"type":"run_item_stream_event"}

@@ -1,0 +1,6 @@
+{"data":{"type":"response_started"},"type":"raw_model_stream_event"}
+{"name":"handoff_requested","item":{"type":"handoff_call_item","rawItem":{"id":"h1","type":"function_call","callId":"handoff_1","name":"transfer_to_refund_agent","status":"completed","arguments":"{\"reason\":\"refund\"}"},"agent":{"name":"Triage"}},"type":"run_item_stream_event"}
+{"name":"handoff_occurred","item":{"type":"handoff_output_item","rawItem":{"type":"function_call_result","callId":"handoff_1","name":"transfer_to_refund_agent","status":"completed","output":{"type":"text","text":"{\"assistant\":\"Refund Agent\"}"}},"sourceAgent":{"name":"Triage"},"targetAgent":{"name":"Refund Agent"}},"type":"run_item_stream_event"}
+{"agent":{"name":"Refund Agent"},"type":"agent_updated_stream_event"}
+{"name":"tool_approval_requested","item":{"type":"tool_approval_item","toolName":"delete_refund","rawItem":{"id":"fc_2","type":"function_call","callId":"call_2","name":"delete_refund","status":"completed","arguments":"{\"id\":42}"},"agent":{"name":"Refund Agent"}},"type":"run_item_stream_event"}
+{"name":"compaction_item_created","item":{"type":"compaction_item","rawItem":{"id":"cmp_1","type":"compaction","encrypted_content":"opaque"},"agent":{"name":"Refund Agent"}},"type":"run_item_stream_event"}
