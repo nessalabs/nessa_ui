@@ -5,12 +5,14 @@ import {
   Badge,
   Button,
   ClaudeStreamMapper,
+  ClaudeMessagesMapper,
   CodexStreamMapper,
   CursorStreamMapper,
   AcpMapper,
   CodexAppServerMapper,
   OpencodeRunMapper,
   OpencodeServerMapper,
+  OpenAIAgentsMapper,
   AGENT_TRANSPORTS,
   claude,
   codex,
@@ -105,6 +107,33 @@ import tools from "./fixtures/agent-stream/tools.jsonl?raw"
 import websearch from "./fixtures/agent-stream/websearch.jsonl?raw"
 import workflow from "./fixtures/agent-stream/workflow.jsonl?raw"
 import workflowPhases from "./fixtures/agent-stream/workflow_phases.jsonl?raw"
+// The same scenario matrix, recorded through the Claude Agent SDK's `query()`.
+// Same prompts as above on purpose: recording them differently would compare
+// two conversations and call the difference a property of the transport.
+import sdkApprovalAllow from "./fixtures/agent-stream/claude-agent-sdk/approval-allow.jsonl?raw"
+import sdkApprovalDeny from "./fixtures/agent-stream/claude-agent-sdk/approval-deny.jsonl?raw"
+import sdkFailing from "./fixtures/agent-stream/claude-agent-sdk/failing.jsonl?raw"
+import sdkPhases from "./fixtures/agent-stream/claude-agent-sdk/phases.jsonl?raw"
+import sdkPrinted from "./fixtures/agent-stream/claude-agent-sdk/printed.jsonl?raw"
+import sdkResume from "./fixtures/agent-stream/claude-agent-sdk/resume.jsonl?raw"
+import sdkSubagent from "./fixtures/agent-stream/claude-agent-sdk/subagent.jsonl?raw"
+import sdkTodos from "./fixtures/agent-stream/claude-agent-sdk/todos.jsonl?raw"
+import sdkTools from "./fixtures/agent-stream/claude-agent-sdk/tools.jsonl?raw"
+import sdkWebsearch from "./fixtures/agent-stream/claude-agent-sdk/websearch.jsonl?raw"
+import sdkWorkflow from "./fixtures/agent-stream/claude-agent-sdk/workflow.jsonl?raw"
+// The raw Messages API, which is a different wire rather than the same one in
+// a different envelope — hence a different, smaller scenario list: it has no
+// plan tool, no subagents and no workflows to record.
+import msgEager from "./fixtures/agent-stream/claude-messages/eager.jsonl?raw"
+import msgFailing from "./fixtures/agent-stream/claude-messages/failing.jsonl?raw"
+import msgImage from "./fixtures/agent-stream/claude-messages/image.jsonl?raw"
+import msgParallel from "./fixtures/agent-stream/claude-messages/parallel.jsonl?raw"
+import msgSearch from "./fixtures/agent-stream/claude-messages/search.jsonl?raw"
+import msgStructured from "./fixtures/agent-stream/claude-messages/structured.jsonl?raw"
+import msgText from "./fixtures/agent-stream/claude-messages/text.jsonl?raw"
+import msgThinking from "./fixtures/agent-stream/claude-messages/thinking.jsonl?raw"
+import msgTools from "./fixtures/agent-stream/claude-messages/tools.jsonl?raw"
+import msgTruncated from "./fixtures/agent-stream/claude-messages/truncated.jsonl?raw"
 // The same scenario matrix recorded from `codex exec --json`.
 import codexDelegate from "./fixtures/agent-stream/codex/delegate.jsonl?raw"
 import codexFailing from "./fixtures/agent-stream/codex/failing.jsonl?raw"
@@ -143,13 +172,16 @@ import opencodeAcpTools from "./fixtures/agent-stream/opencode/acp_tools.jsonl?r
 import opencodeSsePrinted from "./fixtures/agent-stream/opencode/sse_printed.jsonl?raw"
 import opencodeSseTools from "./fixtures/agent-stream/opencode/sse_tools.jsonl?raw"
 import opencodeCliModels from "./fixtures/agent-stream/opencode/cli_models.txt?raw"
+import openaiAgentsTools from "./fixtures/agent-stream/openai-agents/tools.jsonl?raw"
+import openaiAgentsControl from "./fixtures/agent-stream/openai-agents/control.jsonl?raw"
+import openaiAgentsAgentTool from "./fixtures/agent-stream/openai-agents/agent-tool.jsonl?raw"
 // The transcripts the *stream* refuses to carry, read back from the files
 // Claude Code writes under ~/.claude/projects. Keyed by the ids the stream does
 // give: a subagent by its `task_id`, a workflow agent by its `agentId`.
 import diskSubagent from "./fixtures/agent-stream/disk_subagent_a37fefefbc61e13e3.jsonl?raw"
 import diskWorkflowAgent from "./fixtures/agent-stream/disk_workflow_agent_a35ea63276cd501aa.jsonl?raw"
 
-type ProviderId = "claude" | "codex" | "cursor" | "opencode"
+type ProviderId = "openai" | "claude" | "codex" | "cursor" | "opencode"
 
 /**
  * What a provider is, and what it supports.
@@ -171,7 +203,7 @@ interface Provider {
    * opencode's two are different protocols — reading a bus capture with the
    * one-way mapper would decode every frame as unknown.
    */
-  readonly createMapper: (transportId: string) => { push(line: string): readonly AgentEvent[] }
+  readonly createMapper: (transportId: string) => StoryMapper
   /**
    * Why some of this provider's lines produce no event.
    *
@@ -196,14 +228,36 @@ interface Provider {
   }
 }
 
+interface StoryMapper {
+  push(line: string): readonly AgentEvent[]
+  finish?(options?: { status?: "completed" | "interrupted" | "error" }): readonly AgentEvent[]
+}
+
 const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
+  openai: {
+    id: "openai",
+    label: "OpenAI Agents SDK",
+    command: "for await (const event of await run(agent, input, { stream: true }))",
+    transports: transportsOf("openai")!.transports,
+    createMapper: () => new OpenAIAgentsMapper({ sessionId: "storybook-openai", model: "gpt-test" }),
+    silentLinesNote:
+      "response_started opens the run and response_done contributes request usage; run-item events are authoritative for committed messages, executed tool results, handoffs, approvals, and compaction.",
+    supports: { workflowBoard: false, transcriptsOnDisk: false },
+  },
   claude: {
     id: "claude",
     label: "Claude Code",
     command: "claude -p --output-format stream-json --include-partial-messages",
     transports: transportsOf("claude")!.transports,
     createMapper: (transportId: string) =>
-      transportId === "acp" ? new AcpMapper() : new ClaudeStreamMapper(),
+      transportId === "acp"
+        ? new AcpMapper()
+        : // The Messages API is the only Claude transport that is a different
+          // wire; the Agent SDK is this same mapper reading objects, so it
+          // needs no branch of its own here.
+          transportId === "messages"
+          ? new ClaudeMessagesMapper()
+          : new ClaudeStreamMapper(),
     silentLinesNote:
       "message_start is the mapper's join key, message_stop and message_delta repeat what result carries, signature_delta signs a thinking block, and a steady-state rate limit has nothing to act on.",
     supports: { workflowBoard: true, transcriptsOnDisk: true },
@@ -277,9 +331,16 @@ interface Capture {
    */
   readonly prompt: string
   readonly source: string
+  /** How the SDK run ended after the last captured iterator event. */
+  readonly finishStatus?: "completed" | "interrupted" | "error"
+  /** Agent.asTool names are indistinguishable from ordinary functions on the parent wire. */
+  readonly agentToolNames?: readonly string[]
 }
 
 const CAPTURES: readonly Capture[] = [
+  { provider: "openai", transport: "agents-sdk", id: "openai-tools", label: "Tool loop", blurb: "An exercised Agents SDK run: one model request asks for a function tool, the SDK executes it, then a second model request streams and commits the answer. Usage is accumulated across both requests.", prompt: "Look up the weather and answer with the result.", source: openaiAgentsTools },
+  { provider: "openai", transport: "agents-sdk", id: "openai-agent-tool", label: "Agent as tool", blurb: "A coordinator invokes an agent exposed through agent.asTool(). The parent stream exposes an ordinary function call and final result, so host configuration identifies it as delegated work; the child's internal events are not forwarded on this stream.", prompt: "Ask the research agent about the weather, then report its result.", source: openaiAgentsAgentTool, agentToolNames: ["research_agent"] },
+  { provider: "openai", transport: "agents-sdk", id: "openai-control", label: "Handoff + approval + compaction", blurb: "The runtime replaces the active agent with a specialist, pauses for tool approval, and publishes an opaque compaction boundary. A handoff is an agent switch, not a child run.", prompt: "Transfer this refund request to the specialist and perform the protected action.", source: openaiAgentsControl, finishStatus: "interrupted" },
   { provider: "claude", transport: "stream", id: "printed", label: "Plain text", blurb: "One streamed message and nothing else — the delta path with no tools in the way.", prompt: "Print exactly: hello world. Do not use any tools.", source: printed },
   { provider: "claude", transport: "stream", id: "tools", label: "Tools", blurb: "One shell command doing the whole job, its result, and a reasoning block — the model chained it rather than making three calls.", prompt: "Create a file notes.txt containing three lines of text, then read it back, then run 'wc -l notes.txt'. Keep it brief.", source: tools },
   { provider: "claude", transport: "stream", id: "todos", label: "Plan", blurb: "The incremental plan tools — TaskCreate and TaskUpdate — folded into one checklist.", prompt: "Use your todo list to plan and then do these three steps: create a.txt with 'a', create b.txt with 'b', then run 'ls *.txt'. Track each step in your todos.", source: todos },
@@ -292,6 +353,31 @@ const CAPTURES: readonly Capture[] = [
   { provider: "claude", transport: "stream", id: "approval-deny", label: "Approval — refused", blurb: "The same ask, answered no. The refusal text becomes the tool's error, and the turn still completes — a declined tool is not a failed run.", prompt: "The same prompt, answered: deny.", source: approvalDeny },
   { provider: "claude", transport: "stream", id: "compaction", label: "Context compaction", blurb: "The window fills and history is summarised away — twice. The transcript keeps everything; only the model forgets. Forced by reading a generated corpus on Haiku with a 100k window.", prompt: "Read fifteen generated files in full, one at a time, answering with only each filename.", source: compaction },
   { provider: "claude", transport: "stream", id: "resume", label: "Resume + model swap", blurb: "Two processes, one session id: a second init, and a model change derived from it.", prompt: "Remember the number 47. Create marker.txt containing it. Then, resumed on Haiku: what number did I ask you to remember?", source: `${resumeOne}\n${resumeTwo}` },
+  // The Agent SDK: the same wire as `stream`, in-process as objects, recorded
+  // scenario for scenario so the two can be compared rather than assumed equal.
+  { provider: "claude", transport: "agent-sdk", id: "sdk-printed", label: "Plain text", blurb: "The same prompt through `query()`. Identical line kinds to the CLI's one-way stream — this transport is a delivery mechanism, not a different wire.", prompt: "Print exactly: hello world. Do not use any tools.", source: sdkPrinted },
+  { provider: "claude", transport: "agent-sdk", id: "sdk-tools", label: "Tools", blurb: "Write, Read and Bash in one turn, arriving as objects rather than bytes. The mapper is the CLI's, unchanged.", prompt: "Create a file notes2.txt containing three lines of text, then read it back, then run 'wc -l notes2.txt'. Keep it brief.", source: sdkTools },
+  { provider: "claude", transport: "agent-sdk", id: "sdk-todos", label: "Plan", blurb: "The incremental plan tools folded into one checklist, exactly as on the CLI.", prompt: "Use your todo list to plan and then do these three steps: create a.txt with 'a', create b.txt with 'b', then run 'ls *.txt'. Track each step in your todos.", source: sdkTodos },
+  { provider: "claude", transport: "agent-sdk", id: "sdk-subagent", label: "Subagent", blurb: "A delegated run, its task lifecycle intact: the SDK emits the same task_started, task_progress and task_notification lines the CLI prints.", prompt: "Use the Explore subagent to find out what files are in this directory, then tell me what it found in one line.", source: sdkSubagent },
+  { provider: "claude", transport: "agent-sdk", id: "sdk-workflow", label: "Workflow", blurb: "Three agents behind one Workflow call, with the full phase-and-agent board. The tool is named `Workflow`; without it in allowedTools the run is refused and the capture records a refusal instead.", prompt: "Use a workflow to run three agents in parallel, each printing a different greeting (hello, hola, bonjour), then summarize what they returned. Keep it tiny.", source: sdkWorkflow },
+  { provider: "claude", transport: "agent-sdk", id: "sdk-phases", label: "Multi-phase workflow", blurb: "Three phases, four agents, declared up front — the same board the CLI publishes, reached through the SDK.", prompt: "Use a workflow with THREE phases: 'Greet' runs two agents in parallel (hello, hola); 'Translate' runs one (bonjour); 'Summarize' lists all three.", source: sdkPhases },
+  { provider: "claude", transport: "agent-sdk", id: "sdk-failing", label: "Failed tool", blurb: "A non-zero exit, with the wire's error framing stripped off.", prompt: "Run the command 'cat /nonexistent/definitely-missing-file' and then tell me what happened in one sentence.", source: sdkFailing },
+  { provider: "claude", transport: "agent-sdk", id: "sdk-websearch", label: "Web search", blurb: "Server-side search reached through the SDK; the results arrive as structured blocks, not text.", prompt: "Search the web for the current version of the TypeScript compiler and tell me in one line.", source: sdkWebsearch },
+  { provider: "claude", transport: "agent-sdk", id: "sdk-approval-allow", label: "Approval — allowed", blurb: "The difference that matters. `canUseTool` is answered in-process, so nothing on this stream asks — there is no control request to see, only a call that ran.", prompt: "Delete notes.txt with `rm notes.txt`, then confirm. (Answered: allow)", source: sdkApprovalAllow },
+  { provider: "claude", transport: "agent-sdk", id: "sdk-approval-deny", label: "Approval — refused", blurb: "The same ask, refused. The refusal is recoverable only after the fact: as a failed tool result, and in permission_denials on the final result line.", prompt: "The same prompt, answered: deny.", source: sdkApprovalDeny },
+  { provider: "claude", transport: "agent-sdk", id: "sdk-resume", label: "Resume + model swap", blurb: "Two `query()` calls sharing a session id, the second on Haiku: a second init, and a model change derived from it.", prompt: "Remember the number 47. Create marker.txt containing it. Then, resumed on Haiku: what number did I ask you to remember?", source: sdkResume },
+  // The Messages API. A shorter list on purpose: no plan tool, no subagents,
+  // no workflows exist on this wire to record.
+  { provider: "claude", transport: "messages", id: "msg-text", label: "Plain text", blurb: "The raw SSE frames with no CLI around them: message_start opens block indexing, deltas preview, and message_delta ends the turn.", prompt: "In two sentences, what is a newline-delimited JSON stream?", source: msgText },
+  { provider: "claude", transport: "messages", id: "msg-thinking", label: "Thinking", blurb: "Adaptive thinking with summaries. The signature delta is carried for replay and deliberately contributes nothing to the rendered text — and this wire reports reasoning tokens, which Claude Code's does not.", prompt: "A farmer has 17 sheep; all but 9 run away. How many are left? Reason it through.", source: msgThinking },
+  { provider: "claude", transport: "messages", id: "msg-tools", label: "Tools", blurb: "A call whose arguments arrive as fragments that are individually unparseable — the call is only whole at content_block_stop. Its result comes from the host, never from the stream.", prompt: "What is the weather in Oslo? Use the tool.", source: msgTools },
+  { provider: "claude", transport: "messages", id: "msg-parallel", label: "Parallel tools", blurb: "Two calls in one message, each keeping its own id and arguments — the case that catches a mapper indexing blocks carelessly.", prompt: "Get both the weather and the local time for Oslo. Call both tools at once.", source: msgParallel },
+  { provider: "claude", transport: "messages", id: "msg-eager", label: "Eager tool streaming", blurb: "`eager_input_streaming` starts the argument fragments earlier. Note the turn never completes: it ends on a tool_use stop, which hands control to the host rather than ending anything.", prompt: "What is the weather in Reykjavik? Use the tool.", source: msgEager },
+  { provider: "claude", transport: "messages", id: "msg-search", label: "Web search", blurb: "Server-side tools, which are the one kind this wire resolves itself: no tool_result is ever sent back for one, so the stream completes them. Here web_search is called from inside code_execution — server tools nest.", prompt: "What is the newest release of the Zig programming language?", source: msgSearch },
+  { provider: "claude", transport: "messages", id: "msg-failing", label: "Failed tool", blurb: "The host answers with is_error. The tool failed; the turn did not.", prompt: "What is the weather in Atlantis? Use the tool.", source: msgFailing },
+  { provider: "claude", transport: "messages", id: "msg-structured", label: "Structured output", blurb: "A schema-constrained response. It is still ordinary text blocks on the wire — the constraint is in the request, which a parser never sees.", prompt: "Describe the Rust programming language.", source: msgStructured },
+  { provider: "claude", transport: "messages", id: "msg-image", label: "Image prompt", blurb: "An image goes up in the request; the response wire is unchanged. What a parser can see is the usage it cost.", prompt: "What colour is this image? Answer in one word.", source: msgImage },
+  { provider: "claude", transport: "messages", id: "msg-truncated", label: "Truncated", blurb: "max_tokens cut the turn off mid-sentence, and the stop reason says so rather than leaving it to be inferred.", prompt: "Write a long paragraph about the history of the semicolon.", source: msgTruncated },
   { provider: "claude", transport: "acp", id: "claude-acp", label: "Tools over ACP", blurb: "Claude Code through Zed's adapter. The same agent on a different protocol: it asks for permission over the wire without the stdio flag its own stream needs, and `session/new` advertises the models it can switch to.", prompt: "Create notes.txt with two lines, then run 'wc -l notes.txt'.", source: acpClaudeTools },
 
   // ---------- Codex ----------
@@ -427,8 +513,11 @@ function providerOf(captureId: string): ProviderId {
  * recording belongs to the wire it came from, and reading opencode's bus with
  * its one-way mapper would decode every frame as unknown.
  */
-function mapperFor(captureId: string): { push(line: string): readonly AgentEvent[] } {
+function mapperFor(captureId: string): StoryMapper {
   const capture = CAPTURES.find((entry) => entry.id === captureId)
+  if (capture?.provider === "openai") {
+    return new OpenAIAgentsMapper({ sessionId: "storybook-openai", model: "gpt-test", agentToolNames: capture.agentToolNames })
+  }
   const provider = PROVIDERS[capture?.provider ?? "claude"]
   return provider.createMapper(capture?.transport ?? provider.transports[0]!.id)
 }
@@ -437,11 +526,12 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
   const state = React.useRef<{
     captureId: string
     count: number
-    mapper: { push(line: string): readonly AgentEvent[] }
+    mapper: StoryMapper
     builder: TranscriptBuilder | null
     buffers: Map<string, string>
     events: AgentEvent[]
     produced: number[]
+    finished: boolean
   } | null>(null)
 
   const lines = LINES.get(captureId) ?? []
@@ -457,6 +547,7 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
       buffers: new Map(),
       events: [],
       produced: [],
+      finished: false,
     }
     state.current = current
   }
@@ -482,6 +573,13 @@ function useLiveTranscript(captureId: string, count: number, live: boolean): Liv
     applyDeltas(mapped, current.buffers)
   }
   current.count = target
+
+  if (target === lines.length && !current.finished && current.mapper.finish !== undefined) {
+    const terminal = current.mapper.finish({ status: CAPTURES.find((entry) => entry.id === captureId)?.finishStatus })
+    current.events.push(...terminal)
+    current.builder?.push(terminal)
+    current.finished = true
+  }
 
   return {
     events: current.events,
@@ -1686,9 +1784,35 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
   // A capture recorded from one transport is only offered on that transport:
   // opencode's token deltas exist on its server bus and nowhere else, so
   // listing them under the one-way stream would promise a stream that has none.
-  const captures = CAPTURES.filter(
-    (entry) => entry.provider === provider.id && (entry.transport === undefined || entry.transport === transport.id),
-  )
+  const capturesFor = (transportId: string) =>
+    CAPTURES.filter(
+      (entry) => entry.provider === provider.id && (entry.transport === undefined || entry.transport === transportId),
+    )
+
+  /**
+   * What this transport can show, and whether it is really its own.
+   *
+   * Two different situations, and conflating them is what made every Claude
+   * transport render the same transcript. A transport with its own recordings
+   * shows them. A transport with none — Claude's stdin-open mode, which no
+   * capture exercises separately — *borrows* its provider's representative
+   * ones, and the note below says so rather than passing them off as its own.
+   *
+   * The previous code did the borrowing by accident, by leaving `captureId`
+   * pointing at whatever was selected before. That silently showed one
+   * transport's bytes under another's name, including for transports that do
+   * have their own captures.
+   */
+  const own = capturesFor(transport.id)
+  const borrowed = own.length === 0
+  const captures = borrowed ? capturesFor(provider.transports[0]!.id) : own
+
+  /**
+   * The capture actually on screen, resolved *through* that list rather than
+   * read from `captureId`, so a selection cannot survive a switch that
+   * invalidates it.
+   */
+  const selected = captures.find((entry) => entry.id === captureId) ?? captures[0]
 
   // Switching transport lands on a capture that transport actually has. A
   // recording belongs to the wire it came from, so keeping the old selection
@@ -1696,9 +1820,8 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
   const switchTransport = (next: string) => {
     if (next === transport.id) return
     setTransportId(next)
-    const available = CAPTURES.filter(
-      (entry) => entry.provider === provider.id && (entry.transport === undefined || entry.transport === next),
-    )
+    const direct = capturesFor(next)
+    const available = direct.length === 0 ? capturesFor(provider.transports[0]!.id) : direct
     if (!available.some((entry) => entry.id === captureId) && available[0] !== undefined) {
       setCaptureId(available[0].id)
     }
@@ -1717,15 +1840,18 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
     // switch — land on the new provider's first one.
     setTransportId(PROVIDERS[next as ProviderId].transports[0]!.id)
   }
-  const lines = LINES.get(captureId) ?? []
+  const lines = selected === undefined ? [] : (LINES.get(selected.id) ?? [])
   const [count, setCount] = React.useState(autoplay ? 0 : lines.length)
   const [playing, setPlaying] = React.useState(autoplay)
 
+  // Keyed on the resolved capture: switching transport can change what is on
+  // screen without `captureId` changing at all, and the replay has to follow
+  // what is rendered rather than what was clicked.
   React.useEffect(() => {
-    const next = LINES.get(captureId)?.length ?? 0
+    const next = selected === undefined ? 0 : (LINES.get(selected.id)?.length ?? 0)
     setCount(autoplay ? 0 : next)
     setPlaying(autoplay)
-  }, [captureId, autoplay])
+  }, [selected?.id, autoplay])
 
   React.useEffect(() => {
     if (!playing) return
@@ -1743,8 +1869,12 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
 
   // `live` while the player is still feeding lines: an unfinished call is
   // pending, not abandoned, and the difference is the shimmer on its row.
-  const { events, produced, transcript, previews } = useLiveTranscript(captureId, count, count < lines.length)
-  const capture = CAPTURES.find((entry) => entry.id === captureId)
+  const { events, produced, transcript, previews } = useLiveTranscript(
+    selected?.id ?? captureId,
+    count,
+    count < lines.length,
+  )
+  const capture = selected
   const [opened, setOpened] = React.useState<claude.TranscriptRef | null>(null)
   React.useEffect(() => setOpened(null), [captureId])
 
@@ -1820,7 +1950,9 @@ function Explorer({ initialCapture = "tools", autoplay = false }: { initialCaptu
       </div>
       <p className="text-muted-foreground text-xs">
         {transport.note}
-        {transport.interactive ? " These captures were recorded from the one-way mode; this row describes what the interactive one adds." : ""}
+        {borrowed
+          ? " No capture exercises this transport on its own, so the transcript below is the one-way recording; this row describes what this transport adds to it."
+          : ""}
       </p>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
@@ -1859,7 +1991,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "The agent stream parser, driven by real captures from two agents — `claude -p --output-format stream-json` and `codex exec --json`. Left is the transcript drawn from parsed events with Message, ToolCall, TaskList and MessageMarkdown; right is the same bytes unparsed — every wire line and every event it became, selectable against each other through JsonTree. The player feeds lines one at a time so the delta path, the shimmer on an unfinished call and the plan filling in all happen the way they do against a live process.",
+          "The agent stream parser, driven by captured OpenAI Agents SDK, Claude Code, Codex, Cursor Agent, opencode, and ACP event streams. Left is the transcript drawn from normalized events with Message, ToolCall, TaskList and MessageMarkdown; right is the same JSON unparsed — every wire line and every event it became, selectable through JsonTree. The player feeds lines one at a time so deltas, pending calls, handoffs, approvals, and compaction happen in arrival order.",
       },
     },
   },
@@ -2209,6 +2341,32 @@ export const Providers: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "app-server" }))
     await userEvent.click(await canvas.findByRole("button", { name: "Capabilities" }))
     await expect(canvas.getByText(/Models \(\d+\)/)).toBeInTheDocument()
+  },
+}
+
+export const OpenAI: Story = {
+  parameters: storyDocumentation(
+    "The OpenAI Agents SDK adapter over an exercised two-request function-tool loop. It distinguishes model-request completion from run completion, pairs the SDK's executed tool output with its call, and commits the streamed answer only once.",
+  ),
+  args: { initialCapture: "openai-tools" },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByRole("button", { name: "OpenAI Agents SDK" })).toBeInTheDocument()
+    await expect(canvas.getByTestId("progress")).toHaveTextContent("8/8 lines")
+    await expect(canvas.getByText("Sunny")).toBeInTheDocument()
+    await expect(canvas.getByTestId("provider-support")).toHaveTextContent("streams tokens")
+
+    await userEvent.click(canvas.getByRole("button", { name: "Agent as tool" }))
+    await waitFor(async () => {
+      await expect(canvas.getByText("The research agent reports sunny conditions.")).toBeInTheDocument()
+      await expect(canvas.getByTestId("progress")).toHaveTextContent("8/8 lines")
+    })
+
+    await userEvent.click(canvas.getByRole("button", { name: "Handoff + approval + compaction" }))
+    await waitFor(async () => {
+      await expect(canvas.getByTestId("progress")).toHaveTextContent("6/6 lines")
+    })
+    await expect(canvas.getByTestId("compaction-boundary")).toHaveTextContent("Context compacted")
   },
 }
 

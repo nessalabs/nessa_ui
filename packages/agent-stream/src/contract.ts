@@ -84,14 +84,18 @@ export * as claude from "./claude"
 export * as codex from "./codex"
 export * as cursor from "./cursor"
 export * as opencode from "./opencode"
+export * as openai from "./openai"
 
 // Mapper classes and their one-shot helpers are also exported flat, because
 // reaching for a parser by name is the common case and `claude.ClaudeStreamMapper`
 // stutters.
 export { ClaudeStreamMapper, mapClaudeStream } from "./claude"
+export { ClaudeAgentSdkMapper, mapAgentSdkMessages } from "./claude"
+export { ClaudeMessagesMapper, mapClaudeMessagesStream } from "./claude"
 export { CodexAppServerMapper, CodexStreamMapper, mapCodexAppServerStream, mapCodexStream } from "./codex"
 export { CursorStreamMapper, mapCursorStream } from "./cursor"
 export { AcpMapper, mapAcpStream } from "./acp"
+export { OpenAIAgentsMapper, mapOpenAIAgentsStream } from "./openai"
 export {
   OpencodeRunMapper,
   OpencodeServerMapper,

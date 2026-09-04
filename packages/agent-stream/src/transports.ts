@@ -4,12 +4,15 @@ import type { WireProvenance } from "./events"
 // Each wire already records the build it was read from. Naming those constants
 // here rather than restating their values is what keeps a recapture from
 // updating one copy and leaving this table asserting the old one.
+import { CLAUDE_AGENT_SDK_PROVENANCE } from "./claude/agent-sdk/index"
+import { CLAUDE_MESSAGES_PROVENANCE } from "./claude/messages/wire"
 import { CLAUDE_STREAM_PROVENANCE } from "./claude/stream/wire"
 import { CODEX_APP_SERVER_PROVENANCE } from "./codex/app-server/wire"
 import { CODEX_EXEC_PROVENANCE } from "./codex/exec/wire"
 import { CURSOR_STREAM_PROVENANCE } from "./cursor/stream/wire"
 import { OPENCODE_RUN_PROVENANCE } from "./opencode/run/wire"
 import { OPENCODE_SERVER_PROVENANCE } from "./opencode/server/wire"
+import { OPENAI_AGENTS_PROVENANCE } from "./openai/agents/wire"
 
 /**
  * What a transport can report.
@@ -121,6 +124,31 @@ const CURSOR_ACP: WireProvenance = Object.freeze({
  */
 export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
   Object.freeze({
+    id: "openai",
+    label: "OpenAI Agents SDK",
+    transports: Object.freeze([
+      Object.freeze({
+        id: "agents-sdk",
+        label: "Agents SDK stream",
+        command: OPENAI_AGENTS_PROVENANCE.command,
+        interactive: true,
+        provenance: OPENAI_AGENTS_PROVENANCE,
+        supports: Object.freeze({
+          streaming: true,
+          capabilities: false,
+          approvals: true,
+          steering: false,
+          namesModel: false,
+          fileEdits: false,
+          sharedBus: false,
+          sessionControl: true,
+          contextWindow: false,
+        }),
+        note: "High-level run events include deltas, executed tools, handoffs, approval interruptions, reasoning, and compaction. The host supplies its run id and calls finish() after stream.completed.",
+      }),
+    ]),
+  }),
+  Object.freeze({
     id: "claude",
     label: "Claude Code",
     transports: Object.freeze([
@@ -163,6 +191,66 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
           contextWindow: false,
         }),
         note: "The same stream with stdin open: prompts and steering go in, and control requests answer approvals.",
+      }),
+      Object.freeze({
+        id: "agent-sdk",
+        label: "Agent SDK",
+        command: "query({ prompt, options: { includePartialMessages: true } })",
+        interactive: true,
+        provenance: CLAUDE_AGENT_SDK_PROVENANCE,
+        supports: Object.freeze({
+          // Opt-in, not automatic: without `includePartialMessages` the SDK
+          // yields committed messages only. `true` records what the captured
+          // configuration carries, which is what every other row here records.
+          streaming: true,
+          capabilities: true,
+          /**
+           * False as a *fact*, not as "unrecorded".
+           *
+           * The approval capture proves it: `canUseTool` fired twice and denied
+           * once, and no permission line reached the stream — the question is
+           * answered in-process. The denial is still recoverable, from the
+           * `is_error` tool result and from `permission_denials` on the final
+           * `result` line, but nothing on the stream asks, so nothing can be
+           * answered there.
+           */
+          approvals: false,
+          steering: null,
+          namesModel: true,
+          fileEdits: false,
+          sharedBus: false,
+          sessionControl: true,
+          contextWindow: false,
+        }),
+        note: "Claude Code's own wire, in-process as objects. Approvals are a callback, so they never reach the stream.",
+      }),
+      Object.freeze({
+        id: "messages",
+        label: "Messages API",
+        command: "client.messages.stream({ ... })",
+        interactive: false,
+        provenance: CLAUDE_MESSAGES_PROVENANCE,
+        supports: Object.freeze({
+          streaming: true,
+          /**
+           * Nothing is advertised, and nothing can be.
+           *
+           * This wire is one model response. There is no init line, no session,
+           * no tool list — the tools were in the *request*, which is not the
+           * parser's to read. A composer picker cannot be built from this
+           * stream, and that is a property of the transport rather than a gap
+           * in the capture.
+           */
+          capabilities: false,
+          approvals: false,
+          steering: false,
+          namesModel: true,
+          fileEdits: false,
+          sharedBus: false,
+          sessionControl: false,
+          contextWindow: false,
+        }),
+        note: "Raw SSE frames, and only the model's half: tool results come from the host, never from the stream.",
       }),
       Object.freeze({
         id: "acp",

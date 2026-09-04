@@ -1,0 +1,23 @@
+{"type":"message_start","message":{"model":"claude-opus-5","id":"msg_011Cei2qd2h7uNPbqc4GpJY1","type":"message","role":"assistant","content":[],"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":417,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":1,"service_tier":"standard","inference_geo":"global"}}}
+{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
+{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"I"}}
+{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"'ll check that for you."}}
+{"type":"content_block_stop","index":0}
+{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_01BvwTsjdPU4VZQyskCPJ7qn","name":"get_weather","input":{},"caller":{"type":"direct"}}}
+{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":""}}
+{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"city\""}}
+{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":": \"Atl"}}
+{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"antis\"}"}}
+{"type":"content_block_stop","index":1}
+{"type":"message_delta","delta":{"stop_reason":"tool_use","stop_sequence":null,"stop_details":null},"usage":{"input_tokens":417,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":61,"output_tokens_details":{"thinking_tokens":0}}}
+{"type":"message_stop"}
+{"type":"message_start","message":{"model":"claude-opus-5","id":"msg_011Cei2qjPw4PGHUYKmBab1f","type":"message","role":"assistant","content":[],"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":511,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":1,"service_tier":"standard","inference_geo":"global"}}}
+{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
+{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"The"}}
+{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" tool couldn't find it — it returned an `UnknownCityError`, meaning there's no weather station matching \"Atlantis.\" That's expected, since Atlantis is a mythical city rather than a real place with we"}}
+{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ather monitoring.\n\nIf you had a real location in mind, let me know and I'll look it up. A few possibilities:\n\n- **Atlantis, Western Cape, South Africa** — a town north"}}
+{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" of Cape Town\n- **Atlantis, Florida, USA** — a small city in Palm Beach County\n- **Atlantis Paradise Island, Bahamas** — the resort, in which case I'd check Nassau\n\nJust tell me which one ("}}
+{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"or another city entirely) and I'll get the current conditions."}}
+{"type":"content_block_stop","index":0}
+{"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null,"stop_details":null},"usage":{"input_tokens":511,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":226,"output_tokens_details":{"thinking_tokens":0}}}
+{"type":"message_stop"}

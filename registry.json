@@ -828,6 +828,26 @@
           "target": "lib/agent-stream/claude/tools.ts"
         },
         {
+          "path": "packages/agent-stream/src/claude/agent-sdk/index.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/claude/agent-sdk/index.ts"
+        },
+        {
+          "path": "packages/agent-stream/src/claude/messages/mapper.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/claude/messages/mapper.ts"
+        },
+        {
+          "path": "packages/agent-stream/src/claude/messages/mapping.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/claude/messages/mapping.ts"
+        },
+        {
+          "path": "packages/agent-stream/src/claude/messages/wire.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/claude/messages/wire.ts"
+        },
+        {
           "path": "packages/agent-stream/src/codex/app-server/capabilities.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/codex/app-server/capabilities.ts"
@@ -896,6 +916,26 @@
           "path": "packages/agent-stream/src/mapping.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/mapping.ts"
+        },
+        {
+          "path": "packages/agent-stream/src/openai/agents/mapper.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/openai/agents/mapper.ts"
+        },
+        {
+          "path": "packages/agent-stream/src/openai/agents/mapping.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/openai/agents/mapping.ts"
+        },
+        {
+          "path": "packages/agent-stream/src/openai/agents/wire.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/openai/agents/wire.ts"
+        },
+        {
+          "path": "packages/agent-stream/src/openai/index.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/openai/index.ts"
         },
         {
           "path": "packages/agent-stream/src/opencode/capabilities.ts",

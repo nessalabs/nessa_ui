@@ -115,6 +115,31 @@ to find it. The store module is pure path arithmetic; **your host does the file
 reading**, and the same parser reads what comes back. When a path cannot be
 built yet, the pointer says what is missing rather than guessing.
 
+## SDK transports are not CLI transports
+
+An in-process SDK is a transport like any other, but two of its properties keep
+catching people out. Both Claude SDKs are worked examples
+([docs/plans/claude-sdk-agent-stream.md](../../docs/plans/claude-sdk-agent-stream.md)).
+
+- **Check whether it is even a new wire.** The Claude Agent SDK yields Claude
+  Code's `stream-json` vocabulary as objects — same lines, same fields — so it
+  delegates to the existing mapper and adds only an object seam. Map a capture
+  with the existing parser and count unknown events *before* writing a second
+  one; a duplicate mapper drifts, and it drifts silently.
+- **An SDK stream is often only half the conversation.** The raw Messages API
+  never carries tool *results* — the host runs the tool and puts the result in
+  its next request — so the mapper takes them through an explicit seam. Without
+  it every call stays pending forever. Ask what the transport structurally
+  cannot see, and give the host a way to say it.
+- **In-process answers leave no trace.** A callback-based approval (`canUseTool`)
+  is answered without anything reaching the stream, so `approvals: false` there
+  is a fact rather than an omission. What is recoverable after the fact — a
+  failed tool result, a denial list on the terminator — is not the same as an
+  approval a surface can answer.
+- **A response is not a session.** A wire that starts no session names no model
+  list, no cwd, no tools; the host supplies the session id. Leave `SessionInfo`
+  null and empty rather than backfilling it from the request the parser never saw.
+
 ## Adding a provider
 
 A provider is a folder; nothing else moves. Give it its own wire shapes and
@@ -163,6 +188,13 @@ something, or nothing will ever ask. Run with `--input-format stream-json` and
 ```json
 { "permissions": { "ask": ["Bash(*)"], "defaultMode": "default" } }
 ```
+
+The two Claude SDK wires are captured by script rather than by shell redirect,
+since their output is objects. Two traps that cost a capture each: a bare tool
+name in the Agent SDK's `allowedTools` auto-approves *before* `canUseTool` runs,
+so an approval capture taken that way contains no approval (the SDK warns —
+heed it); and the Messages API needs `thinking: { display: "summarized" }`, or
+thinking blocks stream with empty text and teach a delta-joining parser nothing.
 
 To capture a compaction, fill the window with generated files rather than
 authored text, and grow it in small steps — a read big enough to overshoot the
