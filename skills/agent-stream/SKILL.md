@@ -25,7 +25,8 @@ change; the sources below are always current, and this is not.**
 | What is in an event? | `events.ts` — the contract, with every payload variant documented |
 | How do I actually use it? | `agent-stream.test.ts` — executable examples against real captures |
 | Why is the wire like this? | [docs/architecture/agent-stream-parsers.md](../../docs/architecture/agent-stream-parsers.md) |
-| What does the data look like? | `apps/storybook/stories/fixtures/agent-stream/*.jsonl`, and `codex/` beside it |
+| What does the data look like? | `apps/storybook/stories/fixtures/agent-stream/*.jsonl`, and the per-provider dirs beside it |
+| How were the SDK fixtures made? | `fixtures/agent-stream/capture/` — the scripts, and the traps that cost a capture |
 | What does it look like rendered? | Storybook → Composites → AgentStream |
 
 ## The shape of the thing
@@ -115,6 +116,31 @@ to find it. The store module is pure path arithmetic; **your host does the file
 reading**, and the same parser reads what comes back. When a path cannot be
 built yet, the pointer says what is missing rather than guessing.
 
+## SDK transports are not CLI transports
+
+An in-process SDK is a transport like any other, but two of its properties keep
+catching people out. Both Claude SDKs are worked examples
+([docs/plans/claude-sdk-agent-stream.md](../../docs/plans/claude-sdk-agent-stream.md)).
+
+- **Check whether it is even a new wire.** The Claude Agent SDK yields Claude
+  Code's `stream-json` vocabulary as objects — same lines, same fields — so it
+  delegates to the existing mapper and adds only an object seam. Map a capture
+  with the existing parser and count unknown events *before* writing a second
+  one; a duplicate mapper drifts, and it drifts silently.
+- **An SDK stream is often only half the conversation.** The raw Messages API
+  never carries tool *results* — the host runs the tool and puts the result in
+  its next request — so the mapper takes them through an explicit seam. Without
+  it every call stays pending forever. Ask what the transport structurally
+  cannot see, and give the host a way to say it.
+- **In-process answers leave no trace.** A callback-based approval (`canUseTool`)
+  is answered without anything reaching the stream, so `approvals: false` there
+  is a fact rather than an omission. What is recoverable after the fact — a
+  failed tool result, a denial list on the terminator — is not the same as an
+  approval a surface can answer.
+- **A response is not a session.** A wire that starts no session names no model
+  list, no cwd, no tools; the host supplies the session id. Leave `SessionInfo`
+  null and empty rather than backfilling it from the request the parser never saw.
+
 ## Adding a provider
 
 A provider is a folder; nothing else moves. Give it its own wire shapes and
@@ -163,6 +189,18 @@ something, or nothing will ever ask. Run with `--input-format stream-json` and
 ```json
 { "permissions": { "ask": ["Bash(*)"], "defaultMode": "default" } }
 ```
+
+The two Claude SDK wires are captured by script rather than by shell redirect,
+since their output is objects. The scripts are checked in beside the fixtures
+they produce, in `fixtures/agent-stream/capture/`, whose README lists the four
+traps that each cost a capture — the worst being that a bare tool name in the
+Agent SDK's `allowedTools` auto-approves *before* `canUseTool` runs, so an
+approval capture taken that way contains no approval at all.
+
+**Check the scripts in.** A fixture is only evidence if someone else can
+reproduce it. A capture whose provenance cannot be re-run is indistinguishable
+from a file written by hand to agree with the parser — and a parser designed
+against one of those is designed against nothing.
 
 To capture a compaction, fill the window with generated files rather than
 authored text, and grow it in small steps — a read big enough to overshoot the
