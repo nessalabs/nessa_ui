@@ -7,6 +7,7 @@ import {
   ClaudeStreamMapper,
   CodexStreamMapper,
   CursorStreamMapper,
+  KiroChatMapper,
   AcpMapper,
   CodexAppServerMapper,
   OpencodeRunMapper,
@@ -122,6 +123,9 @@ import cursorSubagent from "./fixtures/agent-stream/cursor/subagent.jsonl?raw"
 import cursorTools from "./fixtures/agent-stream/cursor/tools.jsonl?raw"
 import acpCursorPrinted from "./fixtures/agent-stream/acp/cursor_printed.jsonl?raw"
 import acpCursorTools from "./fixtures/agent-stream/acp/cursor_tools.jsonl?raw"
+import kiroPrinted from "./fixtures/agent-stream/kiro/printed.jsonl?raw"
+import kiroTools from "./fixtures/agent-stream/kiro/tools.jsonl?raw"
+import kiroFailing from "./fixtures/agent-stream/kiro/failing.jsonl?raw"
 // What the interactive app-server answers that the one-way stream never sends.
 import codexAppServerCapabilities from "./fixtures/agent-stream/codex/appserver_capabilities.json"
 import opencodeCliAgents from "./fixtures/agent-stream/opencode/cli_agents.txt?raw"
@@ -149,7 +153,7 @@ import opencodeCliModels from "./fixtures/agent-stream/opencode/cli_models.txt?r
 import diskSubagent from "./fixtures/agent-stream/disk_subagent_a37fefefbc61e13e3.jsonl?raw"
 import diskWorkflowAgent from "./fixtures/agent-stream/disk_workflow_agent_a35ea63276cd501aa.jsonl?raw"
 
-type ProviderId = "claude" | "codex" | "cursor" | "opencode"
+type ProviderId = "claude" | "codex" | "cursor" | "opencode" | "kiro"
 
 /**
  * What a provider is, and what it supports.
@@ -254,6 +258,17 @@ const PROVIDERS: Readonly<Record<ProviderId, Provider>> = {
     // and Codex's cannot be read at all.
     supports: { workflowBoard: false, transcriptsOnDisk: true },
   },
+  kiro: {
+    id: "kiro",
+    label: "Kiro CLI",
+    command: "kiro-cli chat --no-interactive --trust-all-tools --output-format stream-json",
+    transports: transportsOf("kiro")!.transports,
+    createMapper: (transportId: string) =>
+      transportId === "acp" ? new AcpMapper() : new KiroChatMapper(),
+    silentLinesNote:
+      "tool_call_update lines with in_progress or pending status produce no event — the opened row covers them. Known _kiro.dev/* extension lines are suppressed the same way; unrecognised ones arrive as unknown.",
+    supports: { workflowBoard: false, transcriptsOnDisk: false },
+  },
 }
 
 interface Capture {
@@ -337,6 +352,13 @@ const CAPTURES: readonly Capture[] = [
   { provider: "opencode", transport: "acp", id: "oc-acp-subagent", label: "Subagent", blurb: "A delegation, which ACP labels with the protocol's own `think` kind. The child session id is named only inside the result text — the one place this wire puts it.", prompt: "Use a subagent to find out what files are in this directory, then tell me what it found.", source: opencodeAcpSubagent },
   { provider: "opencode", transport: "acp", id: "oc-acp-websearch", label: "Web search", blurb: "A search call, renamed by the agent as it goes: it opens as `websearch` and settles under the query it ran.", prompt: "Search the web for the current version of the TypeScript compiler.", source: opencodeAcpWebsearch },
   { provider: "opencode", transport: "acp", id: "oc-acp-permission", label: "Approval", blurb: "The agent asks the client for permission and blocks until answered, listing the options it will accept. Answered allow here, so the write went through.", prompt: "Create a file at /tmp/acp-outside-probe.txt, then tell me whether it worked. (Answered: allow once)", source: opencodeAcpPermission },
+
+  // ---------- kiro ----------
+  // TODO(kiro-live): Swap these synthetic sources for live kiro-cli captures and
+  // drop the "Synthetic — no live CLI" blurbs once provenance is observed.
+  { provider: "kiro", transport: "chat", id: "kiro-printed", label: "Plain text", blurb: "A simple streamed answer: system/init opens the session, two assistant chunks arrive with streaming:true, the committed message replaces them, and turn_end terminates with usage. Synthetic — no live CLI in this environment.", prompt: "Print exactly: hello world. Do not use any tools.", source: kiroPrinted },
+  { provider: "kiro", transport: "chat", id: "kiro-tools", label: "Tools", blurb: "A file write followed by a bash command. The write settles with a diff content block so the mapper emits file_edits; the shell command settles with stdout and a zero exit code. Synthetic — no live CLI.", prompt: "Create a file notes.txt containing two lines, then run wc -l on it.", source: kiroTools },
+  { provider: "kiro", transport: "chat", id: "kiro-failing", label: "Failed command", blurb: "A bash call that exits with code 1. The tool_call_update arrives with status:failed; the mapper marks the result isError:true and carries the stderr text. Synthetic — no live CLI.", prompt: "Run: cat /nonexistent/definitely-missing-file", source: kiroFailing },
 ]
 
 const LINES = new Map(CAPTURES.map((capture) => [capture.id, capture.source.split("\n").filter((line) => line.trim().length > 0)]))

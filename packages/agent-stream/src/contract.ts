@@ -83,6 +83,7 @@ export * as acp from "./acp"
 export * as claude from "./claude"
 export * as codex from "./codex"
 export * as cursor from "./cursor"
+export * as kiro from "./kiro"
 export * as opencode from "./opencode"
 
 // Mapper classes and their one-shot helpers are also exported flat, because
@@ -92,6 +93,7 @@ export { ClaudeStreamMapper, mapClaudeStream } from "./claude"
 export { CodexAppServerMapper, CodexStreamMapper, mapCodexAppServerStream, mapCodexStream } from "./codex"
 export { CursorStreamMapper, mapCursorStream } from "./cursor"
 export { AcpMapper, mapAcpStream } from "./acp"
+export { KiroChatMapper, mapKiroChatStream } from "./kiro"
 export {
   OpencodeRunMapper,
   OpencodeServerMapper,
