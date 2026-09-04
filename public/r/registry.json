@@ -793,6 +793,26 @@
           "target": "lib/agent-stream/cursor/stream/wire.ts"
         },
         {
+          "path": "packages/agent-stream/src/kiro/index.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/kiro/index.ts"
+        },
+        {
+          "path": "packages/agent-stream/src/kiro/chat/mapper.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/kiro/chat/mapper.ts"
+        },
+        {
+          "path": "packages/agent-stream/src/kiro/chat/mapping.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/kiro/chat/mapping.ts"
+        },
+        {
+          "path": "packages/agent-stream/src/kiro/chat/wire.ts",
+          "type": "registry:lib",
+          "target": "lib/agent-stream/kiro/chat/wire.ts"
+        },
+        {
           "path": "packages/agent-stream/src/claude/index.ts",
           "type": "registry:lib",
           "target": "lib/agent-stream/claude/index.ts"

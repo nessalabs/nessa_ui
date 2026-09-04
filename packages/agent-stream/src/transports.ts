@@ -10,6 +10,7 @@ import { CLAUDE_STREAM_PROVENANCE } from "./claude/stream/wire"
 import { CODEX_APP_SERVER_PROVENANCE } from "./codex/app-server/wire"
 import { CODEX_EXEC_PROVENANCE } from "./codex/exec/wire"
 import { CURSOR_STREAM_PROVENANCE } from "./cursor/stream/wire"
+import { KIRO_CHAT_PROVENANCE } from "./kiro/chat/wire"
 import { OPENCODE_RUN_PROVENANCE } from "./opencode/run/wire"
 import { OPENCODE_SERVER_PROVENANCE } from "./opencode/server/wire"
 import { OPENAI_AGENTS_PROVENANCE } from "./openai/agents/wire"
@@ -113,6 +114,17 @@ const CURSOR_ACP: WireProvenance = Object.freeze({
   version: CURSOR_STREAM_PROVENANCE.version,
   command: "agent acp",
   capturedOn: "2026-09-02",
+})
+
+/** Kiro speaks ACP natively; the build is the same CLI as its stream-json transport. */
+// TODO(kiro-live): Capture a real `kiro-cli acp` session and replace the null
+// capability claims below (approvals, fileEdits, contextWindow) with observed
+// values; bump version/capturedOn from that run.
+const KIRO_ACP: WireProvenance = Object.freeze({
+  cli: KIRO_CHAT_PROVENANCE.cli,
+  version: KIRO_CHAT_PROVENANCE.version,
+  command: "kiro-cli acp",
+  capturedOn: "2026-09-04",
 })
 
 /**
@@ -467,6 +479,62 @@ export const AGENT_TRANSPORTS: readonly ProviderDescriptor[] = Object.freeze([
           contextWindow: true,
         }),
         note: "A different protocol from the server's bus, not another door onto it: JSON-RPC over stdio, where the agent asks the client for permission and blocks until answered. It states its own version, negotiates capabilities, and reports the context window's size.",
+      }),
+    ]),
+  }),
+  Object.freeze({
+    id: "kiro",
+    label: "Kiro CLI",
+    transports: Object.freeze([
+      Object.freeze({
+        id: "chat",
+        label: "chat --no-interactive --output-format stream-json",
+        command: "kiro-cli chat --no-interactive --trust-all-tools --output-format stream-json",
+        interactive: false,
+        provenance: KIRO_CHAT_PROVENANCE,
+        supports: Object.freeze({
+          streaming: true,
+          // system/init advertises model, cwd, tools, skills, agents, MCP
+          // servers, and slash commands.
+          capabilities: true,
+          // Headless mode auto-approves with --trust-all-tools; no approval
+          // exchange reaches this stream.
+          approvals: false,
+          steering: false,
+          namesModel: true,
+          // Edit tool completions carry diff content blocks.
+          fileEdits: true,
+          sharedBus: false,
+          sessionControl: false,
+          contextWindow: false,
+        }),
+        note: "One-way headless mode. Requires V2 or V3 engine (--engine v2 or --engine v3). The opening system/init line advertises the whole session. AgentMessageChunk lines are streaming deltas; turn_end terminates the turn.",
+      }),
+      Object.freeze({
+        id: "acp",
+        label: "acp",
+        command: "kiro-cli acp",
+        interactive: true,
+        provenance: KIRO_ACP,
+        supports: Object.freeze({
+          streaming: true,
+          // session/new advertises models and config options; _kiro.dev/commands/available lands on the stream.
+          capabilities: true,
+          // The protocol carries approvals; no capture exists yet for Kiro specifically.
+          // TODO(kiro-live): Fill from a real acp capture — leave null until observed.
+          approvals: null,
+          steering: null,
+          namesModel: true,
+          // Edit tool_call_update carries diff content blocks with path info.
+          // TODO(kiro-live): Confirm fileEdits on a live acp edit tool_call_update.
+          fileEdits: null,
+          sharedBus: false,
+          // initialize advertises loadSession; session/new and session/load open conversations.
+          sessionControl: true,
+          // TODO(kiro-live): Confirm contextWindow from a live acp usage_update / init.
+          contextWindow: null,
+        }),
+        note: "Kiro CLI natively over ACP (JSON-RPC 2.0 over stdio). Implements the standard ACP surface plus _kiro.dev/* extensions for slash commands, MCP events, compaction status, and session management. The shared acp/ mapper reads it.",
       }),
     ]),
   }),

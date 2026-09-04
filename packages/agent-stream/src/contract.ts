@@ -83,6 +83,7 @@ export * as acp from "./acp"
 export * as claude from "./claude"
 export * as codex from "./codex"
 export * as cursor from "./cursor"
+export * as kiro from "./kiro"
 export * as opencode from "./opencode"
 export * as openai from "./openai"
 
@@ -95,6 +96,7 @@ export { ClaudeMessagesMapper, mapClaudeMessagesStream } from "./claude"
 export { CodexAppServerMapper, CodexStreamMapper, mapCodexAppServerStream, mapCodexStream } from "./codex"
 export { CursorStreamMapper, mapCursorStream } from "./cursor"
 export { AcpMapper, mapAcpStream } from "./acp"
+export { KiroChatMapper, mapKiroChatStream } from "./kiro"
 export { OpenAIAgentsMapper, mapOpenAIAgentsStream } from "./openai"
 export {
   OpencodeRunMapper,
