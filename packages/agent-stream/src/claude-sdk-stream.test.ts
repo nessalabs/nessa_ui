@@ -327,6 +327,23 @@ test("a tool_use stop does not end the turn", () => {
 })
 
 /**
+ * `pause_turn` is the same situation as `tool_use`, and was the easier one to
+ * get wrong: it is a long-running server-tool flow the host resumes by
+ * resending, not an ending. Reporting it as a completed turn would split one
+ * turn into as many turns as it paused.
+ */
+test("a pause_turn stop does not end the turn either", () => {
+  const mapper = new ClaudeMessagesMapper()
+  mapper.push('{"type":"message_start","message":{"id":"m1","model":"claude-opus-5","role":"assistant"}}')
+  const events = mapper.push('{"type":"message_delta","delta":{"stop_reason":"pause_turn"},"usage":{"output_tokens":5}}')
+  assert.deepEqual(payloads(events, AgentEventType.TurnCompleted), [])
+
+  // And the ordinary reasons still do end it, so the guard is narrow.
+  const ended = mapper.push('{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":5}}')
+  assert.equal(payloads(ended, AgentEventType.TurnCompleted).length, 1)
+})
+
+/**
  * Without this seam the wire cannot produce a complete transcript: tool results
  * live in the host's next *request*, and never appear on the response stream.
  */

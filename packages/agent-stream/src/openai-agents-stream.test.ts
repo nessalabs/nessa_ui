@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url"
 import test from "node:test"
 
 import { AgentEventType } from "./events"
+import type { Usage } from "./events"
 import { OpenAIAgentsMapper, mapOpenAIAgentsStream } from "./openai/agents/mapper"
 import { OPENAI_AGENTS_EVENT_MAPPING, openAIAgentsWireKind } from "./openai/agents/mapping"
 import { parseOpenAIAgentsLines } from "./openai/agents/wire"
@@ -141,4 +142,30 @@ test("the transport inventory describes the Agents SDK rather than the raw Respo
   assert.equal(transport?.supports.streaming, true)
   assert.equal(transport?.supports.approvals, true)
   assert.equal(transport?.supports.namesModel, false)
+})
+
+/**
+ * The alias keys are alternative spellings, not separate counters.
+ *
+ * A payload carrying both `cached_tokens` and `cachedTokens` used to be summed,
+ * reporting exactly twice the cache reads that happened — a failure that hides
+ * because a doubled token count still looks like a plausible token count.
+ */
+test("a usage detail carrying both spellings of a counter is not double-counted", () => {
+  const usageFor = (details: string): Usage | null => {
+    const mapper = new OpenAIAgentsMapper({ sessionId: "alias" })
+    mapper.push(
+      `{"type":"raw_model_stream_event","data":{"type":"response_done","response":{"usage":{"inputTokens":100,"outputTokens":10,"totalTokens":110,"inputTokensDetails":${details}}}}}`,
+    )
+    const terminal = mapper.finish().find((event) => event.payload.type === AgentEventType.TurnCompleted)
+    return terminal?.payload.type === "turn_completed" ? terminal.payload.usage : null
+  }
+
+  assert.equal(usageFor('{"cached_tokens":40}')?.cacheReadTokens, 40)
+  assert.equal(usageFor('{"cachedTokens":40}')?.cacheReadTokens, 40)
+  assert.equal(usageFor('{"cached_tokens":40,"cachedTokens":40}')?.cacheReadTokens, 40)
+
+  // Several detail records still sum across records, which is the behaviour
+  // the per-record alias choice must not break.
+  assert.equal(usageFor('[{"cached_tokens":40},{"cachedTokens":2}]')?.cacheReadTokens, 42)
 })

@@ -439,11 +439,13 @@ export class ClaudeMessagesMapper implements AgentStreamMapper {
     const stopReason = asString(delta.stop_reason)
     const usage = mergeUsage(this.startUsage, normalizeUsage(frame.usage))
 
-    // A `tool_use` stop is not the end of a turn — it is the model handing
-    // control to the host mid-turn, and the conversation continues in the very
-    // next request. Reporting it as a completed turn would split one turn into
-    // as many turns as it made tool calls.
-    if (stopReason === MessagesStopReason.ToolUse) return []
+    // Two stop reasons are not turn endings, and both mean the same thing: the
+    // model has handed control back mid-turn and the conversation continues in
+    // the very next request. `tool_use` waits for a result the host owes it;
+    // `pause_turn` is a long-running server-tool flow the host resumes by
+    // resending. Reporting either as a completed turn would split one turn
+    // into as many turns as it paused.
+    if (stopReason === MessagesStopReason.ToolUse || stopReason === MessagesStopReason.PauseTurn) return []
 
     return [
       this.build(

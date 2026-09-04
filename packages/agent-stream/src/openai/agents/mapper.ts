@@ -52,9 +52,28 @@ function resultOf(item: Record<string, JsonValue>): ToolResult {
   return { text, isError: status === "failed" || status === "incomplete" || (executionStatus !== null && executionStatus !== "executed"), structured: output ?? null, images: [] }
 }
 
+/**
+ * Sums one counter across a usage detail block, or across several of them.
+ *
+ * The keys are *alternative spellings* of the same counter, not separate
+ * counters: the SDK reports `cachedTokens` where the raw API says
+ * `cached_tokens`. So the first spelling present in a record wins, and only
+ * then are records summed. Adding every matching key instead double-counts any
+ * payload that carries both spellings — which reports twice the cache reads
+ * that actually happened, silently, because a doubled token count still looks
+ * like a plausible token count.
+ */
 function detailTotal(value: JsonValue | undefined, ...keys: readonly string[]): number | null {
   const records = Array.isArray(value) ? value.map(asRecord) : [asRecord(value)]
-  const values = records.flatMap((record) => keys.map((key) => asNumber(record[key])).filter((entry): entry is number => entry !== null))
+  const values = records
+    .map((record) => {
+      for (const key of keys) {
+        const found = asNumber(record[key])
+        if (found !== null) return found
+      }
+      return null
+    })
+    .filter((entry): entry is number => entry !== null)
   return values.length === 0 ? null : values.reduce((sum, entry) => sum + entry, 0)
 }
 

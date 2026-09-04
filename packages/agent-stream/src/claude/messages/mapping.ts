@@ -44,19 +44,24 @@ export const CLAUDE_MESSAGES_EVENT_MAPPING: Readonly<Record<MessagesWireKind, Me
   },
   [MessagesFrameType.MessageDelta]: {
     emits: [AgentEventType.TurnCompleted],
-    note: "the turn terminator, carrying stop reason and the final output count — except on a tool_use stop",
+    note: "the turn terminator, carrying stop reason and the final output count — except where the turn continues",
   },
   /**
-   * The same frame, when the model stopped to call a tool.
+   * The same frame, for the two stop reasons that are not endings.
    *
-   * Keyed separately because it produces nothing: a `tool_use` stop hands
-   * control to the host mid-turn and the conversation resumes in the very next
-   * request. Treating it as a completed turn would split one turn into as many
-   * turns as it made tool calls.
+   * Keyed separately because they produce nothing. Both hand control back to
+   * the host mid-turn and the conversation resumes in the very next request —
+   * `tool_use` waiting for a result, `pause_turn` for a long-running
+   * server-tool flow the host resumes by resending. Treating either as a
+   * completed turn would split one turn into as many turns as it paused.
    */
   [`${MessagesFrameType.MessageDelta}/${MessagesStopReason.ToolUse}`]: {
     emits: [],
     note: "not a turn ending — the model is waiting for a tool result the host owes it",
+  },
+  [`${MessagesFrameType.MessageDelta}/${MessagesStopReason.PauseTurn}`]: {
+    emits: [],
+    note: "also not a turn ending — a long-running server-tool flow the host resumes by resending",
   },
   [MessagesFrameType.MessageStop]: {
     emits: [],
@@ -158,10 +163,12 @@ export function messagesWireKind(event: WireEvent, openBlockType?: string | null
     return `${type}/${openBlockType ?? "unknown"}`
   }
   if (type === MessagesFrameType.MessageDelta) {
-    // A tool_use stop is a different outcome from every other stop reason, so
-    // it is a different kind — see the table.
+    // The two "conversation continues" stop reasons are a different outcome
+    // from every other one, so they are different kinds — see the table.
     const stopReason = asString(asRecord(frame.delta).stop_reason)
-    if (stopReason === MessagesStopReason.ToolUse) return `${type}/${stopReason}`
+    if (stopReason === MessagesStopReason.ToolUse || stopReason === MessagesStopReason.PauseTurn) {
+      return `${type}/${stopReason}`
+    }
   }
   return type
 }
