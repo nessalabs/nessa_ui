@@ -25,7 +25,8 @@ change; the sources below are always current, and this is not.**
 | What is in an event? | `events.ts` — the contract, with every payload variant documented |
 | How do I actually use it? | `agent-stream.test.ts` — executable examples against real captures |
 | Why is the wire like this? | [docs/architecture/agent-stream-parsers.md](../../docs/architecture/agent-stream-parsers.md) |
-| What does the data look like? | `apps/storybook/stories/fixtures/agent-stream/*.jsonl`, and `codex/` beside it |
+| What does the data look like? | `apps/storybook/stories/fixtures/agent-stream/*.jsonl`, and the per-provider dirs beside it |
+| How were the SDK fixtures made? | `fixtures/agent-stream/capture/` — the scripts, and the traps that cost a capture |
 | What does it look like rendered? | Storybook → Composites → AgentStream |
 
 ## The shape of the thing
@@ -190,11 +191,16 @@ something, or nothing will ever ask. Run with `--input-format stream-json` and
 ```
 
 The two Claude SDK wires are captured by script rather than by shell redirect,
-since their output is objects. Two traps that cost a capture each: a bare tool
-name in the Agent SDK's `allowedTools` auto-approves *before* `canUseTool` runs,
-so an approval capture taken that way contains no approval (the SDK warns —
-heed it); and the Messages API needs `thinking: { display: "summarized" }`, or
-thinking blocks stream with empty text and teach a delta-joining parser nothing.
+since their output is objects. The scripts are checked in beside the fixtures
+they produce, in `fixtures/agent-stream/capture/`, whose README lists the four
+traps that each cost a capture — the worst being that a bare tool name in the
+Agent SDK's `allowedTools` auto-approves *before* `canUseTool` runs, so an
+approval capture taken that way contains no approval at all.
+
+**Check the scripts in.** A fixture is only evidence if someone else can
+reproduce it. A capture whose provenance cannot be re-run is indistinguishable
+from a file written by hand to agree with the parser — and a parser designed
+against one of those is designed against nothing.
 
 To capture a compaction, fill the window with generated files rather than
 authored text, and grow it in small steps — a read big enough to overshoot the

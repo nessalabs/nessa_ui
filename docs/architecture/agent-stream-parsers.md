@@ -891,3 +891,105 @@ the result still reports success, and the agent explains itself in prose. And
 neither control frame carries a timestamp, so ordering an approval against the
 surrounding stream rests on `seq` alone — which is the reason `seq` and not `ts`
 is the ordering key.
+
+## 12. The two Claude SDKs, and why one of them needed no parser
+
+"Claude SDK" is two different things, and they answered the same question in
+opposite ways. Recording both is the point of this section: the cheap outcome
+and the expensive one look identical until you check.
+
+### The Agent SDK is Claude Code's wire, delivered differently
+
+`@anthropic-ai/claude-agent-sdk`'s `query()` yields the *same* `stream-json`
+vocabulary the CLI prints — `system/init`, `stream_event`, `assistant`, `user`,
+`result`, and the whole `task_started` / `task_progress` / `task_notification`
+family — with the same fields. Not similar: the same.
+
+The check that established it is the one worth repeating before writing any
+second parser. Map the new transport's captures with the *existing* mapper and
+count what comes back unrecognised:
+
+| Agent SDK captures | lines | unknown | error |
+| --- | --- | --- | --- |
+| eleven, across the CLI's own scenario matrix | 1,000+ | 0 | 0 |
+
+So `ClaudeAgentSdkMapper` delegates to `ClaudeStreamMapper` and adds one thing:
+an object seam, because the SDK hands back objects and serializing them to JSON
+just to parse them back is pure loss. A second copy of a thousand-line mapper
+would have drifted from the first, and the drift would have been silent.
+
+Two differences are real, and neither is a parsing difference:
+
+- **Approvals never reach the stream.** `canUseTool` is a callback, answered
+  in-process, so there is no `control_request` / `control_response` round-trip
+  to read. The refusal is recoverable only after the fact — as an `is_error`
+  tool result, and in `permission_denials` on the terminal `result` line. A
+  surface waiting for a permission event here waits forever, which is why the
+  transport records `approvals: false` as a *fact* rather than a null.
+- **Token previews are opt-in.** Without `includePartialMessages`, `query()`
+  yields committed messages only. "Does it stream" is a question about how the
+  call was made, not about the SDK.
+
+### The Messages API is a genuinely different wire
+
+`client.messages.stream()` is the bare Anthropic SSE frames with no CLI around
+them: `message_start`, `content_block_start`, `content_block_delta`,
+`content_block_stop`, `message_delta`, `message_stop`. Claude Code carries these
+same six *nested inside* a `stream_event` line, alongside line kinds of its own;
+here they arrive bare and they are the entire wire.
+
+Two structural facts follow, and both shape the mapper's API rather than its
+internals.
+
+**It is one response, not a session.** Nothing announces a session id, a model
+list, a cwd or a tool list — the tools were in the *request*, which is not the
+parser's to read. So the host names the session, and `SessionInfo` stays null
+and empty rather than being backfilled from something the stream never said. A
+composer picker cannot be built from this transport, and that is a property of
+the transport rather than a gap in the capture.
+
+**It is only half the conversation.** Tool *results* never appear on it: the
+host runs the tool and puts the result into its next request. A mapper that read
+only frames would leave every call pending forever, so `recordToolResult()` is a
+required seam, not a convenience. Server-side tools (`web_search`,
+`code_execution`) are the exception that needs nothing from the host — no
+`tool_result` is ever sent back for one, so the stream completes them itself.
+Drawing a server tool as a pending client call is a spinner that never resolves.
+
+### Two stop reasons that are not endings
+
+`message_delta` is the turn terminator, except when it isn't. Both `tool_use`
+and `pause_turn` mean the model has handed control back **mid-turn** and the
+conversation continues in the very next request — the first waiting for a
+result, the second a long-running server-tool flow the host resumes by
+resending. Reporting either as a completed turn splits one turn into as many
+turns as it paused.
+
+This is the kind of error that survives review because the output stays
+plausible: a transcript with four turns instead of one still looks like a
+transcript. It is pinned by a test for each reason, and by a third asserting the
+guard stays narrow — ordinary stop reasons must still end the turn.
+
+### What this wire reports that Claude Code's does not
+
+`usage.output_tokens_details.thinking_tokens`. Claude Code folds reasoning into
+its output count and reports no separate figure, so its mapper sends
+`reasoningTokens: null` — *unreported*, not zero. Here the number is real, so it
+is reported. It is deliberately **not** added into the total: the API already
+counts thinking inside `output_tokens`, and adding it again inflates every turn.
+
+Usage also has to be merged across two frames. `message_start` carries the input
+side and an output placeholder of `1`; `message_delta` carries the real output
+count. Reporting either alone understates the turn.
+
+### Both are captured by script, and the scripts are checked in
+
+Every other wire here is a shell redirect. These two yield objects, so something
+has to serialize them — and that something lives beside the fixtures it
+produces, in `fixtures/agent-stream/capture/`, with a README covering the four
+traps that each cost a capture.
+
+That is not tidiness. A fixture is only evidence if someone else can reproduce
+it; a capture whose provenance cannot be re-run is indistinguishable from a file
+written by hand to agree with the parser, and a parser designed against one of
+those is designed against nothing.

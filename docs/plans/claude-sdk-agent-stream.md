@@ -106,27 +106,20 @@ Three decisions are worth stating because the obvious alternative is wrong:
 
 ## Re-capturing
 
-The scripts are not checked in; they are short and their shape is recorded here.
-Both write one JSON object per line, exactly as the SDK yields it. The Messages
-API scenarios are `text`, `thinking`, `tools`, `parallel`, `search`, `eager`,
-`structured`, `image`, `truncated`, and `failing`; the Agent SDK's are
-`printed`, `tools`, `todos`, `subagent`, `workflow`, `phases`, `failing`,
-`websearch`, `approval-allow`, `approval-deny`, and `resume`.
+The capture scripts are checked in beside the fixtures they produce, at
+[`apps/storybook/stories/fixtures/agent-stream/capture/`](../../apps/storybook/stories/fixtures/agent-stream/capture/),
+with a README covering how to run them and the four traps that each cost a
+capture. They are checked in deliberately: a fixture is only evidence if
+someone else can reproduce it, and a capture whose provenance cannot be re-run
+is indistinguishable from a file written by hand to match the parser.
 
-Four traps worth repeating, each of which cost a capture:
+The CLI wires in this package need no script — they are a shell redirect, and
+the command lives in each wire module's provenance. These two need one because
+both SDKs yield objects rather than bytes, so something has to serialize them.
 
-- Listing a bare tool name in `allowedTools` auto-approves it *before*
-  `canUseTool` is consulted, so an approval capture taken that way contains no
-  approval. The SDK warns; heed it.
-- `display: "summarized"` is required to capture thinking text — the default
-  streams thinking blocks with empty content, which teaches a parser nothing
-  about the delta shapes it must join.
-- An allow rule in the *developer's own* settings shadows `canUseTool` silently
-  — `echo` is commonly covered, so an approval capture built around it records
-  a tool call and no approval. Use a command no rule covers (`rm` inside the
-  sandbox) and assert the callback actually fired.
-- The workflow tool is named `Workflow`. Omitting it from `allowedTools` yields
-  a `permission_denied` line and no workflow board at all.
+Both write one JSON object per line, exactly as the SDK yielded it. Nothing is
+reshaped: a field a capture script renamed is a field the parser would then be
+designed against wrongly.
 
 Compaction is deliberately not captured here. Its threshold is not configurable
 on the Messages API, and the Agent SDK emits the same `compact_boundary` line
