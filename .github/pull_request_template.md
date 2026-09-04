@@ -4,8 +4,8 @@ Required. Name every surface this repository ships and say what a consumer
 writes today versus after this change. "No change" is a valid answer for a
 surface; silence is not.
 
-- **`@nessa-ui/react` (npm):**
-- **`@nessa-ui/agent-stream` (npm):**
+- **`@nessalabs/ui` (npm):**
+- **`@nessalabs/agent-stream` (npm):**
 - **shadcn registry (`shadcn add <item>`):**
 
 Add a row for any surface not listed. Reach for the consumer's own words — the

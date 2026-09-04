@@ -1,6 +1,6 @@
 import * as React from "react"
 import type { Preview } from "@storybook/react-vite"
-import { CodeBlockProvider, preloadCodeHighlighter } from "@nessa-ui/react"
+import { CodeBlockProvider, preloadCodeHighlighter } from "@nessalabs/ui"
 
 import "@fontsource-variable/geist"
 import "@fontsource-variable/geist-mono"

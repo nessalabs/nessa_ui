@@ -1,5 +1,5 @@
 import * as React from "react"
-import { type SectionedListboxSection } from "@nessa-ui/react"
+import { type SectionedListboxSection } from "@nessalabs/ui"
 import { Blocks, FileSearch, Pencil, Puzzle, Sparkles } from "lucide-react"
 
 /** One skill or plugin offered by the composer demo's `/` menu. */

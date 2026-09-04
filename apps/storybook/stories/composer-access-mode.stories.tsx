@@ -4,7 +4,7 @@ import { expect, userEvent, within } from "storybook/test"
 import {
   ComposerAccessMode,
   type ComposerAccessModeValue,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

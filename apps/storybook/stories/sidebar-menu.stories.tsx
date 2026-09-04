@@ -18,7 +18,7 @@ import {
   SidebarMenuSkeleton,
   SidebarProvider,
   SidebarTrigger,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import { Folder, LoaderCircle, MoreHorizontal, Settings } from "lucide-react"
 
 import { SidebarToggleIcon } from "./icons/sidebar-toggle-icon"

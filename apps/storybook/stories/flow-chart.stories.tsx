@@ -9,7 +9,7 @@ import {
   type FlowChartLayoutIssue,
   type FlowChartLink,
   type FlowChartNode,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

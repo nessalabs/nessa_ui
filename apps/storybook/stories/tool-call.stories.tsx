@@ -9,7 +9,7 @@ import {
   ToolCallFile,
   ToolCallTabs,
   ToolCallTrigger,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import {
   BashIcon,

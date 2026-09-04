@@ -14,7 +14,7 @@ import {
   SheetExpand,
   SheetHandle,
   SheetHeader,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import { Pencil, Pin, Share } from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"

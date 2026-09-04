@@ -1,20 +1,20 @@
-# @nessa-ui/react
+# @nessalabs/ui
 
 The React package for Nessa UI. This repository uses pnpm, but the published
 package works with every standard JavaScript package manager:
 
 ```bash
-pnpm add @nessa-ui/react @fontsource-variable/geist @fontsource-variable/geist-mono
-npm install @nessa-ui/react @fontsource-variable/geist @fontsource-variable/geist-mono
-yarn add @nessa-ui/react @fontsource-variable/geist @fontsource-variable/geist-mono
-bun add @nessa-ui/react @fontsource-variable/geist @fontsource-variable/geist-mono
+pnpm add @nessalabs/ui @fontsource-variable/geist @fontsource-variable/geist-mono
+npm install @nessalabs/ui @fontsource-variable/geist @fontsource-variable/geist-mono
+yarn add @nessalabs/ui @fontsource-variable/geist @fontsource-variable/geist-mono
+bun add @nessalabs/ui @fontsource-variable/geist @fontsource-variable/geist-mono
 ```
 
 ```tsx
-import { Button } from "@nessa-ui/react"
+import { Button } from "@nessalabs/ui"
 import "@fontsource-variable/geist"
 import "@fontsource-variable/geist-mono"
-import "@nessa-ui/react/styles.css"
+import "@nessalabs/ui/styles.css"
 
 export function SaveButton() {
   return <Button>Save changes</Button>
@@ -31,10 +31,10 @@ For a Nessa-owned application that wants Tailwind Preflight and Nessa's global
 body defaults, import the opinionated application baseline instead:
 
 ```tsx
-import "@nessa-ui/react/app.css"
+import "@nessalabs/ui/app.css"
 ```
 
-Token-only consumers can import `@nessa-ui/react/theme.css`.
+Token-only consumers can import `@nessalabs/ui/theme.css`.
 
 Override semantic tokens after the Nessa import to theme every component:
 

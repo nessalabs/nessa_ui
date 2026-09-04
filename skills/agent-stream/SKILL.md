@@ -5,14 +5,14 @@ description: Parse a coding agent's output stream (Claude Code `--output-format 
 
 # Parsing an agent's output stream
 
-`@nessa-ui/agent-stream` is a framework-free parser at
+`@nessalabs/agent-stream` is a framework-free parser at
 `packages/agent-stream/src/`. It turns an agent CLI's bytes into a
 normalized event log, and optionally folds that log into renderable turns.
 
 The package has no dependencies and no peer dependencies — a Node process or a
-non-React host can consume it. `@nessa-ui/react` re-exports the whole surface,
+non-React host can consume it. `@nessalabs/ui` re-exports the whole surface,
 so an existing React host needs no change; new code should import from
-`@nessa-ui/agent-stream` directly.
+`@nessalabs/agent-stream` directly.
 
 This file is deliberately short on specifics. **Signatures and field names
 change; the sources below are always current, and this is not.**
@@ -20,7 +20,7 @@ change; the sources below are always current, and this is not.**
 | Question | Read |
 | --- | --- |
 | What can I call? | `packages/agent-stream/src/contract.ts` — the contract and providers, stopping at the agent message |
-| Where is the fold? | `packages/agent-stream/src/transcript/` — imported as `@nessa-ui/agent-stream/transcript` |
+| Where is the fold? | `packages/agent-stream/src/transcript/` — imported as `@nessalabs/agent-stream/transcript` |
 | Why two barrels? | `index.ts` is the shadcn registry's barrel and carries both halves; copied source has no exports map |
 | What is in an event? | `events.ts` — the contract, with every payload variant documented |
 | How do I actually use it? | `agent-stream.test.ts` — executable examples against real captures |
@@ -40,7 +40,7 @@ fold        log   →  turns, runs, plan     shared, optional
 
 **Your job is the UI; the parser's job ends at structured events.** That
 boundary is the package's shape, not just advice: the main entry stops at the
-event log, and the fold ships behind `@nessa-ui/agent-stream/transcript`. The
+event log, and the fold ships behind `@nessalabs/agent-stream/transcript`. The
 folds exist because turn boundaries and tool-run grouping are subtle enough that
 every consumer would re-derive them — but they are a convenience, not a
 requirement. Read the event log directly if you want a different shape. The

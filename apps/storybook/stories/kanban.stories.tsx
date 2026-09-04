@@ -9,7 +9,7 @@ import {
   KanbanColumnHandle,
   KanbanColumnList,
   applyKanbanMove,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

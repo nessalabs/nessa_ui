@@ -10,7 +10,7 @@ import {
   MessageHeader,
   MessageMarkdown,
   useMessageStreamText,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

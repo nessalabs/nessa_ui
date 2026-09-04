@@ -21,7 +21,7 @@ import {
   ToolCallContent,
   ToolCallTabs,
   ToolCallTrigger,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import { FileSearch } from "lucide-react"
 
 import { SearchIcon } from "./icons/nucleo"

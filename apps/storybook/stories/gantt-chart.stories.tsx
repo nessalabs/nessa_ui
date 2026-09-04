@@ -12,7 +12,7 @@ import {
   type GanttChartProps,
   type GanttChartQuickCreateContext,
   type GanttChartTask,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

@@ -15,7 +15,7 @@ import {
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import { Plus } from "lucide-react"
 
 import { SidebarToggleIcon } from "./icons/sidebar-toggle-icon"

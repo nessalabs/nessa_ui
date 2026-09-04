@@ -22,7 +22,7 @@ import {
   ToolApprovalTitle,
   ToolCall,
   ToolCallTrigger,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import { Plus, RotateCcw } from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"
@@ -671,19 +671,19 @@ const longCommand = `set -euo pipefail
 export NODE_ENV=test
 export STORYBOOK_DISABLE_TELEMETRY=1
 
-pnpm --filter @nessa-ui/react build
+pnpm --filter @nessalabs/ui build
 pnpm build:registry
 pnpm validate
 
 for project in storybook chromium-touch chromium-reduced-motion; do
-  pnpm --filter @nessa-ui/storybook exec vitest run \\
+  pnpm --filter @nessalabs/storybook exec vitest run \\
     --project="$project" \\
     --reporter=verbose \\
     --coverage.enabled \\
     --coverage.reporter=text-summary
 done
 
-pnpm --filter @nessa-ui/storybook test:docs
+pnpm --filter @nessalabs/storybook test:docs
 git status --short`
 
 export const LongCommand: Story = {

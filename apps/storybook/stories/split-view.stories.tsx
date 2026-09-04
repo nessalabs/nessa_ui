@@ -8,7 +8,7 @@ import {
   SplitViewPanel,
   SplitViewSeparator,
   type SplitViewLayout,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 

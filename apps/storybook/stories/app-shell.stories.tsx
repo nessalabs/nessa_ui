@@ -36,7 +36,7 @@ import {
   useAppShell,
   type AppShellLayout,
   type PaneNode,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import {
   Bot,
   Bug,

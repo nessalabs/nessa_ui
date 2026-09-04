@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { Button } from "@nessa-ui/react"
+import { Button } from "@nessalabs/ui"
 import { ArrowRight, Plus } from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"

@@ -8,7 +8,7 @@ import {
   ReferenceTrigger,
   cn,
   type ReferenceSource,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { FileCopyIcon, GlobeIcon } from "./icons/nucleo"
 import { storyDocumentation } from "./story-documentation"

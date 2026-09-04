@@ -12,8 +12,8 @@ interface PackResult { files: PackFile[] }
 /**
  * Each publishable package and the artifacts its tarball must carry.
  *
- * The lists differ rather than being one shared constant: `@nessa-ui/react`
- * ships stylesheets, and `@nessa-ui/agent-stream` deliberately ships none —
+ * The lists differ rather than being one shared constant: `@nessalabs/ui`
+ * ships stylesheets, and `@nessalabs/agent-stream` deliberately ships none —
  * it has no rendering to style. A shared list would have to be the union or
  * the intersection, and either one stops describing a real package.
  */

@@ -17,7 +17,7 @@ import {
   SidebarProvider,
   SidebarRail,
   SidebarVariant,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import { Folder, MoreHorizontal } from "lucide-react"
 
 import {

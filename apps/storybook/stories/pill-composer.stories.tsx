@@ -98,7 +98,7 @@ import {
   type ChatTrayItem,
   type ModelPickerGroup,
   type ModelPickerValue,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 import { Archive, Bell, Braces, Check, ChevronLeft, ChevronRight, Copy, FileSearch, FileText, Folder, GitFork, History, Image as ImageIcon, Info, Paperclip, Pencil, Pin, Plus, RefreshCw, Share, SlidersHorizontal, Sparkles, Puzzle, Square, X } from "lucide-react"
 
 import { ChatAddIcon, CommentIcon } from "./icons/nucleo"

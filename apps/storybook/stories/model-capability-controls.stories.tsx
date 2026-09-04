@@ -6,7 +6,7 @@ import {
   ModelFastMode,
   ModelThinkingControl,
   ModelThinkingSlider,
-} from "@nessa-ui/react"
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 import { FastIcon, ThinkingIcon } from "./icons/nucleo"

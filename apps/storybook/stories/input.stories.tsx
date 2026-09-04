@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { Input } from "@nessa-ui/react"
+import { Input } from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 
