@@ -17,6 +17,7 @@ import {
   cn,
 } from "@nessalabs/ui"
 
+import { finishStoryTransitions } from "./finish-story-transitions"
 import { storyDocumentation } from "./story-documentation"
 
 /** Shared story chrome so every example frames its questionnaire identically. */
@@ -66,9 +67,7 @@ async function expectChoiceGlyphs(
   choices: readonly (readonly [HTMLElement, "0" | "1"])[],
 ) {
   await waitFor(async () => {
-    for (const animation of canvasElement.getAnimations({ subtree: true })) {
-      if (animation instanceof CSSTransition) animation.finish()
-    }
+    finishStoryTransitions(canvasElement)
     for (const [input, opacity] of choices) {
       await expect(getComputedStyle(checkGlyph(input)!).opacity).toBe(opacity)
     }
