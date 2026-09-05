@@ -1389,7 +1389,8 @@
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
-        "nessalabs/nessa_ui/utils"
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/virtual-list"
       ],
       "files": [
         {
@@ -2357,6 +2358,74 @@
         "type": "registry:ui",
         "target": "components/window-deck/window-deck-shortcuts.ts"
       }
+      ]
+    },
+    {
+      "name": "virtual-list",
+      "type": "registry:ui",
+      "title": "Virtual List",
+      "description": "Fixed-row windowing with stable keys and accessible list positions.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/virtual-list.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/virtual-list.tsx"
+        }
+      ],
+      "dependencies": [
+        "radix-ui",
+        "react-dom"
+      ]
+    },
+    {
+      "name": "git-history",
+      "type": "registry:ui",
+      "title": "Git History",
+      "description": "Parent-derived Git commit history with references and optional row virtualization.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/badge",
+        "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/virtual-list"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/git-history/index.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/git-history/index.tsx"
+        },
+        {
+          "path": "packages/react/src/components/git-history/git-history-layout.ts",
+          "type": "registry:ui",
+          "target": "components/ui/git-history/git-history-layout.ts"
+        }
+      ]
+    },
+    {
+      "name": "git-commit-details",
+      "dependencies": ["lucide-react"],
+      "type": "registry:ui",
+      "title": "Git Commit Details",
+      "description": "Independent commit inspector with changed files and host-linked agent sessions or plans.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/badge",
+        "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/file-diff-list",
+        "nessalabs/nessa_ui/git-history",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/git-commit-details.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/git-commit-details.tsx"
+        }
       ]
     }
   ]

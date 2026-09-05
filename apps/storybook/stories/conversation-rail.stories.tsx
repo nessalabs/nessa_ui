@@ -9,6 +9,7 @@ import {
   ConversationRailTrigger,
 } from "@nessalabs/ui"
 
+import { finishStoryTransitions } from "./finish-story-transitions"
 import { storyDocumentation } from "./story-documentation"
 
 interface Turn {
@@ -243,27 +244,39 @@ export const HoverAndFocusPreview: Story = {
       "adopt the provider rail as a first-class layout for the picker",
     )
     await expect(getComputedStyle(preview).opacity).toBe("0")
-    trigger.focus()
-    await waitFor(() =>
-      expect(getComputedStyle(preview).opacity).toBe("1"),
-    )
+    // Use keyboard navigation so :focus-visible is established on touch too.
+    canvas.getByRole("button", { name: "Queue delivered" }).focus()
+    await userEvent.tab()
+    await expect(trigger).toHaveFocus()
+    await expect(trigger.matches(":focus-visible")).toBe(true)
+    await waitFor(() => {
+      finishStoryTransitions(canvasElement)
+      expect(getComputedStyle(preview).opacity).toBe("1")
+    })
     await userEvent.click(trigger)
-    await waitFor(() =>
-      expect(getComputedStyle(preview).opacity).toBe("0"),
-    )
-    trigger.blur()
-    trigger.focus()
-    await waitFor(() =>
-      expect(getComputedStyle(preview).opacity).toBe("1"),
-    )
+    await waitFor(() => {
+      finishStoryTransitions(canvasElement)
+      expect(getComputedStyle(preview).opacity).toBe("0")
+    })
+    await userEvent.tab({ shift: true })
+    await userEvent.tab()
+    await expect(trigger).toHaveFocus()
+    await expect(trigger.matches(":focus-visible")).toBe(true)
+    await waitFor(() => {
+      finishStoryTransitions(canvasElement)
+      expect(getComputedStyle(preview).opacity).toBe("1")
+    })
     await userEvent.keyboard("{Escape}")
-    await waitFor(() =>
-      expect(getComputedStyle(preview).opacity).toBe("0"),
-    )
+    await waitFor(() => {
+      finishStoryTransitions(canvasElement)
+      expect(getComputedStyle(preview).opacity).toBe("0")
+    })
+    await userEvent.unhover(trigger)
     trigger.blur()
-    await waitFor(() =>
-      expect(getComputedStyle(preview).opacity).toBe("0"),
-    )
+    await waitFor(() => {
+      finishStoryTransitions(canvasElement)
+      expect(getComputedStyle(preview).opacity).toBe("0")
+    })
   },
 }
 
@@ -365,4 +378,12 @@ export const CustomRowsAndAnimation: Story = {
     await expect(trigger).toHaveAttribute("aria-current", "true")
     await expect(canvas.getByText("Viewing: Queue delivered")).toBeVisible()
   },
+}
+
+export const SlowPreviewTransitions: Story = {
+  ...HoverAndFocusPreview,
+  parameters: storyDocumentation(
+    "Verifies keyboard focus, click/Escape dismissal, and final preview opacity with 30-second transitions. The test settles transitions and establishes keyboard modality explicitly, including after pointer clicks.",
+  ),
+  render: () => <RailExample previewClassName="duration-[30s]" />,
 }

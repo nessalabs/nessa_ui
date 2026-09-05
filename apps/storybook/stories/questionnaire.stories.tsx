@@ -17,6 +17,7 @@ import {
   cn,
 } from "@nessalabs/ui"
 
+import { finishStoryTransitions } from "./finish-story-transitions"
 import { storyDocumentation } from "./story-documentation"
 
 /** Shared story chrome so every example frames its questionnaire identically. */
@@ -52,6 +53,25 @@ function checkGlyph(input: HTMLElement) {
   return input
     .closest('[data-slot="questionnaire-choice-indicator"]')
     ?.querySelector<SVGSVGElement>('[data-slot="questionnaire-choice-check"]')
+}
+
+/**
+ * Assert the rendered selection after settling this story's finite CSS
+ * transitions. CI can defer compositor frames while other browser stories run;
+ * these assertions cover the final glyph, not real-time animation scheduling.
+ * getAnimations flushes pending styles before exposing the transitions, and
+ * repeating inside waitFor also covers a React update that commits later.
+ */
+async function expectChoiceGlyphs(
+  canvasElement: HTMLElement,
+  choices: readonly (readonly [HTMLElement, "0" | "1"])[],
+) {
+  await waitFor(async () => {
+    finishStoryTransitions(canvasElement)
+    for (const [input, opacity] of choices) {
+      await expect(getComputedStyle(checkGlyph(input)!).opacity).toBe(opacity)
+    }
+  })
 }
 
 const meta = {
@@ -128,11 +148,7 @@ export const SingleChoice: Story = {
     await userEvent.click(canvas.getByText("Researcher"))
     await expect(researcher).toBeChecked()
     await expect(preselected).not.toBeChecked()
-    // The check glyph swaps by computed opacity (transition-opacity settles).
-    await waitFor(async () => {
-      await expect(getComputedStyle(checkGlyph(researcher)!).opacity).toBe("1")
-      await expect(getComputedStyle(preselectedGlyph).opacity).toBe("0")
-    })
+    await expectChoiceGlyphs(canvasElement, [[researcher, "1"], [preselected, "0"]])
     const checked = canvas
       .getAllByRole("radio")
       .filter((candidate) => (candidate as HTMLInputElement).checked)
@@ -191,16 +207,12 @@ export const MultipleChoice: Story = {
     await expect(desktop).toBeChecked()
     // Multiple selection keeps prior answers checked.
     await expect(web).toBeChecked()
-    await waitFor(async () => {
-      await expect(getComputedStyle(checkGlyph(desktop)!).opacity).toBe("1")
-    })
+    await expectChoiceGlyphs(canvasElement, [[desktop, "1"], [web, "1"]])
 
     // Checkboxes toggle off, clearing the drawn check.
     await userEvent.click(canvas.getByText("Web"))
     await expect(web).not.toBeChecked()
-    await waitFor(async () => {
-      await expect(getComputedStyle(checkGlyph(web)!).opacity).toBe("0")
-    })
+    await expectChoiceGlyphs(canvasElement, [[web, "0"], [desktop, "1"]])
 
     const bar = canvas.getByRole("progressbar", { name: "Question 2 of 2" })
     await expect(getComputedStyle(bar).overflowX).toBe("hidden")
@@ -364,4 +376,14 @@ export const ComposedFlow: Story = {
       canvas.getByRole("radio", { name: "More than 10" }),
     ).toBeChecked()
   },
+}
+
+export const SlowSelectionTransitions: Story = {
+  ...SingleChoice,
+  parameters: storyDocumentation(
+    "Runs the same exclusive-selection and rendered-glyph assertions with 30-second transitions. The play test settles CSS transitions explicitly, so correctness does not depend on compositor frame delivery or a longer timeout.",
+  ),
+  decorators: [
+    (Story) => <div style={{ "--nessa-motion-duration-fast": "30s" } as React.CSSProperties}><Story /></div>,
+  ],
 }

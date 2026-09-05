@@ -166,16 +166,38 @@ export const ExpandToggle: Story = {
     )!
     const collapsedHeight = panel.getBoundingClientRect().height
     const frameHeight = frame.getBoundingClientRect().height
-    await userEvent.click(canvas.getByRole("button", { name: "Expand" }))
     const flight: Array<{ height: number; body: number; bottomGap: number }> = []
-    for (const _ of [1, 2, 3, 4, 5]) {
-      await new Promise((resolve) => setTimeout(resolve, 30))
-      const box = panel.getBoundingClientRect()
-      flight.push({
-        height: box.height,
-        body: bodyPanel.getBoundingClientRect().height,
-        bottomGap: Math.abs(frame.getBoundingClientRect().bottom - box.bottom),
-      })
+    const originalAnimate = Element.prototype.animate
+    // Sample real WAAPI geometry while the expand animation is being created.
+    // Timer-based samples can all arrive after the animation has ended on a
+    // busy runner. Seeking the native animation still detects flex-basis
+    // overriding height, body collapse, or a detached bottom edge.
+    Element.prototype.animate = function sampleFlight(keyframes, options) {
+      const animation = originalAnimate.call(this, keyframes, options)
+      if (this === panel) {
+        try {
+          animation.pause()
+          const duration = Number(animation.effect!.getTiming().duration)
+          for (const fraction of [0.2, 0.4, 0.6, 0.8]) {
+            animation.currentTime = duration * fraction
+            const box = panel.getBoundingClientRect()
+            flight.push({
+              height: box.height,
+              body: bodyPanel.getBoundingClientRect().height,
+              bottomGap: Math.abs(frame.getBoundingClientRect().bottom - box.bottom),
+            })
+          }
+        } finally {
+          animation.currentTime = 0
+          animation.play()
+        }
+      }
+      return animation
+    }
+    try {
+      await userEvent.click(canvas.getByRole("button", { name: "Expand" }))
+    } finally {
+      Element.prototype.animate = originalAnimate
     }
     const inFlight = flight.filter(
       (step) => step.height > collapsedHeight + 5 && step.height < frameHeight - 5,
