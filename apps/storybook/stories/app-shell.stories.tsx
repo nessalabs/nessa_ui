@@ -23,6 +23,10 @@ import {
   ConversationRailMarker,
   ConversationRailPreview,
   ConversationRailTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   PaneSplitDirection,
   SidebarContent,
   SidebarGroup,
@@ -41,7 +45,7 @@ import {
   Bot,
   Bug,
   Columns2,
-  GripVertical,
+  Ellipsis,
   Maximize2,
   Minimize2,
   PanelBottom,
@@ -292,48 +296,62 @@ function ChatPane({ pane }: { pane: PaneNode }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-9 shrink-0 items-center gap-0.5 overflow-hidden border-b border-border bg-muted/40 pe-1.5">
-        {/* Dragging the grip (or the title beside it) moves this pane onto
-            another pane's edge. */}
+        {/* The pane's own grabber sits on its top edge; this title bar is
+            draggable too, the way a window is picked up by its title. */}
         <AppShellPaneDragHandle
           paneId={pane.id}
           className="flex h-full min-w-0 flex-1 items-center gap-1.5 ps-2"
-          title="Drag to move this pane"
+          title="Move"
         >
-          <GripVertical
-            aria-hidden
-            className="size-3.5 shrink-0 text-muted-foreground/70"
-          />
           <Icon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
           <span className="truncate text-xs font-medium">
             {chat?.name ?? "No conversation"}
           </span>
         </AppShellPaneDragHandle>
-        <IconAction
-          label="Split pane right"
-          onClick={() =>
-            // A split opens an empty pane — pick any conversation from
-            // the sidebar to fill it, instead of duplicating this chat.
-            splitPane({
-              paneId: pane.id,
-              direction: PaneSplitDirection.Right,
-              views: [],
-            })
-          }
-        >
-          <Columns2 aria-hidden className="size-3.5" />
-        </IconAction>
-        <IconAction
-          label="Split pane down"
-          onClick={() =>
-            splitPane({
-              paneId: pane.id,
-              direction: PaneSplitDirection.Down,
-              views: [],
-            })
-          }
-        >
-          <Rows2 aria-hidden className="size-3.5" />
-        </IconAction>
+        {/* One overflow button rather than a row of split icons: the
+            directions are named in the menu, which is easier to read than
+            two glyphs that differ only by their axis. A split opens an
+            empty pane — pick any conversation from the sidebar to fill it,
+            instead of duplicating this chat. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6 text-muted-foreground hover:text-foreground"
+              aria-label="Pane actions"
+              title="Pane actions"
+            >
+              <Ellipsis aria-hidden className="size-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onSelect={() =>
+                splitPane({
+                  paneId: pane.id,
+                  direction: PaneSplitDirection.Right,
+                  views: [],
+                })
+              }
+            >
+              <Columns2 aria-hidden className="size-3.5" />
+              Split right
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() =>
+                splitPane({
+                  paneId: pane.id,
+                  direction: PaneSplitDirection.Down,
+                  views: [],
+                })
+              }
+            >
+              <Rows2 aria-hidden className="size-3.5" />
+              Split down
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <IconAction
           label={maximized ? "Restore pane" : "Maximize pane"}
           onClick={() =>
@@ -525,10 +543,17 @@ export const SplitAndClose: Story = {
 
     await waitFor(() => expect(panes()).toHaveLength(1))
 
-    const splitButton = await canvas.findByRole("button", {
-      name: "Split pane right",
+    // The split directions live in the pane's overflow menu, which Radix
+    // portals to the body — so the item is found there, not in the canvas.
+    const paneActions = await canvas.findByRole("button", {
+      name: "Pane actions",
     })
-    splitButton.click()
+    await userEvent.click(paneActions)
+
+    const splitRight = await within(document.body).findByRole("menuitem", {
+      name: "Split right",
+    })
+    await userEvent.click(splitRight)
 
     await waitFor(() => expect(panes()).toHaveLength(2))
 
@@ -549,7 +574,7 @@ export const SplitAndClose: Story = {
 
 export const SwapPanes: Story = {
   parameters: storyDocumentation(
-    "Dragging one pane onto another swaps them — the split structure and orientations stay exactly as they were, and new sections come from the explicit split actions instead. While hovering, the target highlights and previews the incoming content, a miniature of the dragged pane rides the cursor, and uninvolved panes fade.",
+    "Dragging one pane onto another swaps them — the split structure and orientations stay exactly as they were, and new sections come from the explicit split actions instead. While hovering, both slots stand empty and the displaced pane's content travels on its own layer into the slot the drag opened, so the exchange reads as movement rather than a redraw; a miniature of the dragged pane rides the cursor, and uninvolved panes fade.",
   ),
   render: () => (
     <ShellExample
@@ -602,10 +627,11 @@ export const SwapPanes: Story = {
       }),
     )
 
-    // Hovering the target: the pane ghost is up, the source slot shows
-    // its lifted-out placeholder, and the whole target highlights with a
-    // faint preview of the incoming content. Computed styles are asserted
-    // — not just class names — so a missing Tailwind rule can never pass
+    // Hovering the target: the pane ghost is up, both slots stand empty —
+    // the one lifted from and the one about to be landed in — and the
+    // displaced pane's content is on its own layer, travelling from the
+    // target into the emptied source slot. Computed styles are asserted —
+    // not just class names — so a missing Tailwind rule can never pass
     // silently again.
     await waitFor(() => {
       expect(
@@ -629,9 +655,17 @@ export const SwapPanes: Story = {
       expect(getComputedStyle(preview!).backgroundColor).not.toBe(
         "rgba(0, 0, 0, 0)",
       )
-      // The preview scrims this pane's content and shows the incoming
-      // pane's content faintly on top.
-      expect(preview!.querySelector("div")?.hasChildNodes()).toBe(true)
+      // The landing spot is a vacated slot, not a copy of what is coming:
+      // the content that was here is on the travelling layer instead.
+      expect(getComputedStyle(preview!).borderTopStyle).toBe("dashed")
+      expect(preview!.hasChildNodes()).toBe(false)
+      // That travelling layer carries the displaced pane's content and is
+      // parked over the emptied source slot once its glide has settled.
+      const displaced = canvasElement.querySelector<HTMLElement>(
+        '[data-slot="app-shell-displaced-pane"]',
+      )
+      expect(displaced).not.toBeNull()
+      expect(displaced!.hasChildNodes()).toBe(true)
     })
 
     handle.dispatchEvent(

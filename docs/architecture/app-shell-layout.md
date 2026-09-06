@@ -90,24 +90,106 @@ controlled), disabled panels, and non-px/% units. Unlike upstream, pointer
 handling uses capture on the separator element itself — no document-level
 capture-phase listeners — and horizontal resizing respects RTL.
 
+## Pane presentation
+
+The workspace renders panes as **tiles** by default: each pane is a rounded,
+outlined, filled card, with `paneGap` of space between neighbours and the
+same gap inset around the region. A tile reads as its own surface, which is
+what makes the grabber and the drag-to-swap affordance legible — space
+around a thing is what says the thing can move.
+
+The outline is a `ring`, not a `border`. A border occupies layout, and
+maximize renders the panes it hides at exactly zero extent — a bordered
+pane would still measure two pixels wide, so "every other pane collapses to
+nothing" would quietly stop being true. A ring is painted as a shadow and
+takes no space. It also composes: the active pane's ring simply recolours
+the tile's own.
+
+The gap is not CSS `gap`. The separator between two panes *becomes* the gap:
+transparent, and exactly `paneGap` wide. This matters because
+`measureGroupSize` sums the panels' own extents rather than the container's
+(separators excluded by construction), so widening a separator changes
+nothing in the resize mathematics — percentages stay exact and
+`split-view-math.ts` needs no notion of spacing at all. It also means the
+whole visible gap is the resize target, not a 1px line with an invisible
+hit strip around it.
+
+`paneStyle="flush"` restores the older presentation: panes butted together
+with one hairline separator between them, for shells that want the region
+to read as a single continuous surface.
+
 ## Dragging panes
+
+Every pane carries an `AppShellPaneGrabber` on its top edge by default — a
+short pill that appears on hover or focus, the way a window's title bar is
+the part you pick the window up by. Hosts that build their own pane chrome
+can set `paneGrabber={false}` and place an `AppShellPaneDragHandle`
+wherever they prefer; the grabber is only the default dressing on that
+handle, not a second mechanism. It is hidden from assistive technology,
+because dragging is pointer-only and a control screen-reader users cannot
+operate is worse announced than silent.
 
 `AppShellPaneDragHandle` makes part of a pane's chrome draggable, and
 dragging does exactly one thing: swap two panes. Picking a pane up lifts it
 out — its content turns invisible in place (still mounted, so its state
 survives), the emptied slot shows a dashed outline, and a faded miniature
-of the pane follows the cursor as the drag ghost. Hovering any other pane
-highlights its whole surface and previews the incoming content faintly over
-its own fading content; releasing applies `swapPanes`, which exchanges the
-two panes without touching any split or orientation, and both panes glide
-to their new positions with a short transform animation (skipped under
-prefers-reduced-motion). Panes not involved fade slightly so the source and
+of the pane follows the cursor as the drag ghost.
+
+Hovering another pane previews the exchange as *motion*, not as a
+cross-fade. Both slots stand empty — the hole the drag opened and the one
+about to be landed in — and the hovered pane's content leaves on a single
+absolutely-positioned layer (`app-shell-displaced-pane`) that starts on top
+of that pane and glides into the emptied source slot, translating and
+scaling to its size. The layer is keyed on the target pane, so moving to a
+different pane remounts it and replays the journey from that pane's own
+position. Two things blinking read as a redraw; one thing travelling reads
+as a swap, which is what is actually about to happen.
+
+Releasing applies `swapPanes`, which exchanges the two panes without
+touching any split or orientation, and both panes glide to their new
+positions with a short transform animation (skipped under
+prefers-reduced-motion, as is the displacement glide). Panes not involved fade slightly so the source and
 target stand out, and Escape cancels. New sections are never created by
 dragging — they come from the explicit split actions — though the model's
 `movePane` operation remains available to applications that want edge-drop
 behavior. Dragging uses plain pointer events — no drag-and-drop library —
 and is a pointer-only affordance; keyboard users reach the same layouts
 through the split and close actions.
+
+## Nesting in a WindowDeck
+
+A `WindowDeckPane` may host an `AppShellWorkspace`, giving a deck of windows
+where each window is its own split workspace. The two systems own different
+things and never contend: the deck moves *whole windows* by transform, the
+shell tiles *within one* by flex weights.
+
+The join between them is a gesture boundary. The deck starts a drag on any
+pointer down inside a pane — a throw routinely leaves the tile it started
+on, so the gesture is tracked on `window` rather than the pane. A split
+separator and a pane drag handle run pointer drags of their own, and both
+would otherwise also throw the window away.
+
+So a control that owns its own pointer drag marks itself
+`data-deck-gesture="ignore"`, and `WindowDeckPane` walks up from the event
+target to its own element and stands down when it finds one. The walk is
+bounded by the pane, so an opt-out outside this deck can never silence it.
+The attribute is inert when no deck is present, which is why neither
+component imports the other.
+
+Two things the host still has to choose:
+
+- **`contentMount="always"`.** The default (`"active"`) mounts only the live
+  window. The layout document is serializable, so split *structure* survives
+  a remount if the host persists from `onLayoutCommit` — but view state
+  inside panes (scroll offsets, editor buffers, running work) does not.
+- **A `preview` on each pane.** Overview tiles are scaled, and
+  `getBoundingClientRect` reports transformed rectangles, so a separator
+  drag on a scaled-down tile would compute against the shrunken box. A
+  preview keeps a live workspace out of the overview entirely; panes can
+  also read `mode` from `useWindowDeck()` and go inert.
+
+Keyboard bindings do not collide: the deck defaults to Mod+G and Mod+Arrow,
+the shell to Shift+Escape.
 
 ## Accessibility
 

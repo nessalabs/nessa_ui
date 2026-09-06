@@ -178,6 +178,16 @@ export const SentRecord: Story = {
         canvas.getByText("Gather the relevant context from the current chat."),
       ).toBeVisible(),
     )
+    // Each received bubble fades in on mount, and `toBeVisible()` is true
+    // from that fade's first frame. The accessibility pass that runs after
+    // this play function samples computed colour, so a bubble caught
+    // mid-fade reads as a contrast failure that has nothing to do with the
+    // palette. Wait for the fade to finish — the end state, not a proxy.
+    await Promise.all(
+      canvasElement
+        .getAnimations({ subtree: true })
+        .map((animation) => animation.finished),
+    )
     await expect(
       canvas.queryByRole("button", { name: "Discard annotation" }),
     ).not.toBeInTheDocument()

@@ -14,6 +14,7 @@ import {
 } from "@/components/split-view"
 import {
   PaneDropRegion,
+  SplitOrientation,
   findNode,
   setSplitWeights,
   focusPane,
@@ -24,7 +25,21 @@ import {
 } from "@/lib/app-shell-layout"
 
 import { useAppShellContext } from "./app-shell"
-import { AppShellDragProvider, useAppShellDrag } from "./app-shell-drag"
+import {
+  AppShellDragProvider,
+  AppShellPaneGrabber,
+  useAppShellDrag,
+} from "./app-shell-drag"
+
+/** How the workspace presents its panes. */
+type AppShellPaneStyle = "tiled" | "flush"
+
+/**
+ * The space between tiles when the host does not choose one. Small enough
+ * that the workspace still reads as one region, large enough that each tile
+ * reads as its own surface.
+ */
+const DEFAULT_PANE_GAP = "0.375rem"
 
 /** Properties accepted by the workspace region. */
 interface AppShellWorkspaceProps
@@ -47,6 +62,28 @@ interface AppShellWorkspaceProps
    * @defaultValue "Resize workspace panes"
    */
   separatorLabel?: string
+  /**
+   * How panes are presented. `tiled` stands every pane on its own rounded,
+   * outlined card with space between them and around the region, which is
+   * what makes a pane read as a movable thing. `flush` butts panes against
+   * each other and draws one hairline between them, for shells that want
+   * the region to read as a single continuous surface.
+   * @defaultValue "tiled"
+   */
+  paneStyle?: AppShellPaneStyle
+  /**
+   * Space between tiles, and between the tiles and the region's edge, as a
+   * CSS length. Ignored when `paneStyle` is `flush`. It also sets the
+   * separator's grab width, so a larger gap is a larger resize target.
+   * @defaultValue "0.375rem"
+   */
+  paneGap?: string
+  /**
+   * Whether each pane renders the default grabber on its top edge. Turn it
+   * off when the pane's own chrome hosts an `AppShellPaneDragHandle`.
+   * @defaultValue true
+   */
+  paneGrabber?: boolean
 }
 
 /**
@@ -59,10 +96,14 @@ function WorkspacePane({
   pane,
   active,
   renderPane,
+  tiled,
+  grabber,
 }: {
   pane: PaneNode
   active: boolean
   renderPane: AppShellWorkspaceProps["renderPane"]
+  tiled: boolean
+  grabber: boolean
 }) {
   const { updateLayout } = useAppShellContext()
   const { draggingPaneId, dropTarget } = useAppShellDrag()
@@ -75,39 +116,6 @@ function WorkspacePane({
         phase: "settled",
       })
     }
-  }
-
-  /**
-   * Fills a preview container with a snapshot of another pane's content.
-   * Used in both directions while a swap is being previewed: the target
-   * shows the dragged pane's content, and the dragged pane's emptied slot
-   * shows the target's content as the shadow moving in.
-   *
-   * @param element - The preview container, when mounted.
-   * @param paneId - The pane whose content to snapshot.
-   */
-  const fillPreviewWith = (
-    element: HTMLDivElement | null,
-    paneId: LayoutNodeId | null,
-  ) => {
-    if (!element || paneId === null) return
-
-    const workspace = element.closest('[data-slot="app-shell-workspace"]')
-    const panes =
-      workspace?.querySelectorAll<HTMLElement>('[data-slot="app-shell-pane"]') ??
-      []
-    const content = [...panes]
-      .find((candidate) => candidate.dataset.paneId === paneId)
-      ?.querySelector<HTMLElement>('[data-slot="app-shell-pane-content"]')
-
-    if (!content) return
-
-    const snapshot = content.cloneNode(true) as HTMLElement
-    snapshot.removeAttribute("data-slot")
-    snapshot.classList.remove("invisible")
-    snapshot.style.width = "100%"
-    snapshot.style.height = "100%"
-    element.replaceChildren(snapshot)
   }
 
   const isDropTarget = dropTarget?.paneId === pane.id
@@ -124,7 +132,14 @@ function WorkspacePane({
       data-drag-source={isDragSource || undefined}
       data-drag-dimmed={dimmed || undefined}
       className={cn(
-        "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden transition-opacity",
+        "relative flex h-full min-h-0 min-w-0 flex-1 flex-col",
+        "overflow-hidden transition-opacity",
+        // A tile is its own surface: rounded, outlined, and filled, so the
+        // space around it reads as space rather than as a seam. The outline
+        // is a ring, not a border: a border occupies layout, and a pane
+        // collapsed to zero by maximize must measure exactly zero. It also
+        // means the active ring below simply recolours this one.
+        tiled && "rounded-lg bg-background ring-1 ring-border ring-inset",
         "data-active:ring-1 data-active:ring-inset data-active:ring-ring/40",
         "data-drag-dimmed:opacity-75",
       )}
@@ -145,42 +160,31 @@ function WorkspacePane({
         {renderPane(pane)}
       </div>
       {isDragSource ? (
-        // The emptied slot. While a target is hovered, the target pane's
-        // content appears here as a faint shadow — the other half of the
-        // swap being previewed.
+        // The hole this pane was lifted out of. It stays an empty spot: the
+        // displaced pane's content travels into it on its own layer, so the
+        // slot must not also draw a copy of what is arriving.
         <div
           aria-hidden
           inert
           data-slot="app-shell-pane-lift"
-          // Opaque, so nothing beneath can bleed through the preview.
+          // Opaque, so nothing beneath can bleed through the empty slot.
           className="absolute inset-1 z-10 overflow-hidden rounded-md border-2 border-dashed border-ring/50 bg-muted"
-        >
-          {dropTarget ? (
-            <div
-              key={dropTarget.paneId}
-              ref={(element) => fillPreviewWith(element, dropTarget.paneId)}
-              className="h-full w-full bg-background opacity-60"
-            />
-          ) : null}
-        </div>
+        />
       ) : null}
       {isDropTarget ? (
-        // The whole pane highlights and previews the swap: an opaque card
-        // fully covers this pane's own content (nothing bleeds through)
-        // and shows the dragged pane's content in its place. Releasing
-        // here swaps the two.
+        // The spot the dragged pane is about to land in. Its own content
+        // has left — it is travelling to the hole the drag opened — so this
+        // reads as a vacated slot, ringed to say the drop lands here. It is
+        // opaque, so this pane's still-mounted content cannot bleed
+        // through the hole its content just left.
         <div
           aria-hidden
           inert
           data-slot="app-shell-drop-preview"
-          className="pointer-events-none absolute inset-1 z-20 overflow-hidden rounded-md bg-background ring-2 ring-inset ring-ring/70"
-        >
-          <div
-            ref={(element) => fillPreviewWith(element, draggingPaneId)}
-            className="h-full w-full opacity-90"
-          />
-        </div>
+          className="pointer-events-none absolute inset-1 z-20 overflow-hidden rounded-md border-2 border-dashed border-ring/50 bg-muted ring-2 ring-inset ring-ring/70"
+        />
       ) : null}
+      {grabber ? <AppShellPaneGrabber paneId={pane.id} /> : null}
     </div>
   )
 }
@@ -211,6 +215,8 @@ function WorkspaceNode({
   renderPane,
   minPaneSize,
   separatorLabel,
+  tiled,
+  grabber,
 }: {
   node: LayoutNode
   activePaneId: LayoutNodeId
@@ -218,6 +224,8 @@ function WorkspaceNode({
   renderPane: AppShellWorkspaceProps["renderPane"]
   minPaneSize: SplitViewSize
   separatorLabel: string
+  tiled: boolean
+  grabber: boolean
 }) {
   const { updateLayout } = useAppShellContext()
 
@@ -227,6 +235,8 @@ function WorkspaceNode({
         pane={node}
         active={node.id === activePaneId}
         renderPane={renderPane}
+        tiled={tiled}
+        grabber={grabber}
       />
     )
   }
@@ -299,6 +309,8 @@ function WorkspaceNode({
               renderPane={renderPane}
               minPaneSize={minPaneSize}
               separatorLabel={separatorLabel}
+              tiled={tiled}
+              grabber={grabber}
             />
           </SplitViewPanel>
         )
@@ -311,7 +323,29 @@ function WorkspaceNode({
           <SplitViewSeparator
             key={`separator:${child.id}`}
             aria-label={separatorLabel}
-            className={cn(maximizedPaneId !== undefined && "hidden")}
+            className={cn(
+              // A tiled workspace draws no seam: the separator becomes the
+              // gap itself — as wide as the space between two tiles, so the
+              // whole gap is the grab target. The surface never fills,
+              // because tinting the entire gap reads as a slab rather than
+              // an edge. What appears instead is the same pill the pane
+              // grabber uses, turned along the divider: one grip shape for
+              // both "move this" and "resize this", so the two affordances
+              // read as one family.
+              tiled && [
+                "bg-transparent hover:bg-transparent data-resizing:bg-transparent",
+                "before:absolute before:top-1/2 before:left-1/2",
+                "before:-translate-x-1/2 before:-translate-y-1/2",
+                "before:rounded-full before:bg-transparent",
+                "before:transition-colors",
+                "hover:before:bg-muted-foreground/40",
+                "data-resizing:before:bg-muted-foreground/60",
+                split.orientation === SplitOrientation.Horizontal
+                  ? "w-(--nessa-app-shell-pane-gap) before:h-7 before:w-1"
+                  : "h-(--nessa-app-shell-pane-gap) before:h-1 before:w-7",
+              ],
+              maximizedPaneId !== undefined && "hidden",
+            )}
           />,
           panel,
         ]
@@ -333,19 +367,40 @@ function AppShellWorkspace({
   renderPane,
   minPaneSize = "96px",
   separatorLabel = "Resize workspace panes",
+  paneStyle = "tiled",
+  paneGap = DEFAULT_PANE_GAP,
+  paneGrabber = true,
   className,
+  style,
   ...props
 }: AppShellWorkspaceProps) {
   const { layout } = useAppShellContext()
   const { workspace } = layout
   const workspaceRef = React.useRef<HTMLDivElement>(null)
+  const tiled = paneStyle === "tiled"
 
   return (
     <div
       ref={workspaceRef}
       data-slot="app-shell-workspace"
+      data-pane-style={paneStyle}
       data-maximized={workspace.maximizedPaneId !== undefined || undefined}
-      className={cn("relative flex min-h-0 min-w-0 flex-1", className)}
+      className={cn(
+        "relative flex min-h-0 min-w-0 flex-1",
+        // The region is inset by the same gap that separates the tiles, so
+        // a tile sits the same distance from its neighbour and from the
+        // shell's edge.
+        tiled && "p-(--nessa-app-shell-pane-gap)",
+        className,
+      )}
+      style={
+        tiled
+          ? ({
+              ...style,
+              "--nessa-app-shell-pane-gap": paneGap,
+            } as React.CSSProperties)
+          : style
+      }
       {...props}
     >
       <AppShellDragProvider workspaceRef={workspaceRef}>
@@ -356,10 +411,16 @@ function AppShellWorkspace({
           renderPane={renderPane}
           minPaneSize={minPaneSize}
           separatorLabel={separatorLabel}
+          tiled={tiled}
+          grabber={paneGrabber}
         />
       </AppShellDragProvider>
     </div>
   )
 }
 
-export { AppShellWorkspace, type AppShellWorkspaceProps }
+export {
+  AppShellWorkspace,
+  type AppShellPaneStyle,
+  type AppShellWorkspaceProps,
+}

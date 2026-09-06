@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 
 import {
   composeRefs,
+  hasGestureOptOutAncestor,
   useWindowDeck,
   type WindowDeckDismissDirection,
   type WindowDeckDismissal,
@@ -378,6 +379,10 @@ function WindowDeckPane({
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     props.onPointerDown?.(event)
     if (leaving || event.defaultPrevented) return
+    // A control inside the pane that runs its own drag — a split separator,
+    // a pane drag handle — claims the gesture, so the deck stands down and
+    // the window is not thrown out from under the user's hand.
+    if (hasGestureOptOutAncestor(event.target, elementRef.current)) return
     // Overview tiles always listen: sideways travel pans the strip even on
     // a pane that cannot be thrown. Carousel panes only listen to dismiss.
     if (!throwable && !overview) return
