@@ -383,6 +383,14 @@ function SplitView({
         return
       }
 
+      // A resize drag must not also sweep a text selection through the
+      // panes on either side. Suppressing the compatibility mouse events
+      // stops the browser starting one — and because that also withholds
+      // focus-on-press, the separator takes focus itself, so arrow-key
+      // resizing still works on the separator the user just grabbed.
+      event.preventDefault()
+      event.currentTarget.focus()
+
       try {
         event.currentTarget.setPointerCapture(event.pointerId)
       } catch {

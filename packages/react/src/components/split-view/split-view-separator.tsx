@@ -88,6 +88,9 @@ function SplitViewSeparator({
       aria-valuemin={aria?.valueMin}
       aria-valuemax={aria?.valueMax}
       data-slot="split-view-separator"
+      // Resizing is this element's own pointer drag. An enclosing surface
+      // that moves whole windows (WindowDeck) reads this and stands down.
+      data-deck-gesture="ignore"
       data-orientation={orientation}
       data-resizing={resizing || undefined}
       className={cn(
