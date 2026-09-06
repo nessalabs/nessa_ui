@@ -5,7 +5,6 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
-import { longestTransitionMs } from "@/lib/overlay-panel"
 import { swapPanes, type LayoutNodeId } from "@/lib/app-shell-layout"
 
 import { useAppShellContext } from "./app-shell"
@@ -59,8 +58,8 @@ function useAppShellDrag(): AppShellDragContextValue {
 }
 
 /**
- * Cleanup cancelers for glides still in flight, so re-animating a pane can
- * cancel the previous glide's timers before writing new styles.
+ * Cleanup ownership for glides still in flight, so a superseded animation
+ * cannot clear the styles of a new glide on the same pane.
  */
 const pendingGlideCleanups = new WeakMap<HTMLElement, () => void>()
 
@@ -140,8 +139,8 @@ function animatePaneMoves(
           continue
         }
 
-        // A glide already running on this pane hands over cleanly: its
-        // timers are canceled so they cannot snap the new glide mid-flight.
+        // Disown the previous glide before changing styles. Its canceled
+        // animation may settle later and must not clear this glide.
         pendingGlideCleanups.get(pane)?.()
 
         pane.style.transformOrigin = "top left"
@@ -154,23 +153,12 @@ function animatePaneMoves(
         pane.style.opacity = "0.9"
         void pane.offsetWidth // settle the starting position without animating
 
-        let timeoutId: ReturnType<typeof setTimeout>
-
-        /** Only the pane's own transform ending counts — color or hover
-         * transitions bubbling up from content must not cut the glide. */
-        const onTransitionEnd = (event: TransitionEvent) => {
-          if (event.target === pane && event.propertyName === "transform") {
-            finish()
-          }
-        }
-
         const cancel = () => {
-          clearTimeout(timeoutId)
-          pane.removeEventListener("transitionend", onTransitionEnd)
           pendingGlideCleanups.delete(pane)
         }
 
         const finish = () => {
+          if (pendingGlideCleanups.get(pane) !== cancel) return
           cancel()
           pane.style.transition = ""
           pane.style.transform = ""
@@ -179,18 +167,24 @@ function animatePaneMoves(
           pane.style.opacity = ""
         }
 
+        pendingGlideCleanups.set(pane, cancel)
         pane.style.transition = PANE_TRAVEL_TRANSITION
         pane.style.transform = ""
-        const duration = longestTransitionMs(pane, "transform")
-        if (duration === 0) {
+        // Resolve the transition after the final style write. Completion
+        // belongs to the animation timeline: even a duration-derived wall
+        // timer can outrun rendering under load or when playback is slowed.
+        const transitions = pane.getAnimations().filter(
+          (animation) => animation instanceof CSSTransition &&
+            animation.transitionProperty === "transform",
+        )
+        if (transitions.length === 0) {
           finish()
-          continue
+        } else {
+          // Cancellation (including removal from the document) also releases
+          // styles, unless a newer glide has already taken ownership.
+          void Promise.all(transitions.map((animation) => animation.finished))
+            .then(finish, finish)
         }
-        pane.addEventListener("transitionend", onTransitionEnd)
-        // Themes can choose durations longer than the default. The fallback
-        // must outlive the actual transition rather than snap it midway.
-        timeoutId = setTimeout(finish, duration + 50)
-        pendingGlideCleanups.set(pane, cancel)
       }
     }),
   )

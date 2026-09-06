@@ -726,6 +726,9 @@ export const SwapPanes: Story = {
           animation.transitionProperty === "transform",
       ),
     )
+    // A delayed animation timeline must not be cut short by a wall-clock
+    // deadline. Slow playback deterministically exercises that mismatch.
+    for (const animation of glides) animation.playbackRate = 0.5
     await Promise.all(glides.map((animation) => animation.finished))
 
     // Released in the swap zone: the panes trade places — same row, same
@@ -748,6 +751,8 @@ export const SwapPanes: Story = {
       for (const id of ["pane-1", "pane-2"]) {
         expect(pane(id)!.style.transition).toBe("")
         expect(pane(id)!.style.opacity).toBe("")
+        expect(getComputedStyle(pane(id)!).opacity).toBe("1")
+        expect(pane(id)!.getAnimations()).toHaveLength(0)
       }
     })
     workspace.style.removeProperty("--nessa-motion-duration-normal")
