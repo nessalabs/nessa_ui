@@ -1057,8 +1057,9 @@ function WindowWorkspace({ name }: { name: string }) {
       )}
     >
       <AppShellWorkspace
+        paneGrabber
         renderPane={(pane) => (
-          <div className="flex h-full flex-col gap-1 p-3">
+          <div className="flex h-full flex-col gap-1 p-3 pt-6">
             <span className="text-xs font-medium">{pane.activeViewId}</span>
             <span className="nessa-text-2 text-muted-foreground">
               Drag the space between tiles to resize.

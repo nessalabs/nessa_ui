@@ -296,8 +296,8 @@ function ChatPane({ pane }: { pane: PaneNode }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-9 shrink-0 items-center gap-0.5 overflow-hidden border-b border-border bg-muted/40 pe-1.5">
-        {/* The pane's own grabber sits on its top edge; this title bar is
-            draggable too, the way a window is picked up by its title. */}
+        {/* This title bar owns the drag target; the workspace leaves its
+            optional overlay grabber off so pane controls remain clickable. */}
         <AppShellPaneDragHandle
           paneId={pane.id}
           className="flex h-full min-w-0 flex-1 items-center gap-1.5 ps-2"
@@ -572,6 +572,37 @@ export const SplitAndClose: Story = {
   },
 }
 
+export const DefaultPaneControls: Story = {
+  parameters: storyDocumentation(
+    "Pane content owns its top edge by default. Hosts opt into the overlay grabber only when they have reserved space for it.",
+  ),
+  render: () => (
+    <div className="h-60 w-96">
+      <AppShell defaultLayout={createAppShellLayout({ openDocks: [] })}>
+        <AppShellWorkspace
+          renderPane={() => (
+            <div className="flex justify-center">
+              <Button>Pane action</Button>
+            </div>
+          )}
+        />
+      </AppShell>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const button = await within(canvasElement).findByRole("button", {
+      name: "Pane action",
+    })
+    const box = button.getBoundingClientRect()
+    // userEvent.click dispatches directly to its target and cannot detect
+    // an invisible overlay intercepting a real pointer at this position.
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + 5)
+    expect(button.contains(hit)).toBe(true)
+    await userEvent.click(button)
+    expect(button).toHaveFocus()
+  },
+}
+
 export const SwapPanes: Story = {
   parameters: storyDocumentation(
     "Dragging one pane onto another swaps them — the split structure and orientations stay exactly as they were, and new sections come from the explicit split actions instead. While hovering, both slots stand empty and the displaced pane's content travels on its own layer into the slot the drag opened, so the exchange reads as movement rather than a redraw; a miniature of the dragged pane rides the cursor, and uninvolved panes fade.",
@@ -597,6 +628,11 @@ export const SwapPanes: Story = {
       expect(pane("pane-1")).not.toBeNull()
       expect(pane("pane-2")).not.toBeNull()
     })
+
+    const workspace = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="app-shell-workspace"]',
+    )!
+    workspace.style.setProperty("--nessa-motion-duration-normal", "800ms")
 
     const leftBefore = {
       "pane-1": pane("pane-1")!.getBoundingClientRect().left,
@@ -676,6 +712,22 @@ export const SwapPanes: Story = {
       }),
     )
 
+    // Observe the actual transform transition. A fixed cleanup timer used
+    // to cancel long theme transitions halfway through their journey.
+    await waitFor(() => {
+      expect(pane("pane-1")!.getAnimations().some(
+        (animation) => animation instanceof CSSTransition &&
+          animation.transitionProperty === "transform",
+      )).toBe(true)
+    })
+    const glides = [pane("pane-1")!, pane("pane-2")!].flatMap(
+      (element) => element.getAnimations().filter(
+        (animation) => animation instanceof CSSTransition &&
+          animation.transitionProperty === "transform",
+      ),
+    )
+    await Promise.all(glides.map((animation) => animation.finished))
+
     // Released in the swap zone: the panes trade places — same row, same
     // orientation, positions exchanged.
     await waitFor(() => {
@@ -692,6 +744,14 @@ export const SwapPanes: Story = {
         0,
       )
     })
+    await waitFor(() => {
+      for (const id of ["pane-1", "pane-2"]) {
+        expect(pane(id)!.style.transition).toBe("")
+        expect(pane(id)!.style.opacity).toBe("")
+      }
+    })
+    workspace.style.removeProperty("--nessa-motion-duration-normal")
+
   },
 }
 

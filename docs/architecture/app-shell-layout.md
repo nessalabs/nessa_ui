@@ -120,14 +120,15 @@ to read as a single continuous surface.
 
 ## Dragging panes
 
-Every pane carries an `AppShellPaneGrabber` on its top edge by default — a
-short pill that appears on hover or focus, the way a window's title bar is
-the part you pick the window up by. Hosts that build their own pane chrome
-can set `paneGrabber={false}` and place an `AppShellPaneDragHandle`
-wherever they prefer; the grabber is only the default dressing on that
-handle, not a second mechanism. It is hidden from assistive technology,
-because dragging is pointer-only and a control screen-reader users cannot
-operate is worse announced than silent.
+Set `paneGrabber` to render an `AppShellPaneGrabber` on each pane's top
+edge: a short pill that appears when its pointer target is hovered. It is
+**off by default**, so existing pane content keeps receiving pointer input.
+Opt in only when the top-centre 80 by 20 CSS pixels are reserved for this
+overlay: its target receives pointer events even while the pill is hidden.
+Hosts with their own pane chrome can place an `AppShellPaneDragHandle`
+there instead. Both use the same drag mechanism. The grabber is hidden
+from assistive technology because it is pointer-only; hosts must provide
+keyboard-accessible layout actions for equivalent operations.
 
 `AppShellPaneDragHandle` makes part of a pane's chrome draggable, and
 dragging does exactly one thing: swap two panes. Picking a pane up lifts it

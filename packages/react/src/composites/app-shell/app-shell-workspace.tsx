@@ -79,9 +79,10 @@ interface AppShellWorkspaceProps
    */
   paneGap?: string
   /**
-   * Whether each pane renders the default grabber on its top edge. Turn it
-   * off when the pane's own chrome hosts an `AppShellPaneDragHandle`.
-   * @defaultValue true
+   * Whether each pane renders an overlay grabber on its top edge. Enable
+   * only when the pane reserves its top-centre 80 by 20 CSS pixels for the
+   * pointer target. Leave off when content or custom chrome owns that area.
+   * @defaultValue false
    */
   paneGrabber?: boolean
 }
@@ -369,7 +370,7 @@ function AppShellWorkspace({
   separatorLabel = "Resize workspace panes",
   paneStyle = "tiled",
   paneGap = DEFAULT_PANE_GAP,
-  paneGrabber = true,
+  paneGrabber = false,
   className,
   style,
   ...props

@@ -1050,6 +1050,7 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/overlay-panel",
         "nessalabs/nessa_ui/split-view",
         "nessalabs/nessa_ui/app-shell-layout"
       ],

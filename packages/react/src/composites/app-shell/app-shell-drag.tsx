@@ -5,6 +5,7 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { longestTransitionMs } from "@/lib/overlay-panel"
 import { swapPanes, type LayoutNodeId } from "@/lib/app-shell-layout"
 
 import { useAppShellContext } from "./app-shell"
@@ -72,12 +73,6 @@ const pendingGlideCleanups = new WeakMap<HTMLElement, () => void>()
  */
 const PANE_TRAVEL_TRANSITION =
   "transform var(--nessa-motion-duration-normal) var(--nessa-motion-easing-standard)"
-
-/**
- * How long to wait before force-finishing a glide whose `transitionend`
- * never arrives, comfortably past the token duration.
- */
-const PANE_TRAVEL_TIMEOUT_MS = 400
 
 /**
  * Animates panes gliding from their previous spots to their new ones after
@@ -186,8 +181,15 @@ function animatePaneMoves(
 
         pane.style.transition = PANE_TRAVEL_TRANSITION
         pane.style.transform = ""
+        const duration = longestTransitionMs(pane, "transform")
+        if (duration === 0) {
+          finish()
+          continue
+        }
         pane.addEventListener("transitionend", onTransitionEnd)
-        timeoutId = setTimeout(finish, PANE_TRAVEL_TIMEOUT_MS)
+        // Themes can choose durations longer than the default. The fallback
+        // must outlive the actual transition rather than snap it midway.
+        timeoutId = setTimeout(finish, duration + 50)
         pendingGlideCleanups.set(pane, cancel)
       }
     }),
@@ -672,10 +674,11 @@ interface AppShellPaneGrabberProps
  * the pane's top edge, the way a window's title bar reads as the part you
  * pick the window up by.
  *
- * It stays out of the way until the pane is hovered or holds focus, so a
- * settled workspace shows only its content. `AppShellWorkspace` renders one
- * per pane by default; hosts that build their own pane chrome can turn that
- * off and place `AppShellPaneDragHandle` wherever they prefer.
+ * The pill appears when its pointer target is hovered. Enable it with
+ * `AppShellWorkspace paneGrabber` only when the pane reserves its top centre
+ * for the overlay; it occupies an 80 by 20 CSS-pixel pointer target even
+ * while invisible. Hosts with their own chrome can instead place an
+ * `AppShellPaneDragHandle` in that chrome.
  *
  * @param props - The pane id, an optional label, and native container
  * properties.
