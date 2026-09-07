@@ -21,7 +21,7 @@ export interface AgentNotificationProps extends Omit<React.ComponentProps<"div">
   onRetry?: () => void
   /** Accessible name and hover title for the retry icon. Defaults to Retry. */
   retryLabel?: string
-  /** Shows a dismiss action. Called after the slide/fade exit (immediately under reduced motion); the host decides whether to remove the notice. */
+  /** Shows a dismiss action. Called after the exit (immediately under reduced motion). State/content changes cancel a pending exit. The host owns removal and focus placement afterward. */
   onDismiss?: () => void
   /** Development tooling: publishes bounded lifecycle events at window.__nessaAgentNotification. */
   debug?: boolean
@@ -61,6 +61,14 @@ function AgentNotification({
   ...props
 }: AgentNotificationProps) {
   const id = React.useId()
+  const [dismissing, setDismissing] = React.useState(false)
+  const statusRef = React.useRef<HTMLDivElement>(null)
+  const retryRef = React.useCallback((node: HTMLButtonElement | null) => {
+    if (!node) return
+    return () => {
+      if (node.ownerDocument.activeElement === node) statusRef.current?.focus({ preventScroll: true })
+    }
+  }, [])
   const [finishedAnimation, setFinishedAnimation] = React.useState<Animation | null>(null)
   const animationRef = React.useRef<Animation | null>(null)
   const cleanupRef = React.useRef<(() => void) | null>(null)
@@ -90,12 +98,26 @@ function AgentNotification({
     animationRef.current = null
   }, [])
 
+  React.useLayoutEffect(() => {
+    const animation = animationRef.current
+    if (!animation) return
+    cleanupRef.current?.()
+    cleanupRef.current = null
+    animationRef.current = null
+    animation.cancel()
+    setDismissing(false)
+    traceRef.current?.("dismiss-replaced")
+  }, [state, title, description])
+
   // Reset only after React commits the host's visibility update. Cancelling in
   // the promise callback exposes the resting notice for a frame before unmount.
   React.useLayoutEffect(() => {
     if (!finishedAnimation) return
     finishedAnimation.cancel()
-    if (animationRef.current === finishedAnimation) animationRef.current = null
+    if (animationRef.current === finishedAnimation) {
+      animationRef.current = null
+      setDismissing(false)
+    }
   }, [finishedAnimation])
 
   const dismiss = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -114,6 +136,17 @@ function AgentNotification({
     traceRef.current?.("dismiss-start")
     const parent = element.parentElement
     const parentStyles = parent ? view.getComputedStyle(parent) : null
+    const bounds = element.getBoundingClientRect()
+    let slideSpace = view.document.documentElement.clientWidth - bounds.right
+    // A decorative exit must not create a horizontal scrollbar in the host.
+    for (let ancestor = parent; ancestor; ancestor = ancestor.parentElement) {
+      const overflow = view.getComputedStyle(ancestor).overflowX
+      if (overflow === "auto" || overflow === "scroll") {
+        const right = ancestor.getBoundingClientRect().left + ancestor.clientLeft + ancestor.clientWidth
+        slideSpace = Math.min(slideSpace, right - bounds.right)
+      }
+    }
+    const slide = `min(calc(var(--spacing) * 10), ${Math.max(0, slideSpace)}px) 0`
     const flexItems = parent && parentStyles?.display === "flex" && parentStyles.flexDirection === "column"
       ? Array.from(parent.children).filter((child) => {
           const childStyles = view.getComputedStyle(child)
@@ -124,18 +157,19 @@ function AgentNotification({
       height: styles.height, minHeight: styles.minHeight,
       paddingTop: styles.paddingTop, paddingBottom: styles.paddingBottom,
       borderTopWidth: styles.borderTopWidth, borderBottomWidth: styles.borderBottomWidth,
-      marginBottom: styles.marginBottom,
+      marginTop: styles.marginTop, marginBottom: styles.marginBottom,
     }
     const easing = styles.getPropertyValue("--nessa-motion-easing-standard").trim() || "ease-out"
     const animation = element.animate(
       [
         { ...expanded, translate: "0 0", opacity: 1, overflow: "clip", easing, offset: 0 },
-        { ...expanded, translate: "calc(var(--spacing) * 10) 0", opacity: 0, overflow: "clip", easing, offset: 0.55 },
-        { height: "0px", minHeight: "0px", paddingTop: "0px", paddingBottom: "0px", borderTopWidth: "0px", borderBottomWidth: "0px", marginBottom: `${-gap}px`, translate: "calc(var(--spacing) * 10) 0", opacity: 0, overflow: "clip", offset: 1 },
+        { ...expanded, translate: slide, opacity: 0, overflow: "clip", easing, offset: 0.55 },
+        { height: "0px", minHeight: "0px", paddingTop: "0px", paddingBottom: "0px", borderTopWidth: "0px", borderBottomWidth: "0px", marginTop: "0px", marginBottom: `${-gap}px`, translate: slide, opacity: 0, overflow: "clip", offset: 1 },
       ],
       { duration: duration * 1.5, easing: "linear", fill: "forwards" },
     )
     animationRef.current = animation
+    setDismissing(true)
     let completed = false
     const cleanup = () => preference.removeEventListener("change", reduce)
     const finish = () => {
@@ -153,6 +187,11 @@ function AgentNotification({
     cleanupRef.current = cleanup
     void animation.finished.then(finish, () => {
       cleanup()
+      if (animationRef.current === animation) {
+        animationRef.current = null
+        cleanupRef.current = null
+        setDismissing(false)
+      }
       traceRef.current?.("dismiss-cancel")
     })
   }
@@ -170,8 +209,9 @@ function AgentNotification({
       {...props}
       data-slot="agent-notification"
       data-state={state}
+      data-dismissing={dismissing || undefined}
       className={cn(
-        "relative isolate flex min-w-0 max-w-full shrink-0 items-center gap-2 rounded-2xl border border-border bg-card/80 bg-gradient-to-br from-foreground/5 to-transparent px-3 py-2 font-sans text-card-foreground shadow-xs backdrop-blur-xl",
+        "relative isolate flex min-w-0 max-w-full shrink-0 items-center gap-2 rounded-2xl border border-border bg-card/80 bg-linear-to-br from-foreground/5 to-transparent px-3 py-2 font-sans text-card-foreground shadow-xs backdrop-blur-xl",
         "w-full",
         className,
       )}
@@ -185,17 +225,17 @@ function AgentNotification({
         aria-hidden="true"
         className={cn("relative size-4 shrink-0 text-muted-foreground", busy && "animate-spin [animation-duration:var(--nessa-motion-duration-ambient)] motion-reduce:animate-none")}
       />
-      <div role="status" aria-live="polite" aria-atomic="true" className="relative min-w-0 flex-1 break-words">
+      <div ref={statusRef} role="status" tabIndex={-1} aria-live="polite" aria-atomic="true" className="relative min-w-0 flex-1 break-words rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
         <div className="nessa-text-2 font-medium">{title ?? titles[state]}</div>
-        {description ? <div className="mt-0.5 nessa-text-1 text-muted-foreground">{description}</div> : null}
+        {description ? <div className="mt-0.5 nessa-text-1 text-card-foreground/80">{description}</div> : null}
       </div>
       {state === "disconnected" && onRetry ? (
-        <Button type="button" variant="ghost" size="icon" className="relative rounded-full text-muted-foreground" aria-label={retryLabel} title={retryLabel} onClick={onRetry}>
+        <Button type="button" variant="ghost" size="icon" className="relative rounded-full text-muted-foreground" aria-label={retryLabel} title={retryLabel} ref={retryRef} aria-disabled={dismissing || undefined} tabIndex={dismissing ? -1 : undefined} onClick={() => { if (!animationRef.current) onRetry?.() }}>
           <RotateCw aria-hidden="true" />
         </Button>
       ) : null}
       {onDismiss ? (
-        <Button type="button" variant="ghost" size="icon" className="relative rounded-full text-muted-foreground" aria-label={dismissLabel} onClick={dismiss}>
+        <Button type="button" variant="ghost" size="icon" className="relative rounded-full text-muted-foreground" aria-label={dismissLabel} aria-disabled={dismissing || undefined} tabIndex={dismissing ? -1 : undefined} onClick={dismiss}>
           <X aria-hidden="true" />
         </Button>
       ) : null}

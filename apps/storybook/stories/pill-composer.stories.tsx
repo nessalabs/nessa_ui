@@ -3446,6 +3446,7 @@ type Story = StoryObj<typeof meta>
 
 /** Exercises host-owned connection state in the existing agent window. */
 function NotificationsExample() {
+  const exampleRef = React.useRef<HTMLDivElement>(null)
   const [state, setState] = React.useState<AgentNotificationState>("disconnected")
   const [shimmer, setShimmer] = React.useState(true)
   const [visible, setVisible] = React.useState(true)
@@ -3462,7 +3463,7 @@ function NotificationsExample() {
   }, [retrying])
 
   return (
-    <div className="flex max-w-full flex-col items-center gap-4">
+    <div ref={exampleRef} className="flex max-w-full flex-col items-center gap-4">
       <div className="flex max-w-full flex-wrap justify-center gap-2" role="group" aria-label="Simulate connection">
         {(["disconnected", "connecting", "reconnecting", "connected"] as const).map((value) => (
           <Button key={value} variant={state === value ? "secondary" : "ghost"} size="sm" aria-pressed={state === value} onClick={() => {
@@ -3474,7 +3475,7 @@ function NotificationsExample() {
         <Button variant="outline" size="sm" aria-pressed={shimmer} onClick={() => setShimmer((value) => !value)}>Subtle shimmer</Button>
       </div>
       <PlaygroundExample
-        frameClassName="border border-border bg-muted/60 bg-gradient-to-br from-foreground/5 to-transparent shadow-xl backdrop-blur-xl"
+        frameClassName="border border-border bg-muted/60 bg-linear-to-br from-foreground/5 to-transparent shadow-xl backdrop-blur-xl"
         initialMessages={[{ id: 90001, role: "user", text: "hey buddy" }, { id: 90002, role: "user", text: "thanks" }]}
         notification={visible ? (
         <AgentNotification
@@ -3487,7 +3488,10 @@ function NotificationsExample() {
             setState("reconnecting")
             setRetrying(true)
           }}
-          onDismiss={() => setVisible(false)}
+          onDismiss={() => {
+            setVisible(false)
+            exampleRef.current?.querySelector<HTMLElement>('[role="textbox"]')?.focus({ preventScroll: true })
+          }}
         />
       ) : null} />
       <p className="max-w-sm text-center nessa-text-2 text-muted-foreground">Connection preview · Retry simulates a successful connection. Chat replies remain demo data.</p>
@@ -3516,9 +3520,11 @@ export const Notifications: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Subtle shimmer" }))
     await expect(shimmerLayer()).toBeInTheDocument()
     await expect(within(notice()).getByRole("status")).toHaveTextContent("Not connected")
-    await userEvent.click(canvas.getByRole("button", { name: "Retry" }))
+    canvas.getByRole("button", { name: "Retry" }).focus()
+    await userEvent.keyboard("{Enter}")
     await expect(within(notice()).getByRole("status")).toHaveTextContent("Reconnecting…")
     await expect(canvas.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument()
+    await expect(within(notice()).getByRole("status")).toHaveFocus()
     await waitFor(() => expect(within(notice()).getByRole("status")).toHaveTextContent("Connected"), { timeout: 4000 })
     const exitingNotice = notice()
     const view = canvasElement.ownerDocument.defaultView!
@@ -3531,7 +3537,8 @@ export const Notifications: Story = {
     }
     sample()
     try {
-      await userEvent.click(canvas.getByRole("button", { name: "Dismiss notification" }))
+      canvas.getByRole("button", { name: "Dismiss notification" }).focus()
+      await userEvent.keyboard("{Enter}")
       await waitFor(() => expect(canvasElement.querySelector('[data-slot="agent-notification"]')).toBeNull())
       if (!reducedMotion) {
         await expect(frames.every(({ opacity }, index) => index === 0 || opacity <= frames[index - 1].opacity + 0.001)).toBe(true)
@@ -3541,6 +3548,7 @@ export const Notifications: Story = {
     }
     await expect(shimmerLayer()).toBeNull()
     await expect(canvas.getByRole("textbox", { name: "Message" })).toBeVisible()
+    await expect(canvas.getByRole("textbox", { name: "Message" })).toHaveFocus()
   },
 }
 

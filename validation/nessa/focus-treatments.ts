@@ -8,6 +8,8 @@ const sidebarFocusComponents = Object.freeze([
 ] as const)
 
 const composerFocusComponents = Object.freeze([
+  // Status receives keyboard focus when the Retry control disappears.
+  { component: "agent-notification", count: 1 },
   // The source-document link and the badge that opens a sent message's
   // annotations; the thread's reply and discard controls are ChatMessageActions.
   { component: "chat-annotations", count: 2 },
