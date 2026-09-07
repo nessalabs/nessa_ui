@@ -98,6 +98,9 @@
      slot (5.16:1 on the darkest fill, 15:1 on the palest); the near-white
      `--foreground` a dark theme would otherwise use falls to 1.9:1. */
   --nessa-chart-label-ink: oklch(0.205 0 0);
+  /* Notification wash tints, separate from market and diff semantics. */
+  --nessa-notification-error: oklch(0.65 0.13 20);
+  --nessa-notification-success: oklch(0.62 0.10 155);
   /* The closing-ring trio, in the register people already read as activity:
      energy, effort, uprightness. This is a named set of roles, not three
      slots borrowed from the categorical ramp — see
@@ -186,6 +189,8 @@
   --nessa-chart-series-8: oklch(0.7824 0.071 230);
   --nessa-chart-series-8-strong: oklch(0.8524 0.1 230);
   --nessa-chart-label-ink: oklch(0.205 0 0);
+  --nessa-notification-error: oklch(0.76 0.12 20);
+  --nessa-notification-success: oklch(0.76 0.11 155);
   --nessa-activity-ring-1: oklch(0.66 0.225 17);
   --nessa-activity-ring-1-ink: oklch(0.72 0.17 17);
   --nessa-activity-ring-2: oklch(0.87 0.225 131);
