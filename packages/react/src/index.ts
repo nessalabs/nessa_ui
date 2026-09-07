@@ -482,6 +482,11 @@ export {
   type PillComposerRimVariant,
 } from "./components/pill-composer"
 export {
+  AgentNotification,
+  type AgentNotificationProps,
+  type AgentNotificationState,
+} from "./components/agent-notification"
+export {
   DiffStat,
   FileDiffCard,
   FileDiffCardActions,

@@ -3,6 +3,8 @@ import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, userEvent, waitFor, within } from "storybook/test"
 import {
   Button,
+  AgentNotification,
+  type AgentNotificationState,
   Card,
   ChatAnnotationBadge,
   ChatAnnotationList,
@@ -1562,10 +1564,16 @@ function PlaygroundExample({
   replyDelay = 900,
   initialTabId = "chat-1",
   initialQuotes = [],
+  notification,
+  initialMessages,
+  frameClassName,
 }: {
   replyDelay?: number
   initialTabId?: string
   initialQuotes?: ChatAnnotation[]
+  notification?: React.ReactNode
+  initialMessages?: DemoMessage[]
+  frameClassName?: string
 }) {
   // The kit's own tab shape: kind says what a tab holds and parentId gives a
   // drilled-into tab its way back.
@@ -1577,7 +1585,7 @@ function PlaygroundExample({
   const [activeTabId, setActiveTabId] = React.useState(initialTabId)
   const [messagesByTab, setMessagesByTab] = React.useState<
     Record<string, DemoMessage[]>
-  >(seededMessagesByTab)
+  >(() => initialMessages ? { ...seededMessagesByTab, [initialTabId]: initialMessages } : seededMessagesByTab)
   const messages = messagesByTab[activeTabId] ?? EMPTY_MESSAGES
   const updateMessages = React.useCallback(
     (tabId: string, updater: (current: DemoMessage[]) => DemoMessage[]) =>
@@ -1982,7 +1990,7 @@ function PlaygroundExample({
       // A fixed frame height pins the composer's bottom edge: a growing
       // input or attachment row eats the transcript's space upward instead
       // of pushing the pill down.
-      className="relative flex h-[min(38rem,calc(100vh-4rem))] min-w-0 w-[min(28rem,calc(100vw-2rem))] flex-col justify-end gap-3 rounded-[2rem] bg-background p-4"
+      className={cn("relative flex h-[min(38rem,calc(100vh-4rem))] min-w-0 w-[min(28rem,calc(100vw-2rem))] flex-col justify-end gap-3 rounded-[2rem] bg-background p-4", frameClassName)}
     >
       {/* The floating window's tab strip: each tab is its own conversation;
           the busy dot follows wherever a reply streams. */}
@@ -2605,6 +2613,7 @@ function PlaygroundExample({
           }}
         />
       ) : null}
+      {!fileTabs[activeTabId] && !isHistoryTab ? notification : null}
       {fileTabs[activeTabId] || isHistoryTab ? null : (
       <PillComposer
         generating={generating}
@@ -3434,6 +3443,88 @@ const meta = {
 
 export default meta
 type Story = StoryObj<typeof meta>
+
+/** Exercises host-owned connection state in the existing agent window. */
+function NotificationsExample() {
+  const [state, setState] = React.useState<AgentNotificationState>("disconnected")
+  const [shimmer, setShimmer] = React.useState(true)
+  const [visible, setVisible] = React.useState(true)
+  const [attempt, setAttempt] = React.useState(0)
+  const [retrying, setRetrying] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!retrying) return
+    const timer = window.setTimeout(() => {
+      setState("connected")
+      setRetrying(false)
+    }, 1200)
+    return () => window.clearTimeout(timer)
+  }, [retrying])
+
+  return (
+    <div className="flex max-w-full flex-col items-center gap-4">
+      <div className="flex max-w-full flex-wrap justify-center gap-2" role="group" aria-label="Simulate connection">
+        {(["disconnected", "connecting", "reconnecting", "connected"] as const).map((value) => (
+          <Button key={value} variant={state === value ? "secondary" : "ghost"} size="sm" aria-pressed={state === value} onClick={() => {
+            setRetrying(false)
+            setState(value)
+            setVisible(true)
+          }}>{value === "disconnected" ? "Not connected" : value === "connecting" ? "Connecting" : value === "reconnecting" ? "Reconnecting" : "Connected"}</Button>
+        ))}
+        <Button variant="outline" size="sm" aria-pressed={shimmer} onClick={() => setShimmer((value) => !value)}>Subtle shimmer</Button>
+      </div>
+      <PlaygroundExample
+        frameClassName="border border-border bg-muted/60 bg-gradient-to-br from-foreground/5 to-transparent shadow-xl backdrop-blur-xl"
+        initialMessages={[{ id: 90001, role: "user", text: "hey buddy" }, { id: 90002, role: "user", text: "thanks" }]}
+        notification={visible ? (
+        <AgentNotification
+          state={state}
+          shimmer={shimmer}
+          description={state === "disconnected" ? "The agent is offline. Try connecting again." : state === "reconnecting" ? (attempt ? `Retry attempt ${attempt} · Restoring your connection.` : "Restoring your connection.") : state === "connecting" ? "Establishing a connection to your agent." : "You're ready to continue."}
+          onRetry={() => {
+            setAttempt((value) => value + 1)
+            setState("reconnecting")
+            setRetrying(true)
+          }}
+          onDismiss={() => setVisible(false)}
+        />
+      ) : null} />
+      <p className="max-w-sm text-center nessa-text-2 text-muted-foreground">Connection preview · Retry simulates a successful connection. Chat replies remain demo data.</p>
+    </div>
+  )
+}
+
+export const Notifications: Story = {
+  tags: ["reduced-motion"],
+  parameters: storyDocumentation("Glass notifications inside the agent window, directly above the pill composer. Toggle a subtle shader-like mesh shimmer, preview all four connection states, dismiss the surface, or retry. Shimmer is off by default in the component; this example enables it for comparison. It uses a faint red wash when disconnected, green when connected, and blue while connecting or reconnecting, and becomes static under reduced motion. The demo completes a retry after 1.2 seconds; real connection lifecycle and delivery belong to the host app."),
+  render: () => <NotificationsExample />,
+  play: async ({ canvasElement }) => {
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
+    const canvas = within(canvasElement)
+    const notice = () => canvasElement.querySelector<HTMLElement>('[data-slot="agent-notification"]')!
+    const shimmerLayer = () => canvasElement.querySelector<HTMLElement>('[data-slot="agent-notification-shimmer"]')
+    await expect(shimmerLayer()).toBeInTheDocument()
+    const reducedMotion = canvasElement.ownerDocument.defaultView!.matchMedia("(prefers-reduced-motion: reduce)").matches
+    await waitFor(() => expect(shimmerLayer()!.querySelector('[data-slot="morphing-mesh-gradient"]')).toHaveAttribute("data-animated", String(!reducedMotion)))
+    const shimmerAnimations = shimmerLayer()!.getAnimations({ subtree: true })
+    if (reducedMotion) await expect(shimmerAnimations).toHaveLength(0)
+    else await expect(shimmerAnimations.length).toBeGreaterThan(0)
+    await userEvent.click(canvas.getByRole("button", { name: "Subtle shimmer" }))
+    await expect(shimmerLayer()).toBeNull()
+    await expect(shimmerAnimations.every((animation) => animation.playState === "idle")).toBe(true)
+    await userEvent.click(canvas.getByRole("button", { name: "Subtle shimmer" }))
+    await expect(shimmerLayer()).toBeInTheDocument()
+    await expect(within(notice()).getByRole("status")).toHaveTextContent("Not connected")
+    await userEvent.click(canvas.getByRole("button", { name: "Retry" }))
+    await expect(within(notice()).getByRole("status")).toHaveTextContent("Reconnecting…")
+    await expect(canvas.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument()
+    await waitFor(() => expect(within(notice()).getByRole("status")).toHaveTextContent("Connected"), { timeout: 4000 })
+    await userEvent.click(canvas.getByRole("button", { name: "Dismiss notification" }))
+    await expect(canvasElement.querySelector('[data-slot="agent-notification"]')).toBeNull()
+    await expect(shimmerLayer()).toBeNull()
+    await expect(canvas.getByRole("textbox", { name: "Message" })).toBeVisible()
+  },
+}
 
 export const Playground: Story = {
   tags: ["reduced-motion"],
