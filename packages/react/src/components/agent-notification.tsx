@@ -21,8 +21,10 @@ export interface AgentNotificationProps extends Omit<React.ComponentProps<"div">
   onRetry?: () => void
   /** Accessible name and hover title for the retry icon. Defaults to Retry. */
   retryLabel?: string
-  /** Shows a dismiss action. The host decides whether to hide the notice. */
+  /** Shows a dismiss action. Called after the slide/fade exit (immediately under reduced motion); the host decides whether to remove the notice. */
   onDismiss?: () => void
+  /** Development tooling: publishes bounded lifecycle events at window.__nessaAgentNotification. */
+  debug?: boolean
   dismissLabel?: string
 }
 
@@ -34,7 +36,7 @@ const titles: Record<AgentNotificationState, string> = {
 }
 
 const shimmerTints: Record<AgentNotificationState, string> = {
-  disconnected: "var(--destructive)",
+  disconnected: "var(--nessa-notification-error)",
   connected: "var(--nessa-notification-success)",
   connecting: "var(--nessa-chat-accent)",
   reconnecting: "var(--nessa-chat-accent)",
@@ -55,13 +57,84 @@ function AgentNotification({
   onDismiss,
   dismissLabel = "Dismiss notification",
   className,
+  debug = false,
   ...props
 }: AgentNotificationProps) {
+  const id = React.useId()
+  const animationRef = React.useRef<Animation | null>(null)
+  const cleanupRef = React.useRef<(() => void) | null>(null)
+  const dismissRef = React.useRef(onDismiss)
+  React.useLayoutEffect(() => { dismissRef.current = onDismiss }, [onDismiss])
+  const traceRef = React.useRef<((ev: string) => void) | null>(null)
+  React.useEffect(() => {
+    if (!debug) return
+    const events: { t: number; ev: string }[] = []
+    const scope = window as typeof window & {
+      __nessaAgentNotification?: Record<string, { events: typeof events; snapshot: () => { dismissing: boolean } }>
+    }
+    scope.__nessaAgentNotification ??= {}
+    scope.__nessaAgentNotification[id] = { events, snapshot: () => ({ dismissing: animationRef.current !== null }) }
+    traceRef.current = (ev) => {
+      events.push({ t: performance.now(), ev })
+      if (events.length > 4000) events.shift()
+    }
+    return () => {
+      traceRef.current = null
+      delete scope.__nessaAgentNotification?.[id]
+    }
+  }, [debug, id])
+  React.useEffect(() => () => {
+    cleanupRef.current?.()
+    animationRef.current?.cancel()
+    animationRef.current = null
+  }, [])
+
+  const dismiss = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (animationRef.current) return
+    const element = event.currentTarget.closest<HTMLElement>('[data-slot="agent-notification"]')!
+    const view = element.ownerDocument.defaultView!
+    const preference = view.matchMedia("(prefers-reduced-motion: reduce)")
+    const styles = view.getComputedStyle(element)
+    const value = styles.getPropertyValue("--nessa-motion-duration-normal").trim()
+    const duration = Number.parseFloat(value) * (value.endsWith("ms") ? 1 : 1000)
+    if (preference.matches || !Number.isFinite(duration) || duration <= 0 || !element.animate) {
+      traceRef.current?.("dismiss-immediate")
+      dismissRef.current?.()
+      return
+    }
+    traceRef.current?.("dismiss-start")
+    const animation = element.animate(
+      [{ translate: "0 0", opacity: 1 }, { translate: "calc(var(--spacing) * 4) 0", opacity: 0 }],
+      { duration, easing: styles.getPropertyValue("--nessa-motion-easing-standard").trim() || "ease-out", fill: "forwards" },
+    )
+    animationRef.current = animation
+    let completed = false
+    const cleanup = () => preference.removeEventListener("change", reduce)
+    const finish = () => {
+      if (completed || animationRef.current !== animation) return
+      completed = true
+      cleanup()
+      cleanupRef.current = null
+      traceRef.current?.("dismiss-finish")
+      try { dismissRef.current?.() } finally {
+        // A host may keep the notice mounted; restore it once it has handled dismissal.
+        animation.cancel()
+        animationRef.current = null
+      }
+    }
+    const reduce = () => { if (preference.matches) finish() }
+    preference.addEventListener("change", reduce)
+    cleanupRef.current = cleanup
+    void animation.finished.then(finish, () => {
+      cleanup()
+      traceRef.current?.("dismiss-cancel")
+    })
+  }
   const tint = shimmerTints[state]
   const shimmerColors = [
-    `color-mix(in oklab, ${tint} 35%, var(--card))`,
+    `color-mix(in oklab, ${tint} 25%, transparent)`,
     tint,
-    `color-mix(in oklab, ${tint} 70%, var(--card))`,
+    `color-mix(in oklab, ${tint} 65%, transparent)`,
   ]
   const busy = state === "connecting" || state === "reconnecting"
   const Icon = busy ? LoaderCircle : state === "connected" ? Check : WifiOff
@@ -78,8 +151,8 @@ function AgentNotification({
       )}
     >
       {shimmer ? (
-        <div data-slot="agent-notification-shimmer" aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-clip rounded-[inherit] opacity-10">
-          <MorphingMeshGradient colors={shimmerColors} type="aurora" speed={0.25} blur={20} grain={0.12} className="absolute inset-0" />
+        <div data-slot="agent-notification-shimmer" aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-clip rounded-[inherit] opacity-20 [mask-image:linear-gradient(110deg,black,black_30%,transparent_90%)]">
+          <MorphingMeshGradient colors={shimmerColors} type="aurora" speed={0.25} blur={20} grain={0.12} className="absolute inset-0 bg-transparent" />
         </div>
       ) : null}
       <Icon
@@ -96,7 +169,7 @@ function AgentNotification({
         </Button>
       ) : null}
       {onDismiss ? (
-        <Button type="button" variant="ghost" size="icon" className="relative rounded-full text-muted-foreground" aria-label={dismissLabel} onClick={onDismiss}>
+        <Button type="button" variant="ghost" size="icon" className="relative rounded-full text-muted-foreground" aria-label={dismissLabel} onClick={dismiss}>
           <X aria-hidden="true" />
         </Button>
       ) : null}

@@ -3478,6 +3478,7 @@ function NotificationsExample() {
         initialMessages={[{ id: 90001, role: "user", text: "hey buddy" }, { id: 90002, role: "user", text: "thanks" }]}
         notification={visible ? (
         <AgentNotification
+          debug
           state={state}
           shimmer={shimmer}
           description={state === "disconnected" ? "The agent is offline. Try connecting again." : state === "reconnecting" ? (attempt ? `Retry attempt ${attempt} · Restoring your connection.` : "Restoring your connection.") : state === "connecting" ? "Establishing a connection to your agent." : "You're ready to continue."}
@@ -3520,7 +3521,7 @@ export const Notifications: Story = {
     await expect(canvas.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument()
     await waitFor(() => expect(within(notice()).getByRole("status")).toHaveTextContent("Connected"), { timeout: 4000 })
     await userEvent.click(canvas.getByRole("button", { name: "Dismiss notification" }))
-    await expect(canvasElement.querySelector('[data-slot="agent-notification"]')).toBeNull()
+    await waitFor(() => expect(canvasElement.querySelector('[data-slot="agent-notification"]')).toBeNull())
     await expect(shimmerLayer()).toBeNull()
     await expect(canvas.getByRole("textbox", { name: "Message" })).toBeVisible()
   },
