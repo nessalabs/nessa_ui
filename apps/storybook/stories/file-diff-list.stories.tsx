@@ -255,3 +255,26 @@ export const AgentTurnComposition: Story = {
     await expect(canvas.getByRole("button", { name: "Review" })).toBeVisible()
   },
 }
+
+export const VirtualizedFiles: Story = {
+  parameters: storyDocumentation("The existing file-diff primitives opt into VirtualList through FileDiffList virtualize. Native ul/li semantics and the card collapse contract are preserved; only the visible fixed-height rows mount."),
+  render: () => <FileDiffCard defaultExpanded itemCount={10000} className="w-full max-w-2xl">
+    <FileDiffCardHeader><FileDiffCardHeading><FileDiffCardTitle>10,000 changed files</FileDiffCardTitle></FileDiffCardHeading></FileDiffCardHeader>
+    <FileDiffList virtualize height={320} rowHeight={40} aria-label="Virtual changed files">
+      {Array.from({ length: 10000 }, (_, index) => <FileDiffListItem key={index}><FileDiffPath path={`src/components/file-${index}.tsx`} /><DiffStat additions={index % 20} deletions={index % 4} /></FileDiffListItem>)}
+    </FileDiffList>
+    <FileDiffListToggle />
+  </FileDiffCard>,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const list = canvas.getByRole("list", { name: "Virtual changed files" })
+    await expect(list.tagName).toBe("UL")
+    await expect(within(list).getAllByRole("listitem").length).toBeLessThan(30)
+    list.scrollTop = list.scrollHeight
+    list.dispatchEvent(new Event("scroll"))
+    await expect(within(list).getByText("file-9999.tsx")).toBeVisible()
+    await userEvent.click(canvas.getByRole("button", { name: "Collapse files" }))
+    await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(3))
+    await expect(list.scrollTop).toBe(0)
+  },
+}

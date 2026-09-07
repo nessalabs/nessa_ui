@@ -10,6 +10,8 @@ export {
 } from "./window-deck"
 export { WindowDeckPane, type WindowDeckPaneProps } from "./window-deck-pane"
 export {
+  WINDOW_DECK_GESTURE_ATTRIBUTE,
+  hasGestureOptOutAncestor,
   useWindowDeck,
   type WindowDeckContentMount,
   type WindowDeckContextValue,

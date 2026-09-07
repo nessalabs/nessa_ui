@@ -58,10 +58,20 @@ function useAppShellDrag(): AppShellDragContextValue {
 }
 
 /**
- * Cleanup cancelers for glides still in flight, so re-animating a pane can
- * cancel the previous glide's timers before writing new styles.
+ * Cleanup ownership for glides still in flight, so a superseded animation
+ * cannot clear the styles of a new glide on the same pane.
  */
 const pendingGlideCleanups = new WeakMap<HTMLElement, () => void>()
+
+/**
+ * The transition both drag journeys use — the displaced pane travelling
+ * into the emptied slot, and the two panes gliding to their new spots on
+ * drop. The standard easing decelerates into the destination and stops
+ * there: a pane arriving in a slot should settle, not bounce, so the
+ * motion says "this moved" without drawing attention to itself.
+ */
+const PANE_TRAVEL_TRANSITION =
+  "transform var(--nessa-motion-duration-normal) var(--nessa-motion-easing-standard)"
 
 /**
  * Animates panes gliding from their previous spots to their new ones after
@@ -129,8 +139,8 @@ function animatePaneMoves(
           continue
         }
 
-        // A glide already running on this pane hands over cleanly: its
-        // timers are canceled so they cannot snap the new glide mid-flight.
+        // Disown the previous glide before changing styles. Its canceled
+        // animation may settle later and must not clear this glide.
         pendingGlideCleanups.get(pane)?.()
 
         pane.style.transformOrigin = "top left"
@@ -143,23 +153,12 @@ function animatePaneMoves(
         pane.style.opacity = "0.9"
         void pane.offsetWidth // settle the starting position without animating
 
-        let timeoutId: ReturnType<typeof setTimeout>
-
-        /** Only the pane's own transform ending counts — color or hover
-         * transitions bubbling up from content must not cut the glide. */
-        const onTransitionEnd = (event: TransitionEvent) => {
-          if (event.target === pane && event.propertyName === "transform") {
-            finish()
-          }
-        }
-
         const cancel = () => {
-          clearTimeout(timeoutId)
-          pane.removeEventListener("transitionend", onTransitionEnd)
           pendingGlideCleanups.delete(pane)
         }
 
         const finish = () => {
+          if (pendingGlideCleanups.get(pane) !== cancel) return
           cancel()
           pane.style.transition = ""
           pane.style.transform = ""
@@ -168,11 +167,24 @@ function animatePaneMoves(
           pane.style.opacity = ""
         }
 
-        pane.style.transition = "transform 150ms ease"
-        pane.style.transform = ""
-        pane.addEventListener("transitionend", onTransitionEnd)
-        timeoutId = setTimeout(finish, 250)
         pendingGlideCleanups.set(pane, cancel)
+        pane.style.transition = PANE_TRAVEL_TRANSITION
+        pane.style.transform = ""
+        // Resolve the transition after the final style write. Completion
+        // belongs to the animation timeline: even a duration-derived wall
+        // timer can outrun rendering under load or when playback is slowed.
+        const transitions = pane.getAnimations().filter(
+          (animation) => animation instanceof CSSTransition &&
+            animation.transitionProperty === "transform",
+        )
+        if (transitions.length === 0) {
+          finish()
+        } else {
+          // Cancellation (including removal from the document) also releases
+          // styles, unless a newer glide has already taken ownership.
+          void Promise.all(transitions.map((animation) => animation.finished))
+            .then(finish, finish)
+        }
       }
     }),
   )
@@ -308,6 +320,83 @@ function AppShellDragProvider({
     [placeGhost, workspaceRef],
   )
 
+  // While a drop target is hovered, the pane being displaced does not
+  // simply appear in the emptied slot — it travels there. One layer holds a
+  // snapshot of the target's content, starts on top of the target, and
+  // glides into the hole the dragged pane left, so the swap reads as two
+  // things trading places rather than two things blinking.
+  const attachDisplaced = React.useCallback(
+    (element: HTMLDivElement | null) => {
+      if (!element) return
+
+      const workspace = workspaceRef.current
+      const sourceId = draggingRef.current
+      const targetId = dropTargetRef.current?.paneId
+
+      if (!workspace || !sourceId || !targetId) return
+
+      // Pane ids are consumer-supplied strings, so panes are matched on
+      // dataset values rather than interpolated into a CSS selector.
+      const panes = [
+        ...workspace.querySelectorAll<HTMLElement>(
+          '[data-slot="app-shell-pane"]',
+        ),
+      ]
+      const source = panes.find((pane) => pane.dataset.paneId === sourceId)
+      const target = panes.find((pane) => pane.dataset.paneId === targetId)
+
+      if (!source || !target) return
+
+      const root = workspace.getBoundingClientRect()
+      const from = target.getBoundingClientRect()
+      const to = source.getBoundingClientRect()
+
+      if (from.width === 0 || from.height === 0) return
+
+      const content =
+        target.querySelector<HTMLElement>(
+          '[data-slot="app-shell-pane-content"]',
+        ) ?? target
+      const snapshot = content.cloneNode(true) as HTMLElement
+
+      // The clone must never look like a real pane to the drop hit test.
+      snapshot.removeAttribute("data-slot")
+      snapshot.removeAttribute("data-pane-id")
+      snapshot.classList.remove("invisible")
+      // Laid out once at the size it is travelling to, so the journey is a
+      // pure translation. Scaling the box to fit would stretch the content
+      // by each axis independently and squash the text whenever the two
+      // panes differ in shape — and the destination size is the honest
+      // preview anyway, since that is what the drop actually produces.
+      snapshot.style.width = "100%"
+      snapshot.style.height = "100%"
+      element.replaceChildren(snapshot)
+
+      element.style.width = `${to.width}px`
+      element.style.height = `${to.height}px`
+      element.style.transformOrigin = "top left"
+
+      const start = `translate(${from.left - root.left}px, ${from.top - root.top}px)`
+      const end = `translate(${to.left - root.left}px, ${to.top - root.top}px)`
+
+      element.style.transition = "none"
+      element.style.transform = start
+      void element.offsetWidth // settle the start without animating it
+
+      if (
+        typeof matchMedia !== "undefined" &&
+        matchMedia("(prefers-reduced-motion: reduce)").matches
+      ) {
+        element.style.transform = end
+        return
+      }
+
+      element.style.transition = PANE_TRAVEL_TRANSITION
+      element.style.transform = end
+    },
+    [workspaceRef],
+  )
+
   const startDrag = React.useCallback((paneId: LayoutNodeId) => {
     if (draggingRef.current !== null) return false
 
@@ -398,6 +487,18 @@ function AppShellDragProvider({
   return (
     <AppShellDragContext.Provider value={contextValue}>
       {children}
+      {draggingPaneId !== null && dropTarget !== null ? (
+        // Keyed on the target so hovering a different pane remounts the
+        // layer and replays the journey from that pane's own position.
+        <div
+          key={dropTarget.paneId}
+          ref={attachDisplaced}
+          aria-hidden
+          inert
+          data-slot="app-shell-displaced-pane"
+          className="pointer-events-none absolute left-0 top-0 z-30 overflow-hidden rounded-lg bg-background opacity-90 shadow-lg ring-1 ring-border ring-inset"
+        />
+      ) : null}
       {draggingPaneId !== null ? (
         // The ghost — a faded miniature of the dragged pane — rides the
         // cursor. It mounts hidden; the mounting ref fills and places it.
@@ -477,6 +578,9 @@ function AppShellPaneDragHandle({
     <div
       {...props}
       data-slot="app-shell-pane-drag-handle"
+      // Moving a pane within the workspace is this element's own pointer
+      // drag, so an enclosing WindowDeck must not throw the whole window.
+      data-deck-gesture="ignore"
       data-dragging={draggingPaneId === paneId || undefined}
       className={cn(
         "cursor-grab touch-none select-none data-dragging:cursor-grabbing",
@@ -545,11 +649,99 @@ function AppShellPaneDragHandle({
   )
 }
 
+/** Properties accepted by the pane grabber. */
+interface AppShellPaneGrabberProps
+  extends Omit<React.ComponentProps<"div">, "children"> {
+  /** The pane this grabber moves. */
+  paneId: LayoutNodeId
+  /**
+   * Tooltip shown when the pointer rests on the grabber. Override it to
+   * localize. The grabber is hidden from assistive technology, so this is
+   * a pointer affordance only.
+   * @defaultValue "Move"
+   */
+  label?: string
+}
+
+/**
+ * Renders the default affordance for moving a pane: a short pill centred on
+ * the pane's top edge, the way a window's title bar reads as the part you
+ * pick the window up by.
+ *
+ * The pill appears when its pointer target is hovered. Enable it with
+ * `AppShellWorkspace paneGrabber` only when the pane reserves its top centre
+ * for the overlay; it occupies an 80 by 20 CSS-pixel pointer target even
+ * while invisible. Hosts with their own chrome can instead place an
+ * `AppShellPaneDragHandle` in that chrome.
+ *
+ * @param props - The pane id, an optional label, and native container
+ * properties.
+ * @returns The pane's grabber, positioned over its top edge.
+ */
+function AppShellPaneGrabber({
+  paneId,
+  label = "Move",
+  className,
+  ...props
+}: AppShellPaneGrabberProps) {
+  const { draggingPaneId } = useAppShellDrag()
+
+  return (
+    // The strip spans the pane so the band is centred, but only the band
+    // itself takes the pointer — the rest of the top edge stays the pane's,
+    // so a host's own header controls keep their clicks and never summon
+    // the grabber by being hovered.
+    <div
+      data-slot="app-shell-pane-grabber"
+      className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center"
+    >
+      <AppShellPaneDragHandle
+        {...props}
+        paneId={paneId}
+        // Hidden from assistive technology on purpose. Dragging is a
+        // pointer-only affordance — keyboard users reach every layout the
+        // grabber can produce through the split, swap, and close actions —
+        // and a div announced as a control it cannot operate is worse than
+        // one that is not announced at all. `title` still shows the pointer
+        // tooltip.
+        aria-hidden
+        title={label}
+        className={cn(
+          // A centred band, not the whole edge: the grabber answers to the
+          // middle of the header only.
+          "group/app-shell-grabber pointer-events-auto",
+          "flex h-5 w-20 items-center justify-center",
+          "opacity-0 transition-opacity",
+          "hover:opacity-100",
+          draggingPaneId === paneId && "opacity-100",
+          // While another pane is being dragged, this pane is a drop target
+          // showing a preview of the swap. Its own grabber would sit on top
+          // of that preview, so it stays down until the drag is over.
+          draggingPaneId !== null &&
+            draggingPaneId !== paneId &&
+            "opacity-0 hover:opacity-0",
+          className,
+        )}
+      >
+        <span
+          aria-hidden
+          className={cn(
+            "h-1 w-7 rounded-full bg-muted-foreground/40 transition-colors",
+            "group-hover/app-shell-grabber:bg-muted-foreground/60",
+          )}
+        />
+      </AppShellPaneDragHandle>
+    </div>
+  )
+}
+
 export {
   AppShellDragProvider,
   AppShellPaneDragHandle,
+  AppShellPaneGrabber,
   useAppShellDrag,
   type AppShellDragContextValue,
   type AppShellPaneDragHandleProps,
+  type AppShellPaneGrabberProps,
   type PaneDropTarget,
 }

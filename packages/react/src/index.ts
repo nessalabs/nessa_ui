@@ -482,6 +482,11 @@ export {
   type PillComposerRimVariant,
 } from "./components/pill-composer"
 export {
+  AgentNotification,
+  type AgentNotificationProps,
+  type AgentNotificationState,
+} from "./components/agent-notification"
+export {
   DiffStat,
   FileDiffCard,
   FileDiffCardActions,
@@ -1032,3 +1037,6 @@ export {
   type WindowDeckViewport,
 } from "./components/window-deck"
 export { cn } from "./lib/utils"
+export { VirtualList, type VirtualListProps } from "./components/virtual-list"
+export { GitHistory, layoutGitHistory, type GitHistoryProps, type GitCommit, type GitGraphRow } from "./components/git-history"
+export { GitCommitDetails, type GitCommitDetailsProps, type GitCommitDetailsData, type GitChangedFile, type GitCommitResource } from "./components/git-commit-details"

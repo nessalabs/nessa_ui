@@ -113,6 +113,8 @@
           "nessa-chart-series-8": "oklch(0.8824 0.071 230)",
           "nessa-chart-series-8-strong": "oklch(0.72 0.1 230)",
           "nessa-chart-label-ink": "oklch(0.205 0 0)",
+          "nessa-notification-error": "oklch(0.65 0.13 20)",
+          "nessa-notification-success": "oklch(0.62 0.10 155)",
           "nessa-diff-addition": "oklch(0.5 0.137 150)",
           "nessa-diff-deletion": "oklch(0.55 0.19 27)",
           "nessa-market-gain": "oklch(0.5 0.135 148)",
@@ -174,6 +176,8 @@
           "nessa-chart-series-8": "oklch(0.7824 0.071 230)",
           "nessa-chart-series-8-strong": "oklch(0.8524 0.1 230)",
           "nessa-chart-label-ink": "oklch(0.205 0 0)",
+          "nessa-notification-error": "oklch(0.76 0.12 20)",
+          "nessa-notification-success": "oklch(0.76 0.11 155)",
           "nessa-diff-addition": "oklch(0.77 0.17 152)",
           "nessa-diff-deletion": "oklch(0.7 0.19 25)",
           "nessa-market-gain": "oklch(0.8 0.19 150)",
@@ -1336,6 +1340,28 @@
       ]
     },
     {
+      "name": "agent-notification",
+      "type": "registry:ui",
+      "title": "Agent Notification",
+      "description": "A full-width glass notification for agent status, with optional state-tinted shimmer and host-controlled retry and dismissal.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/morphing-mesh-gradient",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/agent-notification.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/agent-notification.tsx"
+        }
+      ]
+    },
+    {
       "name": "chat-composer-editor",
       "type": "registry:ui",
       "title": "Chat Composer Editor",
@@ -1409,7 +1435,8 @@
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
-        "nessalabs/nessa_ui/utils"
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/virtual-list"
       ],
       "files": [
         {
@@ -2377,6 +2404,74 @@
         "type": "registry:ui",
         "target": "components/window-deck/window-deck-shortcuts.ts"
       }
+      ]
+    },
+    {
+      "name": "virtual-list",
+      "type": "registry:ui",
+      "title": "Virtual List",
+      "description": "Fixed-row windowing with stable keys and accessible list positions.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/virtual-list.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/virtual-list.tsx"
+        }
+      ],
+      "dependencies": [
+        "radix-ui",
+        "react-dom"
+      ]
+    },
+    {
+      "name": "git-history",
+      "type": "registry:ui",
+      "title": "Git History",
+      "description": "Parent-derived Git commit history with references and optional row virtualization.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/badge",
+        "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/virtual-list"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/git-history/index.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/git-history/index.tsx"
+        },
+        {
+          "path": "packages/react/src/components/git-history/git-history-layout.ts",
+          "type": "registry:ui",
+          "target": "components/ui/git-history/git-history-layout.ts"
+        }
+      ]
+    },
+    {
+      "name": "git-commit-details",
+      "dependencies": ["lucide-react"],
+      "type": "registry:ui",
+      "title": "Git Commit Details",
+      "description": "Independent commit inspector with changed files and host-linked agent sessions or plans.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/badge",
+        "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/file-diff-list",
+        "nessalabs/nessa_ui/git-history",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/git-commit-details.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/git-commit-details.tsx"
+        }
       ]
     }
   ]

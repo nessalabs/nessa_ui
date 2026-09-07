@@ -3,6 +3,7 @@
 import * as React from "react"
 import { ChevronDown } from "lucide-react"
 
+import { VirtualList } from "./virtual-list"
 import { cn } from "@/lib/utils"
 
 interface FileDiffCardContextValue {
@@ -221,7 +222,14 @@ function FileDiffPath({ path, className, ...props }: FileDiffPathProps) {
 }
 
 // The list id is owned by FileDiffCard so aria-controls stays coherent.
-export type FileDiffListProps = Omit<React.ComponentProps<"ul">, "id">
+export interface FileDiffListProps extends Omit<React.ComponentProps<"ul">, "id"> {
+  /** Opt into shared fixed-row virtualization. Defaults to false for existing compositions. */
+  virtualize?: boolean
+  /** Fixed row height used only when virtualized; each child must fit. Defaults to 40. */
+  rowHeight?: number
+  /** Virtualized scroll viewport height in CSS pixels. Defaults to 320. */
+  height?: number
+}
 
 // Collapsing hides rows, not structural wrappers, so fragments produced by
 // grouping (`{groups.map((group) => <Fragment key={group.id}>…</Fragment>)}`)
@@ -247,7 +255,10 @@ function flattenListChildren(
   })
 }
 
-function FileDiffList({ className, children, ...props }: FileDiffListProps) {
+const fileDiffListFocusClassName = "outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+
+/** Renders the card's expanded or collapsed file rows, optionally using VirtualList with native list semantics. Virtualized children must forward row styles and fit rowHeight. */
+function FileDiffList({ className, children, virtualize = false, rowHeight = 40, height = 320, ...props }: FileDiffListProps) {
   const { expanded, collapsedCount, registerItemCount, listId } =
     useFileDiffCardContext("FileDiffList")
   const listRef = React.useRef<HTMLUListElement>(null)
@@ -282,7 +293,18 @@ function FileDiffList({ className, children, ...props }: FileDiffListProps) {
     const observer = new ResizeObserver(updateScrollable)
     observer.observe(element)
     return () => observer.disconnect()
-  }, [updateScrollable])
+  }, [updateScrollable, virtualize])
+
+  if (virtualize) {
+    const visible = expanded ? items : items.slice(0, collapsedCount)
+    const { ref: externalRef, ...listProps } = props
+    return <VirtualList {...listProps} ref={externalRef} as="ul" itemAsChild id={listId}
+      items={visible} getKey={(item, index) => React.isValidElement(item) ? item.key ?? index : index}
+      height={Math.max(rowHeight, Math.min(height, visible.length * rowHeight))} rowHeight={rowHeight}
+      className={cn(fileDiffListFocusClassName, className)}>
+      {(item) => item}
+    </VirtualList>
+  }
 
   return (
     <ul
@@ -294,7 +316,8 @@ function FileDiffList({ className, children, ...props }: FileDiffListProps) {
         // The default height cap keeps hundred-file change sets scrollable
         // inside a stable card instead of growing without bound; hosts
         // override it with their own max-h-* utility.
-        "m-0 grid max-h-80 list-none overflow-y-auto p-0 outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
+        "m-0 grid max-h-80 list-none overflow-y-auto p-0",
+        fileDiffListFocusClassName,
         className,
       )}
       {...props}

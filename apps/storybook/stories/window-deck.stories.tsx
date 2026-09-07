@@ -2,6 +2,8 @@ import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, userEvent, waitFor, within } from "storybook/test"
 import {
+  AppShell,
+  AppShellWorkspace,
   Badge,
   Button,
   ChatBubble,
@@ -13,6 +15,9 @@ import {
   TaskListItem,
   WindowDeck,
   WindowDeckPane,
+  PaneSplitDirection,
+  createAppShellLayout,
+  splitPane,
 } from "@nessalabs/ui"
 import {
   CalendarDays,
@@ -1006,6 +1011,137 @@ const manyWindows = Array.from({ length: 12 }, (_, index) => ({
   live: `live-${index}`,
   preview: `preview-${index}`,
 }))
+
+/**
+ * One window holding a split workspace. The deck moves whole windows; the
+ * shell tiles within one. They only compose if the deck knows to keep its
+ * hands off a gesture the shell owns, which is what the play test asserts.
+ */
+/**
+ * A cheap stand-in for one window's workspace, shown while the deck is in
+ * the overview. Overview tiles are scaled, and a live workspace measures
+ * itself with `getBoundingClientRect` — which reports transformed
+ * rectangles — so the real thing must never be the thing that is scaled.
+ */
+function WorkspacePreview({ name }: { name: string }) {
+  return (
+    <div aria-hidden className="flex h-full gap-1.5 p-1.5">
+      {[`${name}:notes`, `${name}:tasks`].map((view) => (
+        <div
+          key={view}
+          className="flex-1 rounded-lg bg-muted/60 p-3 ring-1 ring-border ring-inset"
+        >
+          <span className="nessa-text-2 text-muted-foreground">{view}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function WindowWorkspace({ name }: { name: string }) {
+  return (
+    <AppShell
+      className="h-full"
+      defaultLayout={splitPane(
+        createAppShellLayout({
+          initialPaneId: `${name}-left`,
+          views: [`${name}:notes`],
+          openDocks: [],
+        }),
+        {
+          paneId: `${name}-left`,
+          direction: PaneSplitDirection.Right,
+          newPaneId: `${name}-right`,
+          views: [`${name}:tasks`],
+        },
+      )}
+    >
+      <AppShellWorkspace
+        paneGrabber
+        renderPane={(pane) => (
+          <div className="flex h-full flex-col gap-1 p-3 pt-6">
+            <span className="text-xs font-medium">{pane.activeViewId}</span>
+            <span className="nessa-text-2 text-muted-foreground">
+              Drag the space between tiles to resize.
+            </span>
+          </div>
+        )}
+      />
+    </AppShell>
+  )
+}
+
+export const WorkspacesInsideWindows: Story = {
+  parameters: storyDocumentation(
+    "A deck of windows, each one a split workspace. The two layout systems do not contend: the deck moves whole windows by transform, the shell tiles within one by flex weights. The join between them is a gesture boundary — a split separator and a pane grabber mark themselves with `data-deck-gesture=\"ignore\"`, and the deck walks up from the event target and stands down, so resizing a split inside a window never throws the window away.",
+  ),
+  args: { children: null },
+  render: () => (
+    <div className="h-svh w-full bg-background p-4">
+      <WindowDeck className="h-full" contentMount="always">
+        {["Planner", "Review"].map((name) => (
+          <WindowDeckPane
+            key={name}
+            id={name.toLowerCase()}
+            label={name}
+            header={<PaneHeader icon={PanelsTopLeft} name={name} subtitle="2 panes" />}
+            preview={<WorkspacePreview name={name.toLowerCase()} />}
+            dismissible
+          >
+            <WindowWorkspace name={name.toLowerCase()} />
+          </WindowDeckPane>
+        ))}
+      </WindowDeck>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const deck = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="window-deck"]',
+    )
+    const pane = (id: string) =>
+      canvasElement.querySelector<HTMLElement>(`[data-pane-id="${id}"]`)
+
+    await waitFor(() => expect(pane("planner-left")).not.toBeNull())
+
+    const separator = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="split-view-separator"]',
+    )
+
+    if (!separator) throw new Error("No separator rendered.")
+
+    // The separator opts out of the deck's gestures, so the deck can tell a
+    // resize from a throw.
+    await expect(separator).toHaveAttribute("data-deck-gesture", "ignore")
+
+    const widthOf = (id: string) =>
+      pane(id)?.getBoundingClientRect().width ?? 0
+    const before = widthOf("planner-left")
+    const box = separator.getBoundingClientRect()
+    const from = {
+      clientX: Math.round(box.left + box.width / 2),
+      clientY: Math.round(box.top + box.height / 2),
+    }
+
+    await userEvent.pointer([
+      { keys: "[MouseLeft>]", target: separator, coords: from },
+      { target: separator, coords: { ...from, clientX: from.clientX + 60 } },
+      {
+        keys: "[/MouseLeft]",
+        target: separator,
+        coords: { ...from, clientX: from.clientX + 60 },
+      },
+    ])
+
+    // The drag resized the split...
+    await waitFor(() => expect(widthOf("planner-left")).toBeGreaterThan(before))
+    // ...and did not throw the window it happened inside.
+    await expect(pane("planner-left")).not.toBeNull()
+    await expect(
+      canvasElement.querySelector('[data-slot="window-deck-pane"]'),
+    ).toBeVisible()
+    await expect(deck).not.toHaveAttribute("data-mode", "overview")
+  },
+}
 
 /**
  * Proves a deep deck opens the overview without mounting every tree, and

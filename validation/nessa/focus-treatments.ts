@@ -8,6 +8,8 @@ const sidebarFocusComponents = Object.freeze([
 ] as const)
 
 const composerFocusComponents = Object.freeze([
+  // Status receives keyboard focus when the Retry control disappears.
+  { component: "agent-notification", count: 1 },
   // The source-document link and the badge that opens a sent message's
   // annotations; the thread's reply and discard controls are ChatMessageActions.
   { component: "chat-annotations", count: 2 },
@@ -268,7 +270,7 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     layer: "outline",
     state: "focus-visible",
     className: "focus-visible:outline-ring",
-    count: 3,
+    count: 4,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -512,9 +514,9 @@ export const focusGeometryClasses = Object.freeze([
   // sit inside padded rows and keep the standard outset offset.
   { component: "chat-tabs", className: "focus-visible:outline-2", count: 2 },
   { component: "chat-tabs", className: "focus-visible:-outline-offset-2", count: 2 },
-  { component: "file-diff-list", className: "focus-visible:outline-2", count: 3 },
+  { component: "file-diff-list", className: "focus-visible:outline-2", count: 4 },
   { component: "file-diff-list", className: "focus-visible:outline-offset-2", count: 2 },
-  { component: "file-diff-list", className: "focus-visible:-outline-offset-2", count: 1 },
+  { component: "file-diff-list", className: "focus-visible:-outline-offset-2", count: 2 },
   { component: "file-preview/file-preview", className: "focus-visible:outline-2", count: 1 },
   { component: "file-preview/file-preview", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "file-preview/file-preview-fallback", className: "focus-visible:outline-2", count: 1 },

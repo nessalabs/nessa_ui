@@ -24,12 +24,15 @@ export {
 export { AppShellDock, type AppShellDockProps } from "./app-shell-dock"
 export {
   AppShellPaneDragHandle,
+  AppShellPaneGrabber,
   useAppShellDrag,
   type AppShellDragContextValue,
   type AppShellPaneDragHandleProps,
+  type AppShellPaneGrabberProps,
   type PaneDropTarget,
 } from "./app-shell-drag"
 export {
   AppShellWorkspace,
+  type AppShellPaneStyle,
   type AppShellWorkspaceProps,
 } from "./app-shell-workspace"

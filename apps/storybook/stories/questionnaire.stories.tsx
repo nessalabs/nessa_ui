@@ -1,6 +1,6 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { expect, userEvent, within } from "storybook/test"
+import { expect, userEvent, waitFor, within } from "storybook/test"
 import {
   Button,
   Questionnaire,
@@ -17,6 +17,7 @@ import {
   cn,
 } from "@nessalabs/ui"
 
+import { finishStoryTransitions } from "./finish-story-transitions"
 import { storyDocumentation } from "./story-documentation"
 
 /** Shared story chrome so every example frames its questionnaire identically. */
@@ -47,9 +48,30 @@ function StoryForm({ children }: { children: React.ReactNode }) {
   return <form onSubmit={(event) => event.preventDefault()}>{children}</form>
 }
 
-/** Native checkedness — the selection contract, not the glyph's CSS opacity. */
-function isChecked(input: HTMLElement) {
-  return (input as HTMLInputElement).checked
+/** Reads the drawn check glyph inside a choice's indicator. */
+function checkGlyph(input: HTMLElement) {
+  return input
+    .closest('[data-slot="questionnaire-choice-indicator"]')
+    ?.querySelector<SVGSVGElement>('[data-slot="questionnaire-choice-check"]')
+}
+
+/**
+ * Assert the rendered selection after settling this story's finite CSS
+ * transitions. CI can defer compositor frames while other browser stories run;
+ * these assertions cover the final glyph, not real-time animation scheduling.
+ * getAnimations flushes pending styles before exposing the transitions, and
+ * repeating inside waitFor also covers a React update that commits later.
+ */
+async function expectChoiceGlyphs(
+  canvasElement: HTMLElement,
+  choices: readonly (readonly [HTMLElement, "0" | "1"])[],
+) {
+  await waitFor(async () => {
+    finishStoryTransitions(canvasElement)
+    for (const [input, opacity] of choices) {
+      await expect(getComputedStyle(checkGlyph(input)!).opacity).toBe(opacity)
+    }
+  })
 }
 
 const meta = {
@@ -71,7 +93,7 @@ type Story = StoryObj<typeof meta>
 
 export const SingleChoice: Story = {
   parameters: storyDocumentation(
-    "A single-selection question under a 'Question 1 of 2' step counter, wrapped in a form and finished with a QuestionnaireActions row holding the submit button. The choices are native radios — arrow keys move within the group, and clicking anywhere on a row selects it — drawn as circular indicators that fill with a translucent primary wash and a check when selected. The play test proves selection is exclusive via the inputs' checked property.",
+    "A single-selection question under a 'Question 1 of 2' step counter, wrapped in a form and finished with a QuestionnaireActions row holding the submit button. The choices are native radios — arrow keys move within the group, and clicking anywhere on a row selects it — drawn as circular indicators that fill with a translucent primary wash and a check when selected. The play test proves selection is exclusive by computed check-glyph opacity, not class names.",
   ),
   render: () => (
     <StoryFrame>
@@ -119,12 +141,17 @@ export const SingleChoice: Story = {
     await expect(
       Number.parseFloat(getComputedStyle(preselected).borderRadius),
     ).toBeGreaterThan(1000)
-    await expect(isChecked(preselected)).toBe(true)
+    await expect(preselected).toBeChecked()
+    const preselectedGlyph = checkGlyph(preselected)!
+    await expect(getComputedStyle(preselectedGlyph).opacity).toBe("1")
 
-    await userEvent.click(researcher)
-    await expect(isChecked(researcher)).toBe(true)
-    await expect(isChecked(preselected)).toBe(false)
-    const checked = canvas.getAllByRole("radio").filter(isChecked)
+    await userEvent.click(canvas.getByText("Researcher"))
+    await expect(researcher).toBeChecked()
+    await expect(preselected).not.toBeChecked()
+    await expectChoiceGlyphs(canvasElement, [[researcher, "1"], [preselected, "0"]])
+    const checked = canvas
+      .getAllByRole("radio")
+      .filter((candidate) => (candidate as HTMLInputElement).checked)
     await expect(checked).toHaveLength(1)
 
     // The actions row closes the flow with a real submit control.
@@ -135,7 +162,7 @@ export const SingleChoice: Story = {
 
 export const MultipleChoice: Story = {
   parameters: storyDocumentation(
-    "A multiple-selection question under the bar variant of QuestionnaireProgress, closed by the actions row's submit button. The multiple flag on QuestionnaireChoices switches the native inputs to checkboxes — indicators become rounded squares, matching the kit's check-in-a-box glyph — and every toggle reports the full selection through onValueChange. The play test toggles rows on and off and asserts the inputs' checked property.",
+    "A multiple-selection question under the bar variant of QuestionnaireProgress, closed by the actions row's submit button. The multiple flag on QuestionnaireChoices switches the native inputs to checkboxes — indicators become rounded squares, matching the kit's check-in-a-box glyph — and every toggle reports the full selection through onValueChange. The play test toggles rows on and off and asserts the drawn check by computed opacity.",
   ),
   render: () => (
     <StoryFrame>
@@ -174,23 +201,18 @@ export const MultipleChoice: Story = {
 
     // Multiple selection renders rounded-square checkbox indicators.
     await expect(getComputedStyle(web).borderRadius).toBe("5px")
-    await expect(isChecked(web)).toBe(true)
+    await expect(web).toBeChecked()
 
-    await userEvent.click(desktop)
-    await expect(isChecked(desktop)).toBe(true)
+    await userEvent.click(canvas.getByText("Desktop"))
+    await expect(desktop).toBeChecked()
     // Multiple selection keeps prior answers checked.
-    await expect(isChecked(web)).toBe(true)
-    await expect(canvas.getAllByRole("checkbox").filter(isChecked)).toHaveLength(
-      2,
-    )
+    await expect(web).toBeChecked()
+    await expectChoiceGlyphs(canvasElement, [[desktop, "1"], [web, "1"]])
 
-    // Checkboxes toggle off.
-    await userEvent.click(web)
-    await expect(isChecked(web)).toBe(false)
-    await expect(isChecked(desktop)).toBe(true)
-    await expect(canvas.getAllByRole("checkbox").filter(isChecked)).toHaveLength(
-      1,
-    )
+    // Checkboxes toggle off, clearing the drawn check.
+    await userEvent.click(canvas.getByText("Web"))
+    await expect(web).not.toBeChecked()
+    await expectChoiceGlyphs(canvasElement, [[web, "0"], [desktop, "1"]])
 
     const bar = canvas.getByRole("progressbar", { name: "Question 2 of 2" })
     await expect(getComputedStyle(bar).overflowX).toBe("hidden")
@@ -324,9 +346,10 @@ export const ComposedFlow: Story = {
     await expect(
       canvas.getByRole("progressbar", { name: "Question 1 of 2" }),
     ).toBeVisible()
-    const moreThanTen = canvas.getByRole("radio", { name: "More than 10" })
-    await userEvent.click(moreThanTen)
-    await expect(isChecked(moreThanTen)).toBe(true)
+    await userEvent.click(canvas.getByText("More than 10"))
+    await expect(
+      canvas.getByRole("radio", { name: "More than 10" }),
+    ).toBeChecked()
 
     await userEvent.click(canvas.getByRole("button", { name: "Continue" }))
     const counter = canvas.getByRole("progressbar", {
@@ -350,7 +373,17 @@ export const ComposedFlow: Story = {
     // selection, so the remounted group re-renders the chosen value.
     await userEvent.click(canvas.getByRole("button", { name: "Back" }))
     await expect(
-      isChecked(canvas.getByRole("radio", { name: "More than 10" })),
-    ).toBe(true)
+      canvas.getByRole("radio", { name: "More than 10" }),
+    ).toBeChecked()
   },
+}
+
+export const SlowSelectionTransitions: Story = {
+  ...SingleChoice,
+  parameters: storyDocumentation(
+    "Runs the same exclusive-selection and rendered-glyph assertions with 30-second transitions. The play test settles CSS transitions explicitly, so correctness does not depend on compositor frame delivery or a longer timeout.",
+  ),
+  decorators: [
+    (Story) => <div style={{ "--nessa-motion-duration-fast": "30s" } as React.CSSProperties}><Story /></div>,
+  ],
 }
