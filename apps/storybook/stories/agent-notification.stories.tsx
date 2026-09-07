@@ -32,13 +32,18 @@ export const Banner: Story = {
     // Keep the exit paused at its endpoint so this asserts the visible result,
     // independent of runner speed, before letting the host callback finish it.
     const dismissButton = canvas.getByRole("button", { name: "Dismiss notification" })
+    const expandedHeight = notice.getBoundingClientRect().height
     dismissButton.click()
     const exit = notice.getAnimations()[0]
     if (!reduced) {
       await expect(exit).toBeDefined()
       exit.pause()
+      exit.currentTime = Number(exit.effect!.getTiming().duration) * 0.8
+      await expect(notice.getBoundingClientRect().height).toBeGreaterThan(0)
+      await expect(notice.getBoundingClientRect().height).toBeLessThan(expandedHeight)
       exit.currentTime = Number(exit.effect!.getTiming().duration)
       await expect(view.getComputedStyle(notice).opacity).toBe("0")
+      await expect(notice.getBoundingClientRect().height).toBe(0)
       await expect(Number.parseFloat(view.getComputedStyle(notice).translate)).toBeGreaterThan(0)
       dismissButton.click()
       await expect(args.onDismiss).not.toHaveBeenCalled()

@@ -61,6 +61,7 @@ function AgentNotification({
   ...props
 }: AgentNotificationProps) {
   const id = React.useId()
+  const [finishedAnimation, setFinishedAnimation] = React.useState<Animation | null>(null)
   const animationRef = React.useRef<Animation | null>(null)
   const cleanupRef = React.useRef<(() => void) | null>(null)
   const dismissRef = React.useRef(onDismiss)
@@ -89,13 +90,21 @@ function AgentNotification({
     animationRef.current = null
   }, [])
 
+  // Reset only after React commits the host's visibility update. Cancelling in
+  // the promise callback exposes the resting notice for a frame before unmount.
+  React.useLayoutEffect(() => {
+    if (!finishedAnimation) return
+    finishedAnimation.cancel()
+    if (animationRef.current === finishedAnimation) animationRef.current = null
+  }, [finishedAnimation])
+
   const dismiss = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (animationRef.current) return
     const element = event.currentTarget.closest<HTMLElement>('[data-slot="agent-notification"]')!
     const view = element.ownerDocument.defaultView!
     const preference = view.matchMedia("(prefers-reduced-motion: reduce)")
     const styles = view.getComputedStyle(element)
-    const value = styles.getPropertyValue("--nessa-motion-duration-normal").trim()
+    const value = styles.getPropertyValue("--nessa-motion-duration-slow").trim()
     const duration = Number.parseFloat(value) * (value.endsWith("ms") ? 1 : 1000)
     if (preference.matches || !Number.isFinite(duration) || duration <= 0 || !element.animate) {
       traceRef.current?.("dismiss-immediate")
@@ -103,9 +112,28 @@ function AgentNotification({
       return
     }
     traceRef.current?.("dismiss-start")
+    const parent = element.parentElement
+    const parentStyles = parent ? view.getComputedStyle(parent) : null
+    const flexItems = parent && parentStyles?.display === "flex" && parentStyles.flexDirection === "column"
+      ? Array.from(parent.children).filter((child) => {
+          const childStyles = view.getComputedStyle(child)
+          return childStyles.display !== "none" && childStyles.position !== "absolute" && childStyles.position !== "fixed" && child.getClientRects().length > 0
+        }) : []
+    const gap = flexItems.length > 1 ? Number.parseFloat(parentStyles!.rowGap) || 0 : 0
+    const expanded = {
+      height: styles.height, minHeight: styles.minHeight,
+      paddingTop: styles.paddingTop, paddingBottom: styles.paddingBottom,
+      borderTopWidth: styles.borderTopWidth, borderBottomWidth: styles.borderBottomWidth,
+      marginBottom: styles.marginBottom,
+    }
+    const easing = styles.getPropertyValue("--nessa-motion-easing-standard").trim() || "ease-out"
     const animation = element.animate(
-      [{ translate: "0 0", opacity: 1 }, { translate: "calc(var(--spacing) * 4) 0", opacity: 0 }],
-      { duration, easing: styles.getPropertyValue("--nessa-motion-easing-standard").trim() || "ease-out", fill: "forwards" },
+      [
+        { ...expanded, translate: "0 0", opacity: 1, overflow: "clip", easing, offset: 0 },
+        { ...expanded, translate: "calc(var(--spacing) * 10) 0", opacity: 0, overflow: "clip", easing, offset: 0.55 },
+        { height: "0px", minHeight: "0px", paddingTop: "0px", paddingBottom: "0px", borderTopWidth: "0px", borderBottomWidth: "0px", marginBottom: `${-gap}px`, translate: "calc(var(--spacing) * 10) 0", opacity: 0, overflow: "clip", offset: 1 },
+      ],
+      { duration, easing: "linear", fill: "forwards" },
     )
     animationRef.current = animation
     let completed = false
@@ -117,9 +145,7 @@ function AgentNotification({
       cleanupRef.current = null
       traceRef.current?.("dismiss-finish")
       try { dismissRef.current?.() } finally {
-        // A host may keep the notice mounted; restore it once it has handled dismissal.
-        animation.cancel()
-        animationRef.current = null
+        setFinishedAnimation(animation)
       }
     }
     const reduce = () => { if (preference.matches) finish() }

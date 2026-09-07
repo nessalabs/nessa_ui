@@ -3520,8 +3520,25 @@ export const Notifications: Story = {
     await expect(within(notice()).getByRole("status")).toHaveTextContent("Reconnecting…")
     await expect(canvas.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument()
     await waitFor(() => expect(within(notice()).getByRole("status")).toHaveTextContent("Connected"), { timeout: 4000 })
-    await userEvent.click(canvas.getByRole("button", { name: "Dismiss notification" }))
-    await waitFor(() => expect(canvasElement.querySelector('[data-slot="agent-notification"]')).toBeNull())
+    const exitingNotice = notice()
+    const view = canvasElement.ownerDocument.defaultView!
+    const frames: { opacity: number; height: number }[] = []
+    let frame = 0
+    const sample = () => {
+      if (!exitingNotice.isConnected) return
+      frames.push({ opacity: Number(view.getComputedStyle(exitingNotice).opacity), height: exitingNotice.getBoundingClientRect().height })
+      frame = view.requestAnimationFrame(sample)
+    }
+    sample()
+    try {
+      await userEvent.click(canvas.getByRole("button", { name: "Dismiss notification" }))
+      await waitFor(() => expect(canvasElement.querySelector('[data-slot="agent-notification"]')).toBeNull())
+      if (!reducedMotion) {
+        await expect(frames.every(({ opacity }, index) => index === 0 || opacity <= frames[index - 1].opacity + 0.001)).toBe(true)
+      }
+    } finally {
+      view.cancelAnimationFrame(frame)
+    }
     await expect(shimmerLayer()).toBeNull()
     await expect(canvas.getByRole("textbox", { name: "Message" })).toBeVisible()
   },
