@@ -279,10 +279,16 @@ export function computeActivityRingsLayout(
       // would push those two caps into the gaps on either side and close them
       // up, so the drawn track is inset by the overhang and the gap the host
       // asked for is the gap it gets.
-      const capInset =
-        outerRadius > 0
-          ? Math.min(thickness / 2 / outerRadius, sweep / 2)
-          : 0
+      //
+      // A share narrower than the band itself has no room for two overhangs.
+      // Insetting it by what it cannot spare would collapse the track to
+      // nothing and drop the metric off the ring silently, which a lopsided
+      // but perfectly valid split — goals of 1 and 99 — reaches immediately.
+      // Such a segment instead collapses to a point at the middle of its own
+      // share, where the round cap draws it as a dot: the smallest honest
+      // mark, still inside the gaps on either side.
+      const capReach = outerRadius > 0 ? thickness / outerRadius : 0
+      const capInset = sweep > capReach ? capReach / 2 : sweep / 2
       const trackStart = cursor + capInset
       const trackEnd = cursor + sweep - capInset
       // Concentric rings nest outside-in and can run out of room; a segmented
@@ -322,7 +328,9 @@ export function computeActivityRingsLayout(
 /**
  * The track's centreline as a stroked path, from `startAngle` to `endAngle`
  * clockwise. A full turn is drawn as two half arcs, which one arc command
- * cannot express, and closed so its ends meet without a seam.
+ * cannot express, and closed so its ends meet without a seam. A zero-length
+ * range draws a zero-length subpath rather than nothing, so a round cap still
+ * marks the spot.
  *
  * The path carries no fill: stroke it with the band's thickness and a round
  * cap to get the ring.
@@ -335,7 +343,15 @@ export function activityRingTrackPath(
   endAngle: number,
 ): string {
   const sweep = endAngle - startAngle
-  if (!(radius > 0) || !Number.isFinite(sweep) || sweep <= 0) return ""
+  if (!(radius > 0) || !Number.isFinite(sweep) || sweep < 0) return ""
+  if (sweep === 0) {
+    // A zero-length subpath, which a round cap paints as a dot. A segment too
+    // narrow to carry two cap overhangs arrives here, and it has to leave a
+    // mark: an empty path would take the metric off the ring with nothing to
+    // say it was ever there.
+    const point = polar(cx, cy, startAngle, radius)
+    return `M${point.x},${point.y}L${point.x},${point.y}`
+  }
   if (sweep >= TAU - 1e-9) {
     const top = polar(cx, cy, startAngle, radius)
     const bottom = polar(cx, cy, startAngle + Math.PI, radius)

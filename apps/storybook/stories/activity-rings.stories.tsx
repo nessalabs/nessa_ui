@@ -48,6 +48,26 @@ function bandOffset(canvasElement: HTMLElement, ringId: string): number {
   return Number.parseFloat(getComputedStyle(band!).strokeDashoffset)
 }
 
+/**
+ * Waits for every named band to land on its own reading. Each sweep runs for
+ * most of a second on a stagger, so a play that returns before they finish
+ * leaves three transitions taking main-thread time through whatever story
+ * runs next. The wait is on the value each band is travelling to, not on the
+ * absence of running animations — which a transition that has not started yet
+ * would satisfy.
+ */
+async function settled(
+  root: HTMLElement,
+  fills: Readonly<Record<string, number>>,
+) {
+  for (const [ringId, fill] of Object.entries(fills)) {
+    await waitFor(
+      () => expect(bandOffset(root, ringId)).toBeCloseTo(1 - fill, 3),
+      SWEPT,
+    )
+  }
+}
+
 export const ClosingRings: Story = {
   parameters: storyDocumentation(
     "Three concentric rings against their daily goals, in the closing-ring trio's own colours. Each band sweeps up from empty on first paint, one after another from the outside in. The play test waits for every band to settle and reads its dash offset out of the computed style — 1 minus the fraction of the goal met — which is the value the sweep actually lands on rather than a proxy for it, then checks the off-screen list carries all three readings.",
@@ -59,18 +79,11 @@ export const ClosingRings: Story = {
     </div>
   ),
   play: async ({ canvasElement }) => {
-    await waitFor(
-      () => expect(bandOffset(canvasElement, "move")).toBeCloseTo(1 - 450 / 800, 3),
-      SWEPT,
-    )
-    await waitFor(
-      () => expect(bandOffset(canvasElement, "exercise")).toBeCloseTo(1 - 19 / 30, 3),
-      SWEPT,
-    )
-    await waitFor(
-      () => expect(bandOffset(canvasElement, "stand")).toBeCloseTo(1 - 4 / 12, 3),
-      SWEPT,
-    )
+    await settled(canvasElement, {
+      move: 450 / 800,
+      exercise: 19 / 30,
+      stand: 4 / 12,
+    })
 
     const readings = canvasElement.querySelector(
       '[data-slot="activity-rings-readings"]',
@@ -97,12 +110,7 @@ export const AllRingsClosed: Story = {
     </div>
   ),
   play: async ({ canvasElement }) => {
-    for (const id of ["move", "exercise", "stand"]) {
-      await waitFor(
-        () => expect(bandOffset(canvasElement, id)).toBeCloseTo(0, 3),
-        SWEPT,
-      )
-    }
+    await settled(canvasElement, { move: 1, exercise: 1, stand: 1 })
     await expect(
       canvasElement.querySelectorAll('[data-slot="activity-rings-lap"]'),
     ).toHaveLength(0)
@@ -131,22 +139,14 @@ export const BeatenGoal: Story = {
         `[data-slot="activity-rings-ring"][data-ring-id="${id}"] [data-slot="activity-rings-lap"]`,
       )
     await waitFor(() => expect(lapOf("move")).toBeTruthy(), SWEPT)
-    await waitFor(
-      () => expect(bandOffset(canvasElement, "move")).toBeCloseTo(0.6, 3),
-      SWEPT,
-    )
-
+    await settled(canvasElement, { move: 0.4, exercise: 1, stand: 1 })
     await expect(lapOf("exercise")).toBeNull()
-    await waitFor(
-      () => expect(bandOffset(canvasElement, "exercise")).toBeCloseTo(0, 3),
-      SWEPT,
-    )
   },
 }
 
 export const NewReading: Story = {
   parameters: storyDocumentation(
-    "Rings ease to a new reading the same way they arrive at the first one — the fill is a transitionable presentation attribute, so a streamed update animates without any host animation code. The play test waits for the move ring to settle, clicks a button that adds to the reading, and waits for it to settle further round.",
+    "Rings ease to a new reading the same way they arrive at the first one — the fill is a transitionable presentation attribute, so a streamed update animates without any host animation code. A reading that crosses the goal is the one case that cannot ease: `fill` wraps back toward zero, and interpolating that would unwind the arc backwards to show *more* progress. The arc that finished is retired and the next lap starts at the top instead, which is what a ring passing its goal actually does. The play test walks the move ring up in steps, over the goal, and checks it eases within a lap and lands on the remainder with a completed lap beneath it once it crosses.",
   ),
   args: { rings: DAY_RINGS },
   render: (args) => {
@@ -173,15 +173,36 @@ export const NewReading: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
+    await settled(canvasElement, {
+      move: 450 / 800,
+      exercise: 19 / 30,
+      stand: 4 / 12,
+    })
+    const walk = canvas.getByRole("button", { name: "Log a walk" })
+
+    // Inside one lap the arc eases to the new reading.
+    await userEvent.click(walk)
+    await settled(canvasElement, { move: 650 / 800 })
+    await expect(
+      canvasElement.querySelector(
+        '[data-slot="activity-rings-ring"][data-ring-id="move"] [data-slot="activity-rings-lap"]',
+      ),
+    ).toBeNull()
+
+    // Crossing the goal starts a second lap: the completed one is drawn
+    // beneath, and the leading arc reads the 6.25% left over rather than
+    // running backwards from a full circle.
+    await userEvent.click(walk)
     await waitFor(
-      () => expect(bandOffset(canvasElement, "move")).toBeCloseTo(1 - 450 / 800, 3),
+      () =>
+        expect(
+          canvasElement.querySelector(
+            '[data-slot="activity-rings-ring"][data-ring-id="move"] [data-slot="activity-rings-lap"]',
+          ),
+        ).toBeTruthy(),
       SWEPT,
     )
-    await userEvent.click(canvas.getByRole("button", { name: "Log a walk" }))
-    await waitFor(
-      () => expect(bandOffset(canvasElement, "move")).toBeCloseTo(1 - 650 / 800, 3),
-      SWEPT,
-    )
+    await settled(canvasElement, { move: 850 / 800 - 1 })
   },
 }
 
@@ -225,20 +246,26 @@ export const Progression: Story = {
       canvasElement.querySelector<HTMLElement>(
         `[data-testid="progression-${label}"]`,
       )!
-    await waitFor(
-      () => expect(bandOffset(set("Not started"), "move")).toBeCloseTo(1, 3),
-      SWEPT,
-    )
-    await waitFor(
-      () => expect(bandOffset(set("Evening"), "move")).toBeCloseTo(1 - 450 / 800, 3),
-      SWEPT,
-    )
-    // The last set has lapped its move goal and closed the other two.
-    await waitFor(
-      () =>
-        expect(bandOffset(set("All closed"), "move")).toBeCloseTo(1 - 180 / 800, 3),
-      SWEPT,
-    )
+    // Every band in every set, so nothing is still sweeping when the story
+    // hands the main thread to the next one.
+    await settled(set("Not started"), { move: 0, exercise: 0, stand: 0 })
+    await settled(set("Mid-morning"), {
+      move: 180 / 800,
+      exercise: 8 / 30,
+      stand: 3 / 12,
+    })
+    await settled(set("Evening"), {
+      move: 450 / 800,
+      exercise: 19 / 30,
+      stand: 9 / 12,
+    })
+    // The last set has lapped two of its goals and closed the third, so its
+    // leading arcs read as the remainder rather than the whole reading.
+    await settled(set("All closed"), {
+      move: 980 / 800 - 1,
+      exercise: 41 / 30 - 1,
+      stand: 1,
+    })
     await expect(
       set("All closed").querySelector('[data-slot="activity-rings-lap"]'),
     ).toBeTruthy()
@@ -272,7 +299,13 @@ export const SummaryCard: Story = {
 
     await expect(row("move").textContent).toContain("450/800 CAL")
     await expect(row("stand").textContent).toContain("4/12 HRS")
-    await waitFor(() => expect(ring("move")).toBeTruthy(), SWEPT)
+    // The rings are still sweeping when the legend text is already right, so
+    // the pointer work waits for them rather than racing them.
+    await settled(canvasElement, {
+      move: 450 / 800,
+      exercise: 19 / 30,
+      stand: 4 / 12,
+    })
 
     // React derives enter and leave from over and out, so those are the
     // events a pointer actually delivers to the row.
@@ -362,6 +395,12 @@ export const ScoreBreakdownCard: Story = {
       "5 wake-ups, 9m total",
     )
 
+    await settled(canvasElement, {
+      duration: 42 / 50,
+      bedtime: 26 / 30,
+      interruptions: 18 / 20,
+    })
+
     // A segment's track is as long as the goal it carries.
     const track = (id: string) =>
       canvasElement
@@ -414,6 +453,7 @@ export const AnyFigure: Story = {
         ).toBe("56%"),
       SWEPT,
     )
+    await settled(canvasElement, { move: 450 / 800 })
     const legend = canvasElement.querySelector(
       '[data-slot="activity-rings-card-legend"]',
     )

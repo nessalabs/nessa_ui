@@ -175,6 +175,35 @@ describe("computeActivityRingsLayout, segmented", () => {
     assert.equal(duration.capAngle, duration.trackEnd)
   })
 
+  it("keeps a segment too narrow for its own caps as a point rather than dropping it", () => {
+    const layout = computeActivityRingsLayout({
+      ...segmented,
+      rings: [
+        { id: "sliver", value: 1, goal: 1 },
+        { id: "rest", value: 50, goal: 99 },
+      ],
+    })
+    const sliver = ringById(layout, "sliver")
+    // Too narrow to carry a cap at each end, so it collapses onto the middle
+    // of its own share instead of insetting itself out of existence.
+    assert.equal(sliver.trackStart, sliver.trackEnd)
+    assert.equal(sliver.capAngle, sliver.trackStart)
+    // A point still draws: an empty path would take the metric off the ring.
+    assert.notEqual(
+      activityRingTrackPath(
+        layout.cx,
+        layout.cy,
+        sliver.radius,
+        sliver.trackStart,
+        sliver.trackEnd,
+      ),
+      "",
+    )
+    // The wide neighbour is unaffected and still carries two cap insets.
+    const rest = ringById(layout, "rest")
+    assert.ok(rest.trackEnd - rest.trackStart > 0)
+  })
+
   it("collapses gaps that would outgrow the circle rather than drawing backwards", () => {
     const layout = computeActivityRingsLayout({
       ...segmented,
@@ -252,10 +281,14 @@ describe("activityRingTrackPath", () => {
     assert.match(long, /A10,10 0 1 1/)
   })
 
-  it("draws nothing for an empty or impossible track", () => {
-    assert.equal(activityRingTrackPath(0, 0, 10, 0, 0), "")
+  it("draws a zero-length subpath for an empty range, so a round cap marks it", () => {
+    assert.equal(activityRingTrackPath(100, 100, 90, 0, 0), "M100,10L100,10")
+  })
+
+  it("draws nothing for an impossible track", () => {
     assert.equal(activityRingTrackPath(0, 0, 0, 0, Math.PI), "")
     assert.equal(activityRingTrackPath(0, 0, 10, 0, Number.NaN), "")
+    assert.equal(activityRingTrackPath(0, 0, 10, 0, -1), "")
   })
 })
 

@@ -605,6 +605,15 @@ function ActivityRings({
                     </g>
                   ) : null}
                   <path
+                    // A reading crossing a whole goal takes `fill` from near
+                    // 1 back to near 0, and interpolating that would unwind
+                    // the arc backwards to show ten percent more progress.
+                    // Keying on the lap retires the finished arc and starts a
+                    // fresh one, which is what a ring passing its goal
+                    // actually does: it closes, and the next lap begins at the
+                    // top. Readings inside one lap keep the same element and
+                    // ease as before.
+                    key={`band-${laid.laps}`}
                     data-slot="activity-rings-band"
                     data-ring-id={laid.id}
                     {...band}
