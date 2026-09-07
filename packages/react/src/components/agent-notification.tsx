@@ -133,7 +133,7 @@ function AgentNotification({
         { ...expanded, translate: "calc(var(--spacing) * 10) 0", opacity: 0, overflow: "clip", easing, offset: 0.55 },
         { height: "0px", minHeight: "0px", paddingTop: "0px", paddingBottom: "0px", borderTopWidth: "0px", borderBottomWidth: "0px", marginBottom: `${-gap}px`, translate: "calc(var(--spacing) * 10) 0", opacity: 0, overflow: "clip", offset: 1 },
       ],
-      { duration, easing: "linear", fill: "forwards" },
+      { duration: duration * 1.5, easing: "linear", fill: "forwards" },
     )
     animationRef.current = animation
     let completed = false
