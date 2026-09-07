@@ -58,6 +58,14 @@
   --nessa-motion-duration-ambient: 3.2s;
   --nessa-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
   --nessa-motion-easing-emphasized: cubic-bezier(0.4, 0, 0.2, 1);
+  /* For a value arriving at a target rather than an element entering: it
+     leaves rest gently, builds through the middle, and then spends most of
+     its time settling — a third of the travel is still to come at the
+     halfway point. Across a long journey — a ring closing, a gauge landing
+     on a reading — `standard` reads as a constant-speed wipe and
+     `emphasized` finishes too abruptly to look like something coming to
+     rest. */
+  --nessa-motion-easing-arrival: cubic-bezier(0.4, 0, 0.15, 1);
   --nessa-thinking-fill-base: oklch(0.56 0.2 265);
   --nessa-thinking-fill-current: oklch(0.68 0.2 304);
   --nessa-thinking-fill-highlight: oklch(0.86 0.11 214);
@@ -90,6 +98,25 @@
      slot (5.16:1 on the darkest fill, 15:1 on the palest); the near-white
      `--foreground` a dark theme would otherwise use falls to 1.9:1. */
   --nessa-chart-label-ink: oklch(0.205 0 0);
+  /* The closing-ring trio, in the register people already read as activity:
+     energy, effort, uprightness. This is a named set of roles, not three
+     slots borrowed from the categorical ramp — see
+     docs/architecture/chart-series-ramp.md. Each role carries two steps: the
+     band, a graphical mark held to the 3:1 non-text floor against its own
+     track, and the ink, the deepest hue-true version that still clears 4.5:1
+     as text on the surface. A legend names its ring by writing in the ink,
+     never by setting text in the band colour. */
+  --nessa-activity-ring-1: oklch(0.62 0.235 17);
+  --nessa-activity-ring-1-ink: oklch(0.55 0.205 17);
+  --nessa-activity-ring-2: oklch(0.84 0.215 131);
+  --nessa-activity-ring-2-ink: oklch(0.51 0.125 131);
+  --nessa-activity-ring-3: oklch(0.78 0.13 205);
+  --nessa-activity-ring-3-ink: oklch(0.51 0.085 205);
+  /* The shadow a lapped ring's leading cap casts on the lap beneath it. It is
+     the only thing separating a ring at 100% from one at 200%, both of which
+     are a closed circle, so a completed lap stays at full strength and this
+     does the separating. */
+  --nessa-activity-ring-cap-shadow: oklch(0 0 0 / 0.38);
   --nessa-diff-addition: oklch(0.5 0.137 150);
   --nessa-diff-deletion: oklch(0.55 0.19 27);
   --nessa-invalid-ring: color-mix(in oklab, var(--destructive) 20%, transparent);
@@ -159,6 +186,13 @@
   --nessa-chart-series-8: oklch(0.7824 0.071 230);
   --nessa-chart-series-8-strong: oklch(0.8524 0.1 230);
   --nessa-chart-label-ink: oklch(0.205 0 0);
+  --nessa-activity-ring-1: oklch(0.66 0.225 17);
+  --nessa-activity-ring-1-ink: oklch(0.72 0.17 17);
+  --nessa-activity-ring-2: oklch(0.87 0.225 131);
+  --nessa-activity-ring-2-ink: oklch(0.84 0.21 131);
+  --nessa-activity-ring-3: oklch(0.81 0.13 205);
+  --nessa-activity-ring-3-ink: oklch(0.8 0.125 205);
+  --nessa-activity-ring-cap-shadow: oklch(0 0 0 / 0.55);
   --nessa-diff-addition: oklch(0.77 0.17 152);
   --nessa-diff-deletion: oklch(0.7 0.19 25);
   --nessa-invalid-ring: color-mix(in oklab, var(--destructive) 40%, transparent);

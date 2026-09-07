@@ -36,6 +36,7 @@
           "nessa-motion-duration-ambient": "3.2s",
           "nessa-motion-easing-standard": "cubic-bezier(0.2, 0, 0, 1)",
           "nessa-motion-easing-emphasized": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "nessa-motion-easing-arrival": "cubic-bezier(0.4, 0, 0.15, 1)",
           "radius": "0.625rem"
         },
         "light": {
@@ -92,6 +93,7 @@
           "nessa-motion-duration-ambient": "3.2s",
           "nessa-motion-easing-standard": "cubic-bezier(0.2, 0, 0, 1)",
           "nessa-motion-easing-emphasized": "cubic-bezier(0.4, 0, 0.2, 1)",
+          "nessa-motion-easing-arrival": "cubic-bezier(0.4, 0, 0.15, 1)",
           "nessa-thinking-fill-base": "oklch(0.56 0.2 265)",
           "nessa-thinking-fill-current": "oklch(0.68 0.2 304)",
           "nessa-thinking-fill-highlight": "oklch(0.86 0.11 214)",
@@ -113,6 +115,13 @@
           "nessa-chart-series-8": "oklch(0.8824 0.071 230)",
           "nessa-chart-series-8-strong": "oklch(0.72 0.1 230)",
           "nessa-chart-label-ink": "oklch(0.205 0 0)",
+        "nessa-activity-ring-1": "oklch(0.62 0.235 17)",
+        "nessa-activity-ring-1-ink": "oklch(0.55 0.205 17)",
+        "nessa-activity-ring-2": "oklch(0.84 0.215 131)",
+        "nessa-activity-ring-2-ink": "oklch(0.51 0.125 131)",
+        "nessa-activity-ring-3": "oklch(0.78 0.13 205)",
+        "nessa-activity-ring-3-ink": "oklch(0.51 0.085 205)",
+        "nessa-activity-ring-cap-shadow": "oklch(0 0 0 / 0.38)",
           "nessa-diff-addition": "oklch(0.5 0.137 150)",
           "nessa-diff-deletion": "oklch(0.55 0.19 27)",
           "nessa-market-gain": "oklch(0.5 0.135 148)",
@@ -174,6 +183,13 @@
           "nessa-chart-series-8": "oklch(0.7824 0.071 230)",
           "nessa-chart-series-8-strong": "oklch(0.8524 0.1 230)",
           "nessa-chart-label-ink": "oklch(0.205 0 0)",
+        "nessa-activity-ring-1": "oklch(0.66 0.225 17)",
+        "nessa-activity-ring-1-ink": "oklch(0.72 0.17 17)",
+        "nessa-activity-ring-2": "oklch(0.87 0.225 131)",
+        "nessa-activity-ring-2-ink": "oklch(0.84 0.21 131)",
+        "nessa-activity-ring-3": "oklch(0.81 0.13 205)",
+        "nessa-activity-ring-3-ink": "oklch(0.8 0.125 205)",
+        "nessa-activity-ring-cap-shadow": "oklch(0 0 0 / 0.55)",
           "nessa-diff-addition": "oklch(0.77 0.17 152)",
           "nessa-diff-deletion": "oklch(0.7 0.19 25)",
           "nessa-market-gain": "oklch(0.8 0.19 150)",
@@ -2425,6 +2441,39 @@
           "path": "packages/react/src/components/git-commit-details.tsx",
           "type": "registry:ui",
           "target": "components/ui/git-commit-details.tsx"
+        }
+      ]
+    },
+    {
+      "name": "activity-rings",
+      "type": "registry:ui",
+      "title": "Activity rings",
+      "description": "Closing rings for goal-tracking metrics: one band per metric, swept up from empty on mount and eased to every later reading. Rings nest as concentric full circles \u2014 where beating a goal laps the track and draws the completed lap behind the leading arc \u2014 or split one circle into segments weighted by their goals. Bands take the categorical chart ramp's solid step in input order, so a slot always names the same metric, and the readings reach a screen reader as an off-screen list rather than as undescribed shapes. ActivityRingsCard pairs the rings, or any component put in their place, with a per-metric legend inside a Card \u2014 beside the figure or listed beneath it \u2014 and keeps the highlight on the figure and its legend row in step.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/card",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/activity-rings/index.ts",
+          "type": "registry:ui",
+          "target": "components/ui/activity-rings/index.ts"
+        },
+        {
+          "path": "packages/react/src/components/activity-rings/activity-rings.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/activity-rings/activity-rings.tsx"
+        },
+        {
+          "path": "packages/react/src/components/activity-rings/activity-rings-card.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/activity-rings/activity-rings-card.tsx"
+        },
+        {
+          "path": "packages/react/src/components/activity-rings/activity-rings-geometry.ts",
+          "type": "registry:ui",
+          "target": "components/ui/activity-rings/activity-rings-geometry.ts"
         }
       ]
     }

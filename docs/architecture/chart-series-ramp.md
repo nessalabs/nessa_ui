@@ -29,6 +29,10 @@ per-component decision:
   takes the fill step.
 - **RadarChart** — an outline is a two-pixel line, so `radarChartPalette`
   takes the **strong** step and dilutes that same colour for its area wash.
+- **ActivityRings** — the first three rings are not categories at all; they
+  take the closing-ring trio's own tokens, and only the fourth ring onward
+  reaches into this ramp, at its **strong** step. See the trio's section
+  below.
 
 Both steps are tokens, so each theme carries its own pair. **The ramp is pastel
 in both themes**: soft, low-chroma tints, stepped in lightness, on the light
@@ -91,6 +95,53 @@ same relief the ramp's contrast rule asks for.
 A future chart with its own semantic axis (pass/fail, over/under budget)
 should follow this shape — a named pair of tokens and an exported mapping —
 rather than borrowing ramp slots.
+
+## The closing-ring trio is a named set, not three ramp slots
+
+`ActivityRings` is the other case that does not colour by category. A set of
+closing rings is read as one familiar object — energy, effort, uprightness —
+and the reading survives being seen out of context: people know what the three
+rings mean before they read a legend. Handing those three roles ramp slots
+would say the wrong thing twice, exactly as it would for a direction: that the
+three are unrelated categories, and that another chart using slots 1 to 3
+means the same thing by them.
+
+The trio has its own tokens, and unlike the direction pair it carries **two
+steps per role**, because a ring is both drawn and named:
+
+| Token | Role |
+| --- | --- |
+| `--nessa-activity-ring-N` | the **band**, a graphical mark |
+| `--nessa-activity-ring-N-ink` | the **ink** a legend writes that ring's name in |
+
+The split exists because the two are held to different floors. A band is a
+graphical object, read against its own dim track, and lives at the 3:1 non-text
+threshold; the same colour set as text misses the 4.5:1 one — a lime band on a
+white card is unreadable as a value. Each ink is therefore the deepest
+hue-true version of its own band that clears text contrast, so a legend row
+still reads as the ring it names. `ActivityRingsCard` writes every reading in
+the ink and never in the band colour, and a host overriding `color` on a ring
+owes an `ink` alongside it.
+
+The trio carries a third token, `--nessa-activity-ring-cap-shadow`, because a
+ring that laps its track has a genuine ambiguity the ramp never has: 100% and
+200% are both a closed circle. The completed lap is drawn at full strength —
+it was completed, and dimming it makes a closed ring read as an open one — so
+the leading cap's shadow is the only thing that separates the two.
+
+Three hues is inside the all-pairs budget, so the trio is validated on **all
+three pairs** rather than the adjacent list. The worst pair is energy against
+effort under deutan, at CIEDE2000 16.8 on the light surface and 21.9 on the
+dark, against the same floor of 15 the ramp is held to; the remaining pairs
+run from 34 to 55. Ring position carries identity as well, and a legend row
+names each ring in words, so colour is not the only channel.
+
+`activityRingsPalette` covers three roles and then **continues into the
+categorical ramp's solid step**. That is deliberate: past the third ring a set
+has stopped being the canonical trio and is back to being a list of
+categories, which is what the ramp is for. The ramp has no ink step of its own
+— it is a fill/edge pair, both marks — so legend rows for those slots fall
+back to the surface's foreground and take their identity from a swatch.
 
 ## Slot order is the safety mechanism
 
