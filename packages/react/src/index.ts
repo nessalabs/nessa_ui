@@ -1,5 +1,26 @@
 "use client"
 
+export {
+  ActivityRings,
+  ActivityRingsCard,
+  activityRingCapPoint,
+  activityRingTrackPath,
+  activityRingsInkPalette,
+  activityRingsPalette,
+  computeActivityRingsLayout,
+  type ActivityRing,
+  type ActivityRingContext,
+  type ActivityRingInput,
+  type ActivityRingsArrangement,
+  type ActivityRingsCardLayout,
+  type ActivityRingsCardProps,
+  type ActivityRingsCenterContext,
+  type ActivityRingsLayout,
+  type ActivityRingsLayoutIssue,
+  type ActivityRingsLayoutOptions,
+  type ActivityRingsLayoutRing,
+  type ActivityRingsProps,
+} from "./components/activity-rings"
 export { Badge, badgeVariants, type BadgeProps } from "./components/badge"
 export { Button, buttonVariants, type ButtonProps } from "./components/button"
 export {
