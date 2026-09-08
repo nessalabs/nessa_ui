@@ -1,0 +1,6 @@
+{"type":"system","subtype":"init","sessionId":"kiro-sess-01","model":"claude-sonnet-4-5","cwd":"/tmp/kiro-demo","tools":["read","write","edit","bash","glob","grep","websearch","webfetch","todowrite","task"],"slashCommands":[{"name":"agent"},{"name":"context"},{"name":"model"}],"agents":[],"skills":[],"mcpServers":[],"permissionMode":"default","version":"3.0.0"}
+{"type":"user","sessionId":"kiro-sess-01","content":"Print exactly: hello world. Do not use any tools."}
+{"type":"assistant","sessionId":"kiro-sess-01","streaming":true,"messageId":"msg-01","content":"hello"}
+{"type":"assistant","sessionId":"kiro-sess-01","streaming":true,"messageId":"msg-01","content":" world"}
+{"type":"assistant","sessionId":"kiro-sess-01","content":"hello world"}
+{"type":"turn_end","sessionId":"kiro-sess-01","stopReason":"end_turn","usage":{"inputTokens":18,"outputTokens":3,"totalTokens":21},"durationMs":842}

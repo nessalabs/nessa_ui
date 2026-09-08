@@ -1,0 +1,6 @@
+{"type":"system","subtype":"init","sessionId":"kiro-sess-03","model":"claude-sonnet-4-5","cwd":"/tmp/kiro-demo","tools":["read","write","edit","bash","glob","grep","websearch","webfetch","todowrite","task"],"slashCommands":[{"name":"agent"},{"name":"context"},{"name":"model"}],"agents":[],"skills":[],"mcpServers":[],"permissionMode":"default","version":"3.0.0"}
+{"type":"user","sessionId":"kiro-sess-03","content":"Run: cat /nonexistent/definitely-missing-file"}
+{"type":"tool_call","sessionId":"kiro-sess-03","subtype":"started","toolCallId":"call-03","title":"bash","kind":"execute","rawInput":{"command":"cat /nonexistent/definitely-missing-file"}}
+{"type":"tool_call_update","sessionId":"kiro-sess-03","toolCallId":"call-03","status":"failed","kind":"execute","content":[{"type":"text","text":"cat: /nonexistent/definitely-missing-file: No such file or directory"}],"rawOutput":{"stdout":"","stderr":"cat: /nonexistent/definitely-missing-file: No such file or directory","exitCode":1}}
+{"type":"assistant","sessionId":"kiro-sess-03","content":"The command failed: the file /nonexistent/definitely-missing-file does not exist."}
+{"type":"turn_end","sessionId":"kiro-sess-03","stopReason":"end_turn","usage":{"inputTokens":31,"outputTokens":22,"totalTokens":53},"durationMs":1247}
