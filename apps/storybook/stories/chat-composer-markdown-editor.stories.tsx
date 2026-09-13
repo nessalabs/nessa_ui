@@ -327,3 +327,63 @@ export const ConsistentTypography: Story = {
     for (const editor of editors) expect(getComputedStyle(editor).fontSize).toBe(expected)
   },
 }
+
+/** Demonstrates host cancellation before native editor handlers receive an event. */
+function CanceledEventsExample() {
+  const [cancel, setCancel] = React.useState(true)
+  const [submits, setSubmits] = React.useState(0)
+  const [attachments, setAttachments] = React.useState(0)
+  const [callbacks, setCallbacks] = React.useState(0)
+  const onEvent = (event: React.SyntheticEvent) => {
+    setCallbacks((value) => value + 1)
+    if (cancel) event.preventDefault()
+  }
+  return <div className="w-full max-w-[40rem] mx-auto space-y-4">
+    <Button onClick={() => setCancel((value) => !value)}>{cancel ? "Allow events" : "Cancel events"}</Button>
+    <ChatComposer onSubmit={(event) => { event.preventDefault(); setSubmits((value) => value + 1) }}>
+      <ChatComposerMarkdownEditor defaultContent={{ text: "Original", parts: [] }}
+        onKeyDown={onEvent} onPaste={onEvent} onDrop={onEvent}
+        onPasteAttachment={() => setAttachments((value) => value + 1)} pasteAttachmentMinLength={20} />
+    </ChatComposer>
+    <output data-testid="canceled-events-counts">{submits}:{attachments}:{callbacks}</output>
+  </div>
+}
+
+export const CanceledEvents: Story = {
+  parameters: storyDocumentation("Host keyboard, paste, and drop callbacks can preventDefault to preserve the draft and suppress submission or attachment callbacks."),
+  render: () => <CanceledEventsExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const editor = await canvas.findByRole("textbox", { name: "Message" })
+    await waitFor(() => expect(editor).toHaveTextContent("Original"))
+    const initial = editor.innerHTML
+    const paste = (text: string) => {
+      const data = new DataTransfer()
+      data.setData("text/plain", text)
+      editor.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }))
+    }
+    const drop = () => {
+      const data = new DataTransfer()
+      data.setData("text/plain", "Dropped")
+      const rect = editor.getBoundingClientRect()
+      editor.dispatchEvent(new DragEvent("drop", { dataTransfer: data, clientX: rect.x + 8, clientY: rect.y + 8, bubbles: true, cancelable: true }))
+    }
+    await userEvent.click(editor)
+    await userEvent.keyboard("{Enter}")
+    await userEvent.keyboard("{Control>}{Enter}{/Control}")
+    paste("Pasted")
+    paste("A long pasted attachment that must be canceled")
+    drop()
+    await expect(editor.innerHTML).toBe(initial)
+    await expect(canvas.getByTestId("canceled-events-counts")).toHaveTextContent("0:0:6")
+    await userEvent.click(canvas.getByRole("button", { name: "Allow events" }))
+    paste("Pasted")
+    await expect(editor).toHaveTextContent("Pasted")
+    drop()
+    await expect(editor).toHaveTextContent("Dropped")
+    paste("A long pasted attachment that is now allowed")
+    await userEvent.click(editor)
+    await userEvent.keyboard("{Control>}{Enter}{/Control}")
+    await expect(canvas.getByTestId("canceled-events-counts")).toHaveTextContent("1:1:")
+  },
+}
