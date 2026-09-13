@@ -58,6 +58,7 @@ import {
   formatAgentActivitySummary,
   formatAgentThoughtSummary,
   MessageMarkdown,
+  MathBlock,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -668,11 +669,7 @@ function BubbleParts({
     }).join("")
     return { chips, markdown }
   }, [parts])
-  return <MessageMarkdown className="leading-5 text-inherit [&_p]:whitespace-pre-wrap [&_a]:text-inherit [&_th]:text-foreground [&_blockquote]:text-inherit" components={{
-    a: ({ href, children, node: _node, ...props }) => {
-      const part = placeholders.chips.get(href ?? "")
-      if (!part) return <a href={href} {...props}>{children}</a>
-      return (
+  const renderChip = (part: Extract<ChatComposerContentPart, { type: "chip" }>) => (
           <span
             key={part.chip.id}
             data-slot="bubble-chip"
@@ -716,6 +713,21 @@ function BubbleParts({
             {part.chip.label}
           </span>
       )
+  return <MessageMarkdown className="leading-5 text-inherit [&_p]:whitespace-pre-wrap [&_a]:text-inherit [&_th]:text-foreground [&_blockquote]:text-inherit [&_code]:text-foreground" components={{
+    a: ({ href, children, node: _node, ...props }) => {
+      const part = placeholders.chips.get(href ?? "")
+      return part ? renderChip(part) : <a href={href} {...props}>{children}</a>
+    },
+    code: ({ children, className, node: _node, ...props }) => {
+      if (className?.includes("math-inline") && typeof children === "string") return <MathBlock inline tex={children} />
+      // Markdown treats link syntax literally in inline code. Restore chip slots
+      // here too, using only the nonce-owned placeholders from this message.
+      let content: React.ReactNode[] = [children]
+      for (const [url, part] of placeholders.chips) {
+        const marker = `[chip](${url})`
+        content = content.flatMap<React.ReactNode>((child) => typeof child !== "string" ? [child] : child.split(marker).flatMap((text, index) => index === 0 ? [text] : [renderChip(part), text]))
+      }
+      return <code className={className} {...props}>{content}</code>
     },
   }}>{placeholders.markdown}</MessageMarkdown>
 }
@@ -4515,9 +4527,13 @@ export const SentMarkdown: Story = {
       <DemoBubble message={{ id: 1, role: "user", text }} onOpenAttachments={() => {}} />
       <DemoBubble message={{ id: 2, role: "user", text, parts: [{ type: "chip", chip: { id: "skill", label: "Skill Creator", textValue: "Skill Creator" } }, { type: "text", text }] }} onOpenAttachments={() => {}} />
       <BubbleParts parts={[{ type: "text", text: "**Hello " }, { type: "chip", chip: { id: "inline", label: "Inline chip", textValue: "Inline chip" } }, { type: "text", text: " world**" }]} />
+      <div data-testid="inline-code-chip"><BubbleParts parts={[{ type: "text", text: "`Hello " }, { type: "chip", chip: { id: "code-chip", label: "Code chip", textValue: "Payload" } }, { type: "text", text: " world`" }]} /></div>
     </div>
   },
   play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    expect(canvas.getByTestId("inline-code-chip").querySelector("code [data-slot=bubble-chip]")).toHaveTextContent("Code chip")
+    expect(canvas.getByTestId("inline-code-chip")).not.toHaveTextContent("nessa-chip.invalid")
     await waitFor(() => expect(canvasElement.querySelectorAll('[data-slot="code-block"]').length).toBe(2))
     expect(canvasElement.querySelectorAll("li").length).toBe(4)
     expect(canvasElement.textContent).not.toContain("&nbsp;")
