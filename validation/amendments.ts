@@ -186,4 +186,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-013",
+    kind: "transition",
+    contractId: "A11Y-006",
+    baseRevision: "c3b45d161fca2ac4989f66780bc52dad80b03f91",
+    targets: ["validation/contracts.ts"],
+    beforeFingerprint: "64efaca6d0df0fac1c38b3a05190e8cfaa88be1faf0049d231a36fe4cc982ad5",
+    afterFingerprint: "97189dd52e1df326dd97b9fcbd3cb28cd2da76f65e1db47fed5c9aa0af93e535",
+    rationale: "A11Y-005 records the judgment \u2014 which element reads as the field \u2014 and leaves a checker nothing to do, because the focus inventory counts classes per component rather than per element. chat-composer and chat-bubbles both carry focus outlines on their buttons while their editable surfaces carry none, so the existing counts cannot tell a considered omission from a surface nobody examined. A11Y-006 closes the half a machine can decide: every component rendering a textarea or a contenteditable declares, in the inventory, whether that element draws a focus indicator and why, and the declaration is checked against what the element actually draws. Discovery walks JSX elements rather than class surfaces, because a bare textarea owns no className and would otherwise never be asked to declare anything \u2014 the surface most likely to have been added without a decision would have been the one the rule could not see. Each element is judged on its own, so a second textarea cannot pass on the first one's ring, and a data-slot lets one component's editables differ. Only a focus-visible treatment proves an `own` declaration: an aria-invalid ring is a validity state, and a valid focused field carrying only that draws nothing. The resolver gained per-element attribution to make the join possible; classTokens is now a flattening of the same surfaces, so every existing class-surface rule sees exactly what it saw before.",
+    compatibility: "No consumer runtime API, rendered output, token, or registry target changes. A11Y-002 and A11Y-003 are untouched and keep their per-component counts; the new rule adds a separate enforced finding rather than changing an existing one. Four components declare today \u2014 chat-composer, chat-composer-editor, chat-bubbles, and message-actions/message-approval \u2014 and all four already satisfy it, so the gate is green on adoption. No exception ledger entry is added, and the class-surface resolver's coverage widens rather than narrows: it now reports the owning element alongside the same tokens it already returned.",
+    migration: "A component that renders a textarea or a contenteditable adds one entry to editableFocusDeclarations in validation/nessa/focus-treatments.ts naming the component, the element, whether it draws an indicator, and why. A surface declared `none` must carry no focus-visible class on that element; a surface declared `own` must carry one, which A11Y-002 then measures for contrast like any other treatment. A declaration whose component no longer renders that element fails as stale, so removing an editable surface means removing its declaration.",
+    supersedes: null,
+    pullRequest: null,
+  },
 ])
