@@ -502,6 +502,48 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
   } as const)),
 ])
 
+/**
+ * What each editable surface does about focus, and why. A11Y-005 says the
+ * element that reads as the field draws the indicator; this is where a
+ * component answers that question for its own editable elements, so an
+ * omission is a recorded decision rather than silence. `own` means the
+ * element draws its own indicator, which A11Y-002 then measures like any
+ * other; `none` means it deliberately draws nothing.
+ */
+export interface EditableFocusDeclaration {
+  component: string
+  element: "textarea" | "contenteditable"
+  indicator: "none" | "own"
+  reason: string
+}
+
+export const editableFocusDeclarations: readonly EditableFocusDeclaration[] = Object.freeze([
+  {
+    component: "chat-composer",
+    element: "textarea",
+    indicator: "none",
+    reason: "The pill is the field; an outline on its interior reads as a permanent inner border, and the caret carries focus.",
+  },
+  {
+    component: "chat-composer-editor",
+    element: "contenteditable",
+    indicator: "none",
+    reason: "Same surface as ChatComposer's textarea, in its rich form: the composer around it is the field.",
+  },
+  {
+    component: "chat-bubbles",
+    element: "textarea",
+    indicator: "none",
+    reason: "Editing happens inside the bubble, which keeps its own shape while the text becomes editable; the bubble is the field.",
+  },
+  {
+    component: "message-actions/message-approval",
+    element: "textarea",
+    indicator: "none",
+    reason: "The draft field is the card's interior. Its read-only form has no caret and does draw an outline, which the treatment inventory records.",
+  },
+] as const)
+
 export const focusSurfaces = Object.freeze(["--background", "--card", "--popover"] as const)
 
 // Width is geometry, not color. It is inventoried exactly here and remains

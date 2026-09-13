@@ -186,4 +186,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-013",
+    kind: "transition",
+    contractId: "A11Y-006",
+    baseRevision: "dbab75d2c893c56c1b792e79abf0cdc282f22108",
+    targets: ["validation/contracts.ts"],
+    beforeFingerprint: "1573f687c17a68225f8989c595223cd732925b689b24e4743d7d9204098300b3",
+    afterFingerprint: "d2ae4d8f6e5c1d560c3d2520120fcf37c2ac7510e1b09e647d92b5c28e345595",
+    rationale: "A11Y-005 records the judgment \u2014 which element reads as the field \u2014 and leaves a checker nothing to do, because the focus inventory counts classes per component rather than per element. chat-composer and chat-bubbles both carry focus outlines on their buttons while their editable surfaces carry none, so the existing counts cannot tell a considered omission from a surface nobody examined. A11Y-006 closes the half a machine can decide: every component rendering a textarea or a contenteditable declares, in the inventory, whether that element draws a focus indicator and why, and the declaration is checked against what the element actually draws. The resolver gained per-element attribution to make that possible; classTokens is now a flattening of the same surfaces, so every existing class-surface rule sees exactly what it saw before.",
+    compatibility: "No consumer runtime API, rendered output, token, or registry target changes. A11Y-002 and A11Y-003 are untouched and keep their per-component counts; the new rule adds a separate enforced finding rather than changing an existing one. Four components declare today \u2014 chat-composer, chat-composer-editor, chat-bubbles, and message-actions/message-approval \u2014 and all four already satisfy it, so the gate is green on adoption. No exception ledger entry is added, and the class-surface resolver's coverage widens rather than narrows: it now reports the owning element alongside the same tokens it already returned.",
+    migration: "A component that renders a textarea or a contenteditable adds one entry to editableFocusDeclarations in validation/nessa/focus-treatments.ts naming the component, the element, whether it draws an indicator, and why. A surface declared `none` must carry no focus-visible class on that element; a surface declared `own` must carry one, which A11Y-002 then measures for contrast like any other treatment. A declaration whose component no longer renders that element fails as stale, so removing an editable surface means removing its declaration.",
+    supersedes: null,
+    pullRequest: null,
+  },
 ])
