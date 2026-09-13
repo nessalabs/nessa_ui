@@ -162,16 +162,13 @@ export const StructuredDraft: Story = {
     await expect(editor).not.toHaveAttribute("aria-describedby", "draft-help")
     await expect(editor.parentElement).toHaveStyle({ paddingTop: "8px" })
     await userEvent.click(editor)
-    const selection = editor.ownerDocument.getSelection()!
-    const range = editor.ownerDocument.createRange()
-    range.selectNodeContents(editor)
-    selection.removeAllRanges()
-    selection.addRange(range)
+    // Select through the editor keymap so its document selection is current
+    // before copying; a DOM-only range waits on selectionchange delivery.
+    const modifier = /Mac|iPhone|iPad/.test(navigator.platform) ? "Meta" : "Control"
+    await userEvent.keyboard(`{${modifier}>}a{/${modifier}}`)
     const clipboard = new DataTransfer()
-    await waitFor(() => {
-      editor.dispatchEvent(new ClipboardEvent("copy", { clipboardData: clipboard, bubbles: true, cancelable: true }))
-      expect(clipboard.getData("text/plain")).toContain("raw\n  **untouched**\n<source>")
-    })
+    editor.dispatchEvent(new ClipboardEvent("copy", { clipboardData: clipboard, bubbles: true, cancelable: true }))
+    await expect(clipboard.getData("text/plain")).toContain("raw\n  **untouched**\n<source>")
     await expect(clipboard.getData("text/plain")).toContain("# Draft")
   },
 }
