@@ -536,6 +536,26 @@ export interface EditableFocusDeclaration {
 
 export const editableFocusDeclarations: readonly EditableFocusDeclaration[] = Object.freeze([
   {
+    component: "chat-composer-markdown-editor",
+    element: "contenteditable",
+    indicator: "none",
+    reason: "The composer or message bubble is the field; TipTap owns the editable caret, while chip node views explicitly opt out of editing.",
+  },
+  {
+    component: "code-editor",
+    element: "contenteditable",
+    slot: "code-editor-header",
+    indicator: "none",
+    reason: "The language header explicitly sets contentEditable=false inside structured editors. Its language button owns keyboard focus, not the header container.",
+  },
+  {
+    component: "code-editor",
+    element: "textarea",
+    slot: "code-editor-input",
+    indicator: "own",
+    reason: "The standalone code textarea is the field and draws an inset focus-visible ring; custom child editors retain their own focus contract.",
+  },
+  {
     component: "chat-composer",
     element: "textarea",
     indicator: "none",
