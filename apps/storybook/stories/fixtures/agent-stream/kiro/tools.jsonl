@@ -1,0 +1,10 @@
+{"type":"system","subtype":"init","sessionId":"kiro-sess-02","model":"claude-sonnet-4-5","cwd":"/tmp/kiro-demo","tools":["read","write","edit","bash","glob","grep","websearch","webfetch","todowrite","task"],"slashCommands":[{"name":"agent"},{"name":"context"},{"name":"model"}],"agents":[],"skills":[],"mcpServers":[],"permissionMode":"default","version":"3.0.0"}
+{"type":"user","sessionId":"kiro-sess-02","content":"Create a file notes.txt containing two lines, then run wc -l on it."}
+{"type":"assistant","sessionId":"kiro-sess-02","streaming":true,"messageId":"msg-02","content":"I'll create the file and count its lines."}
+{"type":"assistant","sessionId":"kiro-sess-02","content":"I'll create the file and count its lines."}
+{"type":"tool_call","sessionId":"kiro-sess-02","subtype":"started","toolCallId":"call-01","title":"write","kind":"edit","rawInput":{"path":"notes.txt","content":"line one\nline two\n"}}
+{"type":"tool_call_update","sessionId":"kiro-sess-02","toolCallId":"call-01","status":"completed","kind":"edit","content":[{"type":"diff","path":"notes.txt","oldText":"","newText":"line one\nline two\n"}],"rawOutput":{"path":"notes.txt"}}
+{"type":"tool_call","sessionId":"kiro-sess-02","subtype":"started","toolCallId":"call-02","title":"bash","kind":"execute","rawInput":{"command":"wc -l notes.txt","description":"Count lines in notes.txt"}}
+{"type":"tool_call_update","sessionId":"kiro-sess-02","toolCallId":"call-02","status":"completed","kind":"execute","content":[{"type":"text","text":"2 notes.txt\n"}],"rawOutput":{"stdout":"2 notes.txt\n","stderr":"","exitCode":0}}
+{"type":"assistant","sessionId":"kiro-sess-02","content":"Created notes.txt with two lines, and wc -l confirms it has 2 lines."}
+{"type":"turn_end","sessionId":"kiro-sess-02","stopReason":"end_turn","usage":{"inputTokens":45,"outputTokens":52,"totalTokens":97},"durationMs":2103}

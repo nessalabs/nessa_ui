@@ -57,16 +57,19 @@ packages/agent-stream/src/
   cursor/
     stream/        `agent -p --output-format stream-json`
                    (interactive wire is shared `acp/`, not a serve)
+  kiro/
+    chat/          `kiro-cli chat --no-interactive --output-format stream-json`
+                   (interactive wire is shared `acp/`)
   opencode/
     run/           `opencode run --format json`
     server/        `opencode serve` SSE bus
     parts.ts       payload run and serve both carry
 ```
 
-Four providers plus one shared protocol now exist, which is what turns the
-layering from a claim into a measurement. Adding Cursor cost **no** addition to
-the shared contract — Task spawns reuse `task_started`/`task_completed`, and
-Edit diffs reuse `file_edits` — and nothing else moved: the fold, the grouping,
+Five providers plus one shared protocol now exist, which is what turns the
+layering from a claim into a measurement. Adding Cursor and Kiro cost **no**
+addition to the shared contract — Task spawns reuse `task_started`/`task_completed`,
+and Edit diffs reuse `file_edits` — and nothing else moved: the fold, the grouping,
 the delta machinery and every component are reused untouched.
 
 The Storybook story is a demo, not a shipped component.
@@ -752,15 +755,18 @@ description was read from, next to the command that produces it:
 | codex-cli | acp | adapter 1.7.0 | `npx @agentclientprotocol/codex-acp` |
 | Cursor Agent | stream-json | 2026.09.02-c22c1a3 | `agent -p --output-format stream-json --stream-partial-output` |
 | Cursor Agent | acp | 2026.09.02-c22c1a3, **protocol 1** | `agent acp` |
+| Kiro CLI | chat stream-json | 3.0.0 (synthetic) | `kiro-cli chat --no-interactive --trust-all-tools --output-format stream-json` |
+| Kiro CLI | acp | 3.0.0, **protocol 1** (uncaptured) | `kiro-cli acp` |
 | opencode | run | 1.18.25 | `opencode run --format json` |
 | opencode | serve | 1.18.25, **API 1.0.0** | `opencode serve → GET /event` |
 | opencode | acp | 1.18.25, **protocol 1** | `opencode acp` |
 
-Eleven transports over seven wires, because two of them are the same wire twice:
-Claude's duplex mode is its own stream with stdin open, and ACP is one protocol
-shared by four agents. The modules follow that exactly — `claude/stream/`,
-`codex/exec/`, `codex/app-server/`, `cursor/stream/`, `opencode/run/`,
-`opencode/server/`, and `acp/` beside them rather than inside any one agent.
+Thirteen rows in the table above — two of them are the same ACP wire spoken by
+different agents, and Claude's duplex mode is its own stream with stdin open.
+ACP is one protocol shared by five agents. The modules follow that exactly —
+`claude/stream/`, `codex/exec/`, `codex/app-server/`, `cursor/stream/`,
+`kiro/chat/`, `opencode/run/`, `opencode/server/`, and `acp/` beside them rather
+than inside any one agent.
 
 Per *transport*, not per provider, because a provider can speak more than one
 protocol and they version independently — opencode's server declares its own
