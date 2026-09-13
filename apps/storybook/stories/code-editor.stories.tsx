@@ -88,3 +88,26 @@ export const ForcedThemes: Story = {
     }
   },
 }
+
+/** Exercises the large-draft fallback and recovery to highlighted editing. */
+function LargeDraftExample() {
+  const [value, setValue] = React.useState("const answer = 42\n".repeat(1000))
+  return <CodeEditor language="javascript" value={value} onValueChange={setValue} />
+}
+
+export const LargeDraft: Story = {
+  parameters: storyDocumentation("Drafts above 10,000 characters remain editable as plain text to keep synchronous highlighting work bounded. Shorter drafts resume syntax highlighting."),
+  render: () => <LargeDraftExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const input = canvas.getByRole("textbox", { name: "Code" })
+    const overlay = canvasElement.querySelector<HTMLElement>('[data-slot="code-editor-highlight"]')!
+    expect(input).toHaveValue("const answer = 42\n".repeat(1000))
+    expect(overlay.querySelectorAll(".nessa-code-token")).toHaveLength(0)
+    expect(getComputedStyle(overlay).visibility).toBe("hidden")
+    await userEvent.clear(input)
+    await userEvent.type(input, "const short = 1")
+    await waitFor(() => expect(overlay.querySelectorAll(".nessa-code-token").length).toBeGreaterThan(0))
+    expect(input).toHaveValue("const short = 1")
+  },
+}

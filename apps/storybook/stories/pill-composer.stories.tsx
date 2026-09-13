@@ -4647,14 +4647,14 @@ export const SideActions: Story = {
     if (matchMedia("(hover: hover) and (pointer: fine)").matches) {
       const actions = rows.map((row) => row.querySelector<HTMLElement>('[data-slot="chat-message-actions"]')!)
       const copy = within(actions[0]).getByRole("button", { name: "Copy" })
-      // Synthetic pointer events switch modality; actual CSS hover is checked
-      // in the live browser. Keyboard focus must no longer pin its old row.
+      // Pointer movement must not hide keyboard focus; activation hands off ownership.
       copy.focus()
       await userEvent.keyboard("{Escape}")
       await waitFor(() => expect(getComputedStyle(actions[0]).opacity).toBe("1"))
       await userEvent.hover(rows[1])
       await waitFor(() => {
-        expect(getComputedStyle(actions[0]).opacity).toBe("0")
+        expect(getComputedStyle(actions[0]).opacity).toBe("1")
+        expect(getComputedStyle(actions[1]).opacity).toBe("0")
       })
       expect(copy).toHaveFocus()
       // Keyboard input takes ownership again without blurring the control.

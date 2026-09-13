@@ -176,7 +176,7 @@ export const amendments: readonly Amendment[] = Object.freeze([
     id: "AMEND-012",
     kind: "transition",
     contractId: "SRC-002",
-    baseRevision: "a29a36f1ee93ad4cba5053878b9e94b8160efc3e",
+    baseRevision: "e6675db99ea9c2e73881c058dbc8a89495278c41",
     targets: ["validation/exceptions.ts"],
     beforeFingerprint: "6dc49eb23673abadf3c1d1c14c1583c5db429e407706636cbd7be5446bb444eb",
     afterFingerprint: "d30b47b7ba4fcf54b20a32f935e316b6d705d272f0af0540c99a424425871bb6",

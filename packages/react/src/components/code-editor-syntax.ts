@@ -21,7 +21,8 @@ export interface CodeSyntaxColors {
 /**
  * Tokenizes code with the same lazily loaded Shiki instance as CodeBlock.
  * Returns null while loading, for plain/unknown languages, or after a load error;
- * editing must remain available without highlighting. Results never belong to
+ * Drafts above 10,000 UTF-16 characters render as plain text to bound synchronous
+ * tokenization and decoration work; editing remains available without highlighting. Results never belong to
  * stale code, language, or themes. Only colors are returned, preserving editing
  * geometry regardless of theme font styling. Mode follows CodeBlockProvider.
  */
@@ -47,7 +48,7 @@ export function useCodeSyntax(code: string, language: string): {
           dark: { foreground: highlighter.getTheme(dark).fg, background: highlighter.getTheme(dark).bg },
         },
       })
-      if (!code || !language || language === "text" || language === "plaintext") return
+      if (!code || code.length > 10_000 || !language || language === "text" || language === "plaintext") return
       await getSharedHighlighter({ themes: [], langs: [language] })
       if (canceled) return
       const tokens = highlighter.codeToTokensWithThemes(code, { lang: language, themes: { light, dark } }).flatMap((line) => line.map((token) => ({

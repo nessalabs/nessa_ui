@@ -177,6 +177,7 @@ export function ChatComposerMarkdownEditor(props: ChatComposerMarkdownEditorProp
           "Shift-Enter": () => {
             if (startCodeBlock()) return true
             const { $from } = this.editor.state.selection
+            if ($from.parent.type.name === "codeBlock") return this.editor.commands.insertContent("\n")
             if ($from.parent.type.name === "heading") return splitHeading()
             // Block shortcuts must see a paragraph start, not text after a hard break.
             if ($from.depth === 1 && $from.parent.type.name === "paragraph") {
