@@ -513,6 +513,12 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
 export interface EditableFocusDeclaration {
   component: string
   element: "textarea" | "contenteditable"
+  /**
+   * The element's `data-slot`, for a component whose editables of one kind do
+   * not all want the same answer. Omitted, the record covers every element of
+   * that kind in the component; a slot-specific record wins over it.
+   */
+  slot?: string
   indicator: "none" | "own"
   reason: string
 }

@@ -60,6 +60,8 @@ function withinClassSurface(node: ts.Node): boolean {
 export interface ClassSurface {
   element: string | null
   attributes: readonly string[]
+  /** Source position of the owning JSX element, or null when there is none. */
+  elementPos: number | null
   tokens: readonly string[]
 }
 
@@ -145,16 +147,16 @@ export function classSurfaces(ast: ts.SourceFile): ClassSurface[] {
   // The owning element travels with the surface. A className attribute's
   // grandparent is its opening element, which also carries the sibling
   // attributes; anything else resolves with no element, exactly as before.
-  const owner = (attribute: ts.JsxAttribute): { element: string | null; attributes: string[] } => {
+  const owner = (attribute: ts.JsxAttribute): { element: string | null; attributes: string[]; elementPos: number | null } => {
     const opening = attribute.parent.parent
-    if (!ts.isJsxOpeningElement(opening) && !ts.isJsxSelfClosingElement(opening)) return { element: null, attributes: [] }
+    if (!ts.isJsxOpeningElement(opening) && !ts.isJsxSelfClosingElement(opening)) return { element: null, attributes: [], elementPos: null }
     const attributes = opening.attributes.properties.flatMap((property) =>
       ts.isJsxAttribute(property) ? [property.name.getText()] : [],
     )
-    return { element: opening.tagName.getText(), attributes }
+    return { element: opening.tagName.getText(), attributes, elementPos: opening.pos }
   }
 
-  const surfaces: Array<{ node: ts.Node; element: string | null; attributes: string[] }> = []
+  const surfaces: Array<{ node: ts.Node; element: string | null; attributes: string[]; elementPos: number | null }> = []
   function findSurfaces(node: ts.Node): void {
     if (ts.isJsxAttribute(node) && node.name.getText() === "className") {
       if (node.initializer) {
@@ -166,7 +168,7 @@ export function classSurfaces(ast: ts.SourceFile): ClassSurface[] {
       return
     }
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && ["cn", "cva"].includes(node.expression.text) && !withinClassSurface(node.parent)) {
-      for (const argument of node.arguments) surfaces.push({ node: argument, element: null, attributes: [] })
+      for (const argument of node.arguments) surfaces.push({ node: argument, element: null, attributes: [], elementPos: null })
       return
     }
     ts.forEachChild(node, findSurfaces)
@@ -175,6 +177,7 @@ export function classSurfaces(ast: ts.SourceFile): ClassSurface[] {
   return surfaces.map((surface) => ({
     element: surface.element,
     attributes: surface.attributes,
+    elementPos: surface.elementPos,
     tokens: resolve(surface.node).flatMap((value) => value.split(/\s+/).filter(Boolean)),
   }))
 }
