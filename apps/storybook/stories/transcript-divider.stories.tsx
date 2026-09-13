@@ -48,21 +48,31 @@ export const Playground: Story = {
 export const Pending: Story = {
   args: { children: "Compacting…", pending: true },
   parameters: storyDocumentation(
-    "While the summary is being written the label shimmers and is announced politely, so a divider that sits for the better part of a minute reads as work in flight.",
+    "While the summary is being written the label shimmers and is announced politely, so a divider that sits for the better part of a minute reads as work in flight. Liveness is constant rather than switched on with `pending`: turning aria-live on over text that is already rendered announces nothing, so the change a reader waits on — pending giving way to the settled label — is what actually reaches them.",
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     const label = canvas.getByText("Compacting…")
     await expect(label).toBeVisible()
-    // The pending state is what gets announced; a settled marker is part of
-    // the transcript a reader scrolls to, not news.
-    await waitFor(async () => {
-      await expect(label.closest("[aria-live]")).not.toBeNull()
-    })
+    await expect(label.closest("[aria-live]")).not.toBeNull()
   },
 }
 
 /** In place, between the work either side of it. */
+export const SettledKeepsItsRegion: Story = {
+  args: { children: "Compacted 41 messages" },
+  parameters: storyDocumentation(
+    "A settled marker keeps the same live region a pending one has. That is not noise: nothing is announced while the text sits unchanged, and keeping the region mounted is what lets the pending-to-settled change be reported at all. Toggling `aria-live` on at the moment the text appears — which is what this component used to do — announces nothing, because assistive technology reports changes inside a region that was already there.",
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const label = canvas.getByText("Compacted 41 messages")
+    const region = label.closest("[aria-live]")
+    await expect(region).not.toBeNull()
+    await expect(region).toHaveAttribute("aria-live", "polite")
+  },
+}
+
 export const InTranscript: Story = {
   args: { children: "Context compacted" },
   parameters: storyDocumentation(
