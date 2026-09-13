@@ -3,8 +3,10 @@ import { converter, parse, type Color } from "culori"
 import { exceptions, type ContrastException, type FocusContrastException, type ValidationException } from "../../exceptions.ts"
 import { defineCheck } from "../../framework/define-check.ts"
 import { contrastMatrix } from "../contrast-matrix.ts"
-import { focusGeometryClasses, focusSurfaces, focusTreatments } from "../focus-treatments.ts"
-import { classTokens } from "./source-boundaries.ts"
+import { editableFocusDeclarations, focusGeometryClasses, focusSurfaces, focusTreatments, type EditableFocusDeclaration } from "../focus-treatments.ts"
+import tsModule from "typescript"
+
+import { classSurfaces, classTokens } from "./source-boundaries.ts"
 import { extractThemeTokens } from "./theme-parity.ts"
 import { checkMetadata } from "../check-metadata.ts"
 
@@ -82,6 +84,67 @@ export function discoverFocusClasses(source: string): string[] {
 
 export function focusClassesFromAst(ast: import("typescript").SourceFile): string[] {
   return classTokens(ast).filter((token) => /^(?:dark:)?(?:focus-visible|aria-invalid):-?(?:ring|border|outline)-.+$/.test(token))
+}
+
+/**
+ * A focus indicator proper: something that appears *because the element is
+ * focused*. An `aria-invalid:` treatment is a validity state, not focus — a
+ * valid focused field carrying only that renders no indicator at all — so it
+ * can never prove an `own` declaration, and never violates a `none` one.
+ */
+const focusIndicatorPattern = /^(?:dark:)?focus-visible:-?(?:ring|border|outline)-.+$/
+
+/** One editable element, found by walking the tree rather than by its classes. */
+export interface EditableSurface {
+  element: "textarea" | "contenteditable"
+  /** The element's `data-slot`, when it has a literal one: its stable name. */
+  slot: string | null
+  classes: string[]
+}
+
+/**
+ * Every editable element a component renders, one entry per element, with the
+ * focus indicators drawn on that element.
+ *
+ * Discovery walks JSX elements directly, not class surfaces: a bare
+ * `<textarea />` owns no `className` and would otherwise produce no entry at
+ * all, which is exactly the surface most likely to have been added without
+ * anyone deciding what focus should do. Class surfaces are then joined onto
+ * the element that owns them.
+ */
+export function editableFocusSurfaces(ast: import("typescript").SourceFile): EditableSurface[] {
+  const ts = tsModule
+  const byElement = new Map<number, string[]>()
+  for (const surface of classSurfaces(ast)) {
+    if (surface.elementPos === null) continue
+    byElement.set(surface.elementPos, [...(byElement.get(surface.elementPos) ?? []), ...surface.tokens])
+  }
+  const found: EditableSurface[] = []
+  const visit = (node: import("typescript").Node): void => {
+    if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+      const attributes = node.attributes.properties.flatMap((property) =>
+        ts.isJsxAttribute(property) ? [property] : [],
+      )
+      const named = (name: string) => attributes.find((attribute) => attribute.name.getText() === name)
+      const element = node.tagName.getText() === "textarea"
+        ? "textarea" as const
+        : named("contentEditable")
+          ? "contenteditable" as const
+          : null
+      if (element) {
+        const slotAttribute = named("data-slot")?.initializer
+        const slot = slotAttribute && ts.isStringLiteral(slotAttribute) ? slotAttribute.text : null
+        found.push({
+          element,
+          slot,
+          classes: (byElement.get(node.pos) ?? []).filter((token) => focusIndicatorPattern.test(token)),
+        })
+      }
+    }
+    node.forEachChild(visit)
+  }
+  ast.forEachChild(visit)
+  return found
 }
 
 export const accessibilityCheck = defineCheck({
@@ -164,6 +227,39 @@ export const accessibilityCheck = defineCheck({
         }
       }
       for (const geometry of focusGeometryClasses.filter((entry) => entry.component === component)) if (counts.get(geometry.className) !== ("count" in geometry ? geometry.count : 1)) findings.push(context.fail(`Focus geometry inventory is stale for ${component} ${geometry.className}.`, { contractId: "A11Y-003" }))
+    }
+    // A11Y-005 asks which element reads as the field; A11Y-006 is the half a
+    // checker can decide — that somebody answered the question for every
+    // editable element, and that the answer matches what the element draws.
+    const usedDeclarations = new Set<EditableFocusDeclaration>()
+    for (const componentPath of componentPaths) {
+      const component = componentPath.replace(/^packages\/react\/src\/(?:components|composites)\//, "").replace(/\.tsx$/, "")
+      // Each element is judged on its own: two textareas in one file can
+      // disagree, and a bare second one must not pass on the first's ring.
+      for (const surface of editableFocusSurfaces(await context.parseTypeScript(componentPath))) {
+        const candidates = editableFocusDeclarations.filter((entry) => entry.component === component && entry.element === surface.element)
+        // A slot-specific record wins over the component-wide one, which is
+        // how a file whose editables differ expresses that.
+        const declaration = candidates.find((entry) => entry.slot !== undefined && entry.slot === surface.slot)
+          ?? candidates.find((entry) => entry.slot === undefined)
+        const named = surface.slot ? `${surface.element} ${surface.slot}` : surface.element
+        if (!declaration) {
+          findings.push(context.fail(`${component} renders a ${named} that declares no focus intent.`, { contractId: "A11Y-006", path: componentPath }))
+          continue
+        }
+        usedDeclarations.add(declaration)
+        if (declaration.indicator === "none" && surface.classes.length) {
+          findings.push(context.fail(`${component} declares no focus indicator on its ${named} but draws ${surface.classes.join(", ")}.`, { contractId: "A11Y-006", path: componentPath }))
+        }
+        if (declaration.indicator === "own" && !surface.classes.length) {
+          findings.push(context.fail(`${component} declares its ${named} draws its own focus indicator, but no focus-visible treatment is present.`, { contractId: "A11Y-006", path: componentPath }))
+        }
+      }
+    }
+    for (const declaration of editableFocusDeclarations) {
+      if (!usedDeclarations.has(declaration)) {
+        findings.push(context.fail(`Editable focus declaration for ${declaration.component} ${declaration.element}${declaration.slot ? ` ${declaration.slot}` : ""} matches no rendered surface.`, { contractId: "A11Y-006" }))
+      }
     }
     for (const treatment of focusTreatments) if (!scannedComponents.has(treatment.component)) findings.push(context.fail(`Focus inventory references missing component ${treatment.component}.`, { contractId: "A11Y-002" }))
     for (const geometry of focusGeometryClasses) if (!scannedComponents.has(geometry.component)) findings.push(context.fail(`Focus geometry inventory references missing component ${geometry.component}.`, { contractId: "A11Y-003" }))

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { contrastRatio, discoverFocusClasses, focusClassesFromAst, focusExceptionFingerprintMatches, resolveTokenValue } from "../nessa/checks/accessibility.ts"
+import { contrastRatio, discoverFocusClasses, editableFocusSurfaces, focusClassesFromAst, focusExceptionFingerprintMatches, resolveTokenValue } from "../nessa/checks/accessibility.ts"
 import { exceptions } from "../exceptions.ts"
 import { contrastMatrix } from "../nessa/contrast-matrix.ts"
-import { focusTreatments } from "../nessa/focus-treatments.ts"
+import { editableFocusDeclarations, focusTreatments } from "../nessa/focus-treatments.ts"
 import ts from "typescript"
 
 test("contrast math matches WCAG black/white reference", () => {
@@ -93,4 +93,65 @@ test("malformed colors fail and wider-gamut colors are identified", () => {
   assert.throws(() => contrastRatio("not-a-color", "white"), /Unsupported/)
   const wide = contrastRatio("oklch(0.7 0.35 145)", "oklch(1 0 0)")
   assert.equal(wide.wideGamut, true)
+})
+
+const parseTsx = (source: string) =>
+  ts.createSourceFile("fixture.tsx", source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TSX)
+
+test("editable focus discovery attributes classes to the element that draws them", () => {
+  // The case the per-component count cannot see: rings on the buttons, none
+  // on the textarea. A file-wide count reports three focus classes either way.
+  const ast = parseTsx(`const view = (
+    <form className="focus-visible:outline-ring">
+      <button className="focus-visible:outline-2 focus-visible:outline-ring" />
+      <textarea className="resize-none outline-none" />
+    </form>
+  )`)
+  assert.deepEqual(editableFocusSurfaces(ast), [{ element: "textarea", slot: null, classes: [] }])
+})
+
+test("a classless editable is still discovered", () => {
+  // Discovery walks elements, not class surfaces. A bare textarea owns no
+  // className, and is exactly the surface most likely to have been added
+  // without anyone deciding what focus should do.
+  const ast = parseTsx(`const view = <div><textarea /><div contentEditable /></div>`)
+  assert.deepEqual(editableFocusSurfaces(ast), [
+    { element: "textarea", slot: null, classes: [] },
+    { element: "contenteditable", slot: null, classes: [] },
+  ])
+})
+
+test("each editable is judged on its own, and its slot is carried", () => {
+  // Two of a kind in one file: the second must not pass on the first's ring.
+  const ast = parseTsx(`const view = (
+    <form>
+      <textarea data-slot="draft" className="focus-visible:outline-ring" />
+      <textarea data-slot="notes" className="outline-none" />
+    </form>
+  )`)
+  assert.deepEqual(editableFocusSurfaces(ast), [
+    { element: "textarea", slot: "draft", classes: ["focus-visible:outline-ring"] },
+    { element: "textarea", slot: "notes", classes: [] },
+  ])
+})
+
+test("an invalid-state treatment is not a focus indicator", () => {
+  // aria-invalid says the value is wrong, not that the element is focused: a
+  // valid focused field carrying only that renders no indicator at all.
+  const ast = parseTsx(`const view = <textarea className="aria-invalid:ring-destructive aria-invalid:border-destructive" />`)
+  assert.deepEqual(editableFocusSurfaces(ast), [{ element: "textarea", slot: null, classes: [] }])
+})
+
+test("editable focus discovery follows const aliases and sees a contenteditable", () => {
+  const ast = parseTsx(`const field = "rounded-xl focus-visible:outline-ring"
+    const view = <div contentEditable={!disabled} className={cn(field, "px-3")} />`)
+  assert.deepEqual(editableFocusSurfaces(ast), [
+    { element: "contenteditable", slot: null, classes: ["focus-visible:outline-ring"] },
+  ])
+})
+
+test("every editable focus declaration names a distinct component, element, and slot", () => {
+  const keys = editableFocusDeclarations.map((entry) => `${entry.component}:${entry.element}:${entry.slot ?? "*"}`)
+  assert.equal(new Set(keys).size, keys.length)
+  for (const entry of editableFocusDeclarations) assert.ok(entry.reason.trim().length > 20, `${entry.component} needs a reason`)
 })

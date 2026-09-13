@@ -50,7 +50,26 @@ function withinClassSurface(node: ts.Node): boolean {
   return false
 }
 
+/**
+ * One class surface with the JSX element that owns it. `element` is the tag
+ * name for a `className` attribute and null for a bare `cn`/`cva` call, whose
+ * classes reach no element on their own; `attributes` names the other props on
+ * that element, which is how an editable surface is recognised without
+ * re-walking the tree.
+ */
+export interface ClassSurface {
+  element: string | null
+  attributes: readonly string[]
+  /** Source position of the owning JSX element, or null when there is none. */
+  elementPos: number | null
+  tokens: readonly string[]
+}
+
 export function classTokens(ast: ts.SourceFile): string[] {
+  return classSurfaces(ast).flatMap((surface) => [...surface.tokens])
+}
+
+export function classSurfaces(ast: ts.SourceFile): ClassSurface[] {
   const importedBindings = new Set<string>()
   for (const statement of ast.statements) {
     if (!ts.isImportDeclaration(statement) || !statement.importClause || !ts.isStringLiteral(statement.moduleSpecifier) || !statement.moduleSpecifier.text.startsWith(".")) continue
@@ -125,20 +144,42 @@ export function classTokens(ast: ts.SourceFile): string[] {
     return nested
   }
 
-  const surfaces: ts.Node[] = []
+  // The owning element travels with the surface. A className attribute's
+  // grandparent is its opening element, which also carries the sibling
+  // attributes; anything else resolves with no element, exactly as before.
+  const owner = (attribute: ts.JsxAttribute): { element: string | null; attributes: string[]; elementPos: number | null } => {
+    const opening = attribute.parent.parent
+    if (!ts.isJsxOpeningElement(opening) && !ts.isJsxSelfClosingElement(opening)) return { element: null, attributes: [], elementPos: null }
+    const attributes = opening.attributes.properties.flatMap((property) =>
+      ts.isJsxAttribute(property) ? [property.name.getText()] : [],
+    )
+    return { element: opening.tagName.getText(), attributes, elementPos: opening.pos }
+  }
+
+  const surfaces: Array<{ node: ts.Node; element: string | null; attributes: string[]; elementPos: number | null }> = []
   function findSurfaces(node: ts.Node): void {
     if (ts.isJsxAttribute(node) && node.name.getText() === "className") {
-      if (node.initializer) surfaces.push(ts.isJsxExpression(node.initializer) ? node.initializer.expression ?? node.initializer : node.initializer)
+      if (node.initializer) {
+        surfaces.push({
+          node: ts.isJsxExpression(node.initializer) ? node.initializer.expression ?? node.initializer : node.initializer,
+          ...owner(node),
+        })
+      }
       return
     }
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && ["cn", "cva"].includes(node.expression.text) && !withinClassSurface(node.parent)) {
-      surfaces.push(...node.arguments)
+      for (const argument of node.arguments) surfaces.push({ node: argument, element: null, attributes: [], elementPos: null })
       return
     }
     ts.forEachChild(node, findSurfaces)
   }
   findSurfaces(ast)
-  return surfaces.flatMap((surface) => resolve(surface)).flatMap((value) => value.split(/\s+/).filter(Boolean))
+  return surfaces.map((surface) => ({
+    element: surface.element,
+    attributes: surface.attributes,
+    elementPos: surface.elementPos,
+    tokens: resolve(surface.node).flatMap((value) => value.split(/\s+/).filter(Boolean)),
+  }))
 }
 
 export function importedClassSurfaceReferences(ast: ts.SourceFile): string[] {
