@@ -344,6 +344,17 @@ export {
   type MessageThreadSummaryProps,
 } from "./components/message"
 export {
+  ContactChoices,
+  MessageApproval,
+  MessageDigest,
+  type ContactChoice,
+  type ContactChoicesProps,
+  type MessageApprovalProps,
+  type MessageApprovalStatus,
+  type MessageDigestEntry,
+  type MessageDigestProps,
+} from "./components/message-actions"
+export {
   MessageMarkdown,
   type MessageMarkdownProps,
 } from "./components/message-markdown"

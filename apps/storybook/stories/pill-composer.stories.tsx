@@ -668,7 +668,7 @@ function BubbleParts({
     }).join("")
     return { chips, markdown }
   }, [parts])
-  return <MessageMarkdown className="leading-5 text-inherit [&_p]:whitespace-pre-wrap [&_a]:text-inherit" components={{
+  return <MessageMarkdown className="leading-5 text-inherit [&_p]:whitespace-pre-wrap [&_a]:text-inherit [&_th]:text-foreground [&_blockquote]:text-inherit" components={{
     a: ({ href, children, node: _node, ...props }) => {
       const part = placeholders.chips.get(href ?? "")
       if (!part) return <a href={href} {...props}>{children}</a>
@@ -1160,7 +1160,7 @@ function DemoMessageActionScope({ className, onPointerMoveCapture, onPointerDown
   return <div {...props} className={cn(className, keyboard
     ? "[@media(hover:hover)_and_(pointer:fine)]:[&_[data-slot=chat-message-actions]:not(:focus-within)]:opacity-0! [@media(hover:hover)_and_(pointer:fine)]:[&_[data-slot=chat-message-actions]:not(:focus-within)]:pointer-events-none!"
     : "[@media(hover:hover)_and_(pointer:fine)]:[&_[data-slot=chat-message]:not(:hover)_[data-slot=chat-message-actions]]:opacity-0! [@media(hover:hover)_and_(pointer:fine)]:[&_[data-slot=chat-message]:not(:hover)_[data-slot=chat-message-actions]]:pointer-events-none!"
-  )} onPointerMoveCapture={(event) => { setKeyboard(false); onPointerMoveCapture?.(event) }}
+  )} onPointerMoveCapture={(event) => { onPointerMoveCapture?.(event) }}
     onPointerDownCapture={(event) => { setKeyboard(false); onPointerDownCapture?.(event) }}
     onFocusCapture={(event) => { if (event.target.matches(":focus-visible")) setKeyboard(true); onFocusCapture?.(event) }}
     onKeyDownCapture={(event) => { setKeyboard(true); onKeyDownCapture?.(event) }} />
@@ -1325,7 +1325,7 @@ function DemoBubble({
         <ChatMessageActions className={cn("static! shrink-0 self-center! pt-0", message.role === "assistant" && "order-last")}>
           {message.role === "user" ? (
             <>
-              <ChatMessageAction aria-label="Copy" title="Copy">
+              <ChatMessageAction aria-label="Copy" title="Copy" onClick={() => { void navigator.clipboard.writeText(message.text) }}>
                 <Copy aria-hidden="true" />
               </ChatMessageAction>
               {onEditStart ? (
@@ -1340,7 +1340,7 @@ function DemoBubble({
             </>
           ) : (
             <>
-              <ChatMessageAction aria-label="Copy" title="Copy">
+              <ChatMessageAction aria-label="Copy" title="Copy" onClick={() => { void navigator.clipboard.writeText(message.text) }}>
                 <Copy aria-hidden="true" />
               </ChatMessageAction>
               <DropdownMenu>
@@ -1407,7 +1407,7 @@ function DemoBubble({
                   }}
                 />
               ) : (
-                <MessageMarkdown className="leading-5 text-inherit [&_p]:whitespace-pre-wrap [&_a]:text-inherit">
+                <MessageMarkdown className="leading-5 text-inherit [&_p]:whitespace-pre-wrap [&_a]:text-inherit [&_th]:text-foreground [&_blockquote]:text-inherit">
                   {message.text}
                 </MessageMarkdown>
               )}
@@ -4361,6 +4361,88 @@ function ExpansionExample() {
       </div>
     </div>
   )
+}
+
+export const ExpansionWithdrawn: Story = {
+  parameters: storyDocumentation(
+    "Expansion is the host's to withdraw. When `expandable` goes false while the composer is expanded — a responsive breakpoint dropping the affordance, say — the full-pane layout comes down with the control that exits it. Left alone, the pane would keep its absolute layout while the only minimize button disappeared, stranding the person inside an overlay whose sole exit is Escape. The request is dropped too, so re-enabling the prop does not reopen the pane without anyone asking. The play test expands, withdraws the prop, and checks the composer is back to its compact size with no control left behind.",
+  ),
+  render: () => {
+    const WithdrawableExpansion = () => {
+      const [expandable, setExpandable] = React.useState(true)
+      return (
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            data-testid="toggle-expandable"
+            onClick={() => setExpandable((value) => !value)}
+            className="w-fit rounded-md border border-border px-3 py-1 nessa-text-2"
+          >
+            {expandable ? "Withdraw expandable" : "Restore expandable"}
+          </button>
+          {/* The composer's offset parent is the pane itself: expansion is
+              `absolute inset-0`, so an intervening positioned wrapper would
+              collapse it to that wrapper's own height. */}
+          <div
+            data-testid="withdraw-pane"
+            className="relative flex h-64 w-full max-w-md flex-col justify-end rounded-2xl bg-muted p-3"
+          >
+            <PillComposer
+              expandable={expandable}
+              submitOnEnter={false}
+              aria-label="Withdrawable composer"
+              onSubmit={(event) => event.preventDefault()}
+            >
+              <ChatComposerInput aria-label="Withdrawable draft" />
+            </PillComposer>
+          </div>
+        </div>
+      )
+    }
+    return <WithdrawableExpansion />
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const pane = canvas.getByTestId("withdraw-pane")
+    const controls = within(pane)
+    const input = controls.getByRole("textbox")
+    const form = controls.getByRole("form")
+
+    await userEvent.click(input)
+    await userEvent.type(input, "one{Enter}two{Enter}three")
+    await userEvent.click(
+      await controls.findByRole("button", { name: "Expand composer" }),
+    )
+    await waitFor(() =>
+      expect(form.getBoundingClientRect().height).toBeCloseTo(
+        pane.clientHeight,
+        0,
+      ),
+    )
+
+    await userEvent.click(canvas.getByTestId("toggle-expandable"))
+    // The end state, not a proxy for it: the pane is compact again and the
+    // control that was the only way out is gone rather than merely hidden.
+    await waitFor(() => expect(form).not.toHaveAttribute("data-expanded"))
+    await waitFor(() =>
+      expect(form.getBoundingClientRect().height).toBeLessThan(
+        pane.clientHeight,
+      ),
+    )
+    await expect(
+      controls.queryByRole("button", { name: "Minimize composer" }),
+    ).toBeNull()
+
+    // Restoring the prop offers expansion again without reopening it.
+    await userEvent.click(canvas.getByTestId("toggle-expandable"))
+    await waitFor(() =>
+      expect(
+        controls.getByRole("button", { name: "Expand composer" }),
+      ).toBeVisible(),
+    )
+    await expect(form).not.toHaveAttribute("data-expanded")
+    await userEvent.clear(input)
+  },
 }
 
 export const Expansion: Story = {

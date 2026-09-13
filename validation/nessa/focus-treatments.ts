@@ -46,6 +46,10 @@ const composerFocusComponents = Object.freeze([
   { component: "agent-details", count: 1 },
   // The conversation row. The search field is an Input and draws its own ring.
   { component: "conversation-history", count: 1 },
+  // One row control in each list; the picker's check and the digest's unread
+  // dot are decoration inside that control, not targets of their own.
+  { component: "message-actions/contact-choices", count: 1 },
+  { component: "message-actions/message-digest", count: 1 },
 ] as const)
 
 type FocusComponent =
@@ -69,6 +73,7 @@ type FocusComponent =
   | "json-tree"
   | "selection-tooltip"
   | "tool-approval"
+  | "message-actions/message-approval"
   | "checkbox"
   | "drawer"
   | "dropdown-menu"
@@ -388,6 +393,18 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
+  // Only the read-only draft draws a ring. The editable field shows focus
+  // through its caret, like ChatComposer's textarea, so the outline is
+  // declared at one site rather than in the shared field recipe.
+  {
+    component: "message-actions/message-approval",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
   {
     component: "table/table",
     layer: "outline",
@@ -553,6 +570,10 @@ export const focusGeometryClasses = Object.freeze([
   { component: "tool-approval", className: "focus-visible:outline-2", count: 2 },
   { component: "tool-approval", className: "focus-visible:-outline-offset-2", count: 1 },
   { component: "tool-approval", className: "focus-visible:outline-offset-2", count: 1 },
+  // The draft sits flush against the card's padding, so its outline draws
+  // inset for the same reason the tool-approval payload's does.
+  { component: "message-actions/message-approval", className: "focus-visible:outline-2", count: 1 },
+  { component: "message-actions/message-approval", className: "focus-visible:-outline-offset-2", count: 1 },
   // Every event-calendar outline draws inset: the day and week surfaces sit
   // inside the scrolling time grid and month cells clip their overflow, so
   // an outset outline would be swallowed at the region edges.

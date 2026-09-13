@@ -287,7 +287,19 @@ function PillComposer({
     React.useState<ChatComposerInputAdapter | null>(null)
   const [multiline, setMultiline] = React.useState(false)
   const [canExpand, setCanExpand] = React.useState(false)
-  const [expanded, setExpanded] = React.useState(false)
+  const [expandRequested, setExpanded] = React.useState(false)
+  // Expansion is the host's to withdraw. When `expandable` goes false — a
+  // responsive breakpoint dropping the affordance, say — the full-pane
+  // layout has to come down with the control that exits it; otherwise the
+  // person is left inside an overlay whose only way out is Escape. Derived
+  // rather than only reset in an effect, so the collapse lands in the same
+  // commit as the prop change instead of a frame later.
+  const expanded = expandable && expandRequested
+  // And the request itself is dropped, so re-enabling `expandable` does not
+  // reopen the pane without anyone asking for it.
+  React.useEffect(() => {
+    if (!expandable) setExpanded(false)
+  }, [expandable])
 
   // Measure rendered lines, including wrapping and font/width changes. Keep
   // the input width and control positions stable so changing the corners
