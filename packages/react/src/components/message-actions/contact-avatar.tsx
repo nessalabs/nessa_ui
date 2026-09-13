@@ -19,13 +19,19 @@ export function initialsFrom(name: string): string {
 }
 
 /**
- * Where a corner marker sits: centred on the circle's own edge at 45°, which
+ * Where a corner marker sits: centred on the circle's own trailing edge at
+ * 45°, which
  * for a circle of radius r is r/√2 — 35.36% of the box — from its centre, so
  * the ring runs through the marker's middle. Hanging a marker off the square
  * bounding box instead leaves it floating diagonally clear of the edge,
  * because the box's corner is outside the circle by 0.29r.
  */
-const markerPosition = "absolute left-[85.36%] -translate-x-1/2 -translate-y-1/2"
+const markerPosition =
+  // `start-*` is the logical inset, so the corner mirrors with text
+  // direction. The centring shift has to mirror with it: an unscoped
+  // `-translate-x-1/2` would push the marker off the circle in RTL, where
+  // the inset anchors its trailing edge instead of its leading one.
+  "absolute start-[85.36%] ltr:-translate-x-1/2 rtl:translate-x-1/2 -translate-y-1/2"
 
 export interface ContactAvatarProps extends React.ComponentProps<"span"> {
   /** The contact's name; seeds the initials when no photo renders. */
@@ -53,7 +59,9 @@ export interface ContactAvatarProps extends React.ComponentProps<"span"> {
 /**
  * The identity circle shared by every surface in this family: a photo, the
  * contact's initials, or whatever the caller puts in its place, with an
- * optional channel badge on one corner and an unread dot on the other.
+ * optional channel badge on one corner and an unread dot on the other. Both
+ * markers are decoration: a badge that carries meaning is spelled out by the
+ * row that owns it, in its own reading order, not by this circle.
  * Sizing belongs to the caller, through
  * `className` — the circle only owns its shape, its fallback, and the fact
  * that neither the initials nor the badge reach assistive technology, because

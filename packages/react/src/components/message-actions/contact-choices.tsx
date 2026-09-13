@@ -22,6 +22,13 @@ export interface ContactChoice {
   initials?: string
   /** A glyph badged on the avatar — the app this contact is reachable on. */
   badge?: React.ReactNode
+  /**
+   * What that badge means, in words — "on WhatsApp". Required in practice
+   * whenever `badge` is what tells two same-named contacts apart: the mark
+   * is drawn as decoration, and these rows carry no channel text of their
+   * own, so without this the difference reaches no one who cannot see it.
+   */
+  badgeLabel?: string
 }
 
 export interface ContactChoicesProps
@@ -133,6 +140,13 @@ function ContactChoices({
                       className="truncate nessa-text-3 font-medium text-foreground @[24rem]/contact-choices:nessa-text-4"
                     >
                       {contact.name}
+                      {contact.badgeLabel == null ? null : (
+                        // After the name, so the row reads "Clark Kent on
+                        // Mail" rather than leading with the account. The
+                        // badge itself is decoration; this is the only place
+                        // its meaning exists in text.
+                        <span className="sr-only"> {contact.badgeLabel}</span>
+                      )}
                     </span>
                     {contact.detail ? (
                       <span

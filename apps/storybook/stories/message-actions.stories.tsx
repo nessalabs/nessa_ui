@@ -8,6 +8,8 @@ import {
   type MessageApprovalStatus,
 } from "@nessalabs/ui"
 
+import { Mail, MessageSquare } from "lucide-react"
+
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -345,6 +347,86 @@ export const ContactsWithDetail: ChoicesStory = {
       canvas.getByRole("button", { name: /parker@daily-bugle/ }),
     ).toBeVisible()
     await expect(canvas.getAllByRole("listitem")).toHaveLength(3)
+  },
+}
+
+export const ToldApartByTheirBadge: ChoicesStory = {
+  parameters: storyDocumentation(
+    "Two contacts with one name, one account each, and nothing in the text to separate them — the badge is the whole difference. The mark itself is decoration, so `badgeLabel` says in words what it means and the label joins the row's accessible name in reading order. Without it the rows are identical to anyone not looking at the glyphs, which is the one case where a badge must not be silent. A surface that already writes the channel out beside the avatar — MessageApproval — omits the label rather than saying it twice.",
+  ),
+  args: {
+    title: "Which Clark should I message?",
+    contacts: [
+      {
+        id: "clark-messages",
+        name: "Clark Kent",
+        badge: <MessageSquare />,
+        badgeLabel: "on Messages",
+      },
+      {
+        id: "clark-mail",
+        name: "Clark Kent",
+        badge: <Mail />,
+        badgeLabel: "on Mail",
+      },
+    ],
+  },
+  render: (args) => (
+    <div className="max-w-md">
+      <ContactChoices {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    // Each row is reachable by the thing that distinguishes it, which is the
+    // whole point of labelling a badge that carries meaning.
+    await expect(
+      canvas.getByRole("button", { name: "Clark Kent on Messages" }),
+    ).toBeVisible()
+    await expect(
+      canvas.getByRole("button", { name: "Clark Kent on Mail" }),
+    ).toBeVisible()
+  },
+}
+
+export const RightToLeft: ChoicesStory = {
+  parameters: storyDocumentation(
+    "The same rows in an RTL surface. The corner markers are positioned with the logical `start` inset rather than a physical `left`, so the badge mirrors to the avatar's trailing edge — the left, here — instead of sitting on the leading edge where it would collide with the reading order. The centring shift mirrors with it; an unscoped translate would push the marker off the circle. The play test measures the badge against the avatar's centre rather than trusting the class that placed it.",
+  ),
+  args: {
+    title: "أي كلارك تقصد؟",
+    contacts: [
+      {
+        id: "clark-messages",
+        name: "Clark Kent",
+        badge: <MessageSquare />,
+        badgeLabel: "on Messages",
+      },
+    ],
+  },
+  render: (args) => (
+    <div dir="rtl" className="max-w-md">
+      <ContactChoices {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const avatar = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="contact-avatar"]',
+    )
+    const badge = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="contact-avatar-badge"]',
+    )
+    expect(avatar).toBeTruthy()
+    expect(badge).toBeTruthy()
+    await waitFor(() => {
+      const circle = avatar!.getBoundingClientRect()
+      const mark = badge!.getBoundingClientRect()
+      const markCentre = mark.left + mark.width / 2
+      // Trailing edge in RTL is the left one, and the mark still straddles
+      // the ring rather than floating clear of it.
+      expect(markCentre).toBeLessThan(circle.left + circle.width / 2)
+      expect(Math.abs(markCentre - circle.left)).toBeLessThan(circle.width / 2)
+    })
   },
 }
 

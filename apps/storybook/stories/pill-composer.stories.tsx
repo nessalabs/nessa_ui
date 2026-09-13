@@ -4250,6 +4250,88 @@ function ExpansionExample() {
   )
 }
 
+export const ExpansionWithdrawn: Story = {
+  parameters: storyDocumentation(
+    "Expansion is the host's to withdraw. When `expandable` goes false while the composer is expanded — a responsive breakpoint dropping the affordance, say — the full-pane layout comes down with the control that exits it. Left alone, the pane would keep its absolute layout while the only minimize button disappeared, stranding the person inside an overlay whose sole exit is Escape. The request is dropped too, so re-enabling the prop does not reopen the pane without anyone asking. The play test expands, withdraws the prop, and checks the composer is back to its compact size with no control left behind.",
+  ),
+  render: () => {
+    const WithdrawableExpansion = () => {
+      const [expandable, setExpandable] = React.useState(true)
+      return (
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            data-testid="toggle-expandable"
+            onClick={() => setExpandable((value) => !value)}
+            className="w-fit rounded-md border border-border px-3 py-1 nessa-text-2"
+          >
+            {expandable ? "Withdraw expandable" : "Restore expandable"}
+          </button>
+          {/* The composer's offset parent is the pane itself: expansion is
+              `absolute inset-0`, so an intervening positioned wrapper would
+              collapse it to that wrapper's own height. */}
+          <div
+            data-testid="withdraw-pane"
+            className="relative flex h-64 w-full max-w-md flex-col justify-end rounded-2xl bg-muted p-3"
+          >
+            <PillComposer
+              expandable={expandable}
+              submitOnEnter={false}
+              aria-label="Withdrawable composer"
+              onSubmit={(event) => event.preventDefault()}
+            >
+              <ChatComposerInput aria-label="Withdrawable draft" />
+            </PillComposer>
+          </div>
+        </div>
+      )
+    }
+    return <WithdrawableExpansion />
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const pane = canvas.getByTestId("withdraw-pane")
+    const controls = within(pane)
+    const input = controls.getByRole("textbox")
+    const form = controls.getByRole("form")
+
+    await userEvent.click(input)
+    await userEvent.type(input, "one{Enter}two{Enter}three")
+    await userEvent.click(
+      await controls.findByRole("button", { name: "Expand composer" }),
+    )
+    await waitFor(() =>
+      expect(form.getBoundingClientRect().height).toBeCloseTo(
+        pane.clientHeight,
+        0,
+      ),
+    )
+
+    await userEvent.click(canvas.getByTestId("toggle-expandable"))
+    // The end state, not a proxy for it: the pane is compact again and the
+    // control that was the only way out is gone rather than merely hidden.
+    await waitFor(() => expect(form).not.toHaveAttribute("data-expanded"))
+    await waitFor(() =>
+      expect(form.getBoundingClientRect().height).toBeLessThan(
+        pane.clientHeight,
+      ),
+    )
+    await expect(
+      controls.queryByRole("button", { name: "Minimize composer" }),
+    ).toBeNull()
+
+    // Restoring the prop offers expansion again without reopening it.
+    await userEvent.click(canvas.getByTestId("toggle-expandable"))
+    await waitFor(() =>
+      expect(
+        controls.getByRole("button", { name: "Expand composer" }),
+      ).toBeVisible(),
+    )
+    await expect(form).not.toHaveAttribute("data-expanded")
+    await userEvent.clear(input)
+  },
+}
+
 export const Expansion: Story = {
   parameters: storyDocumentation("Plain and rich inputs retain rounded corners as they grow, scroll at their height cap, and reveal Expand at three lines. Expansion fills the positioned chat pane without replacing the input; Minimize or Escape restores its compact size and preserves the draft. Large rich-editor pastes become inline text chips."),
   render: () => <ExpansionExample />,

@@ -24,6 +24,13 @@ export interface MessageDigestEntry {
   initials?: string
   /** A glyph badged on the avatar — the account or app it arrived on. */
   badge?: React.ReactNode
+  /**
+   * What that badge means, in words — "work account". The mark is drawn as
+   * decoration and a digest row writes no channel text of its own, so a
+   * badge that distinguishes one account from another needs this to reach
+   * anyone who cannot see it.
+   */
+  badgeLabel?: string
 }
 
 /** Static classes, so Tailwind's scanner sees every clamp the API allows. */
@@ -154,6 +161,12 @@ function MessageDigest({
                         <span className="sr-only">Unread. </span>
                       ) : null}
                       {message.sender}
+                      {message.badgeLabel == null ? null : (
+                        // After the sender, so the row reads "Lois Lane work
+                        // account" — the badge is decoration and this is the
+                        // only place its meaning exists in text.
+                        <span className="sr-only"> {message.badgeLabel}</span>
+                      )}
                     </span>
                     {message.timestamp ? (
                       <span
