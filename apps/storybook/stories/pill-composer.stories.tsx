@@ -1989,8 +1989,9 @@ function PlaygroundExample({
       data-slot="pill-composer-demo-frame"
       // A fixed frame height pins the composer's bottom edge: a growing
       // input or attachment row eats the transcript's space upward instead
-      // of pushing the pill down.
-      className={cn("relative flex h-[min(38rem,calc(100vh-4rem))] min-w-0 w-[min(28rem,calc(100vw-2rem))] flex-col justify-end gap-3 rounded-[2rem] bg-background p-4", frameClassName)}
+      // of pushing the pill down. The moving transcript must also be excluded
+      // from outer-page scroll anchoring when this frame appears in docs.
+      className={cn("relative flex h-[min(38rem,calc(100vh-4rem))] [overflow-anchor:none] min-w-0 w-[min(28rem,calc(100vw-2rem))] flex-col justify-end gap-3 rounded-[2rem] bg-background p-4", frameClassName)}
     >
       {/* The floating window's tab strip: each tab is its own conversation;
           the busy dot follows wherever a reply streams. */}
@@ -2616,6 +2617,7 @@ function PlaygroundExample({
       {!fileTabs[activeTabId] && !isHistoryTab ? notification : null}
       {fileTabs[activeTabId] || isHistoryTab ? null : (
       <PillComposer
+        expandable
         generating={generating}
         onSubmit={(event) => {
           event.preventDefault()
@@ -3435,7 +3437,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A compact, iMessage-style pill composer for small chat surfaces. It provides the ChatComposer slot context, so ChatComposerInput, ChatComposerAttachments, ChatComposerAction, and ChatComposerTrigger compose inside it unchanged, and it adds a working state: an iridescent light traveling the pill's rim at constant speed, led by a crisp head with a soft glow bleeding inward behind it. Toggling `generating` fades the light in and out so the composer reads as lighting up rather than switching.",
+          "A compact, iMessage-style pill composer for small chat surfaces. It provides the ChatComposer slot context, so ChatComposerInput, ChatComposerAttachments, ChatComposerAction, and ChatComposerTrigger compose inside it unchanged, and it adds a working state: an iridescent light traveling the pill's rim at constant speed, led by a crisp head with a soft glow bleeding inward behind it. Toggling `generating` fades the light in and out so the composer reads as lighting up rather than switching. Multiline content keeps rounded rectangular corners and scrolls at the input height cap. Enable `expandable` inside a positioned chat pane to show a top-right expand control at three lines; it fills that pane until Minimize or Escape, preserving the editor and draft. The Playground enables this behavior.",
       },
     },
   },
@@ -4217,5 +4219,177 @@ export const Attachments: Story = {
     await userEvent.keyboard("{Backspace}")
     await expect(canvas.queryByText("deploy")).not.toBeInTheDocument()
     await expect(canvas.getByText("design-assets")).toBeInTheDocument()
+  },
+}
+
+/** Shows both input implementations expanding within a host-owned chat pane. */
+function ExpansionExample() {
+  const editor = React.useRef<ChatComposerEditorHandle>(null)
+  return (
+    <div className="flex h-[28rem] flex-wrap gap-4 overflow-y-auto" data-testid="composer-scroll-host">
+      {(["plain", "rich"] as const).map((kind) => (
+        <div key={kind} data-testid={`${kind}-pane`} className="relative flex h-[32rem] w-[22rem] max-w-full flex-col justify-end rounded-2xl bg-muted p-3">
+          <PillComposer expandable submitOnEnter={false} aria-label={`${kind} composer`} onSubmit={(event) => event.preventDefault()}>
+            <PillComposerRow>
+              <ChatComposerAction aria-label="Add attachment"><Plus aria-hidden="true" /></ChatComposerAction>
+              {kind === "plain" ? <ChatComposerInput aria-label="Plain draft" /> : (
+                <ChatComposerEditor ref={editor} aria-label="Rich draft" pasteAttachmentMinLength={120} onPasteAttachment={(text) => editor.current?.insertChip({ id: "paste", kind: "pasted-text", label: `Pasted text (${text.length} chars)`, textValue: text })} />
+              )}
+              <ChatComposerAction aria-label="Voice input"><Plus aria-hidden="true" /></ChatComposerAction>
+            </PillComposerRow>
+          </PillComposer>
+        </div>
+      ))}
+      <div data-testid="chat-growth-pane" className="shrink-0">
+        <PlaygroundExample initialMessages={[
+          { id: 91001, role: "user", text: "A message above the composer" },
+          { id: 91002, role: "assistant", text: "A reply in the resizing transcript" },
+        ]} />
+      </div>
+    </div>
+  )
+}
+
+export const ExpansionWithdrawn: Story = {
+  parameters: storyDocumentation(
+    "Expansion is the host's to withdraw. When `expandable` goes false while the composer is expanded — a responsive breakpoint dropping the affordance, say — the full-pane layout comes down with the control that exits it. Left alone, the pane would keep its absolute layout while the only minimize button disappeared, stranding the person inside an overlay whose sole exit is Escape. The request is dropped too, so re-enabling the prop does not reopen the pane without anyone asking. The play test expands, withdraws the prop, and checks the composer is back to its compact size with no control left behind.",
+  ),
+  render: () => {
+    const WithdrawableExpansion = () => {
+      const [expandable, setExpandable] = React.useState(true)
+      return (
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            data-testid="toggle-expandable"
+            onClick={() => setExpandable((value) => !value)}
+            className="w-fit rounded-md border border-border px-3 py-1 nessa-text-2"
+          >
+            {expandable ? "Withdraw expandable" : "Restore expandable"}
+          </button>
+          {/* The composer's offset parent is the pane itself: expansion is
+              `absolute inset-0`, so an intervening positioned wrapper would
+              collapse it to that wrapper's own height. */}
+          <div
+            data-testid="withdraw-pane"
+            className="relative flex h-64 w-full max-w-md flex-col justify-end rounded-2xl bg-muted p-3"
+          >
+            <PillComposer
+              expandable={expandable}
+              submitOnEnter={false}
+              aria-label="Withdrawable composer"
+              onSubmit={(event) => event.preventDefault()}
+            >
+              <ChatComposerInput aria-label="Withdrawable draft" />
+            </PillComposer>
+          </div>
+        </div>
+      )
+    }
+    return <WithdrawableExpansion />
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const pane = canvas.getByTestId("withdraw-pane")
+    const controls = within(pane)
+    const input = controls.getByRole("textbox")
+    const form = controls.getByRole("form")
+
+    await userEvent.click(input)
+    await userEvent.type(input, "one{Enter}two{Enter}three")
+    await userEvent.click(
+      await controls.findByRole("button", { name: "Expand composer" }),
+    )
+    await waitFor(() =>
+      expect(form.getBoundingClientRect().height).toBeCloseTo(
+        pane.clientHeight,
+        0,
+      ),
+    )
+
+    await userEvent.click(canvas.getByTestId("toggle-expandable"))
+    // The end state, not a proxy for it: the pane is compact again and the
+    // control that was the only way out is gone rather than merely hidden.
+    await waitFor(() => expect(form).not.toHaveAttribute("data-expanded"))
+    await waitFor(() =>
+      expect(form.getBoundingClientRect().height).toBeLessThan(
+        pane.clientHeight,
+      ),
+    )
+    await expect(
+      controls.queryByRole("button", { name: "Minimize composer" }),
+    ).toBeNull()
+
+    // Restoring the prop offers expansion again without reopening it.
+    await userEvent.click(canvas.getByTestId("toggle-expandable"))
+    await waitFor(() =>
+      expect(
+        controls.getByRole("button", { name: "Expand composer" }),
+      ).toBeVisible(),
+    )
+    await expect(form).not.toHaveAttribute("data-expanded")
+    await userEvent.clear(input)
+  },
+}
+
+export const Expansion: Story = {
+  parameters: storyDocumentation("Plain and rich inputs retain rounded corners as they grow, scroll at their height cap, and reveal Expand at three lines. Expansion fills the positioned chat pane without replacing the input; Minimize or Escape restores its compact size and preserves the draft. Large rich-editor pastes become inline text chips."),
+  render: () => <ExpansionExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    for (const kind of ["plain", "rich"] as const) {
+      const pane = canvas.getByTestId(`${kind}-pane`)
+      const controls = within(pane)
+      const input = controls.getByRole("textbox")
+      const form = controls.getByRole("form")
+      const read = () => input instanceof HTMLTextAreaElement ? input.value : input.textContent
+      await userEvent.click(input)
+      await userEvent.type(input, "one")
+      const beforeGrowth = form.getBoundingClientRect()
+      const scrollHost = canvas.getByTestId("composer-scroll-host")
+      const beforeScroll = scrollHost.scrollTop
+      await userEvent.type(input, "{Enter}two{Enter}three")
+      await waitFor(() => expect(form.getBoundingClientRect().height).toBeGreaterThan(beforeGrowth.height))
+      expect(form.getBoundingClientRect().bottom).toBeCloseTo(beforeGrowth.bottom, 0)
+      expect(scrollHost.scrollTop).toBeCloseTo(beforeScroll, 0)
+      await waitFor(() => expect(controls.getByRole("button", { name: "Expand composer" })).toBeVisible())
+      expect(input.getBoundingClientRect().top - form.getBoundingClientRect().top).toBeLessThan(20)
+      expect(parseFloat(getComputedStyle(form).borderTopLeftRadius)).toBeGreaterThan(0)
+      await userEvent.click(controls.getByRole("button", { name: "Expand composer" }))
+      await waitFor(() => expect(form.getBoundingClientRect().height).toBeCloseTo(pane.clientHeight, 0))
+      expect(form.getBoundingClientRect().width).toBeCloseTo(pane.clientWidth, 0)
+      expect(read()).toContain("three")
+      await userEvent.keyboard("{Escape}")
+      await waitFor(() => expect(form).not.toHaveAttribute("data-expanded"))
+      await userEvent.clear(input)
+      await waitFor(() => expect(controls.queryByRole("button", { name: "Expand composer" })).toBeNull())
+      if (kind === "rich") {
+        await userEvent.click(input)
+        await userEvent.paste("a long pasted paragraph ".repeat(20))
+        expect(input.querySelector('[data-kind="pasted-text"]')).not.toBeNull()
+        expect(input.clientHeight).toBeLessThan(80)
+        await userEvent.clear(input)
+      }
+      await userEvent.type(input, Array.from({ length: 30 }, (_, i) => `line ${i}`).join("{Enter}"))
+      expect(input.clientHeight).toBeLessThanOrEqual(240)
+      expect(input.scrollHeight).toBeGreaterThan(input.clientHeight)
+      await userEvent.clear(input)
+    }
+    const chat = canvas.getByTestId("chat-growth-pane")
+    const input = within(chat).getByRole("textbox", { name: "Message" })
+    const form = chat.querySelector<HTMLFormElement>('[data-slot="pill-composer"]')!
+    await userEvent.click(input)
+    await userEvent.type(input, "first")
+    const beforeGrowth = form.getBoundingClientRect()
+    const scrollHost = canvas.getByTestId("composer-scroll-host")
+    const beforeScroll = scrollHost.scrollTop
+    await userEvent.type(input, "{Shift>}{Enter}{/Shift}second{Shift>}{Enter}{/Shift}third")
+    await waitFor(() => expect(form.getBoundingClientRect().height).toBeGreaterThan(beforeGrowth.height))
+    expect(form.getBoundingClientRect().bottom).toBeCloseTo(beforeGrowth.bottom, 0)
+    expect(scrollHost.scrollTop).toBeCloseTo(beforeScroll, 0)
+    expect(form.getBoundingClientRect().top).toBeLessThan(beforeGrowth.top)
+    const expand = form.querySelector<HTMLElement>('[data-slot="pill-composer-expand-control"]')!
+    expect(expand.getBoundingClientRect().top - form.getBoundingClientRect().top).toBeLessThan(10)
+    await userEvent.clear(input)
   },
 }

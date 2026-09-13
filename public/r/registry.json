@@ -621,6 +621,62 @@
       ]
     },
     {
+      "name": "message-actions",
+      "type": "registry:ui",
+      "title": "Message actions",
+      "description": "Three surfaces for an agent acting on someone's messages. MessageApproval is the send-confirmation card: recipient, channel, the draft (editable in place by default), and the cancel/send decision, with a status line taking the actions' place once the request resolves. ContactChoices is the disambiguation step before it, offering same-named contacts as selectable rows. MessageDigest lists what an agent found in an inbox \u2014 sender, subject, preview, timestamp, and an unread dot \u2014 as quiet tiles, or as buttons when the host can open a message. All three size themselves to their container rather than the viewport, so one card works in a narrow rail and a full-width panel.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/message-actions/index.ts",
+          "type": "registry:ui",
+          "target": "components/ui/message-actions/index.ts"
+        },
+        {
+          "path": "packages/react/src/components/message-actions/contact-avatar.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/message-actions/contact-avatar.tsx"
+        },
+        {
+          "path": "packages/react/src/components/message-actions/imessage-logo.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/message-actions/imessage-logo.tsx"
+        },
+        {
+          "path": "packages/react/src/components/message-actions/mail-logo.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/message-actions/mail-logo.tsx"
+        },
+        {
+          "path": "packages/react/src/components/message-actions/channel-marks.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/message-actions/channel-marks.tsx"
+        },
+        {
+          "path": "packages/react/src/components/message-actions/contact-choices.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/message-actions/contact-choices.tsx"
+        },
+        {
+          "path": "packages/react/src/components/message-actions/message-approval.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/message-actions/message-approval.tsx"
+        },
+        {
+          "path": "packages/react/src/components/message-actions/message-digest.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/message-actions/message-digest.tsx"
+        }
+      ]
+    },
+    {
       "name": "message-markdown",
       "type": "registry:ui",
       "title": "Message Markdown",
@@ -1322,6 +1378,9 @@
       "type": "registry:ui",
       "title": "Pill Composer",
       "description": "A compact pill-shaped chat composer that hosts the ChatComposer input, attachment, action, and trigger primitives in a single row, with an iridescent traveling-light rim that fades in while the agent works.",
+      "dependencies": [
+        "lucide-react"
+      ],
       "registryDependencies": [
         "nessalabs/nessa_ui/chat-composer",
         "nessalabs/nessa_ui/nessa-base",
