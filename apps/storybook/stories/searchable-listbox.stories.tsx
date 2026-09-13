@@ -263,7 +263,7 @@ export const DisabledItems: Story = {
 
 export const Loading: Story = {
   parameters: storyDocumentation(
-    "Loading keeps the search surface stable while replacing options with an announced status.",
+    "Loading keeps the search surface stable while replacing options with an announced status. The announcement comes from a region mounted with the surface and empty until there is news — a region inserted together with its first text is a mutation assistive technology does not report, so the visible loading block is plain and the live region carries its wording. The play test proves the region exists while the list is idle, before any state has anything to say.",
   ),
   render: () => (
     <div className="w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl">
@@ -279,6 +279,18 @@ export const Loading: Story = {
       />
     </div>
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const region = canvasElement.querySelector(
+      '[data-slot="searchable-listbox-announcement"]',
+    )
+    await expect(region).toHaveTextContent("Loading commands")
+    // The visible block is no longer a region of its own: two regions saying
+    // the same thing is how a message gets announced twice.
+    await expect(
+      canvas.getByText("Loading commands", { selector: "div" }),
+    ).not.toHaveAttribute("role", "status")
+  },
 }
 
 export const Empty: Story = {
@@ -298,4 +310,11 @@ export const Empty: Story = {
       />
     </div>
   ),
+  play: async ({ canvasElement }) => {
+    const region = canvasElement.querySelector(
+      '[data-slot="searchable-listbox-announcement"]',
+    )
+    await expect(region).toHaveTextContent("No commands available")
+    await expect(region).toHaveAttribute("aria-live", "polite")
+  },
 }
