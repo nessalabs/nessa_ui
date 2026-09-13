@@ -4,9 +4,9 @@ import * as React from "react"
 import { createPortal } from "react-dom"
 
 import { cn } from "@/lib/utils"
+import { ChatComposerChipView } from "./chat-composer-editor-chip"
 
 import {
-  ChatComposerAttachmentIcon,
   ChatComposerContext,
   requestComposerSubmit,
   scanTriggerToken,
@@ -203,50 +203,6 @@ function createEditorAdapter(root: HTMLElement): ChatComposerInputAdapter {
   }
 }
 
-/**
- * Renders one editor chip's visual content inside its non-editable host.
- * The chip is plain inline text — an icon aligned to the type baseline plus
- * the label — so it inherits the editor's font metrics and sits on the same
- * baseline as the surrounding message text.
- */
-function ChatComposerChipView({
-  chip,
-  onPress,
-  onHoverChange,
-}: {
-  chip: ChatComposerChip
-  onPress?: (chip: ChatComposerChip) => void
-  onHoverChange?: (
-    chip: ChatComposerChip | null,
-    element: HTMLElement | null,
-  ) => void
-}) {
-  return (
-    <span
-      data-slot="chat-composer-chip"
-      data-kind={chip.kind}
-      onClick={onPress ? () => onPress(chip) : undefined}
-      onMouseEnter={
-        onHoverChange
-          ? (event) => onHoverChange(chip, event.currentTarget)
-          : undefined
-      }
-      onMouseLeave={onHoverChange ? () => onHoverChange(null, null) : undefined}
-      className={cn(
-        "select-none whitespace-nowrap",
-        onPress && "cursor-pointer",
-        chip.className,
-      )}
-    >
-      <ChatComposerAttachmentIcon
-        kind={chip.kind}
-        icon={chip.icon}
-        className="mr-1 size-3.5 align-[-0.125em]"
-      />
-      {chip.label}
-    </span>
-  )
-}
 
 interface ChipMount {
   key: number
@@ -617,7 +573,7 @@ function ChatComposerEditor({
           // Like ChatComposerInput, the editor carries no border or focus
           // outline: the caret indicates focus and the composer's borderMode
           // owns any surface treatment.
-          "min-w-0 w-full overflow-y-auto whitespace-pre-wrap break-words border-0 bg-transparent px-1 py-1 font-sans nessa-text-5 text-foreground outline-none",
+          "min-w-0 w-full overflow-y-auto whitespace-pre-wrap break-words border-0 bg-transparent px-1 py-1 font-sans nessa-text-4 text-foreground outline-none",
           // Chat surfaces scroll without chrome; opt back in via scrollbar.
           // (Kept as a literal per SRC-002: governed class surfaces stay in
           // their consuming module.)
@@ -625,8 +581,7 @@ function ChatComposerEditor({
             "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           "empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)]",
           constrained ? "min-h-0 max-h-full" : "min-h-14",
-          size === "compact" && !constrained && "min-h-10 nessa-text-4",
-          size === "compact" && constrained && "nessa-text-4",
+          size === "compact" && !constrained && "min-h-10",
           disabled && "cursor-not-allowed opacity-50",
           className,
         )}

@@ -1061,3 +1061,7 @@ export { cn } from "./lib/utils"
 export { VirtualList, type VirtualListProps } from "./components/virtual-list"
 export { GitHistory, layoutGitHistory, type GitHistoryProps, type GitCommit, type GitGraphRow } from "./components/git-history"
 export { GitCommitDetails, type GitCommitDetailsProps, type GitCommitDetailsData, type GitChangedFile, type GitCommitResource } from "./components/git-commit-details"
+
+export { ChatComposerMarkdownEditor, type ChatComposerMarkdownEditorProps } from "./components/chat-composer-markdown-editor"
+
+export { CodeEditor, type CodeEditorProps, type CodeEditorLanguage } from "./components/code-editor"
