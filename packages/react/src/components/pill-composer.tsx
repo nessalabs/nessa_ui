@@ -1,10 +1,12 @@
 "use client"
 
 import * as React from "react"
+import { Maximize2, Minimize2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
 import {
+  ChatComposerAction,
   ChatComposerContext,
   type ChatComposerInputAdapter,
 } from "./chat-composer"
@@ -254,6 +256,8 @@ export interface PillComposerProps extends React.ComponentProps<"form"> {
   rimVariant?: PillComposerRimVariant
   /** Sets the preferred width in CSS pixels while preserving host containment. */
   width?: number
+  /** Offers a three-line expand control that fills the nearest positioned ancestor. */
+  expandable?: boolean
   submitOnEnter?: boolean
 }
 
@@ -262,13 +266,18 @@ export interface PillComposerProps extends React.ComponentProps<"form"> {
  * ChatComposerInput, ChatComposerAttachments, ChatComposerAction, and
  * ChatComposerTrigger compose inside it unchanged. Lay the single control
  * row out with PillComposerRow; attachments stack above it and round the
- * pill's corners as it grows.
+ * pill's corners as it grows. Multiline inputs use rounded rectangular corners.
+ * With expandable, three rendered lines reveal a control that fills the nearest
+ * positioned ancestor; Escape or Minimize restores the compact editor without
+ * remounting it. Hosts define that ancestor to bound expansion to a chat pane.
  */
 function PillComposer({
   generating = false,
   rimVariant = "orbit",
   width,
   submitOnEnter = true,
+  expandable = false,
+  onKeyDown,
   className,
   children,
   style,
@@ -276,6 +285,29 @@ function PillComposer({
 }: PillComposerProps) {
   const [inputAdapter, setInputAdapter] =
     React.useState<ChatComposerInputAdapter | null>(null)
+  const [multiline, setMultiline] = React.useState(false)
+  const [canExpand, setCanExpand] = React.useState(false)
+  const [expanded, setExpanded] = React.useState(false)
+
+  // Measure rendered lines, including wrapping and font/width changes. Keep
+  // the input width and control positions stable so changing the corners
+  // cannot itself trigger another expansion/collapse.
+  React.useLayoutEffect(() => {
+    const input = inputAdapter?.element
+    if (!input) return
+    const measure = () => {
+      const css = getComputedStyle(input)
+      const padding = parseFloat(css.paddingTop) + parseFloat(css.paddingBottom)
+      const lines = (input.clientHeight - padding) / parseFloat(css.lineHeight)
+      setMultiline(lines > 1.5)
+      setCanExpand(lines > 2.5)
+    }
+    measure()
+    if (typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(measure)
+    observer.observe(input)
+    return () => observer.disconnect()
+  }, [inputAdapter])
 
   // The pill reads as `constrained` so ChatComposerInput drops its min-height
   // floor and hugs a single line, growing only with content; the attachments
@@ -296,21 +328,51 @@ function PillComposer({
     <ChatComposerContext.Provider value={context}>
       <form
         data-slot="pill-composer"
+        data-multiline={multiline || undefined}
+        data-expanded={expanded || undefined}
+        onKeyDown={(event) => {
+          onKeyDown?.(event)
+          if (!event.defaultPrevented && event.key === "Escape" && expanded) {
+            event.preventDefault()
+            setExpanded(false)
+            inputAdapter?.element.focus()
+          }
+        }}
         data-generating={generating || undefined}
         aria-busy={generating || undefined}
         className={cn(
           // No focus-within ring or border shift: the caret carries focus, as
           // in ChatComposer's borderMode "none" (owner preference, Aug 2026).
-          "relative flex min-w-0 w-full max-w-full flex-col gap-1.5 rounded-[1.625rem] border border-border bg-card p-1.5 font-sans text-card-foreground",
+          // A bottom-anchored input must not become the scroll anchor of an
+          // outer document: preserving its moving top edge scrolls the page
+          // and makes upward growth appear to push the composer downward.
+          "relative flex min-w-0 w-full max-w-full flex-col gap-1.5 [overflow-anchor:none] rounded-[1.625rem] border border-border bg-card p-1.5 font-sans text-card-foreground",
+          (multiline || expanded) && "rounded-2xl",
+          expanded && "absolute inset-0 z-10 min-h-0 [&>[data-slot=pill-composer-row]]:min-h-0 [&>[data-slot=pill-composer-row]]:flex-1 [&_[data-slot=chat-composer-editor]]:h-full [&_[data-slot=chat-composer-editor]]:max-h-none! [&_[data-slot=chat-composer-editor]]:self-stretch! [&_[data-slot=chat-composer-input]]:h-full! [&_[data-slot=chat-composer-input]]:max-h-none! [&_[data-slot=chat-composer-input]]:self-stretch!",
           className,
         )}
         style={{
           ...style,
-          ...(width === undefined ? undefined : { width: `min(${width}px, 100%)` }),
+          ...(expanded ? { width: "100%" } : width === undefined ? undefined : { width: `min(${width}px, 100%)` }),
         }}
         {...props}
       >
         <PillComposerRim active={generating} variant={rimVariant} />
+        {expandable && (canExpand || expanded) && (
+          <div data-slot="pill-composer-expand-control" className="absolute right-1.5 top-1.5 z-10">
+            <ChatComposerAction
+              aria-label={expanded ? "Minimize composer" : "Expand composer"}
+              title={expanded ? "Minimize composer" : "Expand composer"}
+              aria-expanded={expanded}
+              onClick={() => {
+                setExpanded(!expanded)
+                inputAdapter?.element.focus()
+              }}
+            >
+              {expanded ? <Minimize2 aria-hidden="true" className="opacity-70" /> : <Maximize2 aria-hidden="true" className="opacity-70" />}
+            </ChatComposerAction>
+          </div>
+        )}
         {children}
       </form>
     </ChatComposerContext.Provider>

@@ -1322,6 +1322,9 @@
       "type": "registry:ui",
       "title": "Pill Composer",
       "description": "A compact pill-shaped chat composer that hosts the ChatComposer input, attachment, action, and trigger primitives in a single row, with an iridescent traveling-light rim that fades in while the agent works.",
+      "dependencies": [
+        "lucide-react"
+      ],
       "registryDependencies": [
         "nessalabs/nessa_ui/chat-composer",
         "nessalabs/nessa_ui/nessa-base",

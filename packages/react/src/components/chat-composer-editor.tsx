@@ -334,7 +334,7 @@ function ChatComposerEditor({
   "aria-label": ariaLabel,
   ...props
 }: ChatComposerEditorProps) {
-  const { constrained, registerInput, size, submitOnEnter } =
+  const { composerMaxHeight, constrained, registerInput, size, submitOnEnter } =
     React.useContext(ChatComposerContext)
   const [rootElement, setRootElement] = React.useState<HTMLDivElement | null>(
     null,
@@ -632,7 +632,9 @@ function ChatComposerEditor({
         )}
         style={{
           ...style,
-          maxHeight: constrained ? style?.maxHeight : maxHeight,
+          maxHeight: constrained
+            ? (style?.maxHeight ?? (composerMaxHeight === undefined ? maxHeight : undefined))
+            : maxHeight,
         }}
         onInput={(event) => {
           onInput?.(event)
