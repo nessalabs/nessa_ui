@@ -172,4 +172,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: "AMEND-009",
     pullRequest: null,
   },
+  {
+    id: "AMEND-012",
+    kind: "transition",
+    contractId: "A11Y-005",
+    baseRevision: "e6675db99ea9c2e73881c058dbc8a89495278c41",
+    targets: ["validation/contracts.ts"],
+    beforeFingerprint: "6dc49eb23673abadf3c1d1c14c1583c5db429e407706636cbd7be5446bb444eb",
+    afterFingerprint: "50f09feccdce9c8d463973ea6ba59be54067f88c9601d5566db717558a76b267",
+    rationale: "Two accessibility rules were being decided independently, component by component, and written down only as comments beside each decision. ChatComposer's textarea and MessageApproval's draft both suppress the focus outline an editable surface would otherwise draw, for the same reason \u2014 browsers match :focus-visible on editable elements for pointer focus too, so the outline reads as a permanent inner border \u2014 and MessageApproval mounts its live region empty for the card's whole life because a region inserted at the moment it first has text is a mutation assistive technology does not announce. Both are repository-wide calls whose failure modes are invisible: a stray focus ring reads as a design choice, and an announcement that never happens looks exactly like one that does. Recording them as A11Y-005 gives review something to point at instead of two comments that agree by coincidence.",
+    compatibility: "Additive and judgment-based. No consumer runtime API, rendered output, token, or registry target changes, and no existing contract is weakened: A11Y-002 and A11Y-003 keep counting focus treatments and geometry exactly as before, and the new entry is review-required rather than enforced, so it adds a reviewer obligation and no automated failure. Every component in the repository already satisfies it \u2014 the rules describe what ChatComposer, ChatComposerEditor, and the message-action surfaces already do.",
+    migration: "A new borderless editable surface nested in its own bordered container draws no focus outline and records that absence in validation/nessa/focus-treatments.ts by simply owning no outline entry; a standalone bordered field (Input) keeps its ring, and a non-editable region that earns a tab stop by scrolling keeps one too. A surface that announces status mounts its live region with the surface and leaves it empty until there is something to say, rather than rendering the region together with its first message.",
+    supersedes: null,
+    pullRequest: null,
+  },
 ])
