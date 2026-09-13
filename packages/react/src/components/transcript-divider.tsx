@@ -155,9 +155,16 @@ function TranscriptDivider({
       >
         <TranscriptDividerRule />
         <span
-          // Announced only while pending: a settled marker is part of the
-          // transcript a reader can scroll to, not news.
-          aria-live={pending ? "polite" : undefined}
+          // Liveness is constant, not toggled with `pending`. Switching
+          // aria-live on over text that is already rendered announces
+          // nothing — assistive technology reports changes inside a region
+          // that was already there — so the old conditional never made the
+          // pending marker news in the first place. Kept live, the label's
+          // change from pending to settled is what gets announced, which is
+          // the transition a reader actually waits on. A marker that mounts
+          // already settled still says nothing: its text arrives with the
+          // region.
+          aria-live="polite"
           className="flex min-w-0 items-center gap-1.5 whitespace-nowrap nessa-text-2 font-medium text-muted-foreground"
         >
           <TranscriptDividerLabel pending={pending} meta={meta}>

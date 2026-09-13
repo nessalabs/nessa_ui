@@ -225,6 +225,18 @@ function SearchableListbox<Item>({
           className="h-full min-w-0 flex-1 appearance-none bg-transparent font-sans nessa-text-4 text-foreground outline-none placeholder:text-muted-foreground disabled:pointer-events-none disabled:opacity-50"
         />
       </label>
+      {/* Mounted with the surface and empty until there is something to say.
+          A region inserted together with its first text is a mutation
+          assistive technology does not announce, so the loading and empty
+          blocks below stay plain and this carries their wording instead. */}
+      <span
+        role="status"
+        aria-live="polite"
+        data-slot="searchable-listbox-announcement"
+        className="sr-only"
+      >
+        {loading ? loadingMessage : filteredItems.length === 0 ? emptyMessage : ""}
+      </span>
       <div
         data-slot="searchable-listbox-list"
         id={listboxId}
@@ -237,7 +249,6 @@ function SearchableListbox<Item>({
           <div
             data-slot="searchable-listbox-loading"
             className="flex min-h-28 items-center justify-center gap-2 px-3 nessa-text-4 text-muted-foreground"
-            role="status"
           >
             <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
             {loadingMessage}
@@ -294,7 +305,6 @@ function SearchableListbox<Item>({
           <div
             data-slot="searchable-listbox-empty"
             className="flex min-h-28 items-center justify-center px-3 nessa-text-4 text-muted-foreground"
-            role="status"
           >
             {emptyMessage}
           </div>
