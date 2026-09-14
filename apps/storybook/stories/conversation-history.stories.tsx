@@ -87,6 +87,8 @@ export const Playground: Story = {
     })
     await expect(selected).toHaveAccessibleName(/pinned/i)
     await expect(selected).toHaveAttribute("aria-current", "true")
+    // Current conversation metadata must not leave a second row looking hovered.
+    await expect(getComputedStyle(selected).backgroundColor).toBe("rgba(0, 0, 0, 0)")
     const agentAvatar = selected.querySelector("[data-slot=random-avatar]")
     const auditAvatar = canvas
       .getByRole("button", { name: /repo audit/i })

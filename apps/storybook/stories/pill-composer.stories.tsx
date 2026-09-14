@@ -13,7 +13,7 @@ import {
   ChatAttachmentTile,
   ChatAttachmentViewer,
   ChatBubble,
-  ChatBubbleEditor,
+  type ChatComposerContent,
   ChatComposerAction,
   ChatComposerAttachments,
   ChatComposerInput,
@@ -26,6 +26,7 @@ import {
   SelectionTooltipLabel,
   SelectionTooltipSeparator,
   ChatComposerEditor,
+  ChatComposerMarkdownEditor,
   ChatComposerTrigger,
   type ChatComposerContentPart,
   type ChatComposerEditorHandle,
@@ -44,7 +45,6 @@ import {
   ChatMessageAction,
   ChatMessageActions,
   ChatMessageQuote,
-  ChatMessageReceipt,
   chatReactionOptions,
   ChatTabs,
   ChatTray,
@@ -58,6 +58,7 @@ import {
   formatAgentActivitySummary,
   formatAgentThoughtSummary,
   MessageMarkdown,
+  MathBlock,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -101,7 +102,7 @@ import {
   type ModelPickerGroup,
   type ModelPickerValue,
 } from "@nessalabs/ui"
-import { Archive, Bell, Braces, Check, ChevronLeft, ChevronRight, Copy, FileSearch, FileText, Folder, GitFork, History, Image as ImageIcon, Info, Paperclip, Pencil, Pin, Plus, RefreshCw, Share, SlidersHorizontal, Sparkles, Puzzle, Square, X } from "lucide-react"
+import { Archive, Bell, Braces, Check, ChevronLeft, ChevronRight, Copy, FileSearch, FileText, Folder, GitFork, History, Image as ImageIcon, Info, Paperclip, Pencil, Pin, Plus, RefreshCw, Share, SlidersHorizontal, Sparkles, Puzzle, Square, ThumbsUp, ThumbsDown, X } from "lucide-react"
 
 import { ChatAddIcon, CommentIcon } from "./icons/nucleo"
 import { storyDocumentation } from "./story-documentation"
@@ -598,6 +599,8 @@ interface DemoMessage {
   attachments?: DemoAttachment[]
   /** The applied tapback reaction emoji. */
   reaction?: string
+  /** Optional rating of an assistant response. */
+  feedback?: "up" | "down"
   /** True while this assistant reply is still streaming in. */
   streaming?: boolean
   /** Subagent ids this assistant turn spawned, rendered as drill-in chips. */
@@ -654,16 +657,25 @@ function BubbleParts({
     newTab: boolean,
   ) => void
 }) {
-  return (
-    <>
-      {parts.map((part, index) =>
-        part.type === "chip" ? (
+  // Parse one Markdown document so formatting can span inline chips.
+  const placeholders = React.useMemo(() => {
+    const chips = new Map<string, Extract<ChatComposerContentPart, { type: "chip" }>>()
+    const nonce = crypto.randomUUID()
+    const markdown = parts.map((part, index) => {
+      if (part.type === "text") return part.text
+      const url = `https://nessa-chip.invalid/${nonce}/${index}`
+      chips.set(url, part)
+      return `[chip](${url})`
+    }).join("")
+    return { chips, markdown }
+  }, [parts])
+  const renderChip = (part: Extract<ChatComposerContentPart, { type: "chip" }>) => (
           <span
-            key={index}
+            key={part.chip.id}
             data-slot="bubble-chip"
             role={onChipPress ? "button" : undefined}
             tabIndex={onChipPress ? 0 : undefined}
-            title={slashItemForLabel(part.chip.label)?.description}
+            title={slashItemForLabel(part.chip.label)?.description ?? part.chip.label}
             onClick={
               onChipPress
                 ? (event) => {
@@ -689,7 +701,7 @@ function BubbleParts({
                 : undefined
             }
             className={cn(
-              "whitespace-nowrap font-medium underline-offset-2",
+              "inline-block max-w-full truncate align-bottom font-medium underline-offset-2",
               onChipPress && "cursor-pointer hover:underline",
             )}
           >
@@ -700,12 +712,24 @@ function BubbleParts({
             />
             {part.chip.label}
           </span>
-        ) : (
-          <React.Fragment key={index}>{part.text}</React.Fragment>
-        ),
-      )}
-    </>
-  )
+      )
+  return <MessageMarkdown className="leading-5 text-inherit [&_p]:whitespace-pre-wrap [&_a]:text-inherit [&_th]:text-foreground [&_blockquote]:text-inherit [&_code]:text-foreground" components={{
+    a: ({ href, children, node: _node, ...props }) => {
+      const part = placeholders.chips.get(href ?? "")
+      return part ? renderChip(part) : <a href={href} {...props}>{children}</a>
+    },
+    code: ({ children, className, node: _node, ...props }) => {
+      if (className?.includes("math-inline") && typeof children === "string") return <MathBlock inline tex={children} />
+      // Markdown treats link syntax literally in inline code. Restore chip slots
+      // here too, using only the nonce-owned placeholders from this message.
+      let content: React.ReactNode[] = [children]
+      for (const [url, part] of placeholders.chips) {
+        const marker = `[chip](${url})`
+        content = content.flatMap<React.ReactNode>((child) => typeof child !== "string" ? [child] : child.split(marker).flatMap((text, index) => index === 0 ? [text] : [renderChip(part), text]))
+      }
+      return <code className={className} {...props}>{content}</code>
+    },
+  }}>{placeholders.markdown}</MessageMarkdown>
 }
 
 interface DemoSubagent {
@@ -1091,6 +1115,69 @@ function DemoActivity({
  * tone, its text becomes an editable field, and small save and cancel
  * controls sit beside it. Enter saves, Escape cancels.
  */
+/** Edits a sent draft with the same Markdown and chip contract as the composer. */
+function DemoMessageEditor({ message, onSave, onCancel }: {
+  message: DemoMessage
+  onSave: (content: ChatComposerContent) => void
+  onCancel: () => void
+}) {
+  const editorRef = React.useRef<ChatComposerEditorHandle | null>(null)
+  const restore = React.useCallback((editor: ChatComposerEditorHandle | null) => {
+    editorRef.current = editor
+    editor?.focus()
+  }, [])
+  const container = React.useRef<HTMLDivElement>(null)
+  const belongsToEditor = React.useCallback((target: EventTarget | null) => {
+    const root = container.current
+    if (!root || !(target instanceof globalThis.Node)) return false
+    if (root.contains(target)) return true
+    // Language pickers render in a portal but remain part of this edit.
+    return [...root.querySelectorAll("[aria-controls]")].some((trigger) => {
+      const popup = root.ownerDocument.getElementById(trigger.getAttribute("aria-controls") ?? "")
+      return popup?.contains(target)
+    })
+  }, [])
+  React.useEffect(() => {
+    const doc = container.current?.ownerDocument
+    const outside = (event: PointerEvent) => { if (!belongsToEditor(event.target)) onCancel() }
+    doc?.addEventListener("pointerdown", outside, true)
+    return () => doc?.removeEventListener("pointerdown", outside, true)
+  }, [belongsToEditor, onCancel])
+  return <ChatBubble className="max-w-full">
+    <div ref={container} onBlur={(event) => {
+      if (event.relatedTarget && !belongsToEditor(event.relatedTarget)) onCancel()
+    }}>
+      <ChatComposerMarkdownEditor ref={restore} defaultContent={{ text: message.text, parts: message.parts ?? [] }}
+        aria-label="Edit message"
+        className="[&_[data-slot=chat-composer-chip]]:text-inherit! [&_[role=textbox]]:min-h-0 [&_[role=textbox]]:p-0 [&_[role=textbox]]:text-inherit [&_[role=textbox]]:caret-current [&_[role=textbox]]:leading-5"
+        onKeyDown={(event) => {
+          if (event.nativeEvent.isComposing || !(event.target as HTMLElement).isContentEditable) return
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault()
+            event.stopPropagation()
+            const content = editorRef.current?.getContent()
+            if (content && (content.text.trim() || content.parts.some((part) => part.type === "chip"))) onSave({ ...content, text: content.text.trim() })
+            else onCancel()
+          } else if (event.key === "Escape") {
+            event.preventDefault(); event.stopPropagation(); onCancel()
+          }
+        }} />
+    </div>
+  </ChatBubble>
+}
+
+/** Gives pointer hover or keyboard focus sole ownership of message controls. */
+function DemoMessageActionScope({ className, onPointerMoveCapture, onPointerDownCapture, onFocusCapture, onKeyDownCapture, ...props }: React.ComponentProps<"div">) {
+  const [keyboard, setKeyboard] = React.useState(false)
+  return <div {...props} className={cn(className, keyboard
+    ? "[@media(hover:hover)_and_(pointer:fine)]:[&_[data-slot=chat-message-actions]:not(:focus-within)]:opacity-0! [@media(hover:hover)_and_(pointer:fine)]:[&_[data-slot=chat-message-actions]:not(:focus-within)]:pointer-events-none!"
+    : "[@media(hover:hover)_and_(pointer:fine)]:[&_[data-slot=chat-message]:not(:hover)_[data-slot=chat-message-actions]]:opacity-0! [@media(hover:hover)_and_(pointer:fine)]:[&_[data-slot=chat-message]:not(:hover)_[data-slot=chat-message-actions]]:pointer-events-none!"
+  )} onPointerMoveCapture={(event) => { onPointerMoveCapture?.(event) }}
+    onPointerDownCapture={(event) => { setKeyboard(false); onPointerDownCapture?.(event) }}
+    onFocusCapture={(event) => { if (event.target.matches(":focus-visible")) setKeyboard(true); onFocusCapture?.(event) }}
+    onKeyDownCapture={(event) => { setKeyboard(true); onKeyDownCapture?.(event) }} />
+}
+
 /**
  * Maps one demo message onto the ChatBubbles kit: attachments (single tile
  * or fanned stack), reply quote, the bubble itself as the reply control,
@@ -1098,11 +1185,12 @@ function DemoActivity({
  */
 function DemoBubble({
   message,
-  delivered = false,
   onOpenAttachments,
   dimmed = false,
   threadFocused = false,
   onReact,
+  onFeedback,
+  onFork,
   onReplyCommit,
   onMenuOpenChange,
   onChipOpen,
@@ -1118,8 +1206,6 @@ function DemoBubble({
   menuBoundary,
 }: {
   message: DemoMessage
-  /** Shows the Delivered receipt under this message. */
-  delivered?: boolean
   /** Opens the full-surface attachment viewer for this message's items. */
   onOpenAttachments: (attachments: DemoAttachment[]) => void
   /** Recedes the bubble: frost during reply, "soft" while a tapback menu is open. */
@@ -1128,6 +1214,10 @@ function DemoBubble({
   threadFocused?: boolean
   /** Applies or toggles a tapback reaction on this message. */
   onReact?: (emoji: string) => void
+  /** Toggles the host-owned rating, independently of emoji reactions. */
+  onFeedback?: (rating: "up" | "down") => void
+  /** Starts a new conversation through this message. */
+  onFork?: () => void
   /** Enters reply mode for this message and focuses the composer. */
   onReplyCommit?: () => void
   /** Reports the tapback menu opening and closing. */
@@ -1149,7 +1239,7 @@ function DemoBubble({
   /** Enters edit mode for this user message (context-menu Edit). */
   onEditStart?: () => void
   /** Commits the edited text. */
-  onEditSave?: (text: string) => void
+  onEditSave?: (content: ChatComposerContent) => void
   /** Leaves edit mode without changes. */
   onEditCancel?: () => void
   /** Flips the tapback menu above the press point at this element's edges. */
@@ -1161,6 +1251,7 @@ function DemoBubble({
     onLongOpen !== undefined
   // Reply commits after the menu closes: Radix's close-autofocus would
   // otherwise return focus to the bubble and undo the composer focus.
+  const forkChosenRef = React.useRef(false)
   const replyChosenRef = React.useRef(false)
   const editChosenRef = React.useRef(false)
   const attachments = message.attachments ?? []
@@ -1232,9 +1323,9 @@ function DemoBubble({
         />
       ) : null}
       {editing ? (
-        <ChatBubbleEditor
-          defaultValue={message.text}
-          onSave={(text) => onEditSave?.(text)}
+        <DemoMessageEditor
+          message={message}
+          onSave={(content) => onEditSave?.(content)}
           onCancel={() => onEditCancel?.()}
         />
       ) : message.text || (message.parts && message.parts.length > 0) ? (
@@ -1242,7 +1333,55 @@ function DemoBubble({
            row and a Reply action. Opening it never frosts the transcript —
            the frosted thread view belongs to reply mode, entered via Reply. */
         <>
-        <span className="relative flex max-w-full items-center">
+        <span className="relative flex min-w-0 max-w-full items-center gap-2">
+        <ChatMessageActions className={cn("static! shrink-0 self-center! pt-0", message.role === "assistant" && "order-last")}>
+          {message.role === "user" ? (
+            <>
+              <ChatMessageAction aria-label="Copy" title="Copy" onClick={() => { void navigator.clipboard.writeText(message.text) }}>
+                <Copy aria-hidden="true" />
+              </ChatMessageAction>
+              {onEditStart ? (
+                <ChatMessageAction
+                  aria-label="Edit message"
+                  title="Edit message"
+                  onClick={onEditStart}
+                >
+                  <Pencil aria-hidden="true" />
+                </ChatMessageAction>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <ChatMessageAction aria-label="Copy" title="Copy" onClick={() => { void navigator.clipboard.writeText(message.text) }}>
+                <Copy aria-hidden="true" />
+              </ChatMessageAction>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <ChatMessageAction
+                    aria-label={message.feedback === "up" ? "Feedback: Good response" : message.feedback === "down" ? "Feedback: Bad response" : "Give feedback"}
+                    title="Give feedback"
+                    className={message.feedback ? "text-foreground bg-accent" : undefined}
+                  >
+                    {message.feedback === "down" ? <ThumbsDown aria-hidden="true" /> : message.feedback === "up" ? <ThumbsUp aria-hidden="true" /> : (
+                      <span className="relative size-5" aria-hidden="true">
+                        <ThumbsUp className="absolute left-0 top-0 size-2.5!" />
+                        <ThumbsDown className="absolute bottom-0 right-0 size-2.5!" />
+                      </span>
+                    )}
+                  </ChatMessageAction>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="end">
+                  <DropdownMenuCheckboxItem className="pl-2 pr-8 [&>span]:left-auto [&>span]:right-2" checked={message.feedback === "up"} onSelect={() => onFeedback?.("up")}>
+                    <ThumbsUp aria-hidden="true" /> Good response
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem className="pl-2 pr-8 [&>span]:left-auto [&>span]:right-2" checked={message.feedback === "down"} onSelect={() => onFeedback?.("down")}>
+                    <ThumbsDown aria-hidden="true" /> Bad response
+                  </DropdownMenuCheckboxItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          )}
+        </ChatMessageActions>
         <ContextMenu onOpenChange={onMenuOpenChange}>
           <ContextMenuTrigger asChild>
             <ChatBubble
@@ -1258,7 +1397,7 @@ function DemoBubble({
                 longMessage ? () => onLongOpen?.(message.text) : undefined
               }
               className={
-                message.role === "assistant" ? "px-4 py-2.5" : undefined
+                message.role === "assistant" ? "min-w-0 px-4 py-2.5" : "min-w-0"
               }
             >
               {message.role === "assistant" ? (
@@ -1280,7 +1419,9 @@ function DemoBubble({
                   }}
                 />
               ) : (
-                message.text
+                <MessageMarkdown className="leading-5 text-inherit [&_p]:whitespace-pre-wrap [&_a]:text-inherit [&_th]:text-foreground [&_blockquote]:text-inherit">
+                  {message.text}
+                </MessageMarkdown>
               )}
             </ChatBubble>
           </ContextMenuTrigger>
@@ -1290,6 +1431,12 @@ function DemoBubble({
             collisionBoundary={menuBoundary ?? undefined}
             collisionPadding={8}
             onCloseAutoFocus={(event) => {
+              if (forkChosenRef.current) {
+                forkChosenRef.current = false
+                event.preventDefault()
+                onFork?.()
+                return
+              }
               if (editChosenRef.current) {
                 editChosenRef.current = false
                 event.preventDefault()
@@ -1334,6 +1481,12 @@ function DemoBubble({
             >
               Reply
             </ContextMenuItem>
+            {message.role === "assistant" ? (
+              <ContextMenuItem onSelect={() => { forkChosenRef.current = true }}>
+                <GitFork aria-hidden="true" />
+                Fork the conversation from here
+              </ContextMenuItem>
+            ) : null}
             {message.role === "user" && onEditStart ? (
               <ContextMenuItem
                 onSelect={() => {
@@ -1346,46 +1499,7 @@ function DemoBubble({
           </ContextMenuContent>
         </ContextMenu>
         </span>
-        {/* One pattern for both sides: a hover-revealed footer row under
-            the bubble — the receipt lives here too, so the transcript
-            carries no standing chrome. Padding, not margin, bridges the
-            gap so the pointer can reach the actions without losing hover. */}
-        <ChatMessageActions>
-          {message.role === "user" ? (
-            <>
-              {delivered ? (
-                <ChatMessageReceipt>Delivered</ChatMessageReceipt>
-              ) : null}
-              <ChatMessageAction aria-label="Copy" title="Copy">
-                <Copy aria-hidden="true" />
-              </ChatMessageAction>
-              {onEditStart ? (
-                <ChatMessageAction
-                  aria-label="Edit message"
-                  title="Edit message"
-                  onClick={onEditStart}
-                >
-                  <Pencil aria-hidden="true" />
-                </ChatMessageAction>
-              ) : null}
-            </>
-          ) : (
-            <>
-              <ChatMessageAction
-                aria-label="Fork the conversation from here"
-                title="Fork the conversation from here"
-              >
-                <GitFork aria-hidden="true" />
-              </ChatMessageAction>
-              <ChatMessageAction aria-label="Retry this reply" title="Retry this reply">
-                <RefreshCw aria-hidden="true" />
-              </ChatMessageAction>
-              <ChatMessageAction aria-label="Copy" title="Copy">
-                <Copy aria-hidden="true" />
-              </ChatMessageAction>
-            </>
-          )}
-        </ChatMessageActions>
+
         </>
       ) : null}
     </ChatMessage>
@@ -1652,7 +1766,9 @@ function PlaygroundExample({
   // Full text behind each pasted-text chip, keyed by chip id.
   const pastedTexts = React.useRef<Record<string, string>>({})
   /** Shows a full text in the list view — the transcript stays compact. */
-  const openFullText = (text: string) => {
+  const [viewedTitle, setViewedTitle] = React.useState("Annotations")
+  const openFullText = (text: string, title = "Pasted text") => {
+    setViewedTitle(title)
     setActivitySheet(null)
     setQueueOpen(false)
     setDetailsTabId(null)
@@ -1834,14 +1950,6 @@ function PlaygroundExample({
         )
       }
     }, thinkDelay)
-  }
-
-  let lastUserId: number | undefined
-  for (let at = messages.length - 1; at >= 0; at -= 1) {
-    if (messages[at]!.role === "user") {
-      lastUserId = messages[at]!.id
-      break
-    }
   }
 
   // An overflowing transcript keeps its newest message in view: switching
@@ -2246,11 +2354,11 @@ function PlaygroundExample({
           onQueryChange={setHistoryQuery}
         />
       ) : (
-      <div
+      <DemoMessageActionScope
         ref={logRef}
         aria-label="Conversation"
         role="log"
-        className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pb-7 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {/* Bottom-anchors a short transcript without justify-end, which
             would trap overflowing messages above an unscrollable top. */}
@@ -2299,7 +2407,6 @@ function PlaygroundExample({
           ) : null}
           <DemoBubble
             message={entry}
-            delivered={entry.id === lastUserId}
             onOpenAttachments={openAttachmentsOverlay}
             dimmed={
               threadIds !== null
@@ -2334,6 +2441,7 @@ function PlaygroundExample({
               setActivitySheet(null)
               setQueueOpen(false)
               setDetailsTabId(null)
+              setViewedTitle("Annotations")
               setViewedQuotes(next)
             }}
             onPastedOpen={(chipId) => {
@@ -2341,27 +2449,41 @@ function PlaygroundExample({
                 entry.pasted?.[chipId] ?? pastedTexts.current[chipId]
               if (full) openFullText(full)
             }}
-            onLongOpen={openFullText}
+            onLongOpen={(text) => openFullText(text, "Message")}
             editing={editingMessageId === entry.id}
             onEditStart={
               entry.role === "user"
                 ? () => setEditingMessageId(entry.id)
                 : undefined
             }
-            onEditSave={(text) => {
-              // The editor edits the flattened text, so the saved message
-              // is that text — stale parts would otherwise keep rendering
-              // the pre-edit chips over the new words.
+            onEditSave={(content) => {
               updateMessages(activeTabId, (current) =>
                 current.map((message) =>
                   message.id === entry.id
-                    ? { ...message, text, parts: undefined }
+                    ? { ...message, text: content.text, parts: content.parts }
                     : message,
                 ),
               )
               setEditingMessageId(null)
             }}
             onEditCancel={() => setEditingMessageId(null)}
+            onFork={() => {
+              const id = `fork-${nextId.current++}`
+              const title = `${tabs.find((tab) => tab.id === activeTabId)?.title ?? "Chat"} fork`
+              const history = messages.slice(0, messages.findIndex((message) => message.id === entry.id) + 1)
+              setMessagesByTab((current) => ({ ...current, [id]: history.map((message) => ({ ...message, streaming: false })) }))
+              setTabs((current) => [...current, { id, title, closeable: true }])
+              setActiveTabId(id)
+              setReplyTarget(null)
+              setEditingMessageId(null)
+              closeExtraDetails()
+              inputRef.current?.focus()
+            }}
+            onFeedback={(rating) => {
+              updateMessages(activeTabId, (current) => current.map((message) => message.id === entry.id
+                ? { ...message, feedback: message.feedback === rating ? undefined : rating }
+                : message))
+            }}
             onReact={(emoji) => {
               updateMessages(activeTabId, (current) =>
                 current.map((message) =>
@@ -2452,7 +2574,7 @@ function PlaygroundExample({
             <ChatTypingIndicator label="Assistant is typing" />
           )
         ) : null}
-      </div>
+      </DemoMessageActionScope>
       )}
       {overlay ? (
         <ChatAttachmentViewer
@@ -2469,7 +2591,7 @@ function PlaygroundExample({
         // Tab can still reach the strip and the pill.
         <Sheet
           id={extraSheetId}
-          label="Annotations"
+          label={viewedQuotes ? viewedTitle : "Annotations"}
           modal={false}
           defaultExpanded
           onReturnFocus={() => inputRef.current?.focus()}
@@ -2482,7 +2604,7 @@ function PlaygroundExample({
           <SheetHandle />
           <SheetHeader>
             <SheetExpand />
-            <SheetTitle>Annotations</SheetTitle>
+            <SheetTitle>{viewedQuotes ? viewedTitle : "Annotations"}</SheetTitle>
             <SheetAction>Done</SheetAction>
           </SheetHeader>
           <SheetBody>
@@ -2761,7 +2883,7 @@ function PlaygroundExample({
               plugins land as inline chips on the text baseline, exactly as
               in the ChatComposerEditor catalog story; only files, photos,
               and folders use the tile row above. */}
-          <ChatComposerEditor
+          <ChatComposerMarkdownEditor
             ref={inputRef}
             onChipPress={(chip) => {
               if (chip.kind === "pasted-text") {
@@ -3557,7 +3679,7 @@ export const Notifications: Story = {
 export const Playground: Story = {
   tags: ["reduced-motion"],
   parameters: storyDocumentation(
-    "The intended small-surface composition — the floating chat window: pill tabs across the top (each tab an independent conversation, with the busy dot on whichever tab is streaming), + and voice actions inside the pill, Enter as the only send affordance, and no standing model control — typing /model raises a closable model card in the chat, typing /history opens a History tab of the all-conversations roster, and right-clicking a conversation tab offers View Details (project, model, runtime) plus pin, share, and archive. Tool work stays behind exploring cues — “Thought 1s”, “Explored 3 files, 2 searches” — that open the extra-details sheet with that beat’s thinking and tool calls instead of expanding in the transcript; a Queued N pill above the composer opens a sheet of pending follow-ups. The voice action streams a ghost transcription into the editable input — with Hold to record on (the default) it records only while held, the waveform bars pulsing as a live meter, and with it off a click toggles listening with a red stop control; right-click it for a microphone options menu above the pill. Agent replies think first (typing dots), then stream in word by word through MessageMarkdown's streaming mode — rich markdown renders as it arrives and the rim stays lit until the stream completes, and + opens a menu that attaches photos, files, and folders as uniform square tiles — thumbnail previews for photos, icon tiles for the rest — each with a corner delete button and an Open action the host wires to its full view. Bubbles are iMessage-style with tails and a Delivered receipt; right-clicking (or long-pressing) one shows the tapback reaction row and a Reply action — reacting never frosts the transcript; choosing Reply enters the frosted thread view — the rest of the transcript recedes behind a blur while the composer switches to Reply, iMessage-style (Escape from anywhere, or tapping the bubble again, leaves the reply view; a threaded message keeps its whole thread in focus), and while the agent works the rim lights and the mic hands over to a stop control.",
+    "The intended small-surface composition — the floating chat window: pill tabs across the top (each tab an independent conversation, with the busy dot on whichever tab is streaming), + and voice actions inside the pill, Enter as the only send affordance, and no standing model control — typing /model raises a closable model card in the chat, typing /history opens a History tab of the all-conversations roster, and right-clicking a conversation tab offers View Details (project, model, runtime) plus pin, share, and archive. Tool work stays behind exploring cues — “Thought 1s”, “Explored 3 files, 2 searches” — that open the extra-details sheet with that beat’s thinking and tool calls instead of expanding in the transcript; a Queued N pill above the composer opens a sheet of pending follow-ups. The voice action streams a ghost transcription into the editable input — with Hold to record on (the default) it records only while held, the waveform bars pulsing as a live meter, and with it off a click toggles listening with a red stop control; right-click it for a microphone options menu above the pill. Agent replies think first (typing dots), then stream in word by word through MessageMarkdown's streaming mode — rich markdown renders as it arrives and the rim stays lit until the stream completes, and + opens a menu that attaches photos, files, and folders as uniform square tiles — thumbnail previews for photos, icon tiles for the rest — each with a corner delete button and an Open action the host wires to its full view. Bubbles are iMessage-style with tails; right-clicking (or long-pressing) one shows the tapback reaction row and a Reply action — reacting never frosts the transcript; choosing Reply enters the frosted thread view — the rest of the transcript recedes behind a blur while the composer switches to Reply, iMessage-style (Escape from anywhere, or tapping the bubble again, leaves the reply view; a threaded message keeps its whole thread in focus), and while the agent works the rim lights and the mic hands over to a stop control.",
   ),
   render: () => <PlaygroundExample />,
   play: async ({ canvasElement }) => {
@@ -3620,8 +3742,8 @@ export const Playground: Story = {
       expect(getComputedStyle(rim).opacity).toBe("0")
     })
     await expect(
-      canvas.getByText("Delivered"),
-    ).toBeInTheDocument()
+      canvas.queryByText("Delivered"),
+    ).not.toBeInTheDocument()
     await userEvent.pointer({
       keys: "[MouseRight]",
       target: canvas.getByLabelText(
@@ -4222,17 +4344,20 @@ export const Attachments: Story = {
   },
 }
 
-/** Shows both input implementations expanding within a host-owned chat pane. */
+/** Shows all input implementations expanding within a host-owned chat pane. */
 function ExpansionExample() {
   const editor = React.useRef<ChatComposerEditorHandle>(null)
+  const markdownEditor = React.useRef<ChatComposerEditorHandle>(null)
   return (
     <div className="flex h-[28rem] flex-wrap gap-4 overflow-y-auto" data-testid="composer-scroll-host">
-      {(["plain", "rich"] as const).map((kind) => (
+      {(["plain", "rich", "markdown"] as const).map((kind) => (
         <div key={kind} data-testid={`${kind}-pane`} className="relative flex h-[32rem] w-[22rem] max-w-full flex-col justify-end rounded-2xl bg-muted p-3">
           <PillComposer expandable submitOnEnter={false} aria-label={`${kind} composer`} onSubmit={(event) => event.preventDefault()}>
             <PillComposerRow>
               <ChatComposerAction aria-label="Add attachment"><Plus aria-hidden="true" /></ChatComposerAction>
-              {kind === "plain" ? <ChatComposerInput aria-label="Plain draft" /> : (
+              {kind === "plain" ? <ChatComposerInput aria-label="Plain draft" /> : kind === "markdown" ? (
+                <ChatComposerMarkdownEditor ref={markdownEditor} aria-label="Markdown draft" pasteAttachmentMinLength={120} onPasteAttachment={(text) => markdownEditor.current?.insertChip({ id: "paste", kind: "pasted-text", label: `Pasted text (${text.length} chars)`, textValue: text })} />
+              ) : (
                 <ChatComposerEditor ref={editor} aria-label="Rich draft" pasteAttachmentMinLength={120} onPasteAttachment={(text) => editor.current?.insertChip({ id: "paste", kind: "pasted-text", label: `Pasted text (${text.length} chars)`, textValue: text })} />
               )}
               <ChatComposerAction aria-label="Voice input"><Plus aria-hidden="true" /></ChatComposerAction>
@@ -4337,7 +4462,7 @@ export const Expansion: Story = {
   render: () => <ExpansionExample />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    for (const kind of ["plain", "rich"] as const) {
+    for (const kind of ["plain", "rich", "markdown"] as const) {
       const pane = canvas.getByTestId(`${kind}-pane`)
       const controls = within(pane)
       const input = controls.getByRole("textbox")
@@ -4363,7 +4488,7 @@ export const Expansion: Story = {
       await waitFor(() => expect(form).not.toHaveAttribute("data-expanded"))
       await userEvent.clear(input)
       await waitFor(() => expect(controls.queryByRole("button", { name: "Expand composer" })).toBeNull())
-      if (kind === "rich") {
+      if (kind !== "plain") {
         await userEvent.click(input)
         await userEvent.paste("a long pasted paragraph ".repeat(20))
         expect(input.querySelector('[data-kind="pasted-text"]')).not.toBeNull()
@@ -4391,5 +4516,217 @@ export const Expansion: Story = {
     const expand = form.querySelector<HTMLElement>('[data-slot="pill-composer-expand-control"]')!
     expect(expand.getBoundingClientRect().top - form.getBoundingClientRect().top).toBeLessThan(10)
     await userEvent.clear(input)
+  },
+}
+
+export const SentMarkdown: Story = {
+  parameters: storyDocumentation("Sent Markdown retains line breaks, lists, and fenced code, including text beside inline attachment chips."),
+  render: () => {
+    const text = "First line\nSecond line\n\n&nbsp;\n\n```text\nexample code\n```\n\n- first item\n- second item"
+    return <div className="flex max-w-xl flex-col gap-4">
+      <DemoBubble message={{ id: 1, role: "user", text }} onOpenAttachments={() => {}} />
+      <DemoBubble message={{ id: 2, role: "user", text, parts: [{ type: "chip", chip: { id: "skill", label: "Skill Creator", textValue: "Skill Creator" } }, { type: "text", text }] }} onOpenAttachments={() => {}} />
+      <BubbleParts parts={[{ type: "text", text: "**Hello " }, { type: "chip", chip: { id: "inline", label: "Inline chip", textValue: "Inline chip" } }, { type: "text", text: " world**" }]} />
+      <div data-testid="inline-code-chip"><BubbleParts parts={[{ type: "text", text: "`Hello " }, { type: "chip", chip: { id: "code-chip", label: "Code chip", textValue: "Payload" } }, { type: "text", text: " world`" }]} /></div>
+    </div>
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    expect(canvas.getByTestId("inline-code-chip").querySelector("code [data-slot=bubble-chip]")).toHaveTextContent("Code chip")
+    expect(canvas.getByTestId("inline-code-chip")).not.toHaveTextContent("nessa-chip.invalid")
+    await waitFor(() => expect(canvasElement.querySelectorAll('[data-slot="code-block"]').length).toBe(2))
+    expect(canvasElement.querySelectorAll("li").length).toBe(4)
+    expect(canvasElement.textContent).not.toContain("&nbsp;")
+    expect(canvasElement.querySelector('[data-slot="bubble-chip"]')).toHaveTextContent("Skill Creator")
+    expect(canvasElement.querySelector("strong [data-slot=bubble-chip]")).toHaveTextContent("Inline chip")
+    await waitFor(() => {
+      for (const row of canvasElement.querySelectorAll('[data-slot="chat-message"]')) expect(getComputedStyle(row).opacity).toBe("1")
+    })
+    for (const paragraph of [...canvasElement.querySelectorAll("p")].filter((node) => node.textContent?.includes("First line"))) {
+      expect(paragraph.textContent).toContain("First line\nSecond line")
+      expect(getComputedStyle(paragraph).whiteSpace).toBe("pre-wrap")
+    }
+  },
+}
+
+export const EditMarkdown: Story = {
+  parameters: storyDocumentation("Edit a sent message with live Markdown, code highlighting, and retained chips. Editing stays inside the message bubble. Enter commits, Shift+Enter adds a line, and Escape or clicking away discards changes."),
+  render: () => <EditableMarkdownExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByRole("button", { name: "Edit draft" }))
+    const editor = await canvas.findByRole("textbox", { name: "Edit message" })
+    await waitFor(() => expect(editor.querySelector("h2")).toHaveTextContent("Heading"))
+    expect(canvas.queryByRole("button", { name: "Save" })).toBeNull()
+    expect(canvas.queryByRole("button", { name: "Cancel" })).toBeNull()
+    expect(editor.closest('[data-slot="chat-bubble"]')).not.toBeNull()
+    expect(getComputedStyle(editor).fontSize).toBe(getComputedStyle(editor.closest('[data-slot="chat-bubble"]')!).fontSize)
+    expect(editor.querySelector("li")).toHaveTextContent("First")
+    expect(editor.querySelector("pre code")).toHaveTextContent("const value = 1")
+    expect(editor.querySelector("strong [data-chip-id=edit-skill]")).toHaveTextContent("Skill")
+    editor.dispatchEvent(new KeyboardEvent("keydown", { key: "z", metaKey: true, bubbles: true, cancelable: true }))
+    expect(editor.querySelector("h2")).toHaveTextContent("Heading")
+    await userEvent.keyboard("{Enter}")
+    expect(canvas.getByTestId("saved-edit")).toHaveTextContent("## Heading")
+    expect(canvas.getByTestId("saved-edit")).toHaveTextContent("```js")
+    expect(canvas.getByTestId("saved-edit").textContent).toContain("**Hello Skill world**")
+    await userEvent.click(canvas.getByRole("button", { name: "Edit draft" }))
+    await userEvent.keyboard("{Escape}")
+    expect(canvas.queryByRole("textbox", { name: "Edit message" })).toBeNull()
+    await userEvent.click(canvas.getByRole("button", { name: "Edit draft" }))
+    await userEvent.keyboard("{Shift>}{Enter}{/Shift}discard me")
+    expect(canvas.getByRole("textbox", { name: "Edit message" })).toHaveTextContent("discard me")
+    await userEvent.click(canvas.getByTestId("saved-edit"))
+    expect(canvas.queryByRole("textbox", { name: "Edit message" })).toBeNull()
+    expect(canvas.getByTestId("saved-edit")).not.toHaveTextContent("discard me")
+  },
+}
+
+/** Keeps saving and discarding visible for the message-editing example. */
+function EditableMarkdownExample({ pasted = false }: { pasted?: boolean }) {
+  const text = "## Heading\n\n- First\n\n```js\nconst value = 1\n```\n\n**Hello "
+  const [message, setMessage] = React.useState<DemoMessage>(pasted ? { id: 1, role: "user", text: "", pasted: { "edit-paste": "Original pasted payload" }, parts: [{ type: "chip", chip: { ...{ className: "font-medium text-(--nessa-chat-accent)" }, id: "edit-paste", kind: "pasted-text", label: "Pasted text (23 chars)", textValue: "" } }] } : { id: 1, role: "user", text: `${text}Skill world**`, parts: [{ type: "text", text }, { type: "chip", chip: { id: "edit-skill", label: "Skill", textValue: "Skill" } }, { type: "text", text: " world**" }] })
+  const [editing, setEditing] = React.useState(false)
+  const [saveCount, setSaveCount] = React.useState(0)
+  return <div className="w-full max-w-xl">
+    {editing ? <DemoMessageEditor message={message} onSave={(content) => { setSaveCount((count) => count + 1); setMessage({ ...message, text: content.text, parts: content.parts }); setEditing(false) }} onCancel={() => setEditing(false)} /> : <Button onClick={() => setEditing(true)}>Edit draft</Button>}
+    <pre data-testid="saved-edit" className="whitespace-pre-wrap">{message.text}</pre>
+    {pasted && <pre data-testid="saved-pasted">{JSON.stringify({ parts: message.parts, pasted: message.pasted, saveCount })}</pre>}
+  </div>
+}
+
+
+export const EditPastedText: Story = {
+  parameters: storyDocumentation("Pasted-text chips remain visible inside the message bubble during editing and retain their original payload when saved."),
+  render: () => <EditableMarkdownExample pasted />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByRole("button", { name: "Edit draft" }))
+    const editor = await canvas.findByRole("textbox", { name: "Edit message" })
+    const chip = editor.querySelector<HTMLElement>('[data-slot="chat-composer-chip"]')!
+    expect(chip).toHaveTextContent("Pasted text (23 chars)")
+    expect(getComputedStyle(chip).color).toBe(getComputedStyle(editor).color)
+    await waitFor(() => expect(editor).toHaveFocus())
+    await userEvent.keyboard("{Enter}")
+    expect(canvas.queryByRole("textbox", { name: "Edit message" })).toBeNull()
+    const saved = JSON.parse(canvas.getByTestId("saved-pasted").textContent!)
+    expect(saved.saveCount).toBe(1)
+    expect(saved.parts).toHaveLength(1)
+    expect(saved.parts[0].chip.id).toBe("edit-paste")
+    expect(saved.pasted["edit-paste"]).toBe("Original pasted payload")
+    await userEvent.click(canvas.getByRole("button", { name: "Edit draft" }))
+    expect(canvas.getByRole("textbox", { name: "Edit message" })).toHaveTextContent("Pasted text (23 chars)")
+    await userEvent.keyboard("{Escape}")
+  },
+}
+
+export const PastedTextViewer: Story = {
+  parameters: storyDocumentation("Open a pasted-text chip to read its original content in a sheet titled Pasted text."),
+  render: () => <PlaygroundExample />,
+  play: async ({ canvasElement }) => {
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
+    const canvas = within(canvasElement)
+    const body = within(canvasElement.ownerDocument.body)
+    await userEvent.click(canvas.getByRole("textbox", { name: "Message" }))
+    const pasted = "Original pasted text. ".repeat(20)
+    await userEvent.paste(pasted)
+    const chip = await canvas.findByText(`Pasted text (${pasted.length} chars)`)
+    await userEvent.click(chip)
+    const sheet = await body.findByRole("dialog", { name: "Pasted text" })
+    expect(within(sheet).getByText(pasted.trim())).toBeInTheDocument()
+    expect(within(sheet).queryByText("Annotations")).toBeNull()
+    await userEvent.click(within(sheet).getByRole("button", { name: "Done" }))
+    await waitFor(() => expect(body.queryByRole("dialog", { name: "Pasted text" })).toBeNull())
+  },
+}
+
+
+export const SideActions: Story = {
+  parameters: storyDocumentation("User controls sit left of the bubble; AI controls sit right. Long chip labels stay contained in narrow panes."),
+  render: () => <DemoMessageActionScope className="flex w-60 max-w-full flex-col gap-2">
+    <DemoBubble onEditStart={() => {}} onOpenAttachments={() => {}} message={{ id: 1, role: "user", text: "", parts: [{ type: "chip", chip: { id: "narrow-paste", label: "Pasted text (3398 chars)", kind: "pasted-text", textValue: "" } }] }} />
+    <DemoBubble onOpenAttachments={() => {}} message={{ id: 2, role: "assistant", text: "Here is the reply." }} />
+  </DemoMessageActionScope>,
+  play: async ({ canvasElement }) => {
+    const rows = [...canvasElement.querySelectorAll<HTMLElement>('[data-slot="chat-message"]')]
+    await waitFor(() => { for (const row of rows) expect(getComputedStyle(row).opacity).toBe("1") })
+    for (const row of rows) {
+      const actions = row.querySelector<HTMLElement>('[data-slot="chat-message-actions"]')!
+      const bubble = row.querySelector<HTMLElement>('[aria-label^="Reply to:"]')!
+      const a = actions.getBoundingClientRect(), b = bubble.getBoundingClientRect()
+      if (row.dataset.tone === "sent") expect(a.right).toBeLessThanOrEqual(b.left)
+      else expect(a.left).toBeGreaterThanOrEqual(b.right)
+      expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth + 1)
+    }
+    const chip = canvasElement.querySelector<HTMLElement>('[data-slot="bubble-chip"]')!
+    expect(chip.getBoundingClientRect().right).toBeLessThanOrEqual(rows[0].getBoundingClientRect().right)
+    if (matchMedia("(hover: hover) and (pointer: fine)").matches) {
+      const actions = rows.map((row) => row.querySelector<HTMLElement>('[data-slot="chat-message-actions"]')!)
+      const copy = within(actions[0]).getByRole("button", { name: "Copy" })
+      // Pointer movement must not hide keyboard focus; activation hands off ownership.
+      copy.focus()
+      await userEvent.keyboard("{Escape}")
+      await waitFor(() => expect(getComputedStyle(actions[0]).opacity).toBe("1"))
+      await userEvent.hover(rows[1])
+      await waitFor(() => {
+        expect(getComputedStyle(actions[0]).opacity).toBe("1")
+        expect(getComputedStyle(actions[1]).opacity).toBe("0")
+      })
+      expect(copy).toHaveFocus()
+      // Keyboard input takes ownership again without blurring the control.
+      await userEvent.keyboard("{Escape}")
+      await waitFor(() => {
+        expect(getComputedStyle(actions[0]).opacity).toBe("1")
+        expect(getComputedStyle(actions[1]).opacity).toBe("0")
+      })
+      await userEvent.pointer({ target: rows[1], keys: "[MouseLeft]" })
+      await waitFor(() => expect(getComputedStyle(actions[0]).opacity).toBe("0"))
+      await userEvent.unhover(rows[1])
+    }
+  },
+}
+
+
+export const ResponseActions: Story = {
+  parameters: storyDocumentation("AI responses show Copy and one feedback button on hover. Its menu offers Good response and Bad response; ratings toggle exclusively; Fork in the context menu opens a conversation through that response."),
+  render: () => <PlaygroundExample initialMessages={[{ id: 801, role: "user", text: "First question", parts: [{ type: "text", text: "First question " }, { type: "chip", chip: { ...{ icon: <Sparkles /> }, id: "fork-skill", label: "Fork skill", kind: "skill", textValue: "Fork skill" } }] }, { id: 802, role: "assistant", text: "First answer" }, { id: 803, role: "user", text: "Later question" }]} />,
+  play: async ({ canvasElement }) => {
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
+    const canvas = within(canvasElement), body = within(canvasElement.ownerDocument.body)
+    const feedback = canvas.getByRole("button", { name: "Give feedback" })
+    const [upIcon, downIcon] = Array.from(feedback.querySelectorAll("svg"), (icon) => icon.getBoundingClientRect())
+    expect(upIcon.right).toBeLessThanOrEqual(downIcon.left)
+    expect(upIcon.bottom).toBeLessThanOrEqual(downIcon.top)
+    feedback.focus()
+    await userEvent.keyboard("{Enter}")
+    await userEvent.click(await body.findByRole("menuitemcheckbox", { name: "Good response" }))
+    await waitFor(() => expect(feedback).toHaveAccessibleName("Feedback: Good response"))
+    feedback.focus()
+    await userEvent.keyboard("{Enter}")
+    expect(await body.findByRole("menuitemcheckbox", { name: "Good response" })).toHaveAttribute("aria-checked", "true")
+    await userEvent.click(body.getByRole("menuitemcheckbox", { name: "Bad response" }))
+    await waitFor(() => expect(feedback).toHaveAccessibleName("Feedback: Bad response"))
+    feedback.focus()
+    await userEvent.keyboard("{Enter}")
+    expect(await body.findByRole("menuitemcheckbox", { name: "Good response" })).toHaveAttribute("aria-checked", "false")
+    expect(body.getByRole("menuitemcheckbox", { name: "Bad response" })).toHaveAttribute("aria-checked", "true")
+    await userEvent.click(body.getByRole("menuitemcheckbox", { name: "Bad response" }))
+    await waitFor(() => expect(feedback).toHaveAccessibleName("Give feedback"))
+    feedback.focus()
+    await userEvent.keyboard("{Enter}")
+    await body.findByRole("menu")
+    await userEvent.keyboard("{Escape}")
+    await waitFor(() => expect(feedback).toHaveFocus())
+    expect(canvas.queryByRole("button", { name: "Retry this reply" })).toBeNull()
+    expect(canvas.queryByRole("button", { name: "Fork the conversation from here" })).toBeNull()
+    await userEvent.pointer({ keys: "[MouseRight]", target: canvas.getByLabelText("Reply to: First answer") })
+    await userEvent.click(await body.findByRole("menuitem", { name: "Fork the conversation from here" }))
+    await waitFor(() => expect(canvas.getByRole("tab", { name: "Release notes fork" })).toHaveAttribute("aria-selected", "true"))
+    expect(canvas.getByLabelText("Reply to: First answer")).toBeInTheDocument()
+    expect(canvas.getByRole("button", { name: "Fork skill" })).toBeInTheDocument()
+    expect(canvas.queryByLabelText("Reply to: Later question")).toBeNull()
+    await userEvent.click(canvas.getByRole("tab", { name: "Release notes" }))
+    expect(canvas.getByLabelText("Reply to: Later question")).toBeInTheDocument()
+    await waitFor(() => { for (const row of canvasElement.querySelectorAll('[data-slot="chat-message"]')) expect(getComputedStyle(row).opacity).toBe("1") })
   },
 }

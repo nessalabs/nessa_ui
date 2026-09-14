@@ -1434,6 +1434,11 @@
           "path": "packages/react/src/components/chat-composer-editor.tsx",
           "type": "registry:ui",
           "target": "components/ui/chat-composer-editor.tsx"
+        },
+        {
+          "path": "packages/react/src/components/chat-composer-editor-chip.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/chat-composer-editor-chip.tsx"
         }
       ]
     },
@@ -2424,41 +2429,41 @@
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
-      {
-        "path": "packages/react/src/components/window-deck/index.ts",
-        "type": "registry:ui",
-        "target": "components/window-deck/index.ts"
-      },
-      {
-        "path": "packages/react/src/components/window-deck/window-deck.tsx",
-        "type": "registry:ui",
-        "target": "components/window-deck/window-deck.tsx"
-      },
-      {
-        "path": "packages/react/src/components/window-deck/window-deck-pane.tsx",
-        "type": "registry:ui",
-        "target": "components/window-deck/window-deck-pane.tsx"
-      },
-      {
-        "path": "packages/react/src/components/window-deck/window-deck-context.ts",
-        "type": "registry:ui",
-        "target": "components/window-deck/window-deck-context.ts"
-      },
-      {
-        "path": "packages/react/src/components/window-deck/window-deck-layout.ts",
-        "type": "registry:ui",
-        "target": "components/window-deck/window-deck-layout.ts"
-      },
-      {
-        "path": "packages/react/src/components/window-deck/window-deck-motion.ts",
-        "type": "registry:ui",
-        "target": "components/window-deck/window-deck-motion.ts"
-      },
-      {
-        "path": "packages/react/src/components/window-deck/window-deck-shortcuts.ts",
-        "type": "registry:ui",
-        "target": "components/window-deck/window-deck-shortcuts.ts"
-      }
+        {
+          "path": "packages/react/src/components/window-deck/index.ts",
+          "type": "registry:ui",
+          "target": "components/window-deck/index.ts"
+        },
+        {
+          "path": "packages/react/src/components/window-deck/window-deck.tsx",
+          "type": "registry:ui",
+          "target": "components/window-deck/window-deck.tsx"
+        },
+        {
+          "path": "packages/react/src/components/window-deck/window-deck-pane.tsx",
+          "type": "registry:ui",
+          "target": "components/window-deck/window-deck-pane.tsx"
+        },
+        {
+          "path": "packages/react/src/components/window-deck/window-deck-context.ts",
+          "type": "registry:ui",
+          "target": "components/window-deck/window-deck-context.ts"
+        },
+        {
+          "path": "packages/react/src/components/window-deck/window-deck-layout.ts",
+          "type": "registry:ui",
+          "target": "components/window-deck/window-deck-layout.ts"
+        },
+        {
+          "path": "packages/react/src/components/window-deck/window-deck-motion.ts",
+          "type": "registry:ui",
+          "target": "components/window-deck/window-deck-motion.ts"
+        },
+        {
+          "path": "packages/react/src/components/window-deck/window-deck-shortcuts.ts",
+          "type": "registry:ui",
+          "target": "components/window-deck/window-deck-shortcuts.ts"
+        }
       ]
     },
     {
@@ -2509,7 +2514,9 @@
     },
     {
       "name": "git-commit-details",
-      "dependencies": ["lucide-react"],
+      "dependencies": [
+        "lucide-react"
+      ],
       "type": "registry:ui",
       "title": "Git Commit Details",
       "description": "Independent commit inspector with changed files and host-linked agent sessions or plans.",
@@ -2559,6 +2566,69 @@
           "path": "packages/react/src/components/activity-rings/activity-rings-geometry.ts",
           "type": "registry:ui",
           "target": "components/ui/activity-rings/activity-rings-geometry.ts"
+        }
+      ]
+    },
+    {
+      "name": "chat-composer-markdown-editor",
+      "type": "registry:ui",
+      "title": "Chat Composer Markdown Editor",
+      "description": "A structured live Markdown composer with shared inline chips, schema-backed undo, and Markdown draft serialization.",
+      "dependencies": [
+        "@tiptap/core",
+        "@tiptap/extension-code-block",
+        "@tiptap/react",
+        "@tiptap/starter-kit",
+        "@tiptap/markdown",
+        "@tiptap/extension-task-list",
+        "@tiptap/extension-task-item",
+        "@tiptap/extension-table",
+        "@tiptap/extension-image",
+        "@tiptap/pm"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/chat-composer",
+        "nessalabs/nessa_ui/chat-composer-editor",
+        "nessalabs/nessa_ui/code-editor",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/chat-composer-markdown-editor.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/chat-composer-markdown-editor.tsx"
+        }
+      ]
+    },
+    {
+      "name": "code-editor",
+      "type": "registry:ui",
+      "title": "Code Editor",
+      "description": "Reusable editable code surface with a searchable language picker and replaceable editor content.",
+      "dependencies": [
+        "lucide-react",
+        "radix-ui",
+        "@pierre/diffs"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/popover-surface",
+        "nessalabs/nessa_ui/searchable-listbox",
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/code-block"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/code-editor.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/code-editor.tsx"
+        },
+        {
+          "path": "packages/react/src/components/code-editor-syntax.ts",
+          "type": "registry:ui",
+          "target": "components/ui/code-editor-syntax.ts"
         }
       ]
     }

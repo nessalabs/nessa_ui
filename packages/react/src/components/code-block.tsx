@@ -134,7 +134,7 @@ registerCustomTheme("nessa-dark", async () => nessaDarkTheme)
  * theme, and Light+ — the bundled light theme with the highest minimum WCAG
  * contrast.
  */
-const defaultCodeTheme: ThemesType = {
+export const defaultCodeTheme: ThemesType = {
   dark: "nessa-dark",
   light: "light-plus",
 }

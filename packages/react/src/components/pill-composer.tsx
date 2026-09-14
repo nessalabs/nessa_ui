@@ -360,7 +360,7 @@ function PillComposer({
           // and makes upward growth appear to push the composer downward.
           "relative flex min-w-0 w-full max-w-full flex-col gap-1.5 [overflow-anchor:none] rounded-[1.625rem] border border-border bg-card p-1.5 font-sans text-card-foreground",
           (multiline || expanded) && "rounded-2xl",
-          expanded && "absolute inset-0 z-10 min-h-0 [&>[data-slot=pill-composer-row]]:min-h-0 [&>[data-slot=pill-composer-row]]:flex-1 [&_[data-slot=chat-composer-editor]]:h-full [&_[data-slot=chat-composer-editor]]:max-h-none! [&_[data-slot=chat-composer-editor]]:self-stretch! [&_[data-slot=chat-composer-input]]:h-full! [&_[data-slot=chat-composer-input]]:max-h-none! [&_[data-slot=chat-composer-input]]:self-stretch!",
+          expanded && "absolute inset-0 z-10 min-h-0 [&>[data-slot=pill-composer-row]]:min-h-0 [&>[data-slot=pill-composer-row]]:flex-1 [&_[data-slot=chat-composer-markdown-editor]]:h-full [&_[data-slot=chat-composer-markdown-editor]]:max-h-none! [&_[data-slot=chat-composer-editor]]:h-full [&_[data-slot=chat-composer-editor]]:max-h-none! [&_[data-slot=chat-composer-editor]]:self-stretch! [&_[data-slot=chat-composer-input]]:h-full! [&_[data-slot=chat-composer-input]]:max-h-none! [&_[data-slot=chat-composer-input]]:self-stretch!",
           className,
         )}
         style={{

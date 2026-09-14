@@ -56,6 +56,7 @@ type FocusComponent =
   | "button"
   | "badge"
   | "input"
+  | "code-editor"
   | "conversation-rail"
   | "event-calendar"
   | "gantt-chart/gantt-chart-grid"
@@ -255,6 +256,16 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     layer: "outline",
     state: "focus-visible",
     className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The standalone editable area draws inset inside its clipping code surface.
+  {
+    component: "code-editor",
+    layer: "ring",
+    state: "focus-visible",
+    className: "focus-visible:ring-ring",
     count: 1,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
@@ -525,6 +536,26 @@ export interface EditableFocusDeclaration {
 
 export const editableFocusDeclarations: readonly EditableFocusDeclaration[] = Object.freeze([
   {
+    component: "chat-composer-markdown-editor",
+    element: "contenteditable",
+    indicator: "none",
+    reason: "The composer or message bubble is the field; TipTap owns the editable caret, while chip node views explicitly opt out of editing.",
+  },
+  {
+    component: "code-editor",
+    element: "contenteditable",
+    slot: "code-editor-header",
+    indicator: "none",
+    reason: "The language header explicitly sets contentEditable=false inside structured editors. Its language button owns keyboard focus, not the header container.",
+  },
+  {
+    component: "code-editor",
+    element: "textarea",
+    slot: "code-editor-input",
+    indicator: "own",
+    reason: "The standalone code textarea is the field and draws an inset focus-visible ring; custom child editors retain their own focus contract.",
+  },
+  {
     component: "chat-composer",
     element: "textarea",
     indicator: "none",
@@ -674,4 +705,6 @@ export const focusGeometryClasses = Object.freeze([
   { component: "split-view/split-view-separator", className: "focus-visible:ring-offset-0", count: 1 },
   { component: "app-shell/app-shell-dock", className: "focus-visible:ring-2", count: 1 },
   { component: "app-shell/app-shell-dock", className: "focus-visible:ring-offset-0", count: 1 },
+  { component: "code-editor", className: "focus-visible:ring-2", count: 1 },
+  { component: "code-editor", className: "focus-visible:ring-inset", count: 1 },
 ] as const)

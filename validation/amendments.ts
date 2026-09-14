@@ -200,4 +200,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-014",
+    kind: "transition",
+    contractId: "SRC-002",
+    baseRevision: "f5eeae6ab75b0e4a86b3c0f560b2da71dcd586f4",
+    targets: ["validation/exceptions.ts"],
+    beforeFingerprint: "97189dd52e1df326dd97b9fcbd3cb28cd2da76f65e1db47fed5c9aa0af93e535",
+    afterFingerprint: "e96907fed99ccf15e967acf4914eab3ae1d9288d55ccb75f5f86f83fe5097e2d",
+    rationale: "Editable syntax highlighting consumes runtime code-theme palettes. Three exact dark selectors pair token, foreground and background colors with the host mode; the background selector is shared by the editor body and language header while preserving explicit CodeBlockProvider mode overrides.",
+    compatibility: "CodeEditor gains syntax highlighting without changing its value or callbacks. Both standalone and Markdown code editors share the existing highlighter and code-theme provider; plain editors remain independent. Exceptions are confined to runtime syntax palette selection and do not permit general dark styling overrides.",
+    migration: "No consumer migration required. Replace these three selectors with provider-scoped resolved-mode selectors when that theme contract lands.",
+    supersedes: null,
+    pullRequest: null,
+  },
 ])

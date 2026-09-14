@@ -127,10 +127,7 @@ function ConversationHistory({
                   data-slot="conversation-history-item"
                   data-pinned={conversation.pinned || undefined}
                   onClick={() => onValueChange?.(conversation.id)}
-                  className={cn(
-                    "flex w-full min-w-0 items-start gap-3 rounded-xl border-0 bg-transparent px-2.5 py-2.5 text-start outline-none transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                    selected && "bg-accent",
-                  )}
+                  className="flex w-full min-w-0 items-start gap-3 rounded-xl border-0 bg-transparent px-2.5 py-2.5 text-start outline-none transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   <RandomAvatar
                     seed={conversationAvatarSeed(conversation)}

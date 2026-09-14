@@ -150,6 +150,46 @@ function ChatComposer({
   const effectiveMaxHeight = requestedMaxHeight
   const [inputAdapter, setInputAdapter] =
     React.useState<ChatComposerInputAdapter | null>(null)
+  const [chromeHeight, setChromeHeight] = React.useState(0)
+
+  // The footer and attachment rows establish the floor, never the document's
+  // min-content height. Measure the actual chrome so wrapped controls remain
+  // visible while either textarea or structured input can shrink and scroll.
+  React.useLayoutEffect(() => {
+    const input = inputAdapter?.element
+    const form = input?.closest("form")
+    if (!input || !form || effectiveMaxHeight === undefined) return
+    const pixels = (value: string) => Number.parseFloat(value) || 0
+    const measure = () => {
+      const css = getComputedStyle(form)
+      const rows = Array.from(form.children).filter((child): child is HTMLElement => {
+        if (!(child instanceof HTMLElement)) return false
+        const style = getComputedStyle(child)
+        return style.display !== "none" && style.position !== "absolute" && style.position !== "fixed"
+      })
+      const trackCount = css.gridTemplateRows === "none" ? rows.length : css.gridTemplateRows.split(" ").length
+      const gaps = Math.max(0, trackCount - 1) * pixels(css.rowGap)
+      const shell = pixels(css.paddingTop) + pixels(css.paddingBottom) + pixels(css.borderTopWidth) + pixels(css.borderBottomWidth)
+      const chrome = rows.reduce((height, row) => {
+        const style = getComputedStyle(row)
+        return height + (row.contains(input) ? 0 : row.offsetHeight) + pixels(style.marginTop) + pixels(style.marginBottom)
+      }, 0)
+      setChromeHeight(Math.ceil(shell + gaps + chrome))
+    }
+    measure()
+    if (typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(measure)
+    const observeRows = () => {
+      observer.disconnect()
+      observer.observe(form)
+      Array.from(form.children).forEach((child) => observer.observe(child))
+      measure()
+    }
+    observeRows()
+    const mutations = new MutationObserver(observeRows)
+    mutations.observe(form, { childList: true })
+    return () => { observer.disconnect(); mutations.disconnect() }
+  }, [inputAdapter, effectiveMaxHeight])
 
   const context = React.useMemo(
     () => ({
@@ -192,7 +232,7 @@ function ChatComposer({
         minHeight:
           effectiveMaxHeight === undefined
             ? style?.minHeight
-            : "min-content",
+            : chromeHeight,
         maxHeight: effectiveMaxHeight,
       }}
       {...props}
@@ -436,12 +476,11 @@ function ChatComposerInput({
         // apply :focus-visible to editable fields on pointer focus too, so an
         // outline here reads as a permanent inner border. The caret indicates
         // focus; the composer's borderMode owns any surface treatment.
-        "min-w-0 w-full resize-none border-0 bg-transparent px-1 py-1 font-sans nessa-text-5 text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+        "min-w-0 w-full resize-none border-0 bg-transparent px-1 py-1 font-sans nessa-text-4 text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
         // Chat surfaces scroll without chrome; opt back in via scrollbar.
         !scrollbar && "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         constrained ? "min-h-0 max-h-full" : "min-h-14",
-        size === "compact" && !constrained && "min-h-10 nessa-text-4",
-        size === "compact" && constrained && "nessa-text-4",
+        size === "compact" && !constrained && "min-h-10",
         className,
       )}
       onChange={(event) => {
@@ -841,13 +880,14 @@ function ChatComposerTrigger({
       dismiss()
     }
 
+    // Menu selection must arbitrate keys before an editor's native keymap.
     element.addEventListener("input", handleInput)
-    element.addEventListener("keydown", handleKeyDown)
+    element.addEventListener("keydown", handleKeyDown, true)
     element.addEventListener("blur", handleBlur)
     ownerDocument.addEventListener("selectionchange", handleSelectionChange)
     return () => {
       element.removeEventListener("input", handleInput)
-      element.removeEventListener("keydown", handleKeyDown)
+      element.removeEventListener("keydown", handleKeyDown, true)
       element.removeEventListener("blur", handleBlur)
       ownerDocument.removeEventListener(
         "selectionchange",
