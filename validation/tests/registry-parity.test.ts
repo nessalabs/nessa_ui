@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import ts from "typescript"
 
-import { canonicalJson, dependenciesFromSource, embeddedSourceMatches, registryAliasFromSpecifier, relativeRegistryTopology, requiredRegistryDependenciesPresent, sourceOwnedProjection, targetMatchesAlias } from "../nessa/checks/registry-parity.ts"
+import { canonicalJson, dependenciesFromSource, embeddedSourceMatches, registryAliasFromSpecifier, registryAliasImports, relativeRegistryTopology, requiredRegistryDependenciesPresent, sourceOwnedProjection, targetMatchesAlias } from "../nessa/checks/registry-parity.ts"
 
 test("embedded registry source permits only line-ending normalization", () => {
   assert.equal(embeddedSourceMatches("one\r\ntwo\r\n", "one\ntwo\n"), true)
@@ -88,4 +88,37 @@ test("relative registry imports preserve their installed target topology", () =>
 test("registry UI dependencies require both Nessa base and utils", () => {
   assert.equal(requiredRegistryDependenciesPresent(["nessalabs/nessa_ui/nessa-base", "nessalabs/nessa_ui/utils"]), true)
   assert.equal(requiredRegistryDependenciesPresent(["nessalabs/nessa_ui/nessa-base"]), false)
+})
+
+
+test("lazy imports retain registry dependencies and installed-path validation", () => {
+  const ast = ts.createSourceFile("message.tsx", `
+    const Math = React.lazy(() => import("./math-block"))
+    const Mermaid = React.lazy(() => import(\`./mermaid-diagram\`))
+    async function load() { await import("@/components/ui/button"); await import("@scope/pkg/feature") }
+    // import("./not-real")
+    const example = 'import("fake-package")'
+    const dynamic = import(variable)
+  `, ts.ScriptTarget.ES2022, true)
+  const topology = relativeRegistryTopology(ast,
+    "packages/react/src/components/message.tsx", "components/ui/message.tsx", "message",
+    new Map([
+      ["packages/react/src/components/math-block", { owner: "math-block", target: "components/ui/math-block.tsx" }],
+      ["packages/react/src/components/mermaid-diagram", { owner: "mermaid-diagram", target: "components/ui/mermaid-diagram.tsx" }],
+    ]),
+  )
+  assert.deepEqual(topology.issues, [])
+  assert.deepEqual(dependenciesFromSource(ast, topology.relativeRegistryItems), {
+    packages: ["@scope/pkg"],
+    registry: ["nessalabs/nessa_ui/button", "nessalabs/nessa_ui/math-block", "nessalabs/nessa_ui/mermaid-diagram"],
+  })
+  assert.deepEqual(registryAliasImports(ast), [{ specifier: "@/components/ui/button", itemName: "button", targetPrefix: "components/ui/button" }])
+  const misplaced = relativeRegistryTopology(ast,
+    "packages/react/src/components/message.tsx", "components/ui/message.tsx", "message",
+    new Map([["packages/react/src/components/math-block", { owner: "math-block", target: "lib/math-block.tsx" }]]),
+  )
+  assert.deepEqual(misplaced.issues, [
+    "./math-block resolves to components/ui/math-block after installation, not lib/math-block",
+    "./mermaid-diagram is not copied by any registry item",
+  ])
 })
