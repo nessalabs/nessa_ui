@@ -3,6 +3,10 @@
 import * as React from "react"
 import { LoaderCircle, Search } from "lucide-react"
 
+import {
+  useListboxCollection,
+  type ListboxDisabledBehavior,
+} from "@/lib/listbox-collection"
 import { cn } from "@/lib/utils"
 
 /** Describes the selection and focus state supplied to an item renderer. */
@@ -20,7 +24,13 @@ export interface SearchableListboxProps<Item> {
   getItemId: (item: Item) => string
   /** Returns every string that should participate in case-insensitive search. */
   getItemKeywords: (item: Item) => readonly (string | undefined)[]
-  /** Renders non-interactive row content inside the component-owned option. */
+  /**
+   * Renders non-interactive row content inside the component-owned option.
+   *
+   * The option is already a button; a control inside it would be a control
+   * inside a control, which is unreachable by keyboard and announced wrongly.
+   * Render text, icons and badges here and let the row own activation.
+   */
   renderItem: (
     item: Item,
     state: SearchableListboxRenderState,
@@ -32,6 +42,15 @@ export interface SearchableListboxProps<Item> {
   defaultQuery?: string
   onQueryChange?: (query: string) => void
   isItemDisabled?: (item: Item) => boolean
+  /**
+   * Whether Arrow keys visit disabled rows.
+   *
+   * Defaults to `focusable`, because a searchable list is usually a catalogue
+   * and why an option is unavailable is information worth reaching. Pass
+   * `skipped` when a disabled row is only noise.
+   * @defaultValue "focusable"
+   */
+  disabledBehavior?: ListboxDisabledBehavior
   searchPlaceholder?: string
   /** The accessible name announced for the list of matching options. */
   listLabel: string
@@ -60,6 +79,11 @@ function itemMatchesQuery<Item>(
 /**
  * Renders a searchable single-select listbox with controlled or uncontrolled
  * query state, roving keyboard focus, and consumer-defined row content.
+ *
+ * Keyboard behavior comes from the shared listbox collection, so it matches
+ * SectionedListbox exactly: Arrow keys wrap, Home and End jump to the ends,
+ * and a modified Arrow key is left to whoever owns that shortcut. Home and
+ * End belong to the caret while the search field has focus.
  */
 function SearchableListbox<Item>({
   ref,
@@ -73,6 +97,7 @@ function SearchableListbox<Item>({
   defaultQuery = "",
   onQueryChange,
   isItemDisabled = () => false,
+  disabledBehavior = "focusable",
   searchPlaceholder = "Search",
   listLabel,
   emptyMessage = "No results found",
@@ -85,9 +110,6 @@ function SearchableListbox<Item>({
   optionClassName,
 }: SearchableListboxProps<Item>) {
   const [uncontrolledQuery, setUncontrolledQuery] = React.useState(defaultQuery)
-  const [highlightedId, setHighlightedId] = React.useState<string>()
-  const [rovingId, setRovingId] = React.useState<string>()
-  const optionRefs = React.useRef(new Map<string, HTMLButtonElement>())
   const listboxId = React.useId()
   const query = queryProp ?? uncontrolledQuery
   const normalizedQuery = query.trim().toLocaleLowerCase()
@@ -98,93 +120,27 @@ function SearchableListbox<Item>({
       ),
     [getItemKeywords, items, normalizedQuery],
   )
-  const navigableItems = filteredItems
-  const firstNavigableId = navigableItems[0]
-    ? getItemId(navigableItems[0])
-    : undefined
-  const rovingItemIsVisible = navigableItems.some(
-    (item) => getItemId(item) === rovingId,
-  )
-  const selectedItemIsVisible = navigableItems.some(
-    (item) => getItemId(item) === value,
-  )
-  const rovingItemId = rovingItemIsVisible
-    ? rovingId
-    : selectedItemIsVisible
-      ? value
-      : firstNavigableId
-
-  React.useEffect(() => {
-    if (
-      highlightedId &&
-      !navigableItems.some((item) => getItemId(item) === highlightedId)
-    ) {
-      setHighlightedId(undefined)
-    }
-  }, [getItemId, highlightedId, navigableItems])
-
-  React.useEffect(() => {
-    if (rovingId && !navigableItems.some((item) => getItemId(item) === rovingId)) {
-      setRovingId(undefined)
-    }
-  }, [getItemId, navigableItems, rovingId])
+  const entries = filteredItems.map((item) => ({
+    id: getItemId(item),
+    disabled: disabled || isItemDisabled(item),
+  }))
+  const collection = useListboxCollection({
+    entries,
+    value,
+    disabled,
+    disabledBehavior,
+  })
 
   /** Updates the owned query when uncontrolled and always notifies the consumer. */
   const setQuery = React.useCallback(
     (nextQuery: string) => {
       if (queryProp === undefined) setUncontrolledQuery(nextQuery)
-      setHighlightedId(undefined)
-      setRovingId(undefined)
+      // The rows are about to be a different set, so navigation starts over
+      // rather than resuming at a position that meant something else.
+      collection.reset()
       onQueryChange?.(nextQuery)
     },
-    [onQueryChange, queryProp],
-  )
-
-  /** Moves focus to an item, including disabled options that describe why they are unavailable. */
-  const focusItem = React.useCallback(
-    (index: number) => {
-      const item = navigableItems[index]
-      if (!item) return
-      const itemId = getItemId(item)
-      setHighlightedId(itemId)
-      setRovingId(itemId)
-      optionRefs.current.get(itemId)?.focus()
-    },
-    [getItemId, navigableItems],
-  )
-
-  /** Handles vertical roving focus from either the search field or an option. */
-  const handleNavigation = React.useCallback(
-    (event: React.KeyboardEvent, currentId?: string) => {
-      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
-      if (
-        event.key !== "ArrowDown" &&
-        event.key !== "ArrowUp" &&
-        (currentId === undefined ||
-          (event.key !== "Home" && event.key !== "End"))
-      ) {
-        return
-      }
-      if (disabled || navigableItems.length === 0) return
-      event.preventDefault()
-      const currentIndex = currentId
-        ? navigableItems.findIndex((item) => getItemId(item) === currentId)
-        : -1
-      const nextIndex =
-        event.key === "Home"
-          ? 0
-          : event.key === "End"
-            ? navigableItems.length - 1
-            : event.key === "ArrowDown"
-          ? currentIndex < 0 || currentIndex === navigableItems.length - 1
-            ? 0
-            : currentIndex + 1
-          : currentIndex <= 0
-            ? navigableItems.length - 1
-            : currentIndex - 1
-      focusItem(nextIndex)
-    },
-    [disabled, focusItem, getItemId, navigableItems],
+    [collection, onQueryChange, queryProp],
   )
 
   return (
@@ -211,7 +167,9 @@ function SearchableListbox<Item>({
               setQuery("")
               return
             }
-            handleNavigation(event)
+            // Home and End stay with the caret here: taking them would leave
+            // someone mid-query unable to reach either end of what they typed.
+            collection.handleNavigation(event, { allowHomeEnd: false })
           }}
           placeholder={searchPlaceholder}
           autoComplete="off"
@@ -243,7 +201,7 @@ function SearchableListbox<Item>({
         role={!loading && filteredItems.length > 0 ? "listbox" : undefined}
         aria-label={!loading && filteredItems.length > 0 ? listLabel : undefined}
         className={cn("max-h-80 overflow-y-auto p-1.5", listClassName)}
-        onPointerLeave={() => setHighlightedId(undefined)}
+        onPointerLeave={() => collection.setHighlighted(undefined)}
       >
         {loading ? (
           <div
@@ -258,32 +216,37 @@ function SearchableListbox<Item>({
             {filteredItems.map((item) => {
               const itemId = getItemId(item)
               const selected = value === itemId
-              const highlighted = highlightedId === itemId
+              const highlighted = collection.highlightedId === itemId
               const itemDisabled = disabled || isItemDisabled(item)
+              const navigable = collection.isNavigable({
+                id: itemId,
+                disabled: itemDisabled,
+              })
               return (
                 <button
                   key={itemId}
                   type="button"
-                  ref={(node) => {
-                    if (node) optionRefs.current.set(itemId, node)
-                    else optionRefs.current.delete(itemId)
-                  }}
+                  ref={collection.registerOption(itemId)}
                   id={`${listboxId}-option-${encodeURIComponent(itemId)}`}
                   role="option"
                   aria-selected={selected}
-                  tabIndex={!disabled && rovingItemId === itemId ? 0 : -1}
+                  tabIndex={!disabled && collection.rovingItemId === itemId ? 0 : -1}
                   data-slot="searchable-listbox-option"
                   data-selected={selected ? "true" : "false"}
                   data-highlighted={highlighted ? "true" : "false"}
+                  // How the row is disabled follows the navigation policy: a
+                  // row Arrow keys still visit must stay focusable, so it is
+                  // `aria-disabled`; one they skip takes the native attribute
+                  // and leaves the tab order with it.
                   aria-disabled={itemDisabled || undefined}
+                  disabled={itemDisabled && !navigable}
                   onPointerMove={() => {
-                    if (!itemDisabled) setHighlightedId(itemId)
+                    if (!itemDisabled) collection.setHighlighted(itemId)
                   }}
-                  onFocus={() => {
-                    setHighlightedId(itemId)
-                    setRovingId(itemId)
-                  }}
-                  onKeyDown={(event) => handleNavigation(event, itemId)}
+                  onFocus={() => collection.handleOptionFocus(itemId)}
+                  onKeyDown={(event) =>
+                    collection.handleNavigation(event, { from: itemId })
+                  }
                   onClick={() => {
                     if (!itemDisabled) onValueChange?.(itemId, item)
                   }}
@@ -291,7 +254,7 @@ function SearchableListbox<Item>({
                     // Rows carry real padding and a text level by default so a
                     // bare renderItem gets a finished row; content-styled
                     // consumers strip it back via optionClassName.
-                    "w-full rounded-2xl px-2.5 py-2 text-start font-sans nessa-text-4 outline-none transition-colors focus-visible:bg-accent focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-disabled:opacity-45",
+                    "w-full rounded-2xl px-2.5 py-2 text-start font-sans nessa-text-4 outline-none transition-colors focus-visible:bg-accent focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-disabled:opacity-45 disabled:pointer-events-none disabled:opacity-45",
                     highlighted && "bg-accent/70",
                     optionClassName,
                   )}
