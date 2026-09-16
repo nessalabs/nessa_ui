@@ -1068,6 +1068,11 @@ export {
   type WindowDeckTile,
   type WindowDeckViewport,
 } from "./components/window-deck"
+export {
+  PortalContainerProvider,
+  usePortalContainer,
+  type PortalContainerProviderProps,
+} from "./lib/portal-container"
 export { cn } from "./lib/utils"
 export { VirtualList, type VirtualListProps } from "./components/virtual-list"
 export { GitHistory, layoutGitHistory, type GitHistoryProps, type GitCommit, type GitGraphRow } from "./components/git-history"

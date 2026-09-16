@@ -417,14 +417,19 @@ export const PortalledLayerInsideSheet: Story = {
     await userEvent.click(within(sheet).getByRole("button", { name: "Model" }))
     const menu = await body.findByRole("menu")
 
-    // The portal the menu landed in must not have been swept up by the
-    // sheet's inertness: an inert wrapper silently disables the sheet's own
-    // control, and the menu can never take focus.
+    // The menu belongs to the sheet, so it is *in* the sheet: it portalled
+    // into the container the sheet owns rather than to the body. Everything
+    // else follows from that — it cannot be swept up by the sheet's own
+    // inertness, it paints above the panel, and focus entering it is focus
+    // that never left the boundary.
+    await expect(sheet.contains(menu)).toBe(true)
+    await expect(menu.closest('[data-slot="sheet-layers"]')).not.toBeNull()
     await expect(menu.closest("[inert]")).toBeNull()
     await waitFor(() => expect(menu.contains(document.activeElement)).toBe(true))
 
-    // Tab belongs to the menu while the menu is up. The sheet's own
-    // containment must not drag focus back out of it.
+    // Tab belongs to the menu while the menu is up. Being inside the sheet is
+    // what makes this the interesting case: the sheet must recognize the menu
+    // as a layer of its own rather than treat its items as sheet content.
     await userEvent.keyboard("{ArrowDown}")
     await expect(menu.contains(document.activeElement)).toBe(true)
 

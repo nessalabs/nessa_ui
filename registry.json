@@ -366,6 +366,19 @@
       ]
     },
     {
+      "name": "portal-container",
+      "type": "registry:lib",
+      "title": "Portal container",
+      "description": "Where a floating layer puts its content. A panel that owns a boundary \u2014 a modal sheet, a reading view \u2014 mounts a container inside itself and publishes it, and every Nessa menu, popover and tooltip portals there instead of the body, so a layer opened from inside a panel stays inside the panel's inertness, tab order and dismissal.",
+      "files": [
+        {
+          "path": "packages/react/src/lib/portal-container.tsx",
+          "type": "registry:lib",
+          "target": "lib/portal-container.tsx"
+        }
+      ]
+    },
+    {
       "name": "button",
       "type": "registry:ui",
       "title": "Button",
@@ -1196,6 +1209,7 @@
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1237,6 +1251,7 @@
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/searchable-listbox",
         "nessalabs/nessa_ui/utils"
       ],
@@ -1259,6 +1274,7 @@
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1326,6 +1342,7 @@
         "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/overlay-panel",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1390,6 +1407,7 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/file-drop-zone",
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1503,6 +1521,7 @@
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1567,6 +1586,7 @@
         "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/overlay-panel",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1671,6 +1691,7 @@
         "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/json-tree",
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1692,6 +1713,7 @@
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1754,6 +1776,7 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/popover-surface",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -2110,6 +2133,7 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/popover-surface",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -2646,12 +2670,13 @@
         "@pierre/diffs"
       ],
       "registryDependencies": [
-        "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/code-block",
+        "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/popover-surface",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/searchable-listbox",
-        "nessalabs/nessa_ui/utils",
-        "nessalabs/nessa_ui/code-block"
+        "nessalabs/nessa_ui/utils"
       ],
       "files": [
         {

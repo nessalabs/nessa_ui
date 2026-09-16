@@ -209,35 +209,36 @@ export function focusFirstWithin(root: HTMLElement) {
 /**
  * The elements that own focus for whatever is inside them.
  *
- * A panel is not the only layer on the page. A menu, a listbox, or a dialog
- * that a control *inside* the panel opened is usually portalled to the body,
- * so it is not a descendant of the panel even though it belongs to it. Those
- * layers run their own focus management, and the panel underneath has to
- * stand down rather than compete with them.
+ * A panel is not the only layer on the page. A menu, a popover or a dialog
+ * that a control inside the panel opened runs its own focus management —
+ * roving tabindex, its own Escape, its own restore — and a panel that also
+ * acted on those keystrokes would fight it. Nessa's floating layers portal
+ * into the panel that owns them, so they are usually descendants, and being a
+ * descendant is exactly why the panel has to recognize them rather than
+ * assume anything inside itself is its own business.
+ *
+ * Only dismissible floating layers are listed. An in-flow widget with its own
+ * arrow-key navigation — a listbox, a tree, a grid — is *not* one: Tab moves
+ * past it to the panel's next control, which is the panel's job.
  *
  * The popper wrapper is listed because that is the shape Radix portals take:
- * the role-bearing content sits inside a plain positioning wrapper, so a
- * check that only looked at roles would miss the element actually holding
- * the layer.
+ * the role-bearing content sits inside a plain positioning wrapper.
  */
-const focusLayerSelector =
-  '[role="dialog"], [role="alertdialog"], [role="menu"], [role="menubar"], [role="listbox"], [role="tree"], [role="grid"], [data-radix-popper-content-wrapper], [data-nessa-layer]'
+const floatingLayerSelector =
+  '[role="dialog"], [role="alertdialog"], [role="menu"], [data-radix-popper-content-wrapper]'
 
 /**
- * The layer currently holding focus, when it is one the panel does not own.
+ * The floating layer currently holding focus, when it is not the panel itself.
  *
- * A layer nested *within* the panel is the panel's own business and is not
- * reported; only a layer outside it — the portalled menu its own trigger
- * opened — counts, because that is the case where the panel must not act.
- *
- * @param root - The panel asking.
- * @returns The foreign layer holding focus, or null.
+ * @param root - The panel asking. It is a layer too, so it is excluded.
+ * @returns The layer holding focus, or null when focus is in the panel's own
+ * content or outside every layer.
  */
-function foreignLayerWithFocus(root: HTMLElement): HTMLElement | null {
+function layerWithFocus(root: HTMLElement): HTMLElement | null {
   const active = root.ownerDocument.activeElement
-  if (!(active instanceof HTMLElement) || root.contains(active)) return null
-  const layer = active.closest<HTMLElement>(focusLayerSelector)
-  return layer && !root.contains(layer) ? layer : null
+  if (!(active instanceof HTMLElement)) return null
+  const layer = active.closest<HTMLElement>(floatingLayerSelector)
+  return layer && layer !== root ? layer : null
 }
 
 /**
@@ -250,9 +251,10 @@ function foreignLayerWithFocus(root: HTMLElement): HTMLElement | null {
  * tabbable controls at all keeps focus on itself instead of letting the
  * keystroke through, which is the case a trap that returns early gets wrong.
  *
- * Recovery stops at another layer. Focus sitting in a portalled menu, popover
- * or dialog belongs to that layer, not to this panel, and the trap leaves it
- * alone until it closes and hands focus back.
+ * Recovery stops at another layer. Focus sitting in a menu, popover or dialog
+ * belongs to that layer, not to this panel, and the trap leaves it alone
+ * until it closes and hands focus back — whether that layer portalled into
+ * the panel, as Nessa's own do, or sits somewhere else entirely.
  *
  * @param root - The panel Tab may not leave.
  * @returns The disposer that stops trapping.
@@ -261,12 +263,11 @@ export function trapTabWithin(root: HTMLElement) {
   const ownerDocument = root.ownerDocument
   const handleTab = (event: KeyboardEvent) => {
     if (event.key !== "Tab" || event.defaultPrevented) return
-    // Only the topmost layer moves focus. A menu or dialog that something
-    // inside this panel opened is portalled out of it, so `root.contains`
-    // reads as "outside" and the recovery below would drag focus out of the
-    // layer the user is actually in — off the search field of a picker on
-    // the very first keystroke.
-    if (foreignLayerWithFocus(root)) return
+    // Only the topmost layer moves focus. While a menu or popover this
+    // panel's own content opened holds focus, that layer owns the keystroke —
+    // including its own Tab handling — and the containment below would drag
+    // focus off the search field of a picker on its very first keystroke.
+    if (layerWithFocus(root)) return
     const order = tabbableWithin(root)
     const current = ownerDocument.activeElement
     const inside = root.contains(current)

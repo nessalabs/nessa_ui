@@ -4,6 +4,7 @@ import * as React from "react"
 import { HoverCard, Slot } from "radix-ui"
 import { ArrowUpRight, ChevronLeft, ChevronRight } from "lucide-react"
 
+import { usePortalContainer } from "@/lib/portal-container"
 import { cn } from "@/lib/utils"
 
 /**
@@ -307,6 +308,11 @@ function ReferenceTrigger({
 export interface ReferenceContentProps
   extends React.ComponentProps<typeof HoverCard.Content> {
   /** Portal container, for hosts that scope rendering (dialogs, shells). */
+  /**
+   * Where the floating content is portalled. Defaults to the container the
+   * nearest enclosing panel owns — a Sheet's own layer host, say — and to the
+   * body when there is none. Pass `null` to force the body regardless.
+   */
   portalContainer?: HTMLElement | null
   /**
    * Draws the caret pointing at the chip.
@@ -340,6 +346,7 @@ function ReferenceContent({
   onPointerDownOutside,
   ...props
 }: ReferenceContentProps) {
+  const resolvedPortalContainer = usePortalContainer(portalContainer)
   const { closeCard, registerContent, isWithinTrigger } =
     useReference("ReferenceContent")
 
@@ -366,7 +373,7 @@ function ReferenceContent({
   )
 
   return (
-    <HoverCard.Portal container={portalContainer}>
+    <HoverCard.Portal container={resolvedPortalContainer}>
       <HoverCard.Content
         ref={composedRef}
         data-slot="reference-content"

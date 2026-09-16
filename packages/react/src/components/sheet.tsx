@@ -5,6 +5,10 @@ import { Maximize2, Minimize2, X } from "lucide-react"
 
 import { useComposedRefs } from "@/lib/compose"
 import {
+  PortalContainerProvider,
+  usePortalContainerHost,
+} from "@/lib/portal-container"
+import {
   focusFirstWithin,
   openerFromFocus,
   panelMotion,
@@ -150,13 +154,13 @@ export interface SheetProps extends React.ComponentProps<"div"> {
    * sheet's whole interaction contract, and toggling it would leave inert
    * ancestors with nothing left to release them. Remount to change it.
    *
-   * Layers the sheet's own content opens stay live. A menu, popover or
-   * dialog portalled to the body while the sheet is up is treated as sitting
-   * *over* the sheet rather than behind it, so a ModelPicker opened from
-   * inside a modal sheet still takes focus and keystrokes, and Tab inside it
-   * belongs to that layer rather than being pulled back. A host that mounts
-   * its own portal root up front — before the sheet exists, so it cannot be
-   * recognized as a late arrival — marks it `data-nessa-layer`.
+   * Layers the sheet's own content opens stay live, because they are not
+   * outside it: Nessa's menus, popovers and pickers portal into a container
+   * the sheet owns, so a ModelPicker opened from inside a modal sheet renders
+   * within the boundary, takes focus and keystrokes, and paints above the
+   * panel. A host portalling to the body by hand should pass that container
+   * too — every Nessa floating layer reads it from context, and
+   * `usePortalContainer()` exposes it.
    */
   modal?: boolean
 }
@@ -211,6 +215,9 @@ function Sheet({
   // own ref and the focus, inertness, and dismissal effects below — all of
   // which return early on a null node — would never run.
   const rootRef = useComposedRefs(ref, forwardedRef)
+  // The sheet owns where its own floating layers land. See the container
+  // element at the end of the panel for why it is inside the sheet.
+  const { container, setContainer } = usePortalContainerHost()
   const panelRef = React.useRef<HTMLDivElement>(null)
   const backdropRef = React.useRef<HTMLDivElement>(null)
   const onCloseRef = React.useRef(onClose)
@@ -644,50 +651,28 @@ function Sheet({
       }
       return chain
     }
-    /**
-     * Whether new arrivals at this level are content the sheet is drawn over.
-     *
-     * At the sheet's own level, yes: a host that mounts a card or a banner
-     * into the frame while the sheet is up has put it *behind* the sheet, and
-     * leaving it reachable would be a hole in the coverage.
-     *
-     * Above that level, no — and this is the distinction that matters. A
-     * subtree that appears at the body while the sheet is open is something
-     * the sheet's own content opened: the portal behind a ModelPicker, a
-     * menu, a tooltip. Radix mounts those on open, and they are layers *over*
-     * the sheet rather than content under it. Inerting them makes the sheet
-     * disable its own controls — the picker renders, and its search field
-     * cannot take a keystroke.
-     */
-    const coversLateArrivals = (parent: HTMLElement) => parent === node.parentElement
-    const coverLevel = (child: HTMLElement, lateArrivals: boolean) => {
-      const parent = child.parentElement
-      if (!parent) return
-      if (lateArrivals && !coversLateArrivals(parent)) return
-      for (const sibling of parent.children) {
-        if (sibling === child || !(sibling instanceof HTMLElement)) continue
-        if (sibling.getAttribute("role") === "dialog") continue
-        // The explicit opt-out, for a portal root a host mounts once and
-        // reuses rather than creating when the layer opens: it exists before
-        // the sheet does, so the late-arrival rule cannot recognize it.
-        if (sibling.hasAttribute("data-nessa-layer")) continue
-        if (covered.has(sibling)) continue
-        const count = coverCounts.get(sibling)
-        if (count === undefined && sibling.hasAttribute("inert")) continue
-        coverCounts.set(sibling, (count ?? 0) + 1)
-        sibling.setAttribute("inert", "")
-        covered.add(sibling)
+    const coverSiblings = () => {
+      for (const sibling of covered) if (!sibling.isConnected) release(sibling)
+      for (const child of branch()) {
+        for (const sibling of child.parentElement?.children ?? []) {
+          if (sibling === child || !(sibling instanceof HTMLElement)) continue
+          if (sibling.getAttribute("role") === "dialog") continue
+          if (covered.has(sibling)) continue
+          const count = coverCounts.get(sibling)
+          if (count === undefined && sibling.hasAttribute("inert")) continue
+          coverCounts.set(sibling, (count ?? 0) + 1)
+          sibling.setAttribute("inert", "")
+          covered.add(sibling)
+        }
       }
     }
-    const coverSiblings = (lateArrivals: boolean) => {
-      for (const sibling of covered) if (!sibling.isConnected) release(sibling)
-      for (const child of branch()) coverLevel(child, lateArrivals)
-    }
-    coverSiblings(false)
-    // Hosts mount things behind an open sheet, so every level the coverage
-    // reaches is watched — but only the sheet's own level takes new arrivals,
-    // for the reason `coversLateArrivals` gives.
-    const observer = new MutationObserver(() => coverSiblings(true))
+    coverSiblings()
+    // Hosts mount things behind an open sheet at any level of the branch, so
+    // every level the coverage reaches is watched rather than only the
+    // sheet's own parent. Nothing here needs to make an exception for the
+    // sheet's own menus and popovers: they portal into the container the
+    // sheet owns, which is inside the sheet and therefore on the branch.
+    const observer = new MutationObserver(coverSiblings)
     for (const child of branch()) {
       observer.observe(child.parentElement!, { childList: true })
     }
@@ -786,8 +771,26 @@ function Sheet({
               : "max-h-[85%] overflow-hidden rounded-t-3xl",
           )}
         >
-          {children}
+          <PortalContainerProvider container={container}>
+            {children}
+          </PortalContainerProvider>
         </div>
+        {/*
+          Where the sheet's own menus, popovers and pickers land.
+
+          Inside the sheet, because that is the whole point: a layer portalled
+          to the body would be outside the boundary the sheet just made inert,
+          outside the tab order it contains, and outside the subtree its
+          dismissal reasons about. Mounted here rather than in the panel so it
+          is a sibling of the content — last in the sheet, so it paints over
+          the panel — and so the panel's own height interpolation cannot drag
+          an open menu around with it.
+
+          It draws nothing and occupies nothing: Radix positions its content
+          in a fixed wrapper of its own, and this is only the parent that
+          wrapper is appended to.
+        */}
+        <div ref={setContainer} data-slot="sheet-layers" />
       </div>
     </SheetContext.Provider>
   )

@@ -3,6 +3,10 @@
 import * as React from "react"
 
 import { useComposedRefs } from "@/lib/compose"
+import {
+  PortalContainerProvider,
+  usePortalContainerHost,
+} from "@/lib/portal-container"
 import { focusFirstWithin } from "@/lib/overlay-panel"
 import { cn } from "@/lib/utils"
 
@@ -189,6 +193,7 @@ function ChatOverlay({
   // prop in React 19, so `{...props}` after `ref={ref}` would replace the
   // component's own ref and every effect reading it would see null.
   const composedRef = useComposedRefs(ref, forwardedRef)
+  const { container, setContainer } = usePortalContainerHost()
 
   return (
     <ChatOverlayContext.Provider value={context}>
@@ -207,7 +212,16 @@ function ChatOverlay({
         )}
         {...props}
       >
-        {children}
+        <PortalContainerProvider container={container}>
+          {children}
+        </PortalContainerProvider>
+        {/*
+          Where this view's own floating layers land: inside it, so a menu or
+          popover opened from the content is part of the view the siblings
+          around it were made inert for, rather than a stray subtree at the
+          body. It draws nothing; Radix positions its content itself.
+        */}
+        <div ref={setContainer} data-slot="chat-overlay-layers" />
       </div>
     </ChatOverlayContext.Provider>
   )
