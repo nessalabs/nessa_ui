@@ -611,22 +611,46 @@ export const Empty: Story = {
   ),
 }
 
+/**
+ * Controlled, and counting: asserting that a disabled row stays unselected is
+ * only evidence if something would have recorded a selection had one
+ * happened. An uncontrolled listbox with no callback cannot tell the two
+ * apart.
+ */
+function SharedKeyboardPolicyExample() {
+  const [value, setValue] = React.useState<string>()
+  const [selections, setSelections] = React.useState(0)
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="h-72 w-[min(26rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl">
+        <SectionedListbox
+          sections={pluginSections}
+          getItemId={pluginItemId}
+          renderItem={renderPluginItem}
+          isItemDisabled={pluginItemDisabled}
+          disabledBehavior="focusable"
+          value={value}
+          onValueChange={(next) => {
+            setValue(next)
+            setSelections((count) => count + 1)
+          }}
+          listLabel="Available plugins"
+        />
+      </div>
+      <p className="font-mono nessa-text-2 text-muted-foreground">
+        <span data-testid="selections">selections: {selections}</span>
+        {" · "}
+        <span data-testid="value">value: {value ?? "none"}</span>
+      </p>
+    </div>
+  )
+}
+
 export const SharedKeyboardPolicy: Story = {
   parameters: storyDocumentation(
     "Both Nessa listboxes navigate by one engine, so the keyboard contract does not depend on which of them a consumer reached for. A modified Arrow key belongs to whoever owns that shortcut and passes straight through; Home and End reach the ends of the whole collection rather than of a section; and `disabledBehavior` decides in the open whether Arrow keys visit an unavailable row — `skipped` here overridden to `focusable`, which is SearchableListbox's default.",
   ),
-  render: () => (
-    <div className="h-80 w-[min(26rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl">
-      <SectionedListbox
-        sections={pluginSections}
-        getItemId={pluginItemId}
-        renderItem={renderPluginItem}
-        isItemDisabled={pluginItemDisabled}
-        disabledBehavior="focusable"
-        listLabel="Available plugins"
-      />
-    </div>
-  ),
+  render: () => <SharedKeyboardPolicyExample />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     const options = canvas.getAllByRole("option")
@@ -657,7 +681,18 @@ export const SharedKeyboardPolicy: Story = {
     await expect(unavailable).not.toBeDisabled()
     unavailable.focus()
     await expect(unavailable).toHaveFocus()
+
+    // An available row selects, which is what makes the next assertion mean
+    // something: the counter proves a click *can* register here.
+    const available = canvas.getByRole("option", { name: /visualize/i })
+    await userEvent.click(available)
+    await expect(canvas.getByTestId("selections")).toHaveTextContent("selections: 1")
+    await expect(available).toHaveAttribute("aria-selected", "true")
+
+    // The disabled row does not, and the count is what says so — `aria-selected`
+    // staying false is also what an inert listbox would show.
     await userEvent.click(unavailable)
+    await expect(canvas.getByTestId("selections")).toHaveTextContent("selections: 1")
     await expect(unavailable).toHaveAttribute("aria-selected", "false")
 
     // The announcement region is mounted with the surface and empty while

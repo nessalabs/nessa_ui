@@ -95,6 +95,78 @@ export interface ListboxCollection {
 }
 
 /**
+ * Whether a keystroke is one the collection moves on.
+ *
+ * Exported and pure because it is the policy, not an implementation detail:
+ * this is the function the hook calls, so a test of it is a test of what
+ * ships rather than of a second copy written to match.
+ *
+ * @param event - The keystroke, as far as this decision is concerned.
+ * @param allowHomeEnd - False where Home and End belong to a caret.
+ * @returns Whether the collection should handle it.
+ */
+export function isNavigationKey(
+  event: Pick<React.KeyboardEvent, "key" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey">,
+  allowHomeEnd = true,
+): boolean {
+  // A modified Arrow key is somebody else's shortcut — a browser tab switch,
+  // a caret jump by word, an extend-selection — and swallowing it to move a
+  // highlight is a keystroke stolen rather than handled.
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return false
+  const isArrow = event.key === "ArrowDown" || event.key === "ArrowUp"
+  const isEdge = allowHomeEnd && (event.key === "Home" || event.key === "End")
+  return isArrow || isEdge
+}
+
+/**
+ * Where in the navigable rows a keystroke came from.
+ *
+ * `!== undefined`, not truthiness: an id is required to be unique and stable,
+ * not to be non-empty, and `""` is a perfectly good one. Reading it as "the
+ * keystroke came from outside the collection" sends Arrow keys to the wrong
+ * row, or to none at all — silently, because -1 is also what a legitimate
+ * search field produces.
+ *
+ * @param navigable - The rows Arrow keys can visit, in order.
+ * @param from - The row the keystroke came from, or undefined for a surface
+ * outside the collection such as a search field above it.
+ * @returns The row's index, or -1 for outside — which includes a row that was
+ * filtered away between the keydown and this lookup.
+ */
+export function indexOfOrigin(
+  navigable: readonly ListboxEntry[],
+  from?: string,
+): number {
+  if (from === undefined) return -1
+  return navigable.findIndex((entry) => entry.id === from)
+}
+
+/**
+ * Where a navigation key moves, given where it started.
+ *
+ * @param key - The key, already known to be a navigation key.
+ * @param currentIndex - The position the keystroke came from, or -1 for a
+ * keystroke from outside the collection such as a search field above it.
+ * @param length - How many rows Arrow keys can visit.
+ * @returns The index to move to, or null when there is nowhere to go.
+ */
+export function nextNavigationIndex(
+  key: string,
+  currentIndex: number,
+  length: number,
+): number | null {
+  if (length === 0) return null
+  const last = length - 1
+  if (key === "Home") return 0
+  if (key === "End") return last
+  if (key === "ArrowDown") {
+    return currentIndex < 0 || currentIndex === last ? 0 : currentIndex + 1
+  }
+  if (key === "ArrowUp") return currentIndex <= 0 ? last : currentIndex - 1
+  return null
+}
+
+/**
  * Runs one listbox's keyboard and highlight state.
  *
  * @param options - The rows and the policies that apply to them.
@@ -175,32 +247,12 @@ export function useListboxCollection({
   const handleNavigation = React.useCallback(
     (event: React.KeyboardEvent, options: ListboxNavigationOptions = {}) => {
       const { from, allowHomeEnd = true } = options
-      // A modified Arrow key is somebody else's shortcut — a browser tab
-      // switch, a caret jump by word, an extend-selection — and swallowing it
-      // to move a highlight is a keystroke stolen rather than handled.
-      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
-      const isArrow = event.key === "ArrowDown" || event.key === "ArrowUp"
-      const isEdge = allowHomeEnd && (event.key === "Home" || event.key === "End")
-      if (!isArrow && !isEdge) return
+      if (!isNavigationKey(event, allowHomeEnd)) return
       if (disabled || navigable.length === 0) return
       event.preventDefault()
-      const currentIndex = from
-        ? navigable.findIndex((entry) => entry.id === from)
-        : -1
-      const last = navigable.length - 1
-      const nextIndex =
-        event.key === "Home"
-          ? 0
-          : event.key === "End"
-            ? last
-            : event.key === "ArrowDown"
-              ? currentIndex < 0 || currentIndex === last
-                ? 0
-                : currentIndex + 1
-              : currentIndex <= 0
-                ? last
-                : currentIndex - 1
-      focusIndex(nextIndex)
+      const currentIndex = indexOfOrigin(navigable, from)
+      const nextIndex = nextNavigationIndex(event.key, currentIndex, navigable.length)
+      if (nextIndex !== null) focusIndex(nextIndex)
     },
     [disabled, focusIndex, navigable],
   )
