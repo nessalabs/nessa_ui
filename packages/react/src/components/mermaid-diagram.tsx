@@ -15,11 +15,30 @@ let renderSequence = 0
  * Every initialize+render pair is chained through this queue instead.
  */
 let renderQueue: Promise<unknown> = Promise.resolve()
+/**
+ * Set while a render that blew its watchdog is still, as far as this module
+ * knows, running.
+ *
+ * A hung render cannot be cancelled: Mermaid offers no abort, and the promise
+ * this module is holding may never settle. Two things then have to be true at
+ * once — no later diagram may wait on it (the queue is one chain, so one
+ * unsettled link strands every diagram behind it forever), and no later
+ * diagram may start either, because starting one means calling `initialize`
+ * and mutating the global config the stuck render is still reading.
+ *
+ * Quarantine is the only move that satisfies both. The queue link is settled
+ * so the chain advances, and every caller that dequeues while the flag is up
+ * falls back to its source immediately instead of rendering. The flag clears
+ * if the stuck render ever does settle, so a slow machine costs one diagram
+ * rather than every diagram for the life of the page.
+ */
+let renderQuarantined = false
 
 /**
- * How long a dequeued Mermaid render may run before the diagram gives up
- * and shows its source instead. Far longer than any real render — it exists
- * only so a render that never resolves cannot pin the placeholder forever.
+ * How long a dequeued Mermaid render may run before the diagram gives up and
+ * shows its source instead, and before the shared queue moves on without it.
+ * Far longer than any real render — it exists only so a render that never
+ * resolves cannot pin this placeholder, or every later diagram's, forever.
  */
 const RENDER_TIMEOUT = 10000
 
@@ -382,6 +401,14 @@ function MermaidDiagram({
       renderQueue = renderQueue
         .then(async () => {
           if (cancelled) return
+          // A render already timed out and is still holding the global
+          // config. Nothing may start behind it, so this diagram settles
+          // into its source now rather than waiting for a turn that is not
+          // coming.
+          if (renderQuarantined) {
+            setFailedChart(chart)
+            return
+          }
           // The watchdog is armed here — when this task actually dequeues —
           // not when it was enqueued: renderQueue is shared by every diagram
           // on the page, so a reply with a dozen fences can leave the last
@@ -390,9 +417,9 @@ function MermaidDiagram({
           // merely waiting its turn. It only guards against a render that
           // never resolves, converting an eternal shimmer into the readable
           // source fallback.
-          watchdog = window.setTimeout(() => {
-            if (!cancelled) setFailedChart(chart)
-          }, RENDER_TIMEOUT)
+          const expiry = new Promise<"timed-out">((resolve) => {
+            watchdog = window.setTimeout(() => resolve("timed-out"), RENDER_TIMEOUT)
+          })
           try {
             mermaid.initialize({
               startOnLoad: false,
@@ -406,10 +433,26 @@ function MermaidDiagram({
                 ? { edgeLabelBackground: "#1f1f1f" }
                 : undefined,
             })
-            const result = await mermaid.render(
+            const render = mermaid.render(
               `nessa-mermaid-${++renderSequence}`,
               chart,
             )
+            // The queue link itself is what is bounded, not just this
+            // component's placeholder: awaiting the render alone would leave
+            // an unsettled link that no later diagram can ever get past.
+            const result = await Promise.race([render, expiry])
+            if (result === "timed-out") {
+              renderQuarantined = true
+              // The stuck render is still the owner of the global config
+              // until it proves otherwise, so the quarantine lifts from the
+              // render's own settlement rather than from a timer.
+              void render.then(
+                () => { renderQuarantined = false },
+                () => { renderQuarantined = false },
+              )
+              if (!cancelled) setFailedChart(chart)
+              return
+            }
             if (!cancelled) {
               setRendered({ chart, svg: result.svg })
               setFailedChart(null)

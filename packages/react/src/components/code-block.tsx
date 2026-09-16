@@ -10,6 +10,7 @@ import type {
 } from "@pierre/diffs"
 import { Check, Copy } from "lucide-react"
 
+import { composeEventHandler } from "@/lib/compose"
 import { cn } from "@/lib/utils"
 
 export type CodeBlockMode = "system" | "light" | "dark"
@@ -214,6 +215,7 @@ function CopyButton({
   text,
   label,
   className,
+  onClick,
   ...props
 }: Omit<React.ComponentProps<"button">, "children"> & {
   /** The exact text placed on the clipboard. */
@@ -229,7 +231,11 @@ function CopyButton({
       type="button"
       data-slot="copy-button"
       aria-label={copied ? "Copied" : label}
-      onClick={() => {
+      // The host's handler is composed, not replaced: a spread `onClick`
+      // would land after this one and silently turn the copy button into a
+      // button that does not copy. A host that means to take the click over
+      // says so with `preventDefault`.
+      onClick={composeEventHandler(onClick, () => {
         // Clipboard access is absent in insecure contexts and writes can be
         // denied; only show the copied state once the write actually landed.
         navigator.clipboard
@@ -240,7 +246,7 @@ function CopyButton({
             resetTimer.current = window.setTimeout(() => setCopied(false), 2000)
           })
           .catch(() => {})
-      }}
+      })}
       className={cn(
         "absolute right-2 top-2 flex size-7 items-center justify-center rounded-md border border-border bg-background/80 text-muted-foreground opacity-0 backdrop-blur transition-opacity hover:text-foreground focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 [&_svg]:size-3.5",
         className,

@@ -2,6 +2,8 @@
 
 import * as React from "react"
 
+import { useComposedRefs } from "@/lib/compose"
+import { focusFirstWithin } from "@/lib/overlay-panel"
 import { cn } from "@/lib/utils"
 
 const reducedMotionQuery = "(prefers-reduced-motion: reduce)"
@@ -75,6 +77,7 @@ function ChatOverlay({
   className,
   children,
   onKeyDown,
+  ref: forwardedRef,
   ...props
 }: ChatOverlayProps) {
   const ref = React.useRef<HTMLDivElement>(null)
@@ -120,10 +123,7 @@ function ChatOverlay({
         : null
     // The view itself is the fallback focus target, so a reading view with
     // no controls of its own still answers Escape.
-    const firstControl = node.querySelector<HTMLElement>(
-      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    )
-    ;(firstControl ?? node).focus()
+    focusFirstWithin(node)
     // The view covers its parent's other children, so while it is open they
     // are inert: nothing behind it takes focus, a pointer, or a screen
     // reader's attention. Siblings that are dialogs themselves are left
@@ -185,10 +185,15 @@ function ChatOverlay({
     onCloseRef.current()
   }
 
+  // The host's ref is composed rather than spread: `ref` is an ordinary
+  // prop in React 19, so `{...props}` after `ref={ref}` would replace the
+  // component's own ref and every effect reading it would see null.
+  const composedRef = useComposedRefs(ref, forwardedRef)
+
   return (
     <ChatOverlayContext.Provider value={context}>
       <div
-        ref={ref}
+        ref={composedRef}
         role="dialog"
         aria-label={label}
         data-slot="chat-overlay"

@@ -4,6 +4,7 @@ import * as React from "react"
 import { ChevronDown } from "lucide-react"
 import { DropdownMenu } from "radix-ui"
 
+import { composeRefs } from "@/lib/compose"
 import { cn } from "@/lib/utils"
 import { Button, type ButtonProps } from "./button"
 import { JsonTree } from "./json-tree"
@@ -260,33 +261,6 @@ function useResolutionExit(
  */
 const ToolApprovalResolutionContext =
   React.createContext<ToolApprovalResolution | null>(null)
-
-/**
- * Builds one ref callback that feeds the element to the component's own ref
- * and to a ref the consumer may have passed, so neither side loses it.
- * Memoize the result (`useMemo(..., [forwarded])`) so React never detaches
- * and reattaches refs render-to-render. A consumer callback that returns a
- * React 19 cleanup keeps its cleanup semantics.
- */
-function composeRefs<Element>(
-  internal: React.RefObject<Element | null>,
-  forwarded: React.Ref<Element> | undefined,
-): React.RefCallback<Element> {
-  return (element) => {
-    internal.current = element
-    if (typeof forwarded === "function") {
-      const cleanup = forwarded(element)
-      if (typeof cleanup === "function") {
-        return () => {
-          internal.current = null
-          cleanup()
-        }
-      }
-    } else if (forwarded) {
-      forwarded.current = element
-    }
-  }
-}
 
 export interface ToolApprovalProps extends React.ComponentProps<"div"> {
   /** The card's surface treatment and geometry. Defaults to `docked`. */

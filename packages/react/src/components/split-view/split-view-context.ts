@@ -120,29 +120,6 @@ function useSplitView(): SplitViewContextValue {
 }
 
 /**
- * Builds one ref callback that feeds an element to our internal ref and to
- * a ref the consumer may have passed, so neither side loses it.
- *
- * @param internal - The component's own element ref.
- * @param forwarded - The consumer's ref, if any.
- * @returns A ref callback serving both.
- */
-function composeRefs<Element>(
-  internal: React.RefObject<Element | null>,
-  forwarded: React.Ref<Element> | undefined,
-): React.RefCallback<Element> {
-  return (element) => {
-    internal.current = element
-
-    if (typeof forwarded === "function") {
-      forwarded(element)
-    } else if (forwarded) {
-      forwarded.current = element
-    }
-  }
-}
-
-/**
  * Orders registered elements by their position in the document, so panel and
  * separator order always matches what the user sees regardless of mount
  * order.
@@ -166,7 +143,6 @@ function sortByDocumentPosition<Entry>(
 
 export {
   SplitViewContext,
-  composeRefs,
   sortByDocumentPosition,
   useSplitView,
   type RegisteredSplitViewPanel,

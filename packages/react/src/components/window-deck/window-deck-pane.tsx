@@ -4,10 +4,10 @@
 
 import * as React from "react"
 
+import { composeRefs } from "@/lib/compose"
 import { cn } from "@/lib/utils"
 
 import {
-  composeRefs,
   hasGestureOptOutAncestor,
   useWindowDeck,
   type WindowDeckDismissDirection,

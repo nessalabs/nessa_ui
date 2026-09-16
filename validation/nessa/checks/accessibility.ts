@@ -11,31 +11,50 @@ import { extractThemeTokens } from "./theme-parity.ts"
 import { checkMetadata } from "../check-metadata.ts"
 
 const toRgb = converter("rgb")
-const toLinear = converter("lrgb")
 const validationExceptions: readonly ValidationException[] = exceptions
 const contrastExceptions = validationExceptions.filter((entry): entry is ContrastException => entry.kind === "contrast")
 const focusExceptions = validationExceptions.filter((entry): entry is FocusContrastException => entry.kind === "focus-contrast")
 
-interface LinearColor { r: number; g: number; b: number; alpha: number; wideGamut: boolean }
+/**
+ * One color as the checker carries it: gamma-encoded sRGB channels in 0..1,
+ * plus the alpha it will be composited with.
+ *
+ * Encoded, not linear, because that is the space a browser composites a
+ * translucent CSS color in. `rgb(255 255 255 / 12%)` drawn over `#0a0a0a`
+ * renders as `#272727`, the result of blending the *encoded* channels; a
+ * checker that blends the linear ones produces a color four times brighter
+ * and reports 3.26:1 where the screen shows 1.33:1. That error goes one way
+ * only — it flatters every translucent boundary and focus ring — so a gate
+ * built on it certifies contrast that does not exist.
+ *
+ * Luminance is still computed from linearized channels, which is what WCAG
+ * defines; the two spaces are separate steps rather than one.
+ */
+interface EncodedColor { r: number; g: number; b: number; alpha: number; wideGamut: boolean }
 
-function color(value: string): LinearColor {
+function color(value: string): EncodedColor {
   const parsed = parse(value)
   if (!parsed) throw new Error(`Unsupported color: ${value}`)
   const rgb = toRgb(parsed as Color)
-  const linear = toLinear(parsed as Color)
-  if (!rgb || !linear || ![rgb.r, rgb.g, rgb.b, linear.r, linear.g, linear.b].every(Number.isFinite)) {
+  if (!rgb || ![rgb.r, rgb.g, rgb.b].every(Number.isFinite)) {
     throw new Error(`Non-finite color: ${value}`)
   }
   return {
-    r: linear.r,
-    g: linear.g,
-    b: linear.b,
+    r: rgb.r,
+    g: rgb.g,
+    b: rgb.b,
     alpha: "alpha" in parsed && typeof parsed.alpha === "number" ? parsed.alpha : 1,
     wideGamut: rgb.r < 0 || rgb.r > 1 || rgb.g < 0 || rgb.g > 1 || rgb.b < 0 || rgb.b > 1,
   }
 }
 
-function composite(foreground: LinearColor, background: LinearColor, opacity = 1): LinearColor {
+/**
+ * Simple alpha compositing, in the encoded sRGB space a browser uses for a
+ * translucent color over an opaque backdrop.
+ *
+ * @see https://www.w3.org/TR/compositing-1/
+ */
+function composite(foreground: EncodedColor, background: EncodedColor, opacity = 1): EncodedColor {
   const alpha = foreground.alpha * opacity
   if (background.alpha < 1) throw new Error("Adjacent background must resolve to an opaque color")
   return {
@@ -47,8 +66,13 @@ function composite(foreground: LinearColor, background: LinearColor, opacity = 1
   }
 }
 
-function luminance(value: LinearColor): number {
-  return 0.2126 * value.r + 0.7152 * value.g + 0.0722 * value.b
+/** The sRGB transfer function's inverse, exactly as WCAG 2 spells it. */
+function linearize(channel: number): number {
+  return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+}
+
+function luminance(value: EncodedColor): number {
+  return 0.2126 * linearize(value.r) + 0.7152 * linearize(value.g) + 0.0722 * linearize(value.b)
 }
 
 export function contrastRatio(foregroundValue: string, backgroundValue: string, opacity = 1, overlay?: { value: string; opacity: number }): { ratio: number; wideGamut: boolean } {

@@ -4,6 +4,7 @@ import * as React from "react"
 import { ChevronDown } from "lucide-react"
 
 import { VirtualList } from "./virtual-list"
+import { useComposedRefs } from "@/lib/compose"
 import { cn } from "@/lib/utils"
 
 interface FileDiffCardContextValue {
@@ -258,7 +259,7 @@ function flattenListChildren(
 const fileDiffListFocusClassName = "outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
 
 /** Renders the card's expanded or collapsed file rows, optionally using VirtualList with native list semantics. Virtualized children must forward row styles and fit rowHeight. */
-function FileDiffList({ className, children, virtualize = false, rowHeight = 40, height = 320, ...props }: FileDiffListProps) {
+function FileDiffList({ className, children, virtualize = false, rowHeight = 40, height = 320, ref: forwardedRef, ...props }: FileDiffListProps) {
   const { expanded, collapsedCount, registerItemCount, listId } =
     useFileDiffCardContext("FileDiffList")
   const listRef = React.useRef<HTMLUListElement>(null)
@@ -295,10 +296,14 @@ function FileDiffList({ className, children, virtualize = false, rowHeight = 40,
     return () => observer.disconnect()
   }, [updateScrollable, virtualize])
 
+  // The host's ref is composed rather than spread: `ref` is an ordinary
+  // prop in React 19, so `{...props}` after `ref={listRef}` would replace the
+  // component's own ref and every effect reading it would see null.
+  const composedRef = useComposedRefs(listRef, forwardedRef)
+
   if (virtualize) {
     const visible = expanded ? items : items.slice(0, collapsedCount)
-    const { ref: externalRef, ...listProps } = props
-    return <VirtualList {...listProps} ref={externalRef} as="ul" itemAsChild id={listId}
+    return <VirtualList {...props} ref={forwardedRef} as="ul" itemAsChild id={listId}
       items={visible} getKey={(item, index) => React.isValidElement(item) ? item.key ?? index : index}
       height={Math.max(rowHeight, Math.min(height, visible.length * rowHeight))} rowHeight={rowHeight}
       className={cn(fileDiffListFocusClassName, className)}>
@@ -308,7 +313,7 @@ function FileDiffList({ className, children, virtualize = false, rowHeight = 40,
 
   return (
     <ul
-      ref={listRef}
+      ref={composedRef}
       id={listId}
       data-slot="file-diff-list"
       tabIndex={scrollable ? 0 : undefined}

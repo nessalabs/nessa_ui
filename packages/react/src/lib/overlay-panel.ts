@@ -124,6 +124,138 @@ export function restoreFocusToOpener(
   return opener.ownerDocument.activeElement === opener
 }
 
+/**
+ * The elements a panel's own Tab order can land on.
+ *
+ * The candidate selector is deliberately wide and the filtering is done in
+ * script, because the things that disqualify a control are not expressible as
+ * a selector: an element is out of the tab order when it is `display:none` or
+ * `visibility:hidden`, when it or an ancestor is `inert` or `hidden`, when it
+ * sits inside a closed `<details>`, or when it carries a negative
+ * `tabindex` — including a `<button tabindex="-1">`, which every
+ * `[tabindex]:not([tabindex="-1"])` selector still matches through its *tag*
+ * clause and which a browser will never Tab to.
+ *
+ * Getting this wrong is not cosmetic. A trap that believes a hidden control
+ * is first sends opening focus somewhere invisible, and one that believes a
+ * `tabindex="-1"` button is last wraps onto an element Tab cannot reach, so
+ * the next keystroke escapes the panel entirely.
+ *
+ * @param root - The panel whose descendants are searched. Excluded itself.
+ * @returns The tabbable descendants, in document order.
+ */
+export function tabbableWithin(root: HTMLElement): HTMLElement[] {
+  const candidates = root.querySelectorAll<HTMLElement>(
+    "a[href], area[href], button, input, select, textarea, iframe, audio[controls], video[controls], summary, [contenteditable]:not([contenteditable=\"false\"]), [tabindex]",
+  )
+  return Array.from(candidates).filter((element) => isTabbable(element, root))
+}
+
+/** Whether Tab can reach this element, given the panel it is inside. */
+function isTabbable(element: HTMLElement, root: HTMLElement): boolean {
+  if (element.tabIndex < 0) return false
+  // `disabled` is only a disqualifier on the elements that have it; an
+  // attribute check alone would also reject `<div disabled>`, which is
+  // focusable, and accept nothing it should.
+  if ("disabled" in element && (element as { disabled?: boolean }).disabled) {
+    return false
+  }
+  // `inert` and `hidden` are inherited by descendants, so the walk goes up to
+  // the panel rather than looking at the element alone.
+  for (
+    let node: HTMLElement | null = element;
+    node && node !== root.parentElement;
+    node = node.parentElement
+  ) {
+    if (node.hasAttribute("inert") || node.hidden) return false
+    if (
+      node.parentElement instanceof HTMLDetailsElement &&
+      !node.parentElement.open &&
+      node.tagName !== "SUMMARY"
+    ) {
+      return false
+    }
+  }
+  // Rendered-ness last: it is the only branch that costs layout or style
+  // resolution. `checkVisibility` is the one call that answers for the whole
+  // ancestor chain — `getComputedStyle(element).display` reports the
+  // element's own value even inside a `display:none` ancestor, and
+  // `offsetParent` is null for `position: fixed` content that is perfectly
+  // visible. Where it is unavailable, a box-free element stands in: nothing
+  // that generates no box can be Tabbed to.
+  if (typeof element.checkVisibility === "function") {
+    return element.checkVisibility({
+      checkVisibilityCSS: true,
+      contentVisibilityAuto: true,
+    })
+  }
+  return element.getClientRects().length > 0
+}
+
+/**
+ * Moves focus into a panel that has just opened: its first tabbable control,
+ * or the panel itself when it has none.
+ *
+ * The panel must carry `tabIndex={-1}` for the fallback to work; a panel that
+ * cannot take focus leaves it on whatever opened the panel, outside the
+ * boundary the panel is about to defend.
+ *
+ * @param root - The panel to move focus into.
+ */
+export function focusFirstWithin(root: HTMLElement) {
+  ;(tabbableWithin(root)[0] ?? root).focus()
+}
+
+/**
+ * Keeps Tab inside a panel for as long as the panel is open.
+ *
+ * Both directions wrap, and both directions also *recover*: focus that is
+ * already outside the panel — moved there programmatically, or left on the
+ * body after the focused control was removed — is pulled back in on the next
+ * Tab rather than continuing out through the document. A panel with no
+ * tabbable controls at all keeps focus on itself instead of letting the
+ * keystroke through, which is the case a trap that returns early gets wrong.
+ *
+ * @param root - The panel Tab may not leave.
+ * @returns The disposer that stops trapping.
+ */
+export function trapTabWithin(root: HTMLElement) {
+  const ownerDocument = root.ownerDocument
+  const handleTab = (event: KeyboardEvent) => {
+    if (event.key !== "Tab" || event.defaultPrevented) return
+    const order = tabbableWithin(root)
+    const current = ownerDocument.activeElement
+    const inside = root.contains(current)
+    if (order.length === 0) {
+      // Nothing to move to, and letting the keystroke through would hand the
+      // next control outside the panel a focus ring behind a modal surface.
+      event.preventDefault()
+      if (!inside) root.focus()
+      return
+    }
+    const first = order[0]!
+    const last = order[order.length - 1]!
+    if (!inside) {
+      event.preventDefault()
+      ;(event.shiftKey ? last : first).focus()
+      return
+    }
+    if (event.shiftKey && current === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && current === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
+  // Capture, so a control inside the panel that handles Tab itself still
+  // cannot carry focus past the boundary.
+  ownerDocument.addEventListener("keydown", handleTab, { capture: true })
+  return () => {
+    ownerDocument.removeEventListener("keydown", handleTab, { capture: true })
+  }
+}
+
 /** A drag in progress, measured along the axis the gesture was opened on. */
 export interface DragGesture {
   /** The pointer's position along the axis when the press landed. */

@@ -22,6 +22,7 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import { ArrowUp, CornerDownRight, Ellipsis, GripVertical, Trash2 } from "lucide-react"
 
+import { useComposedRefs } from "@/lib/compose"
 import { cn } from "@/lib/utils"
 
 /** Sortable rows stay on the vertical axis — sideways drag is not a reorder. */
@@ -144,6 +145,7 @@ function ComposerQueue({
   onReorder,
   appearance = "card",
   className,
+  ref: forwardedRef,
   ...props
 }: ComposerQueueProps) {
   const listRef = React.useRef<HTMLOListElement>(null)
@@ -170,6 +172,11 @@ function ComposerQueue({
     [itemIds, onReorder],
   )
 
+  // The host's ref is composed rather than spread: `ref` is an ordinary
+  // prop in React 19, so `{...props}` after `ref={listRef}` would replace the
+  // component's own ref and every effect reading it would see null.
+  const composedRef = useComposedRefs(listRef, forwardedRef)
+
   return (
     <ComposerQueueAppearanceContext.Provider value={appearance}>
       <DndContext
@@ -181,7 +188,7 @@ function ComposerQueue({
       >
         <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
           <ol
-            ref={listRef}
+            ref={composedRef}
             data-slot="composer-queue"
             data-appearance={appearance}
             aria-label="Pending messages"
@@ -269,6 +276,7 @@ function ComposerQueueItem({
   className,
   children,
   style,
+  ref: forwardedRef,
   ...props
 }: ComposerQueueItemProps) {
   const appearance = React.useContext(ComposerQueueAppearanceContext)
@@ -281,10 +289,14 @@ function ComposerQueueItem({
     isDragging,
   } = useSortable({ id, data: { itemLabel }, disabled: !showHandle })
   const plain = appearance === "plain"
+  // The host's ref is composed rather than spread: `ref` is an ordinary
+  // prop in React 19, so `{...props}` after `ref={setNodeRef}` would replace the
+  // component's own ref and every effect reading it would see null.
+  const composedRef = useComposedRefs(setNodeRef, forwardedRef)
 
   return (
     <li
-      ref={setNodeRef}
+      ref={composedRef}
       data-slot="composer-queue-item"
       data-appearance={appearance}
       data-dragging={isDragging ? "true" : "false"}

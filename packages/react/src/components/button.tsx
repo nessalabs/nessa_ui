@@ -43,15 +43,66 @@ export interface ButtonProps
   asChild?: boolean
 }
 
+/**
+ * The action primitive.
+ *
+ * Two defaults are worth knowing, because both are places the native
+ * behavior is a trap rather than a convenience:
+ *
+ * `type` defaults to `"button"`, not the HTML default of `"submit"`. A
+ * button inside a form that opens a picker, toggles a panel, or removes a
+ * row is not a submit control, and inheriting `submit` turns every one of
+ * them into an accidental form submission that only shows up once somebody
+ * puts the component in a form. Submit controls say `type="submit"`.
+ *
+ * With `asChild`, `disabled` cannot do its native job — an `<a>` has no
+ * disabled state, and neither pointer-events nor a forwarded attribute takes
+ * it out of the tab order or stops Enter from following the link. The button
+ * supplies what ARIA can: the child is announced as disabled, taken out of
+ * the tab order, and its activation is swallowed. Prefer rendering no link
+ * at all over a disabled one.
+ */
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  (
+    {
+      className,
+      variant,
+      size,
+      asChild = false,
+      type,
+      disabled,
+      tabIndex,
+      onClick,
+      onKeyDown,
+      ...props
+    },
+    ref,
+  ) => {
     const Comp = asChild ? Slot.Root : "button"
+    // Everything this component decides is written after the spread, because
+    // a prop it resolved is not a default to be overwritten by the same prop
+    // arriving again — `type`, `disabled`, and the handlers are all read out
+    // of props above and folded in deliberately below.
+    const inert = asChild && disabled
+    const swallow = (event: React.SyntheticEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+    }
 
     return (
       <Comp
+        {...props}
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
-        {...props}
+        {...(asChild
+          ? {
+              "aria-disabled": disabled || undefined,
+              "data-disabled": disabled || undefined,
+              tabIndex: disabled ? -1 : tabIndex,
+            }
+          : { type: type ?? "button", disabled, tabIndex })}
+        onClick={inert ? swallow : onClick}
+        onKeyDown={inert ? swallow : onKeyDown}
       />
     )
   },
