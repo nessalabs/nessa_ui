@@ -5,6 +5,7 @@
 import * as React from "react"
 import { ChevronRight } from "lucide-react"
 
+import { useComposedRefs } from "@/lib/compose"
 import { cn } from "@/lib/utils"
 
 import { Button } from "../button"
@@ -1037,7 +1038,7 @@ export interface GanttChartGridProps extends React.ComponentProps<"div"> {}
  * after the toolbar and scrolls both axes inside it; leave the chart
  * unsized and it simply grows with its rows.
  */
-function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
+function GanttChartGrid({ className, ref: forwardedRef, ...props }: GanttChartGridProps) {
   const {
     rows,
     range,
@@ -1483,10 +1484,15 @@ function GanttChartGrid({ className, ...props }: GanttChartGridProps) {
     }
   }
 
+  // The host's ref is composed rather than spread: `ref` is an ordinary
+  // prop in React 19, so `{...props}` after `ref={scrollerRef}` would replace the
+  // component's own ref and every effect reading it would see null.
+  const composedRef = useComposedRefs(scrollerRef, forwardedRef)
+
   return (
     <div data-slot="gantt-chart-grid" className="relative min-h-0 flex-1">
     <div
-      ref={scrollerRef}
+      ref={composedRef}
       data-slot="gantt-chart-scroll"
       role="region"
       aria-label={labels.timeline}

@@ -5,21 +5,17 @@ import mermaid from "mermaid"
 import { Hand, Maximize2, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { mermaidRenderQueue } from "./mermaid-render-queue"
 import { CopyButton, useCodeBlockConfig, type CodeBlockMode } from "./code-block"
 import { GeneratingSurface } from "./generating-surface"
 
 let renderSequence = 0
-/**
- * Mermaid's initialize() mutates library-global config, so concurrent
- * diagrams with different themes could read each other's settings mid-render.
- * Every initialize+render pair is chained through this queue instead.
- */
-let renderQueue: Promise<unknown> = Promise.resolve()
 
 /**
- * How long a dequeued Mermaid render may run before the diagram gives up
- * and shows its source instead. Far longer than any real render — it exists
- * only so a render that never resolves cannot pin the placeholder forever.
+ * How long a dequeued Mermaid render may run before the diagram gives up and
+ * shows its source instead, and before the shared queue moves on without it.
+ * Far longer than any real render — it exists only so a render that never
+ * resolves cannot pin this placeholder, or every later diagram's, forever.
  */
 const RENDER_TIMEOUT = 10000
 
@@ -377,59 +373,47 @@ function MermaidDiagram({
     // times — visible jitter, especially for sequence diagrams. Waiting for
     // a short pause renders once per lull instead, and a static chart (the
     // usual case outside streaming) only defers its first paint by the delay.
-    let watchdog: number | undefined
     const timer = window.setTimeout(() => {
-      renderQueue = renderQueue
-        .then(async () => {
+      void mermaidRenderQueue
+        .run(() => {
+          mermaid.initialize({
+            startOnLoad: false,
+            securityLevel: "strict",
+            suppressErrorRendering: true,
+            theme: isDark ? "dark" : "default",
+            // Mermaid's stock dark edge-label background leaves label text at
+            // 4.43:1 — just under WCAG AA. A darker backdrop clears it.
+            themeVariables: isDark
+              ? { edgeLabelBackground: "#1f1f1f" }
+              : undefined,
+          })
+          return mermaid.render(`nessa-mermaid-${++renderSequence}`, chart)
+        }, RENDER_TIMEOUT, () => !cancelled)
+        .then((outcome) => {
+          // `cancelled` did two different jobs above and here. At dequeue
+          // time it withdrew the job entirely, so a diagram whose chart
+          // changed while it waited never takes a turn — and never holds one
+          // open long enough to quarantine the diagram behind it. From the
+          // moment the render started it means only this: stop writing to a
+          // component that has moved on. The queue's deadline and quarantine
+          // stay out of the effect's reach either way, because a cleanup that
+          // could cancel them would strand every later diagram.
           if (cancelled) return
-          // The watchdog is armed here — when this task actually dequeues —
-          // not when it was enqueued: renderQueue is shared by every diagram
-          // on the page, so a reply with a dozen fences can leave the last
-          // one queued for longer than the timeout through no fault of its
-          // own, and arming at enqueue time would fail it while it was
-          // merely waiting its turn. It only guards against a render that
-          // never resolves, converting an eternal shimmer into the readable
-          // source fallback.
-          watchdog = window.setTimeout(() => {
-            if (!cancelled) setFailedChart(chart)
-          }, RENDER_TIMEOUT)
-          try {
-            mermaid.initialize({
-              startOnLoad: false,
-              securityLevel: "strict",
-              suppressErrorRendering: true,
-              theme: isDark ? "dark" : "default",
-              // Mermaid's stock dark edge-label background leaves label
-              // text at 4.43:1 — just under WCAG AA. A darker backdrop
-              // clears the threshold.
-              themeVariables: isDark
-                ? { edgeLabelBackground: "#1f1f1f" }
-                : undefined,
-            })
-            const result = await mermaid.render(
-              `nessa-mermaid-${++renderSequence}`,
-              chart,
-            )
-            if (!cancelled) {
-              setRendered({ chart, svg: result.svg })
-              setFailedChart(null)
-            }
-          } catch {
-            // Mid-stream source is often momentarily invalid; keep the
-            // previous successful render on screen, but record the failure
-            // so a chart that never parses can settle into its fallback
-            // instead of generating forever.
-            if (!cancelled) setFailedChart(chart)
-          } finally {
-            window.clearTimeout(watchdog)
+          if (outcome.status === "rendered") {
+            setRendered({ chart, svg: outcome.value.svg })
+            setFailedChart(null)
+            return
           }
+          // Everything else settles into the readable source. Mid-stream
+          // source is often momentarily invalid, so the previous successful
+          // render stays on screen; recording the failure is what lets a
+          // chart that never parses stop generating forever.
+          setFailedChart(chart)
         })
-        .catch(() => {})
     }, 250)
     return () => {
       cancelled = true
       window.clearTimeout(timer)
-      window.clearTimeout(watchdog)
     }
   }, [chart, isDark])
 

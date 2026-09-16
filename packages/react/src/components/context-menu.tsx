@@ -4,6 +4,7 @@ import * as React from "react"
 import { ContextMenu as ContextMenuPrimitive } from "radix-ui"
 import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react"
 
+import { usePortalContainer } from "@/lib/portal-container"
 import { cn } from "@/lib/utils"
 import { popoverSurfaceVariants } from "./popover-surface"
 
@@ -66,8 +67,11 @@ function ContextMenuContent({
   className,
   ...props
 }: React.ComponentProps<typeof ContextMenuPrimitive.Content>) {
+  // No prop of its own: a layer with no opinion belongs to whatever panel
+  // it was opened from, and to the body when there is none.
+  const portalContainer = usePortalContainer()
   return (
-    <ContextMenuPrimitive.Portal>
+    <ContextMenuPrimitive.Portal container={portalContainer}>
       <ContextMenuPrimitive.Content
         data-slot="context-menu-content"
         collisionPadding={12}
@@ -86,8 +90,11 @@ function ContextMenuSubContent({
   className,
   ...props
 }: React.ComponentProps<typeof ContextMenuPrimitive.SubContent>) {
+  // No prop of its own: a layer with no opinion belongs to whatever panel
+  // it was opened from, and to the body when there is none.
+  const portalContainer = usePortalContainer()
   return (
-    <ContextMenuPrimitive.Portal>
+    <ContextMenuPrimitive.Portal container={portalContainer}>
       <ContextMenuPrimitive.SubContent
         data-slot="context-menu-sub-content"
         collisionPadding={12}

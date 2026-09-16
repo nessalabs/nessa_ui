@@ -4,9 +4,10 @@
 
 import * as React from "react"
 
+import { composeRefs } from "@/lib/compose"
 import { cn } from "@/lib/utils"
 
-import { composeRefs, useSplitView } from "./split-view-context"
+import { useSplitView } from "./split-view-context"
 import { SplitViewOrientation } from "./split-view-options"
 
 /** Properties accepted by one SplitView separator. */

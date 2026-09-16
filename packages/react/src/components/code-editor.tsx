@@ -4,6 +4,7 @@ import * as React from "react"
 import { Check, ChevronDown } from "lucide-react"
 import { Popover } from "radix-ui"
 
+import { usePortalContainer } from "@/lib/portal-container"
 import { cn } from "@/lib/utils"
 import { Button } from "./button"
 import { PopoverSurface } from "./popover-surface"
@@ -133,6 +134,9 @@ export function CodeEditor({
   }
   if (offset < value.length) coloredText.push(value.slice(offset))
   React.useEffect(() => { if (disabled) setOpen(false) }, [disabled])
+  // No prop of its own: a layer with no opinion belongs to whatever panel
+  // it was opened from, and to the body when there is none.
+  const portalContainer = usePortalContainer()
   const label = languages.find((item) => item.value === language)?.label ?? language
   return (
     <div data-slot="code-editor" data-code-mode={syntax.mode} className={cn(codeSurfaceDarkModeClassName, "min-w-0 w-full overflow-hidden rounded-lg caret-[var(--nessa-code-foreground)] bg-[var(--nessa-code-background)] text-[var(--nessa-code-foreground)] [--nessa-code-foreground:var(--nessa-code-fg-light)] [--nessa-code-background:var(--nessa-code-bg-light)] dark:[--nessa-code-foreground:var(--nessa-code-fg-dark)] data-[code-mode=light]:[--nessa-code-foreground:var(--nessa-code-fg-light)]! data-[code-mode=light]:[--nessa-code-background:var(--nessa-code-bg-light)]! data-[code-mode=dark]:[--nessa-code-foreground:var(--nessa-code-fg-dark)]! data-[code-mode=dark]:[--nessa-code-background:var(--nessa-code-bg-dark)]! [&_.nessa-code-token]:text-[var(--code-light)] dark:[&_.nessa-code-token]:text-[var(--code-dark)] [&[data-code-mode=light]_.nessa-code-token]:text-[var(--code-light)]! [&[data-code-mode=dark]_.nessa-code-token]:text-[var(--code-dark)]!", className)} style={{
@@ -150,7 +154,7 @@ export function CodeEditor({
               {label}<ChevronDown aria-hidden="true" />
             </Button>
           </Popover.Trigger>
-          <Popover.Portal>
+          <Popover.Portal container={portalContainer}>
             <PopoverSurface asChild>
               <Popover.Content aria-label="Choose code language" align="start" className="z-50 w-64 max-w-[var(--radix-popover-content-available-width)] overflow-hidden outline-none" onKeyDown={(event) => event.stopPropagation()}>
                 <SearchableListbox

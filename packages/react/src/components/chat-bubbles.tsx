@@ -4,6 +4,8 @@ import * as React from "react"
 import { ArrowLeft, ChevronRight, LayoutGrid } from "lucide-react"
 
 import { Button } from "./button"
+import { composeEventHandler, useComposedRefs } from "@/lib/compose"
+import { focusFirstWithin, trapTabWithin } from "@/lib/overlay-panel"
 import { cn } from "@/lib/utils"
 
 const reducedMotionQuery = "(prefers-reduced-motion: reduce)"
@@ -28,17 +30,6 @@ function cssDurationInMilliseconds(value: string, fallback: number) {
   const parsed = Number.parseFloat(value)
   if (!Number.isFinite(parsed)) return fallback
   return value.trim().endsWith("ms") ? parsed : parsed * 1000
-}
-
-/** Runs the host's handler first; ours follows unless the host prevented default. */
-function composeHandler<E extends { defaultPrevented: boolean }>(
-  theirs: ((event: E) => void) | undefined,
-  ours: (event: E) => void,
-) {
-  return (event: E) => {
-    theirs?.(event)
-    if (!event.defaultPrevented) ours(event)
-  }
 }
 
 const chatBubblesFocusClassName =
@@ -84,6 +75,7 @@ function ChatMessage({
   threadFocused = false,
   className,
   children,
+  ref: forwardedRef,
   ...props
 }: ChatMessageProps) {
   const context = React.useMemo(
@@ -114,10 +106,14 @@ function ChatMessage({
     // The entrance runs once, on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  // The host's ref is composed rather than spread: `ref` is an ordinary
+  // prop in React 19, so `{...props}` after `ref={ref}` would replace the
+  // component's own ref and every effect reading it would see null.
+  const composedRef = useComposedRefs(ref, forwardedRef)
   return (
     <ChatMessageContext.Provider value={context}>
       <div
-        ref={ref}
+        ref={composedRef}
         data-slot="chat-message"
         data-tone={tone}
         data-dimmed={
@@ -247,7 +243,7 @@ function ChatBubble({
       // real pointer press happened regardless of whether the host
       // preventDefaults the event.
       pointerPressedRef.current = true
-      composeHandler(
+      composeEventHandler(
         hostPointerDown as
           | ((event: React.PointerEvent<HTMLElement>) => void)
           | undefined,
@@ -268,8 +264,8 @@ function ChatBubble({
         },
       )(event)
     },
-    onPointerUp: composeHandler(hostPointerUp, clearLongPress),
-    onPointerLeave: composeHandler(
+    onPointerUp: composeEventHandler(hostPointerUp, clearLongPress),
+    onPointerLeave: composeEventHandler(
       hostPointerLeave,
       (event: React.PointerEvent<HTMLElement>) => {
         void event
@@ -385,18 +381,18 @@ function ChatBubble({
         // honors a host preventDefault.
         const fromPointer = pointerPressedRef.current
         pointerPressedRef.current = false
-        composeHandler(hostClick, () => {
+        composeEventHandler(hostClick, () => {
           // A click that never saw a pointer press came from the keyboard
           // or assistive tech — activate; plain pointer clicks stay inert.
           if (!fromPointer) onSelect()
         })(event)
       }}
-      onKeyDown={composeHandler(hostKeyDown, (event) => {
+      onKeyDown={composeEventHandler(hostKeyDown, (event) => {
         if (event.key !== "Enter" && event.key !== " ") return
         event.preventDefault()
         onSelect()
       })}
-      onContextMenu={composeHandler(hostContextMenu, (event) => {
+      onContextMenu={composeEventHandler(hostContextMenu, (event) => {
         event.preventDefault()
         onSelect()
       })}
@@ -613,6 +609,7 @@ function ChatReactionPicker({
   onSelect,
   options = chatReactionOptions,
   className,
+  ref: forwardedRef,
   ...props
 }: ChatReactionPickerProps) {
   const reducedMotion = useReducedMotion()
@@ -652,9 +649,13 @@ function ChatReactionPicker({
     // The pop-in runs once, on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  // The host's ref is composed rather than spread: `ref` is an ordinary
+  // prop in React 19, so `{...props}` after `ref={ref}` would replace the
+  // component's own ref and every effect reading it would see null.
+  const composedRef = useComposedRefs(ref, forwardedRef)
   return (
     <div
-      ref={ref}
+      ref={composedRef}
       role="group"
       aria-label="React with an emoji"
       data-slot="chat-reaction-picker"
@@ -698,6 +699,7 @@ export interface ChatTypingIndicatorProps extends React.ComponentProps<"div"> {
 function ChatTypingIndicator({
   label = "Typing",
   className,
+  ref: forwardedRef,
   ...props
 }: ChatTypingIndicatorProps) {
   const reducedMotion = useReducedMotion()
@@ -724,9 +726,13 @@ function ChatTypingIndicator({
     )
     return () => animations.forEach((animation) => animation.cancel())
   }, [reducedMotion])
+  // The host's ref is composed rather than spread: `ref` is an ordinary
+  // prop in React 19, so `{...props}` after `ref={ref}` would replace the
+  // component's own ref and every effect reading it would see null.
+  const composedRef = useComposedRefs(ref, forwardedRef)
   return (
     <div
-      ref={ref}
+      ref={composedRef}
       role="status"
       aria-label={label}
       data-slot="chat-typing-indicator"
@@ -923,6 +929,7 @@ function ChatAttachmentViewer({
   backLabel = "Back to conversation",
   className,
   children,
+  ref: forwardedRef,
   ...props
 }: ChatAttachmentViewerProps) {
   const reducedMotion = useReducedMotion()
@@ -962,36 +969,21 @@ function ChatAttachmentViewer({
       ownerDocument.activeElement instanceof HTMLElement
         ? ownerDocument.activeElement
         : null
-    const focusables = () =>
-      Array.from(
-        node.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-        ),
-      ).filter((element) => !element.hasAttribute("disabled"))
-    focusables()[0]?.focus()
+    focusFirstWithin(node)
+    // Tab containment is the shared overlay primitive rather than a local
+    // query: a hand-written one lands opening focus on hidden controls and
+    // wraps onto `tabindex="-1"` buttons, which is how focus escapes a
+    // dialog that declares `aria-modal`.
+    const releaseTrap = trapTabWithin(node)
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault()
-        event.stopPropagation()
-        onCloseRef.current()
-        return
-      }
-      if (event.key !== "Tab") return
-      const order = focusables()
-      if (order.length === 0) return
-      const first = order[0]!
-      const last = order[order.length - 1]!
-      const current = ownerDocument.activeElement
-      if (event.shiftKey && (current === first || !node.contains(current))) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && current === last) {
-        event.preventDefault()
-        first.focus()
-      }
+      if (event.key !== "Escape") return
+      event.preventDefault()
+      event.stopPropagation()
+      onCloseRef.current()
     }
     ownerDocument.addEventListener("keydown", handleKeyDown, { capture: true })
     return () => {
+      releaseTrap()
       ownerDocument.removeEventListener("keydown", handleKeyDown, {
         capture: true,
       })
@@ -1000,9 +992,13 @@ function ChatAttachmentViewer({
     // Mount-once by design; onClose flows through onCloseRef.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  // The host's ref is composed rather than spread: `ref` is an ordinary
+  // prop in React 19, so `{...props}` after `ref={ref}` would replace the
+  // component's own ref and every effect reading it would see null.
+  const composedRef = useComposedRefs(ref, forwardedRef)
   return (
     <div
-      ref={ref}
+      ref={composedRef}
       role="dialog"
       aria-modal="true"
       aria-label="Attachments"

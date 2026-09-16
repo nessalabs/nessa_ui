@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { useComposedRefs } from "@/lib/compose"
 import { cn } from "@/lib/utils"
 
 const DEFAULT_SIDEBAR_WIDTH = "17rem"
@@ -238,6 +239,7 @@ function SidebarProvider({
   className,
   style,
   children,
+  ref: forwardedRef,
   ...props
 }: SidebarProviderProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = React.useState(defaultOpen)
@@ -330,10 +332,15 @@ function SidebarProvider({
     [open, setOpen, toggleSidebar],
   )
 
+  // The host's ref is composed rather than spread: `ref` is an ordinary
+  // prop in React 19, so `{...props}` after `ref={portalContainerRef}` would replace the
+  // component's own ref and every effect reading it would see null.
+  const composedRef = useComposedRefs(portalContainerRef, forwardedRef)
+
   return (
     <SidebarContext.Provider value={contextValue}>
       <div
-        ref={portalContainerRef}
+        ref={composedRef}
         data-slot="sidebar-wrapper"
         style={
           {

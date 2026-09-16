@@ -4,11 +4,11 @@
 
 import * as React from "react"
 
+import { composeRefs } from "@/lib/compose"
 import { cn } from "@/lib/utils"
 
 import {
   SplitViewContext,
-  composeRefs,
   sortByDocumentPosition,
   type RegisteredSplitViewPanel,
   type SplitViewContextValue,

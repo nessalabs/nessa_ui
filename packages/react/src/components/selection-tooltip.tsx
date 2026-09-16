@@ -4,6 +4,7 @@ import * as React from "react"
 import { ChevronRight } from "lucide-react"
 import { Tooltip as TooltipPrimitive } from "radix-ui"
 
+import { usePortalContainer } from "@/lib/portal-container"
 import { cn } from "@/lib/utils"
 
 export type SelectionTooltipSide = "top" | "bottom"
@@ -267,6 +268,9 @@ function SelectionTooltipAction({
   type = "button",
   ...props
 }: SelectionTooltipActionProps) {
+  // No prop of its own: a layer with no opinion belongs to whatever panel
+  // it was opened from, and to the body when there is none.
+  const portalContainer = usePortalContainer()
   const button = (
     <button
       type={type}
@@ -283,7 +287,7 @@ function SelectionTooltipAction({
     <TooltipPrimitive.Provider delayDuration={300}>
       <TooltipPrimitive.Root>
         <TooltipPrimitive.Trigger asChild>{button}</TooltipPrimitive.Trigger>
-        <TooltipPrimitive.Portal>
+        <TooltipPrimitive.Portal container={portalContainer}>
           <TooltipPrimitive.Content
             side="top"
             sideOffset={6}

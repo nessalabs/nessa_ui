@@ -141,7 +141,7 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     state: "focus-visible:invalid",
     className: "aria-invalid:ring-(--nessa-invalid-ring)",
     light: { token: "--destructive", opacity: 0.2 },
-    dark: { token: "--destructive", opacity: 0.4 },
+    dark: { token: "--destructive", opacity: 0.65 },
   },
   // The questionnaire choice indicator is a native input styled in place; it
   // takes the standard full-strength outline treatment.

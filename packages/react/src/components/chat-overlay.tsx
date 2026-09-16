@@ -2,6 +2,12 @@
 
 import * as React from "react"
 
+import { useComposedRefs } from "@/lib/compose"
+import {
+  PortalContainerProvider,
+  usePortalContainerHost,
+} from "@/lib/portal-container"
+import { focusFirstWithin } from "@/lib/overlay-panel"
 import { cn } from "@/lib/utils"
 
 const reducedMotionQuery = "(prefers-reduced-motion: reduce)"
@@ -75,6 +81,7 @@ function ChatOverlay({
   className,
   children,
   onKeyDown,
+  ref: forwardedRef,
   ...props
 }: ChatOverlayProps) {
   const ref = React.useRef<HTMLDivElement>(null)
@@ -120,10 +127,7 @@ function ChatOverlay({
         : null
     // The view itself is the fallback focus target, so a reading view with
     // no controls of its own still answers Escape.
-    const firstControl = node.querySelector<HTMLElement>(
-      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    )
-    ;(firstControl ?? node).focus()
+    focusFirstWithin(node)
     // The view covers its parent's other children, so while it is open they
     // are inert: nothing behind it takes focus, a pointer, or a screen
     // reader's attention. Siblings that are dialogs themselves are left
@@ -185,10 +189,16 @@ function ChatOverlay({
     onCloseRef.current()
   }
 
+  // The host's ref is composed rather than spread: `ref` is an ordinary
+  // prop in React 19, so `{...props}` after `ref={ref}` would replace the
+  // component's own ref and every effect reading it would see null.
+  const composedRef = useComposedRefs(ref, forwardedRef)
+  const { container, setContainer } = usePortalContainerHost()
+
   return (
     <ChatOverlayContext.Provider value={context}>
       <div
-        ref={ref}
+        ref={composedRef}
         role="dialog"
         aria-label={label}
         data-slot="chat-overlay"
@@ -202,7 +212,16 @@ function ChatOverlay({
         )}
         {...props}
       >
-        {children}
+        <PortalContainerProvider container={container}>
+          {children}
+        </PortalContainerProvider>
+        {/*
+          Where this view's own floating layers land: inside it, so a menu or
+          popover opened from the content is part of the view the siblings
+          around it were made inert for, rather than a stray subtree at the
+          body. It draws nothing; Radix positions its content itself.
+        */}
+        <div ref={setContainer} data-slot="chat-overlay-layers" />
       </div>
     </ChatOverlayContext.Provider>
   )
@@ -252,7 +271,7 @@ function ChatOverlayBack({
         if (!event.defaultPrevented) close()
       }}
       className={cn(
-        "mx-auto shrink-0 cursor-pointer rounded-full border-0 bg-transparent px-3 py-1.5 font-sans nessa-text-2 font-medium text-(--nessa-chat-accent) outline-none hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        "mx-auto shrink-0 cursor-pointer rounded-full border-0 bg-transparent px-3 py-1.5 font-sans nessa-text-2 font-medium text-(--nessa-chat-accent-ink) outline-none hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         className,
       )}
       {...props}

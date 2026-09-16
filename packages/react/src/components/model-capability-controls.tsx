@@ -5,6 +5,7 @@ import { BrainCircuit, ChevronRight, Zap } from "lucide-react"
 import { Direction, Popover, Slider } from "radix-ui"
 
 import type { ModelThinkingLevel } from "./model-capabilities"
+import { usePortalContainer } from "@/lib/portal-container"
 import { cn } from "@/lib/utils"
 
 export type ModelThinkingIconProps = React.ComponentProps<"svg">
@@ -94,6 +95,11 @@ export interface ModelThinkingControlProps {
   disabled?: boolean
   className?: string
   contentClassName?: string
+  /**
+   * Where the floating content is portalled. Defaults to the container the
+   * nearest enclosing panel owns — a Sheet's own layer host, say — and to the
+   * body when there is none. Pass `null` to force the body regardless.
+   */
   portalContainer?: HTMLElement | null
   side?: React.ComponentProps<typeof Popover.Content>["side"]
   align?: React.ComponentProps<typeof Popover.Content>["align"]
@@ -705,6 +711,7 @@ function ModelThinkingControl({
   getSliderValueText,
   fastMode,
 }: ModelThinkingControlProps) {
+  const resolvedPortalContainer = usePortalContainer(portalContainer)
   const effectiveDir = Direction.useDirection(dir)
   const [uncontrolledValue, setUncontrolledValue] = React.useState(
     defaultValue ?? levels[0]?.value,
@@ -772,7 +779,7 @@ function ModelThinkingControl({
           {icon ?? <ModelThinkingIcon aria-hidden="true" />}
         </button>
       </Popover.Trigger>
-      {!unavailable ? <Popover.Portal container={portalContainer}>
+      {!unavailable ? <Popover.Portal container={resolvedPortalContainer}>
         <Popover.Content
           data-slot="model-thinking-content"
           data-model-capability-control="thinking-content"

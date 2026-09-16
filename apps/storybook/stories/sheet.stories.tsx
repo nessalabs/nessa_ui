@@ -2,6 +2,14 @@ import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, fireEvent, userEvent, waitFor, within } from "storybook/test"
 import {
+  Button,
+  ChatOverlay,
+  ChatOverlayBack,
+  ChatOverlayBody,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   Sheet,
   SheetAction,
   SheetBody,
@@ -351,5 +359,184 @@ export const DoneAction: Story = {
     // Released with the dismissal itself, not a task later when the unmount
     // cleanup happens to flush.
     await expect(canvas.getByRole("button", { name: "Open sheet" })).not.toHaveAttribute("inert")
+  },
+}
+
+function SheetWithPortalledMenu() {
+  const [open, setOpen] = React.useState(false)
+  const [chosen, setChosen] = React.useState("none")
+  return (
+    <div className="relative h-80 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-[2rem] bg-background">
+      <div className="p-4">
+        <button
+          type="button"
+          className="rounded-md border border-border px-3 py-2 font-sans nessa-text-4"
+          onClick={() => setOpen(true)}
+        >
+          Open sheet
+        </button>
+        <p className="mt-2 font-mono nessa-text-2 text-muted-foreground" data-testid="chosen">
+          chosen: {chosen}
+        </p>
+      </div>
+      {open ? (
+        <Sheet onClose={() => setOpen(false)} label="Run settings">
+          <SheetHandle />
+          <SheetHeader>
+            <SheetClose className="col-start-1 justify-self-start" />
+            <SheetTitle className="col-start-2">Run settings</SheetTitle>
+          </SheetHeader>
+          <SheetBody className="p-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">Model</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onSelect={() => setChosen("fast")}>Fast</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setChosen("deep")}>Deep</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SheetBody>
+        </Sheet>
+      ) : null}
+    </div>
+  )
+}
+
+export const PortalledLayerInsideSheet: Story = {
+  parameters: storyDocumentation(
+    "A menu opened from inside a modal sheet portals into a container the sheet owns rather than to the body, so it is a descendant of the sheet that raised it. That is what keeps it working: it sits inside the boundary the sheet made inert instead of being disabled by it, and it paints above the panel. Being a descendant is also why the sheet has to recognize it as a layer rather than treat its items as sheet content — while the menu holds focus it owns the keystrokes, including Tab, and only the innermost owner moves focus.",
+  ),
+  render: () => <SheetWithPortalledMenu />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const body = within(document.body)
+    await userEvent.click(canvas.getByRole("button", { name: "Open sheet" }))
+    const sheet = await canvas.findByRole("dialog", { name: "Run settings" })
+
+    // The sheet is modal, so what it covers really is inert.
+    await expect(sheet).toHaveAttribute("aria-modal", "true")
+
+    await userEvent.click(within(sheet).getByRole("button", { name: "Model" }))
+    const menu = await body.findByRole("menu")
+
+    // The menu belongs to the sheet, so it is *in* the sheet: it portalled
+    // into the container the sheet owns rather than to the body. Everything
+    // else follows from that — it cannot be swept up by the sheet's own
+    // inertness, it paints above the panel, and focus entering it is focus
+    // that never left the boundary.
+    await expect(sheet.contains(menu)).toBe(true)
+    await expect(menu.closest('[data-slot="sheet-layers"]')).not.toBeNull()
+    await expect(menu.closest("[inert]")).toBeNull()
+    await waitFor(() => expect(menu.contains(document.activeElement)).toBe(true))
+
+    // Tab belongs to the menu while the menu is up. Being inside the sheet is
+    // what makes this the interesting case: the sheet must recognize the menu
+    // as a layer of its own rather than treat its items as sheet content.
+    await userEvent.keyboard("{ArrowDown}")
+    await expect(menu.contains(document.activeElement)).toBe(true)
+
+    // And the layer still works end to end.
+    await userEvent.keyboard("{Enter}")
+    await waitFor(() =>
+      expect(canvas.getByTestId("chosen")).not.toHaveTextContent("chosen: none"),
+    )
+    // Closing the menu leaves the sheet in charge again.
+    await waitFor(() => expect(body.queryByRole("menu")).toBeNull())
+    await waitFor(() => expect(sheet.contains(document.activeElement)).toBe(true))
+  },
+}
+
+/** Document order of the things Tab can land on inside the sheet. */
+function tabbableWithinSheet(sheet: HTMLElement) {
+  return Array.from(
+    sheet.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, [tabindex]"),
+  ).filter((element) => element.tabIndex >= 0 && !(element as HTMLButtonElement).disabled)
+}
+
+function SheetWithNonmodalOverlay() {
+  const [open, setOpen] = React.useState(false)
+  const [reading, setReading] = React.useState(false)
+  return (
+    <div className="relative h-80 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-[2rem] bg-background">
+      <div className="p-4">
+        <button
+          type="button"
+          className="rounded-md border border-border px-3 py-2 font-sans nessa-text-4"
+          onClick={() => setOpen(true)}
+        >
+          Open sheet
+        </button>
+        <button type="button" className="ml-2 rounded-md border border-border px-3 py-2 font-sans nessa-text-4">
+          Outside the sheet
+        </button>
+      </div>
+      {open ? (
+        <Sheet onClose={() => setOpen(false)} label="Run settings">
+          <SheetHandle />
+          <SheetHeader>
+            <SheetClose className="col-start-1 justify-self-start" />
+            <SheetTitle className="col-start-2">Run settings</SheetTitle>
+          </SheetHeader>
+          <SheetBody className="p-4">
+            <Button size="sm" onClick={() => setReading(true)}>Read transcript</Button>
+          </SheetBody>
+          {/* The reading view fills the panel, the way a transcript-scoped
+              overlay does in a real host. */}
+          {reading ? (
+            <ChatOverlay onClose={() => setReading(false)} label="Transcript">
+              <ChatOverlayBack onClick={() => setReading(false)}>Back</ChatOverlayBack>
+              {/* Deliberately the last tabbable thing in the sheet: the case
+                  that matters is Tab leaving the *end* of the nested view. */}
+              <ChatOverlayBody className="p-4">
+                <Button size="sm" data-testid="last-control">Last control</Button>
+              </ChatOverlayBody>
+            </ChatOverlay>
+          ) : null}
+        </Sheet>
+      ) : null}
+    </div>
+  )
+}
+
+export const NonmodalOverlayInsideSheet: Story = {
+  parameters: storyDocumentation(
+    "A ChatOverlay is a `role=\"dialog\"` that deliberately does not trap Tab. Nested inside a modal Sheet it is still the Sheet's to contain: a panel defers only to a surface that actually owns focus, never to one that merely looks like it does, or Tab would leave the modal entirely.",
+  ),
+  render: () => <SheetWithNonmodalOverlay />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByRole("button", { name: "Open sheet" }))
+    const sheet = await canvas.findByRole("dialog", { name: "Run settings" })
+    await userEvent.click(within(sheet).getByRole("button", { name: "Read transcript" }))
+    const overlay = await within(sheet).findByRole("dialog", { name: "Transcript" })
+
+    // The view fades in, and an assertion taken mid-fade is an assertion
+    // about a frame rather than about the composition. Wait for the value the
+    // test actually depends on — the view being fully drawn — rather than for
+    // "no animations", which a fade that has not started yet also satisfies.
+    await waitFor(() =>
+      expect(getComputedStyle(overlay).opacity).toBe("1"),
+    )
+
+    // The premise: a nested dialog that claims no modality and traps nothing.
+    await expect(overlay).not.toHaveAttribute("aria-modal")
+
+    // The last control really is last: nothing inside the sheet follows it,
+    // so a Tab the sheet fails to contain leaves the modal for good.
+    const last = canvas.getByTestId("last-control")
+    const order = tabbableWithinSheet(sheet)
+    await expect(order.at(-1)).toBe(last)
+
+    last.focus()
+    await userEvent.tab()
+    await expect(document.body).not.toHaveFocus()
+    await expect(sheet.contains(document.activeElement)).toBe(true)
+
+    // And the same going backwards off the front of the sheet.
+    order[0]!.focus()
+    await userEvent.tab({ shift: true })
+    await expect(document.body).not.toHaveFocus()
+    await expect(sheet.contains(document.activeElement)).toBe(true)
   },
 }

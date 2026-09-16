@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import { Popover } from "radix-ui"
 
+import { usePortalContainer } from "@/lib/portal-container"
 import { cn } from "@/lib/utils"
 
 import {
@@ -734,6 +735,9 @@ function ChatComposerTrigger({
   className,
   children,
 }: ChatComposerTriggerProps) {
+  // No prop of its own: a layer with no opinion belongs to whatever panel
+  // it was opened from, and to the body when there is none.
+  const portalContainer = usePortalContainer()
   const { inputAdapter } = React.useContext(ChatComposerContext)
   const [token, setTokenState] = React.useState<TriggerTokenState | null>(null)
   const tokenRef = React.useRef<TriggerTokenState | null>(null)
@@ -981,7 +985,7 @@ function ChatComposerTrigger({
       }}
     >
       <Popover.Anchor virtualRef={anchorRef} />
-      <Popover.Portal>
+      <Popover.Portal container={portalContainer}>
         <Popover.Content
           ref={contentRef}
           data-slot="chat-composer-trigger-panel"

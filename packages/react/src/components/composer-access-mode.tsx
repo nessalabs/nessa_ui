@@ -3,6 +3,7 @@
 import * as React from "react"
 import { DropdownMenu } from "radix-ui"
 
+import { usePortalContainer } from "@/lib/portal-container"
 import { cn } from "@/lib/utils"
 
 export type ComposerAccessModeValue =
@@ -111,6 +112,11 @@ export interface ComposerAccessModeProps
   onValueChange?: (value: ComposerAccessModeValue) => void
   showLabel?: boolean
   contentClassName?: string
+  /**
+   * Where the floating content is portalled. Defaults to the container the
+   * nearest enclosing panel owns — a Sheet's own layer host, say — and to the
+   * body when there is none. Pass `null` to force the body regardless.
+   */
   portalContainer?: HTMLElement | null
 }
 
@@ -132,6 +138,7 @@ const ComposerAccessMode = React.forwardRef<
     },
     ref,
   ) => {
+    const resolvedPortalContainer = usePortalContainer(portalContainer)
     const [uncontrolledValue, setUncontrolledValue] =
       React.useState<ComposerAccessModeValue>(defaultValue)
     const value = valueProp ?? uncontrolledValue
@@ -170,7 +177,7 @@ const ComposerAccessMode = React.forwardRef<
             {showLabel ? <span className="truncate">{label}</span> : null}
           </button>
         </DropdownMenu.Trigger>
-        <DropdownMenu.Portal container={portalContainer}>
+        <DropdownMenu.Portal container={resolvedPortalContainer}>
           <DropdownMenu.Content
             data-slot="composer-access-mode-content"
             side="top"

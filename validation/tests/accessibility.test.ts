@@ -60,12 +60,90 @@ test("alpha compositing is evaluated against the adjacent background", () => {
 })
 
 test("surface overlays composite over the adjacent background before measuring", () => {
-  // A 50% black wash over white yields a linear 0.5 gray surface, so black
-  // text measures (0.5 + 0.05) / 0.05 = 11 against it instead of 21.
+  // A 50% black wash over white is *encoded* 0.5 gray — `#808080`, what the
+  // browser paints — whose relative luminance is 0.2140. Black text therefore
+  // measures (0.2140 + 0.05) / 0.05 = 5.28 against it, not the 11 that
+  // compositing in linear light would predict.
   const washed = contrastRatio("oklch(0 0 0)", "oklch(1 0 0)", 1, { value: "oklch(0 0 0)", opacity: 0.5 })
-  assert.ok(Math.abs(washed.ratio - 11) < 1e-6)
+  assert.ok(Math.abs(washed.ratio - 5.2808228) < 1e-6)
   const wideWash = contrastRatio("oklch(0 0 0)", "oklch(1 0 0)", 1, { value: "oklch(0.7 0.35 145)", opacity: 0.5 })
   assert.equal(wideWash.wideGamut, true)
+})
+
+/**
+ * The oracle's ground truth, taken from Chromium rather than from the
+ * oracle's own arithmetic.
+ *
+ * Each case pairs a translucent color with the opaque color a browser
+ * actually paints for it, read back from `getComputedStyle` on a painted
+ * `color-mix(in srgb, …)` swatch and cross-checked against a 2D canvas
+ * compositing the same `rgba()` over the same backdrop. Measuring the
+ * translucent input and measuring the browser's opaque output must agree: if
+ * they ever diverge, the checker has gone back to compositing somewhere the
+ * screen does not.
+ *
+ * This is the regression that matters. The previous oracle composited in
+ * linear light, which is self-consistent and produces plausible numbers — it
+ * reported 3.26:1 for a boundary Chromium draws at 1.33:1 — so no test
+ * written against the oracle's own model could have caught it. Only a value
+ * the browser produced can.
+ */
+const browserComposites = [
+  // rgba(255,255,255,0.12) over rgb(10,10,10) paints as rgb(40,40,40).
+  { translucent: "oklch(1 0 0 / 12%)", backdrop: "oklch(0.145 0 0)", painted: "color(srgb 0.154651 0.154666 0.154667)" },
+  { translucent: "oklch(1 0 0 / 15%)", backdrop: "oklch(0.145 0 0)", painted: "color(srgb 0.18347 0.183484 0.183485)" },
+  // rgba(255,255,255,0.35) over rgb(10,10,10) paints as rgb(96,96,96).
+  { translucent: "oklch(1 0 0 / 35%)", backdrop: "oklch(0.145 0 0)", painted: "color(srgb 0.375595 0.375605 0.375606)" },
+  { translucent: "oklch(1 0 0 / 38%)", backdrop: "oklch(0.145 0 0)", painted: "color(srgb 0.404413 0.404424 0.404425)" },
+  { translucent: "oklch(0 0 0 / 50%)", backdrop: "oklch(1 0 0)", painted: "color(srgb 0.5 0.5 0.5)" },
+] as const
+
+test("translucent measurement agrees with the color Chromium actually paints", () => {
+  for (const { translucent, backdrop, painted } of browserComposites) {
+    const composited = contrastRatio(translucent, backdrop).ratio
+    const opaque = contrastRatio(painted, backdrop).ratio
+    assert.ok(
+      Math.abs(composited - opaque) < 1e-4,
+      `${translucent} over ${backdrop}: checker ${composited.toFixed(5)}:1 vs painted ${opaque.toFixed(5)}:1`,
+    )
+  }
+})
+
+test("an opacity argument and a baked-in alpha are the same composite", () => {
+  const baked = contrastRatio("oklch(1 0 0 / 35%)", "oklch(0.145 0 0)").ratio
+  const applied = contrastRatio("oklch(1 0 0)", "oklch(0.145 0 0)", 0.35).ratio
+  assert.ok(Math.abs(baked - applied) < 1e-9)
+  // And the two multiply, the way `ring-ring/40` on an already-translucent
+  // token would: 50% of a 50% color is a quarter-strength wash.
+  const compounded = contrastRatio("oklch(1 0 0 / 50%)", "oklch(0.145 0 0)", 0.5).ratio
+  const quarter = contrastRatio("oklch(1 0 0 / 25%)", "oklch(0.145 0 0)").ratio
+  assert.ok(Math.abs(compounded - quarter) < 1e-9)
+})
+
+test("an overlay a required boundary sits on is composited before the boundary is", () => {
+  // Nested: a 50% white wash over the dark surface, then a 35% white border
+  // over that. Each step happens in the painted space, so the boundary is
+  // measured against what is really behind it.
+  const surface = contrastRatio("oklch(1 0 0 / 50%)", "oklch(0.145 0 0)").ratio
+  const nested = contrastRatio("oklch(1 0 0 / 35%)", "oklch(0.145 0 0)", 1, { value: "oklch(1 0 0)", opacity: 0.5 }).ratio
+  // Against a surface that is already half white, the same border reads as
+  // far less of a boundary than it does against the bare background.
+  assert.ok(nested < surface)
+  assert.ok(nested < contrastRatio("oklch(1 0 0 / 35%)", "oklch(0.145 0 0)").ratio)
+})
+
+test("the required dark boundaries and focus ring clear 3:1 as painted", () => {
+  const background = "oklch(0.145 0 0)"
+  const card = "oklch(0.205 0 0)"
+  for (const surface of [background, card]) {
+    assert.ok(contrastRatio("oklch(1 0 0 / 35%)", surface).ratio >= 3, "--border")
+    assert.ok(contrastRatio("oklch(1 0 0 / 38%)", surface).ratio >= 3, "--input")
+    assert.ok(contrastRatio("oklch(0.92 0 0)", surface, 0.4).ratio >= 3, "--ring at 40%")
+    assert.ok(contrastRatio("oklch(0.704 0.187 22.216)", surface, 0.65).ratio >= 3, "--nessa-invalid-ring")
+  }
+  // The values they replaced did not, which is what the linear-space oracle
+  // hid: 12% white reads as 1.33:1, a boundary that is barely visible.
+  assert.ok(contrastRatio("oklch(1 0 0 / 12%)", background).ratio < 1.4)
 })
 
 test("custom text tokens are enforced on their rendered surfaces, including the hover wash", () => {

@@ -4,6 +4,7 @@
 
 import * as React from "react"
 
+import { useComposedRefs } from "@/lib/compose"
 import { cn } from "@/lib/utils"
 import {
   SplitView,
@@ -373,16 +374,21 @@ function AppShellWorkspace({
   paneGrabber = false,
   className,
   style,
+  ref: forwardedRef,
   ...props
 }: AppShellWorkspaceProps) {
   const { layout } = useAppShellContext()
   const { workspace } = layout
   const workspaceRef = React.useRef<HTMLDivElement>(null)
+  // The host's ref is composed rather than spread: `ref` is an ordinary
+  // prop in React 19, so `{...props}` after `ref={workspaceRef}` would replace the
+  // component's own ref and every effect reading it would see null.
+  const composedRef = useComposedRefs(workspaceRef, forwardedRef)
   const tiled = paneStyle === "tiled"
 
   return (
     <div
-      ref={workspaceRef}
+      ref={composedRef}
       data-slot="app-shell-workspace"
       data-pane-style={paneStyle}
       data-maximized={workspace.maximizedPaneId !== undefined || undefined}

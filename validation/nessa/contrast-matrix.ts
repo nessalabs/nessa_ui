@@ -41,4 +41,11 @@ export const contrastMatrix = Object.freeze([
   { foreground: "--nessa-fast-mode-active", background: "--background", minimum: 4.5, role: "normal-text" },
   // The chat bubble's white text on the fixed chat accent (#0071e3 holds 4.7:1).
   { foreground: "--nessa-chat-rim-head", background: "--nessa-chat-accent", minimum: 4.5, role: "normal-text" },
+  // And the other direction, which is the one that was missing: the accent is
+  // also written *as* text — a back link, an annotation action, an activity
+  // icon — and a token checked only as a background says nothing about that.
+  // The ink is the step that has to survive it.
+  { foreground: "--nessa-chat-accent-ink", background: "--background", minimum: 4.5, role: "normal-text" },
+  { foreground: "--nessa-chat-accent-ink", background: "--card", minimum: 4.5, role: "normal-text" },
+  { foreground: "--nessa-chat-accent-ink", background: "--popover", minimum: 4.5, role: "normal-text" },
 ] satisfies readonly ContrastPair[])
