@@ -4,6 +4,7 @@ import * as React from "react"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 import { Check, ChevronRight, Circle } from "lucide-react"
 
+import { usePortalContainer } from "@/lib/portal-container"
 import { cn } from "@/lib/utils"
 import { popoverSurfaceVariants } from "./popover-surface"
 
@@ -37,7 +38,11 @@ function DropdownMenuTrigger({
 
 export interface DropdownMenuContentProps
   extends React.ComponentProps<typeof DropdownMenuPrimitive.Content> {
-  /** Portal container for the floating content; defaults to the body. */
+  /**
+   * Where the floating content is portalled. Defaults to the container the
+   * nearest enclosing panel owns — a Sheet's own layer host, say — and to the
+   * body when there is none. Pass `null` to force the body regardless.
+   */
   portalContainer?: HTMLElement | null
 }
 
@@ -52,8 +57,9 @@ function DropdownMenuContent({
   portalContainer,
   ...props
 }: DropdownMenuContentProps) {
+  const resolvedPortalContainer = usePortalContainer(portalContainer)
   return (
-    <DropdownMenuPrimitive.Portal container={portalContainer}>
+    <DropdownMenuPrimitive.Portal container={resolvedPortalContainer}>
       <DropdownMenuPrimitive.Content
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}

@@ -3,10 +3,17 @@
 import * as React from "react"
 import { Maximize2, Minimize2, X } from "lucide-react"
 
+import { useComposedRefs } from "@/lib/compose"
 import {
+  PortalContainerProvider,
+  usePortalContainerHost,
+} from "@/lib/portal-container"
+import {
+  focusFirstWithin,
   openerFromFocus,
   panelMotion,
   restoreFocusToOpener,
+  trapTabWithin,
   useDragGesture,
 } from "@/lib/overlay-panel"
 import { cn } from "@/lib/utils"
@@ -133,11 +140,27 @@ export interface SheetProps extends React.ComponentProps<"div"> {
   /** Fires when SheetExpand toggles the panel between drawer and filled. */
   onExpandedChange?: (expanded: boolean) => void
   /**
-   * When true (the default), the sheet is modal to its positioned ancestor:
-   * `aria-modal`, Tab stays inside the panel, and siblings go inert. Queue
-   * and details use this. When false, Tab is not trapped and `aria-modal` is
-   * omitted so chrome outside the ancestor — a tab strip and composer around
-   * a transcript-scoped sheet — stays reachable. Annotations use this.
+   * When true (the default), the sheet is a modal dialog: it declares
+   * `aria-modal`, Tab stays inside the panel, and everything outside it goes
+   * inert — not only the siblings it is drawn over, but every level up to
+   * the document, so the pointer, the tab order, and assistive technology
+   * all agree with the claim. Queue and details use this. When false, none
+   * of that is claimed: `aria-modal` is omitted, Tab is not trapped, and
+   * only the siblings the panel covers go inert, so chrome outside the
+   * ancestor — a tab strip and composer around a transcript-scoped sheet —
+   * stays reachable. Annotations use this.
+   *
+   * Immutable for the life of the sheet: the value at open decides the
+   * sheet's whole interaction contract, and toggling it would leave inert
+   * ancestors with nothing left to release them. Remount to change it.
+   *
+   * Layers the sheet's own content opens stay live, because they are not
+   * outside it: Nessa's menus, popovers and pickers portal into a container
+   * the sheet owns, so a ModelPicker opened from inside a modal sheet renders
+   * within the boundary, takes focus and keystrokes, and paints above the
+   * panel. A host portalling to the body by hand should pass that container
+   * too — every Nessa floating layer reads it from context, and
+   * `usePortalContainer()` exposes it.
    */
   modal?: boolean
 }
@@ -146,10 +169,11 @@ export interface SheetProps extends React.ComponentProps<"div"> {
  * A bottom sheet that rises over its nearest positioned ancestor — typically
  * a chat window — without leaving that frame. By default it is a modal
  * dialog: the backdrop and Escape dismiss it, Tab stays inside, focus moves
- * into the panel on open and returns to the opener on close, and the
- * siblings it covers go inert so nothing behind it takes a pointer or a
- * keystroke. Pass `modal={false}` for a contained extra-details surface that
- * still covers its siblings but leaves surrounding chrome in the tab order.
+ * into the panel on open and returns to the opener on close, and everything
+ * outside it goes inert so nothing behind it takes a pointer, a keystroke,
+ * or a screen reader's attention. Pass `modal={false}` for a contained
+ * extra-details surface that still covers the siblings it is drawn over but
+ * claims no modality and leaves surrounding chrome in the tab order.
  *
  * Mount it as a child of the ancestor it should fill. Queue, agent details,
  * and activity (thought / explored) sit on the chat frame so Expand covers
@@ -182,9 +206,18 @@ function Sheet({
   className,
   children,
   onKeyDown,
+  ref: forwardedRef,
   ...props
 }: SheetProps) {
   const ref = React.useRef<HTMLDivElement>(null)
+  // The host's ref is composed rather than spread: `ref` is an ordinary prop
+  // in React 19, so `{...props}` after `ref={ref}` would replace the sheet's
+  // own ref and the focus, inertness, and dismissal effects below — all of
+  // which return early on a null node — would never run.
+  const rootRef = useComposedRefs(ref, forwardedRef)
+  // The sheet owns where its own floating layers land. See the container
+  // element at the end of the panel for why it is inside the sheet.
+  const { container, setContainer } = usePortalContainerHost()
   const panelRef = React.useRef<HTMLDivElement>(null)
   const backdropRef = React.useRef<HTMLDivElement>(null)
   const onCloseRef = React.useRef(onClose)
@@ -585,12 +618,8 @@ function Sheet({
     if (!node || !ownerDocument) return
     const opener = openerFromFocus(ownerDocument)
     openerRef.current = opener
-    const firstControl = node.querySelector<HTMLElement>(
-      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    )
-    ;(firstControl ?? node).focus()
+    focusFirstWithin(node)
 
-    const parent = node.parentElement
     const covered = new Set<HTMLElement>()
     const release = (sibling: HTMLElement) => {
       covered.delete(sibling)
@@ -599,61 +628,69 @@ function Sheet({
       coverCounts.delete(sibling)
       sibling.removeAttribute("inert")
     }
+    /**
+     * The branch the sheet sits on, innermost first. Everything *off* this
+     * branch is what the sheet covers.
+     *
+     * A modal sheet walks the branch to the root, because `aria-modal` and a
+     * document-wide Tab trap both say the rest of the document is out of
+     * reach: inerting only the immediate siblings would leave the app's own
+     * chrome clickable and readable by assistive technology while claiming
+     * the opposite. A non-modal sheet makes no such claim and covers exactly
+     * the siblings it is drawn over.
+     */
+    const branch = () => {
+      const chain: HTMLElement[] = []
+      for (
+        let child: HTMLElement = node;
+        child.parentElement && child !== ownerDocument.body;
+        child = child.parentElement
+      ) {
+        chain.push(child)
+        if (!modal) break
+      }
+      return chain
+    }
     const coverSiblings = () => {
       for (const sibling of covered) if (!sibling.isConnected) release(sibling)
-      for (const sibling of parent?.children ?? []) {
-        if (sibling === node || !(sibling instanceof HTMLElement)) continue
-        if (sibling.getAttribute("role") === "dialog") continue
-        if (covered.has(sibling)) continue
-        const count = coverCounts.get(sibling)
-        if (count === undefined && sibling.hasAttribute("inert")) continue
-        coverCounts.set(sibling, (count ?? 0) + 1)
-        sibling.setAttribute("inert", "")
-        covered.add(sibling)
+      for (const child of branch()) {
+        for (const sibling of child.parentElement?.children ?? []) {
+          if (sibling === child || !(sibling instanceof HTMLElement)) continue
+          if (sibling.getAttribute("role") === "dialog") continue
+          if (covered.has(sibling)) continue
+          const count = coverCounts.get(sibling)
+          if (count === undefined && sibling.hasAttribute("inert")) continue
+          coverCounts.set(sibling, (count ?? 0) + 1)
+          sibling.setAttribute("inert", "")
+          covered.add(sibling)
+        }
       }
     }
     coverSiblings()
-    const observer = parent ? new MutationObserver(coverSiblings) : null
-    if (parent && observer) observer.observe(parent, { childList: true })
+    // Hosts mount things behind an open sheet at any level of the branch, so
+    // every level the coverage reaches is watched rather than only the
+    // sheet's own parent. Nothing here needs to make an exception for the
+    // sheet's own menus and popovers: they portal into the container the
+    // sheet owns, which is inside the sheet and therefore on the branch.
+    const observer = new MutationObserver(coverSiblings)
+    for (const child of branch()) {
+      observer.observe(child.parentElement!, { childList: true })
+    }
     releaseCoverRef.current = () => {
       // The observer goes first. It is still live between a dismissal and the
       // unmount cleanup a task later, and the sheet's own removal is a
       // childList change — which would re-cover the siblings this just
       // released, leaving them inert with no sheet left to release them.
-      observer?.disconnect()
+      observer.disconnect()
       for (const sibling of [...covered]) release(sibling)
     }
-    const focusables = () =>
-      Array.from(
-        node.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-        ),
-      ).filter((element) => !element.hasAttribute("disabled"))
-    const handleTab = (event: KeyboardEvent) => {
-      if (event.key !== "Tab") return
-      const order = focusables()
-      if (order.length === 0) return
-      const first = order[0]!
-      const last = order[order.length - 1]!
-      const current = ownerDocument.activeElement
-      if (event.shiftKey && (current === first || !node.contains(current))) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && current === last) {
-        event.preventDefault()
-        first.focus()
-      }
-    }
-    if (modal) {
-      ownerDocument.addEventListener("keydown", handleTab, { capture: true })
-    }
+    // A modal sheet is the only thing its ancestor's keyboard user can be
+    // in, so Tab is trapped for as long as it is open. A non-modal one
+    // declares no `aria-modal` and traps nothing.
+    const releaseTrap = modal ? trapTabWithin(node) : null
     return () => {
-      observer?.disconnect()
-      if (modal) {
-        ownerDocument.removeEventListener("keydown", handleTab, {
-          capture: true,
-        })
-      }
+      observer.disconnect()
+      releaseTrap?.()
       releaseCoverRef.current()
       // A dismissal that played the exit has already put focus home; running
       // it again here would fire the host's fallback for an opener this
@@ -666,6 +703,20 @@ function Sheet({
     // Mount-once by design; modal is the value at open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // `modal` decides what the mount effect inerted and trapped, and that
+  // effect deliberately never re-runs. A host that changes it mid-life gets
+  // ARIA that no longer matches behavior, which is silent in production and
+  // worth saying out loud in development.
+  const openedModal = React.useRef(modal)
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === "production") return
+    if (openedModal.current === modal) return
+    openedModal.current = modal
+    console.warn(
+      "Sheet `modal` changed after open and has no effect: the sheet keeps the focus, inertness, and ARIA contract it opened with. Remount the sheet to change it.",
+    )
+  }, [modal])
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     onKeyDown?.(event)
@@ -680,7 +731,7 @@ function Sheet({
   return (
     <SheetContext.Provider value={context}>
       <div
-        ref={ref}
+        ref={rootRef}
         role="dialog"
         aria-modal={modal || undefined}
         aria-label={label}
@@ -720,8 +771,26 @@ function Sheet({
               : "max-h-[85%] overflow-hidden rounded-t-3xl",
           )}
         >
-          {children}
+          <PortalContainerProvider container={container}>
+            {children}
+          </PortalContainerProvider>
         </div>
+        {/*
+          Where the sheet's own menus, popovers and pickers land.
+
+          Inside the sheet, because that is the whole point: a layer portalled
+          to the body would be outside the boundary the sheet just made inert,
+          outside the tab order it contains, and outside the subtree its
+          dismissal reasons about. Mounted here rather than in the panel so it
+          is a sibling of the content — last in the sheet, so it paints over
+          the panel — and so the panel's own height interpolation cannot drag
+          an open menu around with it.
+
+          It draws nothing and occupies nothing: Radix positions its content
+          in a fixed wrapper of its own, and this is only the parent that
+          wrapper is appended to.
+        */}
+        <div ref={setContainer} data-slot="sheet-layers" />
       </div>
     </SheetContext.Provider>
   )
@@ -804,11 +873,15 @@ export interface SheetHeaderProps extends React.ComponentProps<"div"> {}
  * and SheetAction as children; the side columns share leftover width so the
  * title stays optically centered whether or not the side controls are present.
  *
- * The row sits over SheetHandle's absolute drag target and is pointer-events
- * none by default. SheetClose, SheetExpand, and SheetAction set
- * `data-sheet-interactive` so they receive presses; custom interactive
- * children need the same attribute (or their own pointer-events) or the grab
- * bar will eat the gesture.
+ * The row sits over SheetHandle's absolute drag target, so its own background
+ * passes presses through to the grab bar and its controls do not. Ordinary
+ * controls — a Button, a link, a field, anything with an interactive ARIA
+ * role — take their own presses without being told to: a plain Button in the
+ * header works, which is the whole point of a component system. Anything
+ * outside that set (a custom element that handles pointer events itself)
+ * opts in with `data-sheet-interactive`, and anything that should stay part
+ * of the drag surface opts back out with `pointer-events-none` in its own
+ * className.
  */
 function SheetHeader({ className, ...props }: SheetHeaderProps) {
   return (
@@ -819,9 +892,16 @@ function SheetHeader({ className, ...props }: SheetHeaderProps) {
         // whose bounding box is flush with straight text reads as indented, so
         // it is outdented by half its overhang to line up optically.
         "relative z-10 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 pb-2 pt-4",
-        // Opt-in only: tag-name allowlists would miss custom controls and
-        // would steal presses from the absolute SheetHandle underneath.
-        "pointer-events-none [&_[data-sheet-interactive]]:pointer-events-auto",
+        // The row is transparent to the pointer so the grab bar underneath
+        // gets the drag, and every control on it is transparent to *that*,
+        // so a press on a control is a press on the control. The allowlist
+        // is the interactive-element set rather than the sheet's own three
+        // controls: a header is a place hosts put buttons, and one that
+        // silently swallowed them would be a trap.
+        "pointer-events-none",
+        "[&_a[href]]:pointer-events-auto [&_button]:pointer-events-auto [&_input]:pointer-events-auto [&_select]:pointer-events-auto [&_textarea]:pointer-events-auto",
+        "[&_[role=button]]:pointer-events-auto [&_[role=link]]:pointer-events-auto [&_[role=checkbox]]:pointer-events-auto [&_[role=switch]]:pointer-events-auto [&_[role=menuitem]]:pointer-events-auto [&_[role=tab]]:pointer-events-auto",
+        "[&_[data-sheet-interactive]]:pointer-events-auto",
         className,
       )}
       {...props}

@@ -8,6 +8,7 @@ import {
   SearchableListbox,
   type SearchableListboxRenderState,
 } from "./searchable-listbox"
+import { usePortalContainer } from "@/lib/portal-container"
 import { cn } from "@/lib/utils"
 
 /** Describes one selectable model in a provider catalog. */
@@ -52,6 +53,11 @@ export interface ModelPickerProps {
   disabled?: boolean
   className?: string
   contentClassName?: string
+  /**
+   * Where the floating content is portalled. Defaults to the container the
+   * nearest enclosing panel owns — a Sheet's own layer host, say — and to the
+   * body when there is none. Pass `null` to force the body regardless.
+   */
   portalContainer?: HTMLElement | null
   side?: React.ComponentProps<typeof Popover.Content>["side"]
   align?: React.ComponentProps<typeof Popover.Content>["align"]
@@ -194,6 +200,7 @@ function ModelPicker({
   tabsLabel = "Model providers",
   loadingMessage = "Loading models",
 }: ModelPickerProps) {
+  const resolvedPortalContainer = usePortalContainer(portalContainer)
   const effectiveDir = Direction.useDirection(dir)
   const [uncontrolledValue, setUncontrolledValue] =
     React.useState<ModelPickerValue | undefined>(defaultValue)
@@ -454,7 +461,7 @@ function ModelPicker({
           />
         </button>
       </Popover.Trigger>
-      <Popover.Portal container={portalContainer}>
+      <Popover.Portal container={resolvedPortalContainer}>
         <Popover.Content
           data-slot="model-picker-content"
           aria-label={contentLabel}

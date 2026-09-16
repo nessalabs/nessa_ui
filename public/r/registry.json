@@ -131,6 +131,7 @@
           "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 20%, transparent)",
           "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)",
           "nessa-chat-accent": "#0071e3",
+          "nessa-chat-accent-ink": "#0064c8",
           "nessa-chat-rim-0": "rgba(245, 158, 11, 0.06)",
           "nessa-chat-rim-1": "rgba(245, 158, 11, 0.22)",
           "nessa-chat-rim-2": "rgba(236, 72, 153, 0.42)",
@@ -155,9 +156,9 @@
           "accent-foreground": "oklch(0.985 0 0)",
           "destructive": "oklch(0.704 0.187 22.216)",
           "destructive-foreground": "oklch(0.145 0 0)",
-          "border": "oklch(1 0 0 / 12%)",
-          "input": "oklch(1 0 0 / 15%)",
-          "ring": "oklch(0.708 0 0)",
+          "border": "oklch(1 0 0 / 35%)",
+          "input": "oklch(1 0 0 / 38%)",
+          "ring": "oklch(0.92 0 0)",
           "sidebar": "oklch(0.141 0.005 285.823)",
           "sidebar-foreground": "oklch(0.985 0 0)",
           "sidebar-accent": "oklch(0.274 0.006 286.033)",
@@ -198,9 +199,10 @@
           "nessa-diff-deletion": "oklch(0.7 0.19 25)",
           "nessa-market-gain": "oklch(0.8 0.19 150)",
           "nessa-market-loss": "oklch(0.7 0.19 25)",
-          "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 40%, transparent)",
+          "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 65%, transparent)",
           "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)",
           "nessa-chat-accent": "#0071e3",
+          "nessa-chat-accent-ink": "#5aaaff",
           "nessa-chat-rim-0": "rgba(245, 158, 11, 0.06)",
           "nessa-chat-rim-1": "rgba(245, 158, 11, 0.22)",
           "nessa-chat-rim-2": "rgba(236, 72, 153, 0.42)",
@@ -353,6 +355,32 @@
       ]
     },
     {
+      "name": "compose",
+      "type": "registry:lib",
+      "title": "Ref and event composition",
+      "description": "The two ways a component that owns internal behavior shares an element and an event with its host: composing the consumer's ref with the component's own so neither is lost to a props spread, and running a consumer's handler ahead of the component's own behavior so adding one augments rather than replaces it.",
+      "files": [
+        {
+          "path": "packages/react/src/lib/compose.ts",
+          "type": "registry:lib",
+          "target": "lib/compose.ts"
+        }
+      ]
+    },
+    {
+      "name": "portal-container",
+      "type": "registry:lib",
+      "title": "Portal container",
+      "description": "Where a floating layer puts its content. A panel that owns a boundary \u2014 a modal sheet, a reading view \u2014 mounts a container inside itself and publishes it, and every Nessa menu, popover and tooltip portals there instead of the body, so a layer opened from inside a panel stays inside the panel's inertness, tab order and dismissal.",
+      "files": [
+        {
+          "path": "packages/react/src/lib/portal-container.tsx",
+          "type": "registry:lib",
+          "target": "lib/portal-container.tsx"
+        }
+      ]
+    },
+    {
       "name": "button",
       "type": "registry:ui",
       "title": "Button",
@@ -473,6 +501,7 @@
         "lucide-react"
       ],
       "registryDependencies": [
+        "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
       ],
@@ -511,6 +540,7 @@
       "title": "Generating Surface",
       "description": "An ambient placeholder for content that takes a while to generate \u2014 drifting smoke and a shimmering status label reserve the space, then morph into the finished content when generation completes.",
       "registryDependencies": [
+        "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
       ],
@@ -597,6 +627,11 @@
           "path": "packages/react/src/components/mermaid-diagram.tsx",
           "type": "registry:ui",
           "target": "components/ui/mermaid-diagram.tsx"
+        },
+        {
+          "path": "packages/react/src/components/mermaid-render-queue.ts",
+          "type": "registry:ui",
+          "target": "components/ui/mermaid-render-queue.ts"
         }
       ]
     },
@@ -710,6 +745,7 @@
         "lucide-react"
       ],
       "registryDependencies": [
+        "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
       ],
@@ -766,6 +802,7 @@
       "title": "SplitView",
       "description": "Controlled resizable panel groups with accessible, keyboard-operable separators.",
       "registryDependencies": [
+        "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
       ],
@@ -1124,10 +1161,11 @@
       "title": "AppShell",
       "description": "An IDE-style application shell: resizable docks around a recursively splittable workspace.",
       "registryDependencies": [
+        "nessalabs/nessa_ui/app-shell-layout",
+        "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
-        "nessalabs/nessa_ui/utils",
         "nessalabs/nessa_ui/split-view",
-        "nessalabs/nessa_ui/app-shell-layout"
+        "nessalabs/nessa_ui/utils"
       ],
       "files": [
         {
@@ -1173,6 +1211,7 @@
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1214,6 +1253,7 @@
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/searchable-listbox",
         "nessalabs/nessa_ui/utils"
       ],
@@ -1236,6 +1276,7 @@
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1261,7 +1302,9 @@
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/overlay-panel",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1298,7 +1341,10 @@
       "title": "Chat Overlay",
       "description": "A reading view that takes over a chat's transcript region while its tab strip and composer stay visible and usable: a non-modal dialog surface that makes the content it covers inert, with a scrolling body, a centered back link, and an optional caption.",
       "registryDependencies": [
+        "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/overlay-panel",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1363,6 +1409,7 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/file-drop-zone",
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1454,6 +1501,7 @@
         "lucide-react"
       ],
       "registryDependencies": [
+        "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
       ],
@@ -1475,6 +1523,7 @@
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1494,6 +1543,7 @@
         "lucide-react"
       ],
       "registryDependencies": [
+        "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils",
         "nessalabs/nessa_ui/virtual-list"
@@ -1535,8 +1585,10 @@
         "lucide-react"
       ],
       "registryDependencies": [
+        "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/overlay-panel",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1637,9 +1689,11 @@
         "radix-ui"
       ],
       "registryDependencies": [
-        "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/json-tree",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1661,6 +1715,7 @@
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1723,6 +1778,7 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/popover-surface",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1804,6 +1860,7 @@
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/popover-surface",
         "nessalabs/nessa_ui/segmented-control",
@@ -1877,6 +1934,7 @@
         "radix-ui"
       ],
       "registryDependencies": [
+        "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
       ],
@@ -2077,6 +2135,7 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/popover-surface",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -2425,6 +2484,7 @@
       "title": "WindowDeck",
       "description": "A deck of windows the user moves between: a snapping horizontal carousel, and a keyboard-toggled overview that shows a scrolling strip of preview tiles. Only the live window mounts its full content. Each pane is a frame for any Nessa composition.",
       "registryDependencies": [
+        "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
       ],
@@ -2612,12 +2672,13 @@
         "@pierre/diffs"
       ],
       "registryDependencies": [
-        "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/code-block",
+        "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/popover-surface",
+        "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/searchable-listbox",
-        "nessalabs/nessa_ui/utils",
-        "nessalabs/nessa_ui/code-block"
+        "nessalabs/nessa_ui/utils"
       ],
       "files": [
         {

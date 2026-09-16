@@ -478,10 +478,12 @@ export interface QuestionnaireSubmitProps
   extends React.ComponentProps<typeof Button> {}
 
 /**
- * The submit control: the library `Button` defaulting to `type="submit"`,
- * so wrapping the questionnaire in a `<form>` submits every item's answers
- * as `FormData` under their field names. Children default to "Submit";
- * pass your own copy ("Finish", "Send feedback") or any Button prop.
+ * The submit control: the library `Button`, with `type` defaulted back to
+ * `"submit"` (Button itself defaults to `"button"`, so an action in a form
+ * cannot submit it by accident), so wrapping the questionnaire in a `<form>`
+ * submits every item's answers as `FormData` under their field names.
+ * Children default to "Submit"; pass your own copy ("Finish", "Send
+ * feedback") or any Button prop.
  */
 function QuestionnaireSubmit({
   type = "submit",

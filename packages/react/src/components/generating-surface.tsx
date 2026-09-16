@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { useComposedRefs } from "@/lib/compose"
 import { cn } from "@/lib/utils"
 
 const reducedMotionQuery = "(prefers-reduced-motion: reduce)"
@@ -231,6 +232,7 @@ function GeneratingSurface({
   onSettled,
   className,
   children,
+  ref: forwardedRef,
   ...props
 }: GeneratingSurfaceProps) {
   const reducedMotion = useReducedMotion()
@@ -403,9 +405,14 @@ function GeneratingSurface({
     }
   }, [phase, reducedMotion])
 
+  // The host's ref is composed rather than spread: `ref` is an ordinary
+  // prop in React 19, so `{...props}` after `ref={surfaceRef}` would replace the
+  // component's own ref and every effect reading it would see null.
+  const composedRef = useComposedRefs(surfaceRef, forwardedRef)
+
   return (
     <div
-      ref={surfaceRef}
+      ref={composedRef}
       data-slot="generating-surface"
       data-phase={phase}
       // Busy for the whole reveal, not just the wait: through the morph the

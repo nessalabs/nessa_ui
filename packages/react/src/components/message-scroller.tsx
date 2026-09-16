@@ -3,6 +3,7 @@
 import * as React from "react"
 import { ChevronDown } from "lucide-react"
 
+import { useComposedRefs } from "@/lib/compose"
 import { cn } from "@/lib/utils"
 
 interface MessageScrollerContextValue {
@@ -119,6 +120,7 @@ function MessageScrollerViewport({
   autoScroll = true,
   className,
   onScroll,
+  ref: forwardedRef,
   ...props
 }: MessageScrollerViewportProps) {
   const { pinnedRef, returningRef, setPinned, viewportRef } =
@@ -174,9 +176,14 @@ function MessageScrollerViewport({
     return () => observer.disconnect()
   }, [autoScroll, pinnedRef, returningRef, setPinned, updatePinned, viewportRef])
 
+  // The host's ref is composed rather than spread: `ref` is an ordinary
+  // prop in React 19, so `{...props}` after `ref={viewportRef}` would replace the
+  // component's own ref and every effect reading it would see null.
+  const composedRef = useComposedRefs(viewportRef, forwardedRef)
+
   return (
     <div
-      ref={viewportRef}
+      ref={composedRef}
       data-slot="message-scroller-viewport"
       tabIndex={0}
       className={cn(

@@ -70,7 +70,16 @@
   --nessa-thinking-fill-current: oklch(0.68 0.2 304);
   --nessa-thinking-fill-highlight: oklch(0.86 0.11 214);
   --nessa-fast-mode-active: oklch(0.57 0.22 300);
+  /* The fixed chat identity, in the same two steps the activity rings use:
+     the accent is the surface — the sent bubble, the live dot, the approve
+     button — and holds 4.7:1 under the white set on it. The ink is the
+     version that survives being the text itself. A link or an icon written
+     in the accent reads at 4.70:1 on pure white and less on anything a shade
+     off it, which is a boundary a component cannot control; in Dark it was
+     4.21:1 on the background and 3.81:1 on a card, below AA outright. Write
+     in the ink, never in the surface colour. */
   --nessa-chat-accent: #0071e3;
+  --nessa-chat-accent-ink: #0064c8;
   --nessa-chat-rim-0: rgba(245, 158, 11, 0.06);
   --nessa-chat-rim-1: rgba(245, 158, 11, 0.22);
   --nessa-chat-rim-2: rgba(236, 72, 153, 0.42);
@@ -151,10 +160,18 @@
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.187 22.216);
   --destructive-foreground: oklch(0.145 0 0);
-  /* 12% instead of stock shadcn 10%: the gate requires 3:1 on --background. */
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.708 0 0);
+  /* Translucent white composites in encoded sRGB, not linear light: over
+     `--background` these read as #5a5a5a and #616161 on screen. Stock
+     shadcn's 10% renders at 1.28:1 — the earlier 12%/15% here were chosen
+     against a checker that composited in linear space and reported 3.26:1
+     and 3.82:1 for colors the screen draws at 1.33:1 and 1.47:1. These are
+     the alphas that actually clear the 3:1 required-boundary threshold. */
+  --border: oklch(1 0 0 / 35%);
+  --input: oklch(1 0 0 / 38%);
+  /* Focus rings are drawn at 40% opacity, so the ring token has to be bright
+     enough that 40% of it still clears 3:1 against the darkest surface it
+     lands on. 0.708 did not: it rendered at 2.11:1. */
+  --ring: oklch(0.92 0 0);
   --sidebar: oklch(0.141 0.005 285.823);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.274 0.006 286.033);
@@ -166,6 +183,7 @@
   --nessa-thinking-fill-highlight: oklch(0.82 0.12 210);
   --nessa-fast-mode-active: oklch(0.72 0.185 306);
   --nessa-chat-accent: #0071e3;
+  --nessa-chat-accent-ink: #5aaaff;
   --nessa-chat-rim-0: rgba(245, 158, 11, 0.06);
   --nessa-chat-rim-1: rgba(245, 158, 11, 0.22);
   --nessa-chat-rim-2: rgba(236, 72, 153, 0.42);
@@ -200,7 +218,10 @@
   --nessa-activity-ring-cap-shadow: oklch(0 0 0 / 0.55);
   --nessa-diff-addition: oklch(0.77 0.17 152);
   --nessa-diff-deletion: oklch(0.7 0.19 25);
-  --nessa-invalid-ring: color-mix(in oklab, var(--destructive) 40%, transparent);
+  /* 65%, not 40%: the invalid ring is a required non-text boundary, and the
+     dark destructive at 40% composites to 1.96:1 against the surfaces it is
+     drawn on. */
+  --nessa-invalid-ring: color-mix(in oklab, var(--destructive) 65%, transparent);
   --nessa-diff-dark-addition: oklch(0.6222 0.1661 146.22);
   --nessa-market-gain: oklch(0.8 0.19 150);
   --nessa-market-loss: oklch(0.7 0.19 25);

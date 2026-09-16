@@ -222,10 +222,9 @@ function useDrawerPresence(
     // Both halves of the exit are waited out: a host that lengthens the
     // overlay's fade through `overlayClassName` must not have its backdrop
     // destroyed at partial opacity when the panel's slide ends first.
-    const duration = Math.max(
-      longestTransitionMs(panel, "translate"),
-      overlay ? longestTransitionMs(overlay, "opacity") : 0,
-    )
+    const slide = longestTransitionMs(panel, "translate")
+    const fade = overlay ? longestTransitionMs(overlay, "opacity") : 0
+    const duration = Math.max(slide, fade)
     if (duration === 0) {
       setPresent(false)
       return
@@ -233,16 +232,28 @@ function useDrawerPresence(
     // The timer is the authority and `transitionend` only shortens it: a
     // panel in a hidden tab runs no transition and fires no event.
     const timer = window.setTimeout(() => setPresent(false), duration + 50)
+    // The panel's slide may only shorten the exit while it is the half that
+    // ends last. Once a host has lengthened the overlay's fade through
+    // `overlayClassName`, the fade is what the exit is waiting for, and
+    // unmounting on the slide would destroy the backdrop mid-fade — the
+    // longer half being exactly the one somebody lengthened on purpose.
+    //
+    // Waiting for the fade's own `transitionend` instead would be the wrong
+    // repair: a transition that is cancelled, or never starts because the
+    // property is already at its target, fires no event at all, and the exit
+    // would hang on it. `duration` is already the max of the two halves, so
+    // in that case the timer is the complete and correct answer.
+    const slideEndsLast = slide >= fade
     const finish = (event: TransitionEvent) => {
       // The slide, on the panel itself: a descendant's transition, or another
       // property of the panel finishing first, must not cut the exit short.
       if (event.target !== panel || event.propertyName !== "translate") return
       setPresent(false)
     }
-    panel.addEventListener("transitionend", finish)
+    if (slideEndsLast) panel.addEventListener("transitionend", finish)
     return () => {
       window.clearTimeout(timer)
-      panel.removeEventListener("transitionend", finish)
+      if (slideEndsLast) panel.removeEventListener("transitionend", finish)
     }
   }, [open, overlay, panel])
 

@@ -160,7 +160,7 @@ const cueClassName =
 
 /** Leading mark on a cue: SVG glyphs stay 14px; RandomAvatar fills 16px. */
 const cueIconClassName =
-  "flex shrink-0 items-center justify-center text-(--nessa-chat-accent) [&_svg]:size-3.5 [&_[data-slot=random-avatar]]:size-4"
+  "flex shrink-0 items-center justify-center text-(--nessa-chat-accent-ink) [&_svg]:size-3.5 [&_[data-slot=random-avatar]]:size-4"
 
 export type AgentActivityCueProps = {
   /**
@@ -377,7 +377,7 @@ function AgentActivityCard({
       {icon != null ? (
         <span
           aria-hidden="true"
-          className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-(--nessa-chat-accent) [&_svg]:size-3.5 [&_[data-slot=random-avatar]]:size-7"
+          className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-(--nessa-chat-accent-ink) [&_svg]:size-3.5 [&_[data-slot=random-avatar]]:size-7"
         >
           {icon}
         </span>
