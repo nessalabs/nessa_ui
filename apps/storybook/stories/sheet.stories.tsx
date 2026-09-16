@@ -405,7 +405,7 @@ function SheetWithPortalledMenu() {
 
 export const PortalledLayerInsideSheet: Story = {
   parameters: storyDocumentation(
-    "A menu opened from inside a modal sheet is portalled to the body, so it is not a descendant of the sheet. It is still the sheet's own layer: the sheet must not inert the portal it lands in, and its Tab containment must stand down while that layer holds focus. Only the topmost layer moves focus.",
+    "A menu opened from inside a modal sheet portals into a container the sheet owns rather than to the body, so it is a descendant of the sheet that raised it. That is what keeps it working: it sits inside the boundary the sheet made inert instead of being disabled by it, and it paints above the panel. Being a descendant is also why the sheet has to recognize it as a layer rather than treat its items as sheet content — while the menu holds focus it owns the keystrokes, including Tab, and only the innermost owner moves focus.",
   ),
   render: () => <SheetWithPortalledMenu />,
   play: async ({ canvasElement }) => {
