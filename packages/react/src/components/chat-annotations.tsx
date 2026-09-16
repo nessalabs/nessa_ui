@@ -115,7 +115,7 @@ function ChatAnnotationThread({
               data-slot="chat-annotation-source"
               onClick={onOpenSource}
               className={cn(
-                "self-start rounded-full border-0 bg-transparent px-1 py-0 font-sans nessa-text-1 text-(--nessa-chat-accent) hover:underline",
+                "self-start rounded-full border-0 bg-transparent px-1 py-0 font-sans nessa-text-1 text-(--nessa-chat-accent-ink) hover:underline",
                 chatAnnotationsFocusClassName,
               )}
             >

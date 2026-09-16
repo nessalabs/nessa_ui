@@ -4,6 +4,7 @@ import { expect, fireEvent, userEvent, waitFor, within } from "storybook/test"
 import {
   Button,
   ChatOverlay,
+  ChatOverlayBack,
   ChatOverlayBody,
   DropdownMenu,
   DropdownMenuContent,
@@ -484,14 +485,7 @@ function SheetWithNonmodalOverlay() {
               overlay does in a real host. */}
           {reading ? (
             <ChatOverlay onClose={() => setReading(false)} label="Transcript">
-              {/* A plain Button rather than ChatOverlayBack: the subject here
-                  is focus ownership, and ChatOverlayBack's accent text sits
-                  close enough to the AA line that its own contrast would be
-                  what this story reported on. ChatOverlay's own stories cover
-                  it. */}
-              <Button variant="ghost" size="sm" onClick={() => setReading(false)}>
-                Back
-              </Button>
+              <ChatOverlayBack onClick={() => setReading(false)}>Back</ChatOverlayBack>
               {/* Deliberately the last tabbable thing in the sheet: the case
                   that matters is Tab leaving the *end* of the nested view. */}
               <ChatOverlayBody className="p-4">

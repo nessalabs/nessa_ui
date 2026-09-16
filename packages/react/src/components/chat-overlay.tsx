@@ -271,7 +271,7 @@ function ChatOverlayBack({
         if (!event.defaultPrevented) close()
       }}
       className={cn(
-        "mx-auto shrink-0 cursor-pointer rounded-full border-0 bg-transparent px-3 py-1.5 font-sans nessa-text-2 font-medium text-(--nessa-chat-accent) outline-none hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        "mx-auto shrink-0 cursor-pointer rounded-full border-0 bg-transparent px-3 py-1.5 font-sans nessa-text-2 font-medium text-(--nessa-chat-accent-ink) outline-none hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         className,
       )}
       {...props}

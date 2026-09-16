@@ -70,7 +70,16 @@
   --nessa-thinking-fill-current: oklch(0.68 0.2 304);
   --nessa-thinking-fill-highlight: oklch(0.86 0.11 214);
   --nessa-fast-mode-active: oklch(0.57 0.22 300);
+  /* The fixed chat identity, in the same two steps the activity rings use:
+     the accent is the surface — the sent bubble, the live dot, the approve
+     button — and holds 4.7:1 under the white set on it. The ink is the
+     version that survives being the text itself. A link or an icon written
+     in the accent reads at 4.70:1 on pure white and less on anything a shade
+     off it, which is a boundary a component cannot control; in Dark it was
+     4.21:1 on the background and 3.81:1 on a card, below AA outright. Write
+     in the ink, never in the surface colour. */
   --nessa-chat-accent: #0071e3;
+  --nessa-chat-accent-ink: #0064c8;
   --nessa-chat-rim-0: rgba(245, 158, 11, 0.06);
   --nessa-chat-rim-1: rgba(245, 158, 11, 0.22);
   --nessa-chat-rim-2: rgba(236, 72, 153, 0.42);
@@ -174,6 +183,7 @@
   --nessa-thinking-fill-highlight: oklch(0.82 0.12 210);
   --nessa-fast-mode-active: oklch(0.72 0.185 306);
   --nessa-chat-accent: #0071e3;
+  --nessa-chat-accent-ink: #5aaaff;
   --nessa-chat-rim-0: rgba(245, 158, 11, 0.06);
   --nessa-chat-rim-1: rgba(245, 158, 11, 0.22);
   --nessa-chat-rim-2: rgba(236, 72, 153, 0.42);
