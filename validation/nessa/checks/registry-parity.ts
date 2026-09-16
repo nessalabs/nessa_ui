@@ -48,15 +48,29 @@ export function registryAliasFromSpecifier(specifier: string): { itemName: strin
   return null
 }
 
+/** Collect static imports and literal lazy imports without matching comments or strings. */
+function importSpecifiers(ast: ts.SourceFile): string[] {
+  const specifiers: string[] = []
+  const visit = (node: ts.Node): void => {
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+      specifiers.push(node.moduleSpecifier.text)
+    } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      const argument = node.arguments[0]
+      if (argument && (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument))) specifiers.push(argument.text)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(ast)
+  return specifiers
+}
+
 export function dependenciesFromSource(
   ast: ts.SourceFile,
   relativeRegistryItems: ReadonlyMap<string, string> = new Map(),
 ): { packages: string[]; registry: string[] } {
   const packages = new Set<string>()
   const registry = new Set<string>()
-  ast.forEachChild((node) => {
-    if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier)) return
-    const specifier = node.moduleSpecifier.text
+  importSpecifiers(ast).forEach((specifier) => {
     if (specifier === "react") return
     const alias = registryAliasFromSpecifier(specifier)
     if (alias) registry.add(`nessalabs/nessa_ui/${alias.itemName}`)
@@ -72,10 +86,9 @@ export function dependenciesFromSource(
  */
 export function registryAliasImports(ast: ts.SourceFile): Array<{ specifier: string; itemName: string; targetPrefix: string }> {
   const imports: Array<{ specifier: string; itemName: string; targetPrefix: string }> = []
-  ast.forEachChild((node) => {
-    if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier)) return
-    const alias = registryAliasFromSpecifier(node.moduleSpecifier.text)
-    if (alias) imports.push({ specifier: node.moduleSpecifier.text, ...alias })
+  importSpecifiers(ast).forEach((specifier) => {
+    const alias = registryAliasFromSpecifier(specifier)
+    if (alias) imports.push({ specifier, ...alias })
   })
   return imports
 }
@@ -106,9 +119,7 @@ export function relativeRegistryTopology(
 ) {
   const relativeRegistryItems = new Map<string, string>()
   const issues: string[] = []
-  ast.forEachChild((node) => {
-    if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier)) return
-    const specifier = node.moduleSpecifier.text
+  importSpecifiers(ast).forEach((specifier) => {
     if (!specifier.startsWith(".")) return
     const resolvedSourceStem = moduleStem(path.posix.normalize(path.posix.join(path.posix.dirname(sourcePath), specifier)))
     const dependency = registryFileBySourceStem.get(resolvedSourceStem) ?? registryFileBySourceStem.get(`${resolvedSourceStem}/index`)

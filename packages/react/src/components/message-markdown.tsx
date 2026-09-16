@@ -7,8 +7,13 @@ import remarkMath from "remark-math"
 
 import { cn } from "@/lib/utils"
 import { CodeBlock, CopyButton } from "./code-block"
-import { MathBlock } from "./math-block"
-import { MermaidDiagram } from "./mermaid-diagram"
+// Optional renderers load only when their corresponding node is present.
+const MathBlock = React.lazy(() =>
+  import("./math-block").then((module) => ({ default: module.MathBlock })),
+)
+const MermaidDiagram = React.lazy(() =>
+  import("./mermaid-diagram").then((module) => ({ default: module.MermaidDiagram })),
+)
 
 export interface MessageMarkdownProps
   extends Omit<React.ComponentProps<"div">, "children"> {
@@ -16,6 +21,8 @@ export interface MessageMarkdownProps
   children: string
   /** Per-element renderer overrides forwarded to react-markdown. */
   components?: Components
+  /** Additional Markdown AST transforms, applied after GFM and math parsing. */
+  remarkPlugins?: React.ComponentProps<typeof ReactMarkdown>["remarkPlugins"]
   /**
    * While true, newly arrived prose fades in with the same animation
    * MessageStreamText uses, so streamed markdown and streamed plain text
@@ -174,7 +181,11 @@ function MarkdownPre({ node, children, ...rest }: PreProps) {
   const replyStreaming = React.useContext(MarkdownStreamingContext)
   const fenced = extractFencedCode(children)
   if (fenced === null) return <pre {...rest}>{children}</pre>
-  if (fenced.isMath) return <MathBlock tex={fenced.code} className="my-3" />
+  if (fenced.isMath) return (
+    <React.Suspense fallback={<pre className="my-3">{fenced.code}</pre>}>
+      <MathBlock tex={fenced.code} className="my-3" />
+    </React.Suspense>
+  )
   if (fenced.language === "mermaid") {
     // While the reply streams, an unclosed fence at the tail parses as a
     // code block running to the end of the source, so "does the block's raw
@@ -190,7 +201,9 @@ function MarkdownPre({ node, children, ...rest }: PreProps) {
         : null
     const fenceOpen = replyStreaming && raw !== null && isFenceOpen(raw)
     return (
-      <MermaidDiagram chart={fenced.code} streaming={fenceOpen} className="my-3" />
+      <React.Suspense fallback={<pre className="my-3">{fenced.code}</pre>}>
+        <MermaidDiagram chart={fenced.code} streaming={fenceOpen} className="my-3" />
+      </React.Suspense>
     )
   }
   return (
@@ -202,7 +215,11 @@ type CodeProps = React.ComponentProps<"code"> & { node?: unknown }
 
 function MarkdownCode({ node: _node, className, children, ...rest }: CodeProps) {
   if ((className ?? "").includes("math-inline") && typeof children === "string") {
-    return <MathBlock inline tex={children} />
+    return (
+      <React.Suspense fallback={<code>{children}</code>}>
+        <MathBlock inline tex={children} />
+      </React.Suspense>
+    )
   }
   return (
     <code className={className} {...rest}>
@@ -256,6 +273,7 @@ const defaultComponents: Components = {
 function MessageMarkdown({
   children,
   components,
+  remarkPlugins = [],
   streaming = false,
   className,
   ...props
@@ -288,7 +306,7 @@ function MessageMarkdown({
       <MarkdownSourceContext.Provider value={children}>
         <MarkdownStreamingContext.Provider value={streaming}>
           <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkMath]}
+            remarkPlugins={[remarkGfm, remarkMath, ...(remarkPlugins ?? [])]}
             rehypePlugins={streaming ? streamingRehypePlugins : staticRehypePlugins}
             components={{ ...defaultComponents, ...components }}
           >
