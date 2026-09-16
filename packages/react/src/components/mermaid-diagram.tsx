@@ -388,12 +388,16 @@ function MermaidDiagram({
               : undefined,
           })
           return mermaid.render(`nessa-mermaid-${++renderSequence}`, chart)
-        }, RENDER_TIMEOUT)
+        }, RENDER_TIMEOUT, () => !cancelled)
         .then((outcome) => {
-          // `cancelled` silences this component's writes and nothing else.
-          // The queue's own deadline and quarantine are deliberately out of
-          // the effect's reach: a cleanup that could cancel them would strand
-          // every later diagram behind whatever this render was doing.
+          // `cancelled` did two different jobs above and here. At dequeue
+          // time it withdrew the job entirely, so a diagram whose chart
+          // changed while it waited never takes a turn — and never holds one
+          // open long enough to quarantine the diagram behind it. From the
+          // moment the render started it means only this: stop writing to a
+          // component that has moved on. The queue's deadline and quarantine
+          // stay out of the effect's reach either way, because a cleanup that
+          // could cancel them would strand every later diagram.
           if (cancelled) return
           if (outcome.status === "rendered") {
             setRendered({ chart, svg: outcome.value.svg })

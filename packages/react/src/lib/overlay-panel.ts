@@ -207,38 +207,58 @@ export function focusFirstWithin(root: HTMLElement) {
 }
 
 /**
- * The elements that own focus for whatever is inside them.
- *
- * A panel is not the only layer on the page. A menu, a popover or a dialog
- * that a control inside the panel opened runs its own focus management —
- * roving tabindex, its own Escape, its own restore — and a panel that also
- * acted on those keystrokes would fight it. Nessa's floating layers portal
- * into the panel that owns them, so they are usually descendants, and being a
- * descendant is exactly why the panel has to recognize them rather than
- * assume anything inside itself is its own business.
- *
- * Only dismissible floating layers are listed. An in-flow widget with its own
- * arrow-key navigation — a listbox, a tree, a grid — is *not* one: Tab moves
- * past it to the panel's next control, which is the panel's job.
- *
- * The popper wrapper is listed because that is the shape Radix portals take:
- * the role-bearing content sits inside a plain positioning wrapper.
+ * Every panel currently trapping Tab, so a nested one can be recognized as a
+ * real owner rather than guessed at from its markup.
  */
-const floatingLayerSelector =
-  '[role="dialog"], [role="alertdialog"], [role="menu"], [data-radix-popper-content-wrapper]'
+const activeTraps = new Set<HTMLElement>()
 
 /**
- * The floating layer currently holding focus, when it is not the panel itself.
+ * Foreign layers that genuinely own the focus inside them.
  *
- * @param root - The panel asking. It is a layer too, so it is excluded.
- * @returns The layer holding focus, or null when focus is in the panel's own
- * content or outside every layer.
+ * Every entry here is a *declaration*, not a shape. A menu and a Radix popper
+ * wrapper manage their own keyboard navigation by construction, and
+ * `aria-modal="true"` is the element saying outright that focus is contained
+ * within it — which is exactly what a panel needs to know before standing
+ * down.
+ *
+ * `role="dialog"` on its own is deliberately absent, and the reason is in
+ * this package: ChatOverlay is a `role="dialog"` that does *not* trap Tab, on
+ * purpose, so the chrome around it stays reachable. Treating the role as
+ * ownership would make a modal Sheet defer to an inner trap that does not
+ * exist, and Tab would leave the modal entirely — a worse failure than the
+ * one the delegation was added to fix, because it is silent.
+ *
+ * In-flow widgets with their own arrow-key navigation are absent for a
+ * different reason: Tab past a listbox or a tree is the panel's job.
  */
-function layerWithFocus(root: HTMLElement): HTMLElement | null {
+const foreignFocusOwnerSelector =
+  '[role="menu"], [data-radix-popper-content-wrapper], [aria-modal="true"]'
+
+/**
+ * The thing that owns focus right now, when it is something nested inside or
+ * beside this panel rather than the panel itself.
+ *
+ * Walks outward from the focused element and stops at whichever comes first:
+ * a nested owner, or `root`. Reaching `root` first means focus is in the
+ * panel's own content and the panel owns it.
+ *
+ * @param root - The panel asking.
+ * @returns The nested owner holding focus, or null when the panel owns it.
+ */
+function focusOwnerWithin(root: HTMLElement): HTMLElement | null {
   const active = root.ownerDocument.activeElement
   if (!(active instanceof HTMLElement)) return null
-  const layer = active.closest<HTMLElement>(floatingLayerSelector)
-  return layer && layer !== root ? layer : null
+  for (
+    let node: HTMLElement | null = active;
+    node;
+    node = node.parentElement
+  ) {
+    if (node === root) return null
+    if (activeTraps.has(node) || node.matches(foreignFocusOwnerSelector)) {
+      return node
+    }
+  }
+  return null
 }
 
 /**
@@ -251,10 +271,13 @@ function layerWithFocus(root: HTMLElement): HTMLElement | null {
  * tabbable controls at all keeps focus on itself instead of letting the
  * keystroke through, which is the case a trap that returns early gets wrong.
  *
- * Recovery stops at another layer. Focus sitting in a menu, popover or dialog
- * belongs to that layer, not to this panel, and the trap leaves it alone
- * until it closes and hands focus back — whether that layer portalled into
- * the panel, as Nessa's own do, or sits somewhere else entirely.
+ * Recovery stops at a nested owner. Focus sitting in a menu, a popover, or
+ * another trap belongs to that owner, not to this panel, and the trap leaves
+ * it alone until it closes and hands focus back — whether that owner
+ * portalled into the panel, as Nessa's own layers do, or sits somewhere else
+ * entirely. Ownership is read from what a surface actually does, never from
+ * its role alone: a nonmodal dialog nested inside a modal panel is still the
+ * modal panel's to contain.
  *
  * @param root - The panel Tab may not leave.
  * @returns The disposer that stops trapping.
@@ -263,11 +286,13 @@ export function trapTabWithin(root: HTMLElement) {
   const ownerDocument = root.ownerDocument
   const handleTab = (event: KeyboardEvent) => {
     if (event.key !== "Tab" || event.defaultPrevented) return
-    // Only the topmost layer moves focus. While a menu or popover this
+    // Only the innermost owner moves focus. While a menu or popover this
     // panel's own content opened holds focus, that layer owns the keystroke —
     // including its own Tab handling — and the containment below would drag
     // focus off the search field of a picker on its very first keystroke.
-    if (layerWithFocus(root)) return
+    // A nested surface that owns nothing does not qualify, so the panel keeps
+    // containing Tab through it.
+    if (focusOwnerWithin(root)) return
     const order = tabbableWithin(root)
     const current = ownerDocument.activeElement
     const inside = root.contains(current)
@@ -296,7 +321,11 @@ export function trapTabWithin(root: HTMLElement) {
   // Capture, so a control inside the panel that handles Tab itself still
   // cannot carry focus past the boundary.
   ownerDocument.addEventListener("keydown", handleTab, { capture: true })
+  // Announced, so an enclosing panel can tell a real nested trap from a
+  // surface that merely looks like one.
+  activeTraps.add(root)
   return () => {
+    activeTraps.delete(root)
     ownerDocument.removeEventListener("keydown", handleTab, { capture: true })
   }
 }

@@ -27,6 +27,8 @@ export type QueuedRenderOutcome<Value> =
   | { status: "timed-out" }
   /** An earlier render is still hung, so this one never started. */
   | { status: "quarantined" }
+  /** The caller no longer wanted it by the time its turn came. */
+  | { status: "cancelled" }
   /** The render itself threw — unparseable source, most often. */
   | { status: "failed"; error: unknown }
 
@@ -78,12 +80,28 @@ export class MermaidRenderQueue {
    * afterwards, including unmounting, can cancel that deadline; the job owns
    * it and clears it itself.
    *
-   * @param start - Begins the render. Not called at all when quarantined.
+   * Cancelling queued work and protecting active work are opposite needs, and
+   * `stillWanted` is the line between them. It is asked once, at the moment
+   * the job dequeues, and a caller that has gone away by then never runs at
+   * all — no `initialize`, no render, and no turn taken from the diagram
+   * behind it, which would otherwise wait on work nobody wanted and could be
+   * quarantined by it. Once the render has begun the answer no longer
+   * matters: the job is holding the global config either way, so it keeps its
+   * deadline regardless of what its caller does next.
+   *
+   * @param start - Begins the render. Never called when the job is cancelled
+   * or quarantined.
    * @param timeout - How long the dequeued render may run.
+   * @param stillWanted - Asked at dequeue time. Returning false skips the job.
    * @returns What happened, for the caller to render.
    */
-  run<Value>(start: () => Promise<Value>, timeout: number): Promise<QueuedRenderOutcome<Value>> {
+  run<Value>(
+    start: () => Promise<Value>,
+    timeout: number,
+    stillWanted?: () => boolean,
+  ): Promise<QueuedRenderOutcome<Value>> {
     const result = this.#chain.then(async (): Promise<QueuedRenderOutcome<Value>> => {
+      if (stillWanted && !stillWanted()) return { status: "cancelled" }
       if (this.#quarantining) return { status: "quarantined" }
       let deadline: number | undefined
       const expiry = new Promise<"timed-out">((resolve) => {

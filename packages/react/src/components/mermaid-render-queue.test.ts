@@ -129,6 +129,63 @@ test("a late settlement cannot lift a quarantine another render is holding", asy
   assert.equal(queue.quarantined, true)
 })
 
+/**
+ * Cancelling queued work is not the same as interrupting active work, and
+ * conflating them fails in both directions. A job whose caller went away
+ * while it waited must not take a turn: it would mutate the global config
+ * nobody is waiting on, and — if it then hung — quarantine the diagram behind
+ * it, which is still mounted and still wants its render.
+ */
+test("a job cancelled while queued never starts, and never blocks the one behind it", async () => {
+  const { clock, expire } = manualClock()
+  const queue = new MermaidRenderQueue(clock)
+
+  let releaseFirst: (value: string) => void = () => {}
+  const first = queue.run(() => new Promise<string>((resolve) => { releaseFirst = resolve }), 10)
+  await flush()
+
+  // B queues behind A, then its component unmounts.
+  let obsoleteStarted = false
+  let wanted = true
+  const obsolete = queue.run(
+    () => { obsoleteStarted = true; return new Promise<string>(() => {}) },
+    10,
+    () => wanted,
+  )
+  wanted = false
+
+  // C queues behind B and stays mounted.
+  let liveStarted = false
+  const live = queue.run(() => { liveStarted = true; return Promise.resolve("<svg/>") }, 10, () => true)
+
+  releaseFirst("<svg/>")
+  assert.deepEqual(await first, { status: "rendered", value: "<svg/>" })
+  assert.deepEqual(await obsolete, { status: "cancelled" })
+  assert.equal(obsoleteStarted, false, "an unwanted job must not touch the renderer")
+  assert.deepEqual(await live, { status: "rendered", value: "<svg/>" })
+  assert.equal(liveStarted, true)
+  assert.equal(queue.quarantined, false, "a job that never ran cannot quarantine the queue")
+  assert.equal(expire, expire)
+})
+
+/**
+ * The other half of the same line: cancellation applies while a job waits,
+ * never once it is running. A render that has started owns the global config,
+ * so its deadline has to survive its caller walking away.
+ */
+test("cancellation after the render starts does not disarm the deadline", async () => {
+  const { clock, expire } = manualClock()
+  const queue = new MermaidRenderQueue(clock)
+  let wanted = true
+  const running = queue.run(hangs(), 10, () => wanted)
+  await flush()
+  // The component unmounts mid-render. The job is already past the question.
+  wanted = false
+  expire()
+  assert.deepEqual(await running, { status: "timed-out" })
+  assert.equal(queue.quarantined, true)
+})
+
 test("each dequeued render arms its deadline and clears it on settlement", async () => {
   const state = manualClock()
   const queue = new MermaidRenderQueue(state.clock)
