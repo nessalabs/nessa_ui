@@ -2,6 +2,11 @@ import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, fireEvent, userEvent, waitFor, within } from "storybook/test"
 import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   Sheet,
   SheetAction,
   SheetBody,
@@ -351,5 +356,85 @@ export const DoneAction: Story = {
     // Released with the dismissal itself, not a task later when the unmount
     // cleanup happens to flush.
     await expect(canvas.getByRole("button", { name: "Open sheet" })).not.toHaveAttribute("inert")
+  },
+}
+
+function SheetWithPortalledMenu() {
+  const [open, setOpen] = React.useState(false)
+  const [chosen, setChosen] = React.useState("none")
+  return (
+    <div className="relative h-80 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-[2rem] bg-background">
+      <div className="p-4">
+        <button
+          type="button"
+          className="rounded-md border border-border px-3 py-2 font-sans nessa-text-4"
+          onClick={() => setOpen(true)}
+        >
+          Open sheet
+        </button>
+        <p className="mt-2 font-mono nessa-text-2 text-muted-foreground" data-testid="chosen">
+          chosen: {chosen}
+        </p>
+      </div>
+      {open ? (
+        <Sheet onClose={() => setOpen(false)} label="Run settings">
+          <SheetHandle />
+          <SheetHeader>
+            <SheetClose className="col-start-1 justify-self-start" />
+            <SheetTitle className="col-start-2">Run settings</SheetTitle>
+          </SheetHeader>
+          <SheetBody className="p-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">Model</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onSelect={() => setChosen("fast")}>Fast</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setChosen("deep")}>Deep</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SheetBody>
+        </Sheet>
+      ) : null}
+    </div>
+  )
+}
+
+export const PortalledLayerInsideSheet: Story = {
+  parameters: storyDocumentation(
+    "A menu opened from inside a modal sheet is portalled to the body, so it is not a descendant of the sheet. It is still the sheet's own layer: the sheet must not inert the portal it lands in, and its Tab containment must stand down while that layer holds focus. Only the topmost layer moves focus.",
+  ),
+  render: () => <SheetWithPortalledMenu />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const body = within(document.body)
+    await userEvent.click(canvas.getByRole("button", { name: "Open sheet" }))
+    const sheet = await canvas.findByRole("dialog", { name: "Run settings" })
+
+    // The sheet is modal, so what it covers really is inert.
+    await expect(sheet).toHaveAttribute("aria-modal", "true")
+
+    await userEvent.click(within(sheet).getByRole("button", { name: "Model" }))
+    const menu = await body.findByRole("menu")
+
+    // The portal the menu landed in must not have been swept up by the
+    // sheet's inertness: an inert wrapper silently disables the sheet's own
+    // control, and the menu can never take focus.
+    await expect(menu.closest("[inert]")).toBeNull()
+    await waitFor(() => expect(menu.contains(document.activeElement)).toBe(true))
+
+    // Tab belongs to the menu while the menu is up. The sheet's own
+    // containment must not drag focus back out of it.
+    await userEvent.keyboard("{ArrowDown}")
+    await expect(menu.contains(document.activeElement)).toBe(true)
+
+    // And the layer still works end to end.
+    await userEvent.keyboard("{Enter}")
+    await waitFor(() =>
+      expect(canvas.getByTestId("chosen")).not.toHaveTextContent("chosen: none"),
+    )
+    // Closing the menu leaves the sheet in charge again.
+    await waitFor(() => expect(body.queryByRole("menu")).toBeNull())
+    await waitFor(() => expect(sheet.contains(document.activeElement)).toBe(true))
   },
 }

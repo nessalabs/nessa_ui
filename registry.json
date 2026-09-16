@@ -612,6 +612,11 @@
           "path": "packages/react/src/components/mermaid-diagram.tsx",
           "type": "registry:ui",
           "target": "components/ui/mermaid-diagram.tsx"
+        },
+        {
+          "path": "packages/react/src/components/mermaid-render-queue.ts",
+          "type": "registry:ui",
+          "target": "components/ui/mermaid-render-queue.ts"
         }
       ]
     },

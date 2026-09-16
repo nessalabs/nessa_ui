@@ -5,34 +5,11 @@ import mermaid from "mermaid"
 import { Hand, Maximize2, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { mermaidRenderQueue } from "./mermaid-render-queue"
 import { CopyButton, useCodeBlockConfig, type CodeBlockMode } from "./code-block"
 import { GeneratingSurface } from "./generating-surface"
 
 let renderSequence = 0
-/**
- * Mermaid's initialize() mutates library-global config, so concurrent
- * diagrams with different themes could read each other's settings mid-render.
- * Every initialize+render pair is chained through this queue instead.
- */
-let renderQueue: Promise<unknown> = Promise.resolve()
-/**
- * Set while a render that blew its watchdog is still, as far as this module
- * knows, running.
- *
- * A hung render cannot be cancelled: Mermaid offers no abort, and the promise
- * this module is holding may never settle. Two things then have to be true at
- * once — no later diagram may wait on it (the queue is one chain, so one
- * unsettled link strands every diagram behind it forever), and no later
- * diagram may start either, because starting one means calling `initialize`
- * and mutating the global config the stuck render is still reading.
- *
- * Quarantine is the only move that satisfies both. The queue link is settled
- * so the chain advances, and every caller that dequeues while the flag is up
- * falls back to its source immediately instead of rendering. The flag clears
- * if the stuck render ever does settle, so a slow machine costs one diagram
- * rather than every diagram for the life of the page.
- */
-let renderQuarantined = false
 
 /**
  * How long a dequeued Mermaid render may run before the diagram gives up and
@@ -396,83 +373,43 @@ function MermaidDiagram({
     // times — visible jitter, especially for sequence diagrams. Waiting for
     // a short pause renders once per lull instead, and a static chart (the
     // usual case outside streaming) only defers its first paint by the delay.
-    let watchdog: number | undefined
     const timer = window.setTimeout(() => {
-      renderQueue = renderQueue
-        .then(async () => {
+      void mermaidRenderQueue
+        .run(() => {
+          mermaid.initialize({
+            startOnLoad: false,
+            securityLevel: "strict",
+            suppressErrorRendering: true,
+            theme: isDark ? "dark" : "default",
+            // Mermaid's stock dark edge-label background leaves label text at
+            // 4.43:1 — just under WCAG AA. A darker backdrop clears it.
+            themeVariables: isDark
+              ? { edgeLabelBackground: "#1f1f1f" }
+              : undefined,
+          })
+          return mermaid.render(`nessa-mermaid-${++renderSequence}`, chart)
+        }, RENDER_TIMEOUT)
+        .then((outcome) => {
+          // `cancelled` silences this component's writes and nothing else.
+          // The queue's own deadline and quarantine are deliberately out of
+          // the effect's reach: a cleanup that could cancel them would strand
+          // every later diagram behind whatever this render was doing.
           if (cancelled) return
-          // A render already timed out and is still holding the global
-          // config. Nothing may start behind it, so this diagram settles
-          // into its source now rather than waiting for a turn that is not
-          // coming.
-          if (renderQuarantined) {
-            setFailedChart(chart)
+          if (outcome.status === "rendered") {
+            setRendered({ chart, svg: outcome.value.svg })
+            setFailedChart(null)
             return
           }
-          // The watchdog is armed here — when this task actually dequeues —
-          // not when it was enqueued: renderQueue is shared by every diagram
-          // on the page, so a reply with a dozen fences can leave the last
-          // one queued for longer than the timeout through no fault of its
-          // own, and arming at enqueue time would fail it while it was
-          // merely waiting its turn. It only guards against a render that
-          // never resolves, converting an eternal shimmer into the readable
-          // source fallback.
-          const expiry = new Promise<"timed-out">((resolve) => {
-            watchdog = window.setTimeout(() => resolve("timed-out"), RENDER_TIMEOUT)
-          })
-          try {
-            mermaid.initialize({
-              startOnLoad: false,
-              securityLevel: "strict",
-              suppressErrorRendering: true,
-              theme: isDark ? "dark" : "default",
-              // Mermaid's stock dark edge-label background leaves label
-              // text at 4.43:1 — just under WCAG AA. A darker backdrop
-              // clears the threshold.
-              themeVariables: isDark
-                ? { edgeLabelBackground: "#1f1f1f" }
-                : undefined,
-            })
-            const render = mermaid.render(
-              `nessa-mermaid-${++renderSequence}`,
-              chart,
-            )
-            // The queue link itself is what is bounded, not just this
-            // component's placeholder: awaiting the render alone would leave
-            // an unsettled link that no later diagram can ever get past.
-            const result = await Promise.race([render, expiry])
-            if (result === "timed-out") {
-              renderQuarantined = true
-              // The stuck render is still the owner of the global config
-              // until it proves otherwise, so the quarantine lifts from the
-              // render's own settlement rather than from a timer.
-              void render.then(
-                () => { renderQuarantined = false },
-                () => { renderQuarantined = false },
-              )
-              if (!cancelled) setFailedChart(chart)
-              return
-            }
-            if (!cancelled) {
-              setRendered({ chart, svg: result.svg })
-              setFailedChart(null)
-            }
-          } catch {
-            // Mid-stream source is often momentarily invalid; keep the
-            // previous successful render on screen, but record the failure
-            // so a chart that never parses can settle into its fallback
-            // instead of generating forever.
-            if (!cancelled) setFailedChart(chart)
-          } finally {
-            window.clearTimeout(watchdog)
-          }
+          // Everything else settles into the readable source. Mid-stream
+          // source is often momentarily invalid, so the previous successful
+          // render stays on screen; recording the failure is what lets a
+          // chart that never parses stop generating forever.
+          setFailedChart(chart)
         })
-        .catch(() => {})
     }, 250)
     return () => {
       cancelled = true
       window.clearTimeout(timer)
-      window.clearTimeout(watchdog)
     }
   }, [chart, isDark])
 
