@@ -350,4 +350,10 @@ function CodeBlock({
   )
 }
 
-export { CodeBlock, CodeBlockProvider, CopyButton, useCodeBlockConfig }
+export {
+  CodeBlock,
+  CodeBlockProvider,
+  CopyButton,
+  useCodeBlockConfig,
+  useResolvedAppearance,
+}

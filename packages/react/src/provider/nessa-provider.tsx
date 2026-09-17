@@ -4,6 +4,10 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 import {
+  PortalContainerProvider,
+  usePortalContainerHost,
+} from "@/lib/portal-container"
+import {
   NessaColorMode,
   NessaColorModeContext,
   darkSchemeQuery,
@@ -116,11 +120,38 @@ function NessaProvider({
       ? (suppliedResolvedMode ?? systemResolved)
       : mode
 
+  // The appearance actually committed, whatever produced it. Entering
+  // unsupplied `system` hands over to this rather than to the initial seed:
+  // the seed answers "what should the first paint be", which is a different
+  // question from "what is on screen right now", and a Dark page switching to
+  // `system` under a Dark OS would otherwise publish Dark → Light → Dark and
+  // flash white on the way to the answer it already had.
+  //
+  // Written in an effect rather than during render, so a concurrent render
+  // that React throws away cannot leave its appearance behind as the
+  // committed one.
+  const committedResolved = React.useRef(resolvedMode)
+  React.useEffect(() => {
+    committedResolved.current = resolvedMode
+  }, [resolvedMode])
+
   // Only an unsupplied `system` request listens. A controlled resolution is
   // the application's answer and Nessa must not second-guess it; an explicit
   // light or dark has nothing to follow.
   const followsSystem =
     mode === NessaColorMode.System && suppliedResolvedMode === undefined
+  // Carry the committed appearance into the handoff render. `matchMedia` is
+  // sampled in the effect below, one render later; until then the last thing
+  // on screen is a better answer than a stale seed.
+  React.useEffect(() => {
+    if (!followsSystem) return
+    setSystemResolved((current) =>
+      current === committedResolved.current ? current : committedResolved.current,
+    )
+    // Runs on entry to unsupplied `system` only; the media effect below owns
+    // every later value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [followsSystem])
   React.useEffect(() => {
     if (!followsSystem || typeof window === "undefined" || !window.matchMedia) {
       return
@@ -159,6 +190,15 @@ function NessaProvider({
     [mode, resolvedMode, setMode],
   )
   const themeState = React.useMemo(() => ({ theme, scale }), [scale, theme])
+  // Where floating layers land when nothing nearer owns one. A menu portalled
+  // to the body leaves the scope entirely: its content keeps the semantic
+  // class names but none of the `data-nessa-*` attributes those tokens are
+  // declared on, so a picker opened inside a Dark provider on a Light page
+  // renders light. Panels that own a boundary — a Sheet, a reading view —
+  // still publish their own container nearer the layer and keep it, because
+  // routing their layers out here would undo their inertness and focus
+  // boundaries.
+  const { container: layerHost, setContainer: setLayerHost } = usePortalContainerHost()
 
   useControlledModeWarning(isControlled)
   useResolutionPropWarning(mode, suppliedResolvedMode, defaultResolvedMode)
@@ -180,12 +220,20 @@ function NessaProvider({
       style: { ...style, colorScheme: resolvedMode },
     }),
     scopeName: "NessaProvider",
+    // Rendered inside the scope element — after the content, and through
+    // `trailing` rather than as part of `children`, because `asChild` takes
+    // exactly one element and a fragment would not be one. A layer portalled
+    // here reads the same tokens and the same resolved mode as the content
+    // that opened it. It draws nothing; Radix positions its own content.
+    trailing: <div ref={setLayerHost} data-slot="nessa-layers" />,
   })
 
   return (
     <NessaThemeContext.Provider value={themeState}>
       <NessaColorModeContext.Provider value={colorModeState}>
-        {element}
+        <PortalContainerProvider container={layerHost}>
+          {element}
+        </PortalContainerProvider>
       </NessaColorModeContext.Provider>
     </NessaThemeContext.Provider>
   )

@@ -71,6 +71,13 @@ export function applyScopeProps(
 interface ScopeElementOptions {
   asChild?: boolean
   children?: React.ReactNode
+  /**
+   * Rendered inside the scope element, after the content, in both branches.
+   * Separate from `children` because `asChild` takes exactly one element:
+   * appending to a fragment would break that, so it is composed into the
+   * child's own children instead.
+   */
+  trailing?: React.ReactNode
   ref?: React.Ref<HTMLElement>
   props: Record<string, unknown>
   scopeName: string
@@ -84,6 +91,7 @@ interface ScopeElementOptions {
 export function useNessaScopeElement({
   asChild,
   children,
+  trailing,
   ref,
   props,
   scopeName,
@@ -91,15 +99,53 @@ export function useNessaScopeElement({
   useFragmentGuard(asChild, children, scopeName)
   useExistingScopeAttributeGuard(asChild, children, scopeName)
   if (asChild) {
+    // Reconciled explicitly, because Slot does not do what it looks like it
+    // does: `mergeProps` returns `{...slotProps, ...childProps}`, so for any
+    // prop that is not a handler, `style` or `className`, the *child* wins.
+    // Passing the scope's attributes straight through would let a child
+    // declare `data-nessa-mode="light"` inside a Dark provider — React
+    // context saying one thing while the DOM and the native controls say
+    // another — or keep `system` on the element, defeating the Light-or-Dark
+    // invariant the whole contract rests on.
+    //
+    // So the child's own copies are dropped first and the scope's values
+    // applied after, and `colorScheme` is merged last over the child's style
+    // rather than beside it. Everything else the child brought is left alone.
+    const child = children as React.ReactElement<Record<string, unknown>>
+    const childProps = (child.props ?? {}) as Record<string, unknown>
+    const childStyle = childProps.style as React.CSSProperties | undefined
+    const owned: Record<string, unknown> = { ...props }
+    const ownedStyle = props.style as React.CSSProperties | undefined
+    const reconciled = React.cloneElement(
+      child,
+      {
+        ...Object.fromEntries(
+          Object.keys(childProps)
+            .filter((key) => key.startsWith("data-nessa-"))
+            .map((key) => [key, undefined]),
+        ),
+        style: undefined,
+      } as Record<string, unknown>,
+      trailing === undefined ? (
+        (childProps.children as React.ReactNode)
+      ) : (
+        <>
+          {childProps.children as React.ReactNode}
+          {trailing}
+        </>
+      ),
+    )
+    owned.style = { ...childStyle, ...ownedStyle }
     return (
-      <Slot.Root {...props} ref={ref}>
-        {children as React.ReactElement}
+      <Slot.Root {...owned} ref={ref}>
+        {reconciled}
       </Slot.Root>
     )
   }
   return (
     <div {...props} ref={ref as React.Ref<HTMLDivElement>}>
       {children}
+      {trailing}
     </div>
   )
 }
@@ -141,7 +187,7 @@ function useExistingScopeAttributeGuard(
     )
     if (!existing.length) return
     console.warn(
-      `${scopeName} owns ${existing.join(", ")} and is replacing the value on its \`asChild\` child.`,
+      `${scopeName} owns ${existing.join(", ")}; the value on its \`asChild\` child is dropped so the scope's own wins.`,
     )
   }, [asChild, children, scopeName])
 }
