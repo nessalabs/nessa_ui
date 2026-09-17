@@ -70,6 +70,9 @@ export async function validateFull(options: FullValidationOptions = {}): Promise
       ["pnpm", ["validate:artifacts"]],
       ["pnpm", ["check:registry"]],
       ["pnpm", ["check:package"]],
+      // After the artifacts exist, because it measures them: what an
+      // installed consumer actually pays, against recorded budgets.
+      ["pnpm", ["measure:consumers"]],
       ["pnpm", ["check:storybook-docs"]],
     ]
     for (const [command, args] of commands) {
