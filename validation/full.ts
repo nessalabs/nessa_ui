@@ -66,7 +66,17 @@ export async function validateFull(options: FullValidationOptions = {}): Promise
       ["pnpm", ["validate:contracts:test"]],
       ["pnpm", ["typecheck"]],
       ["pnpm", ["test"]],
+      // Its own step, run after the Chromium suite rather than beside it.
+      // Vitest runs projects concurrently, and five browser instances across
+      // three engines contend for the machine badly enough to wedge: the run
+      // sat at 0% CPU with every engine alive. Sequential costs a few minutes
+      // and finishes.
+      ["pnpm", ["test:cross-engine"]],
       ["pnpm", ["test:unit"]],
+      // The server render. No browser suite can cover it: a component that
+      // reads `window` during render throws in Node and is invisible in a
+      // browser, however many engines that browser suite covers.
+      ["pnpm", ["test:ssr"]],
       ["pnpm", ["validate:artifacts"]],
       ["pnpm", ["check:registry"]],
       ["pnpm", ["check:package"]],

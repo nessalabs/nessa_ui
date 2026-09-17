@@ -139,6 +139,8 @@ export const Composition: Story = {
 }
 
 export const Submenu: Story = {
+  // Cross-engine: portalled layers, typeahead, and focus return.
+  tags: ["cross-engine"],
   parameters: storyDocumentation(
     "The nested submenu path: hovering or activating the sub-trigger opens the sub-content beside the menu, here holding a single-select radio group whose selection is marked by the leading dot indicator only.",
   ),

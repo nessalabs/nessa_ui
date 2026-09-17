@@ -306,6 +306,8 @@ export const Default: Story = {
 
 /** Proves the shortcut, the tile return, and where selection lands. */
 export const OverviewAndBack: Story = {
+  // Cross-engine: Web Animations sequencing across a layout change.
+  tags: ["cross-engine"],
   args: {},
   parameters: storyDocumentation(
     "Mod+G opens the overview, where the live window keeps its content and every other window becomes a preview tile. Choosing a tile returns the deck to the carousel focused on that window; Escape leaves the overview on the window the deck came from.",

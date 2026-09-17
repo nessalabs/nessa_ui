@@ -28,7 +28,8 @@
     "build": "pnpm clean && tsup && tailwindcss -i ./src/theme.css -o ./dist/theme.css --minify && tailwindcss -i ./src/styles.css -o ./dist/styles.css --minify && tailwindcss -i ./src/app.css -o ./dist/app.css --minify",
     "clean": "rimraf dist",
     "prepack": "pnpm build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:ssr": "tsx --test \"src/server-render.test.tsx\""
   },
   "peerDependencies": {
     "react": ">=19.0.0",

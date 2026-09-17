@@ -48,14 +48,36 @@ function ResetDemo({ onReset }: { onReset: () => void }) {
 /**
  * Waits for a restored card to finish its entrance, so the post-play axe
  * sweep measures settled colors rather than a mid-fade frame.
+ *
+ * How long that takes is the engine's business, not the component's. The
+ * entrance runs for one motion token, but an animation stays listed until the
+ * engine advances past its active phase, and a loaded WebKit runner can be
+ * several frames behind wall-clock — which is how this timed out on CI while
+ * passing on every engine locally. The budget is explicit rather than the
+ * one-second default, and generous enough for the slowest engine the package
+ * claims.
+ *
+ * The end state is unchanged: nothing may still be running on the card, which
+ * is what a play test owes the stories that run after it.
  */
 async function settledCard(canvasElement: HTMLElement) {
   let card: HTMLElement | null = null
-  await waitFor(() => {
-    card = canvasElement.querySelector<HTMLElement>('[data-slot="tool-approval"]')
-    expect(card).not.toBeNull()
-    expect(card!.getAnimations()).toHaveLength(0)
-  })
+  await waitFor(
+    () => {
+      card = canvasElement.querySelector<HTMLElement>('[data-slot="tool-approval"]')
+      expect(card).not.toBeNull()
+      const running = card!.getAnimations()
+      // Named, so a future failure says which animation is still running
+      // instead of only how many.
+      expect(
+        running.map((animation) => {
+          const effect = animation.effect as KeyframeEffect | null
+          return `${effect?.getTiming().duration ?? "?"}ms ${animation.playState}`
+        }),
+      ).toEqual([])
+    },
+    { timeout: 10000 },
+  )
   return card!
 }
 
@@ -297,7 +319,8 @@ export const ComposerDocked: Story = {
 }
 
 export const AllowFlow: Story = {
-  tags: ["reduced-motion"],
+  // Cross-engine: exit animation timing and focus after a resolved card.
+  tags: ["cross-engine", "reduced-motion"],
   parameters: storyDocumentation(
     "What granting looks like end to end on the docked surface: choosing a scope sets `resolution`, the card goes inert and plays its sink-and-fade exit, and the host's `onExited` swaps in the running ToolCall row plus a note naming the grant's reach, then re-homes focus into the composer — the exiting card released it. The play test grants for the session, asserts the handoff and the focus move, then presses the story's Reset demo scaffolding so the story is left on a live request you can run yourself.",
   ),
@@ -462,25 +485,19 @@ export const ExitFrameHold: Story = {
     // Enter or stray click can never grant twice.
     allowOnce.focus()
     await expect(allowOnce).not.toHaveFocus()
-    // Under motion, exactly one exit animation runs and settles into its
-    // held final frame — the card ends invisible but mounted. Under reduced
-    // motion no animation ever exists and the card simply stays put, inert.
-    const reducedMotion = canvasElement.ownerDocument.defaultView?.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches
-    if (reducedMotion) {
-      // No player runs, so the exit's end state applies instantly instead —
-      // an inert card must never sit there looking live.
-      await expect(card.getAnimations()).toHaveLength(0)
-      await waitFor(() => expect(getComputedStyle(card).opacity).toBe("0"))
-    } else {
-      await waitFor(() => expect(card.getAnimations()).toHaveLength(1))
-      await waitFor(() =>
-        expect(card.getAnimations()[0]!.playState).toBe("finished"),
-      )
-      // fill: "forwards" holds the sink-and-fade destination.
-      await expect(getComputedStyle(card).opacity).toBe("0")
-    }
+    // The held frame, asserted as the end state rather than as the mechanism
+    // holding it. Under motion the exit plays and then hands its destination
+    // to a class; under reduced motion that class applies immediately and no
+    // player ever runs. Either way the contract is the same and is what this
+    // story is for: the card ends invisible, still mounted, and inert.
+    //
+    // It used to assert one `finished` animation filling forwards, which is
+    // one way of holding the frame rather than the thing being promised —
+    // and a filling animation stays attached to the node for as long as it
+    // exists, so a card that had finished leaving kept an animation running
+    // behind it.
+    await waitFor(() => expect(getComputedStyle(card).opacity).toBe("0"))
+    await waitFor(() => expect(card.getAnimations()).toHaveLength(0))
     await expect(card.isConnected).toBe(true)
     // Clearing the resolution cancels the held frame and brings the card
     // back — both the documented reset path and what leaves this story

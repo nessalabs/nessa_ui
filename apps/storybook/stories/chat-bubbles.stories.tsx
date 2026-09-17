@@ -360,7 +360,8 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Conversation: Story = {
-  tags: ["reduced-motion"],
+  // Cross-engine: pointer long-press synthesis and the contextmenu event engines raise differently.
+  tags: ["cross-engine", "reduced-motion"],
   parameters: storyDocumentation(
     "Sent and received messages with a reply quote and a delivery receipt. Right-clicking or long-pressing a bubble shows the iMessage tapback row and a Reply action — reacting applies only iMessage's light dim to the rest of the transcript, while choosing Reply focuses the whole thread behind the full frost — picking an emoji pins it to the bubble's corner, picking it again clears it — the tapped message, the message it replies to, and every reply chained onto it stay sharp while the rest of the transcript recedes behind a frosted blur, and in-thread quotes hide since the replied-to message is already on screen.  Repeating the gesture or pressing Escape releases the focus.",
   ),
@@ -590,7 +591,8 @@ export const Typing: Story = {
 }
 
 export const Attachments: Story = {
-  tags: ["reduced-motion"],
+  // Cross-engine: a nested modal viewer's focus containment and restore.
+  tags: ["cross-engine", "reduced-motion"],
   parameters: storyDocumentation(
     "Every attachment kind shares the square tile. Multiple attachments collapse into a one-direction fanned stack labeled with a count; both the label and the stack open the full-surface viewer, which fills the chat frame with a tile grid and a per-kind summary. Back or Escape closes it.",
   ),

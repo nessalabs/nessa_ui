@@ -200,6 +200,12 @@ export const Playground: Story = {
 }
 
 export const Open: Story = {
+  // Cross-engine: a portalled popover, pointer events reaching a portalled
+  // option, and the capability-control invariant. Deliberately not
+  // ProviderTabs, which asserts flush subpixel adjacency between two
+  // separately positioned elements — that is calibrated to one engine on one
+  // platform's font metrics, and INT-001 already holds it on Chromium.
+  tags: ["cross-engine"],
   parameters: storyDocumentation(
     "The open state is dedicated to model discovery; capability controls never alter its layout.",
   ),
