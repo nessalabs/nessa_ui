@@ -48,14 +48,36 @@ function ResetDemo({ onReset }: { onReset: () => void }) {
 /**
  * Waits for a restored card to finish its entrance, so the post-play axe
  * sweep measures settled colors rather than a mid-fade frame.
+ *
+ * How long that takes is the engine's business, not the component's. The
+ * entrance runs for one motion token, but an animation stays listed until the
+ * engine advances past its active phase, and a loaded WebKit runner can be
+ * several frames behind wall-clock — which is how this timed out on CI while
+ * passing on every engine locally. The budget is explicit rather than the
+ * one-second default, and generous enough for the slowest engine the package
+ * claims.
+ *
+ * The end state is unchanged: nothing may still be running on the card, which
+ * is what a play test owes the stories that run after it.
  */
 async function settledCard(canvasElement: HTMLElement) {
   let card: HTMLElement | null = null
-  await waitFor(() => {
-    card = canvasElement.querySelector<HTMLElement>('[data-slot="tool-approval"]')
-    expect(card).not.toBeNull()
-    expect(card!.getAnimations()).toHaveLength(0)
-  })
+  await waitFor(
+    () => {
+      card = canvasElement.querySelector<HTMLElement>('[data-slot="tool-approval"]')
+      expect(card).not.toBeNull()
+      const running = card!.getAnimations()
+      // Named, so a future failure says which animation is still running
+      // instead of only how many.
+      expect(
+        running.map((animation) => {
+          const effect = animation.effect as KeyframeEffect | null
+          return `${effect?.getTiming().duration ?? "?"}ms ${animation.playState}`
+        }),
+      ).toEqual([])
+    },
+    { timeout: 10000 },
+  )
   return card!
 }
 
