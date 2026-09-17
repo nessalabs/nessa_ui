@@ -116,6 +116,8 @@ function TakeoverExample({ summary }: { summary?: string }) {
 }
 
 export const TranscriptTakeover: Story = {
+  // Cross-engine: focus entry into a view, sibling inertness, and focus restore.
+  tags: ["cross-engine"],
   parameters: storyDocumentation(
     "Opening the view replaces the transcript and nothing else: the tab strip above and the composer below stay exactly where they were, so switching conversations or starting a message never needs the reading view dismissed first. Back — or Escape — returns the transcript, and focus goes back to the control that opened it.",
   ),

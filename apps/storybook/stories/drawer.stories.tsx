@@ -197,6 +197,8 @@ export const SidePanel: Story = {
 }
 
 export const Resizable: Story = {
+  // Cross-engine: transitionend timing and pointer capture during a drag.
+  tags: ["cross-engine"],
   parameters: storyDocumentation(
     "A drawer the reader can widen: resizable puts an ARIA window-splitter handle on the inner edge, operable by drag and by keyboard, and clamped between minSize and maxSize. The play test drives it both ways — an arrow step, End for the maximum, then a pointer drag and a drag that overshoots the minimum — and asserts the rendered width and the reported aria-valuenow move together, since the handle reports the size layout actually resolved rather than the size that was requested. A double-click restores defaultSize, and a drawer dismissed mid-drag ends the gesture with it, so the next one does not resize on a hover.",
   ),

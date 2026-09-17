@@ -20,6 +20,8 @@ function PlaygroundExample() {
 }
 
 export const Playground: Story = {
+  // Cross-engine: contenteditable input handling and caret behavior.
+  tags: ["cross-engine"],
   parameters: storyDocumentation("An editable code surface with a searchable language picker and shared Shiki syntax colors. Code and language are controlled independently, and changing language preserves code. Supply children to replace the textarea with an editor-owned content view; the language header stays non-editable."),
   render: () => <PlaygroundExample />,
   play: async ({ canvasElement }) => {
@@ -36,7 +38,15 @@ export const Playground: Story = {
     await expect(input).toHaveValue("print('hello')\nprint('world')")
     await expect(canvas.getByTestId("submissions")).toHaveTextContent("0")
     const highlight = canvasElement.querySelector<HTMLElement>('[data-slot="code-editor-highlight"]')!
-    await waitFor(() => expect(highlight.querySelectorAll(".nessa-code-token").length).toBeGreaterThan(0))
+    // Shiki loads and compiles a grammar to colour Python, and how long that
+    // takes is an engine's business rather than the component's: Firefox under
+    // a parallel run needs several times what Chromium does, which the default
+    // one-second budget does not cover. The assertion is the same end state;
+    // only the patience is engine-shaped.
+    await waitFor(
+      () => expect(highlight.querySelectorAll(".nessa-code-token").length).toBeGreaterThan(0),
+      { timeout: 15000 },
+    )
     await expect(new Set(Array.from(highlight.querySelectorAll(".nessa-code-token"), (token) => getComputedStyle(token).color)).size).toBeGreaterThan(1)
     await expect(highlight).toHaveAttribute("aria-hidden", "true")
     await expect(highlight.textContent).toBe("print('hello')\nprint('world')")
@@ -44,7 +54,10 @@ export const Playground: Story = {
     await userEvent.click(input)
     ;(input as HTMLTextAreaElement).setSelectionRange(0, 5)
     await userEvent.keyboard("repr")
-    await waitFor(() => expect(highlight.textContent).toBe("repr('hello')\nprint('world')"))
+    await waitFor(
+      () => expect(highlight.textContent).toBe("repr('hello')\nprint('world')"),
+      { timeout: 15000 },
+    )
     await expect(input).toHaveValue("repr('hello')\nprint('world')")
     await expect((input as HTMLTextAreaElement).selectionStart).toBe(4)
   },

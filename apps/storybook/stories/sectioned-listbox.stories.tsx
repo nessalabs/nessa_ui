@@ -550,6 +550,8 @@ export const TrailingHints: Story = {
 }
 
 export const KeyboardCrossesSections: Story = {
+  // Cross-engine: roving tabindex across grouped options.
+  tags: ["cross-engine"],
   parameters: storyDocumentation(
     "Arrow-key navigation treats the list as one continuous sequence, moving from the last item of one section straight into the first item of the next.",
   ),

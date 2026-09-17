@@ -162,6 +162,8 @@ export const Pill: Story = {
 }
 
 export const VerticalManualActivation: Story = {
+  // Cross-engine: roving tabindex with manual activation.
+  tags: ["cross-engine"],
   parameters: storyDocumentation(
     "Vertical orientation with manual activation: arrow keys move focus down the list without selecting, and Enter or Space commits. Use manual activation when showing a panel is expensive — a fetch, a heavy render — so arrowing past a tab does not trigger it. The indicator moves to the list's inline-end edge and follows the writing direction.",
   ),

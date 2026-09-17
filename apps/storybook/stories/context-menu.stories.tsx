@@ -127,6 +127,8 @@ async function waitForMenuClosed(body: HTMLElement) {
 }
 
 export const Browser: Story = {
+  // Cross-engine: the contextmenu event and a portalled menu's focus.
+  tags: ["cross-engine"],
   parameters: storyDocumentation(
     "The full shadcn context-menu layout: navigation items with shortcuts, a disabled item, a More Tools submenu, checkbox items, and a People radio group. Checkbox items keep the menu open on toggle so several can be picked in one session; plain items and radio items dismiss on select. The play test opens the menu by right click, proves the popover surface by computed style, walks into the submenu, toggles both checkboxes without the menu closing, changes the radio selection, and closes the menu with Escape.",
   ),
