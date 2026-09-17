@@ -240,6 +240,16 @@ function useResolutionExit(
       fill: "forwards",
     })
     let cancelled = false
+    // The timer is the authority and `finished` only shortens it, the same
+    // way Sheet settles its interpolations. An animation's timeline does not
+    // advance while the document is not being rendered — a background tab, a
+    // hidden pane — so `finished` may never resolve, and `onExited` is what
+    // tells the host to take the card away. Waiting only on the promise
+    // leaves a resolved, inert card on screen indefinitely, with nothing
+    // left to move it.
+    const settle = window.setTimeout(() => {
+      if (!cancelled) report()
+    }, duration + 50)
     animation.finished
       .then(() => {
         if (!cancelled) report()
@@ -247,6 +257,7 @@ function useResolutionExit(
       .catch(() => undefined)
     return () => {
       cancelled = true
+      window.clearTimeout(settle)
       animation.cancel()
     }
   }, [entranceRef, ref, resolved])
