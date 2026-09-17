@@ -80,6 +80,13 @@ export async function validateFull(options: FullValidationOptions = {}): Promise
       ["pnpm", ["validate:artifacts"]],
       ["pnpm", ["check:registry"]],
       ["pnpm", ["check:package"]],
+      // Both after the artifacts exist, because both read them. The
+      // typecheck runs first and against the *built* declarations: esbuild
+      // strips types without checking them, so a fixture calling an API that
+      // does not exist still bundles, and the measurement would go on
+      // reporting bytes for a scenario that is no longer a valid consumer.
+      ["pnpm", ["typecheck:consumers"]],
+      ["pnpm", ["measure:consumers"]],
       ["pnpm", ["check:storybook-docs"]],
     ]
     for (const [command, args] of commands) {
