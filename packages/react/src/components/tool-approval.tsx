@@ -182,6 +182,7 @@ function useResolutionExit(
   // or zeroed duration tokens). The exit's END STATE still applies — just
   // instantly — so the card never sits fully visible while inert.
   const [motionless, setMotionless] = React.useState(false)
+  const exitRef = React.useRef<Animation | null>(null)
   // Keyed on resolved-ness, not the resolution's value: an optimistic
   // allowed that flips to denied mid-exit must not cancel-and-restart the
   // motion (a cancel drops the fill and flashes the card back first).
@@ -239,6 +240,7 @@ function useResolutionExit(
       easing,
       fill: "forwards",
     })
+    exitRef.current = animation
     let cancelled = false
     // The timer is the authority and `finished` only shortens it, the same
     // way Sheet settles its interpolations. An animation's timeline does not
@@ -247,20 +249,37 @@ function useResolutionExit(
     // tells the host to take the card away. Waiting only on the promise
     // leaves a resolved, inert card on screen indefinitely, with nothing
     // left to move it.
-    const settle = window.setTimeout(() => {
-      if (!cancelled) report()
-    }, duration + 50)
-    animation.finished
-      .then(() => {
-        if (!cancelled) report()
-      })
-      .catch(() => undefined)
+    //
+    // Settling hands the end state to CSS as well as reporting it. The
+    // animation fills forwards, so it stays attached to the node for as long
+    // as it exists — a card that has finished leaving would keep an animation
+    // running behind it, which is both untrue and the sort of thing that
+    // surfaces later as an unrelated test timing out. `motionless` paints the
+    // same end state from a class, and the layout effect below retires the
+    // animation once that class is on the element, so there is no frame where
+    // neither is holding the card down.
+    const settle = () => {
+      if (cancelled) return
+      setMotionless(true)
+      report()
+    }
+    const deadline = window.setTimeout(settle, duration + 50)
+    animation.finished.then(settle).catch(() => undefined)
     return () => {
       cancelled = true
-      window.clearTimeout(settle)
+      window.clearTimeout(deadline)
       animation.cancel()
+      exitRef.current = null
     }
   }, [entranceRef, ref, resolved])
+
+  // Retires the filling exit once its end state is on the element as a class.
+  // After the commit, so the card is never briefly un-held between the two.
+  React.useLayoutEffect(() => {
+    if (!motionless) return
+    exitRef.current?.cancel()
+    exitRef.current = null
+  }, [motionless])
   // Ref reads during render are safe here: the refs only change in effects,
   // and every change is paired with a state/prop change that re-renders.
   return { exiting: resolved && !mountedResolved.current, motionless }

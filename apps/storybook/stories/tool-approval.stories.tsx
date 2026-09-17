@@ -463,25 +463,19 @@ export const ExitFrameHold: Story = {
     // Enter or stray click can never grant twice.
     allowOnce.focus()
     await expect(allowOnce).not.toHaveFocus()
-    // Under motion, exactly one exit animation runs and settles into its
-    // held final frame — the card ends invisible but mounted. Under reduced
-    // motion no animation ever exists and the card simply stays put, inert.
-    const reducedMotion = canvasElement.ownerDocument.defaultView?.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches
-    if (reducedMotion) {
-      // No player runs, so the exit's end state applies instantly instead —
-      // an inert card must never sit there looking live.
-      await expect(card.getAnimations()).toHaveLength(0)
-      await waitFor(() => expect(getComputedStyle(card).opacity).toBe("0"))
-    } else {
-      await waitFor(() => expect(card.getAnimations()).toHaveLength(1))
-      await waitFor(() =>
-        expect(card.getAnimations()[0]!.playState).toBe("finished"),
-      )
-      // fill: "forwards" holds the sink-and-fade destination.
-      await expect(getComputedStyle(card).opacity).toBe("0")
-    }
+    // The held frame, asserted as the end state rather than as the mechanism
+    // holding it. Under motion the exit plays and then hands its destination
+    // to a class; under reduced motion that class applies immediately and no
+    // player ever runs. Either way the contract is the same and is what this
+    // story is for: the card ends invisible, still mounted, and inert.
+    //
+    // It used to assert one `finished` animation filling forwards, which is
+    // one way of holding the frame rather than the thing being promised —
+    // and a filling animation stays attached to the node for as long as it
+    // exists, so a card that had finished leaving kept an animation running
+    // behind it.
+    await waitFor(() => expect(getComputedStyle(card).opacity).toBe("0"))
+    await waitFor(() => expect(card.getAnimations()).toHaveLength(0))
     await expect(card.isConnected).toBe(true)
     // Clearing the resolution cancels the held frame and brings the card
     // back — both the documented reset path and what leaves this story
