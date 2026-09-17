@@ -64,6 +64,13 @@ export default defineConfig({
           // engine implements in its own way. Rendering a card does not.
           name: "storybook-cross-engine",
           testTimeout: 30000,
+          // Run through `pnpm test:cross-engine`, not as part of `pnpm test`.
+          // Vitest runs projects concurrently, and this one brings two more
+          // engines: five browser instances at once contend badly enough to
+          // wedge the whole run — measured at 0% CPU across every engine,
+          // still alive, 26 minutes in. The root scripts name their projects
+          // so the two suites never share a machine. Separately they cost
+          // about 2m40s and 3m10s.
           browser: {
             enabled: true,
             provider: playwright({}),
