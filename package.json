@@ -16,6 +16,7 @@
     "check:package": "tsx validation/check-package.ts",
     "check:chart-ramp": "tsx validation/tools/check-chart-ramp.ts",
     "measure:consumers": "tsx validation/tools/measure-consumers.ts",
+    "typecheck:consumers": "tsc -p validation/fixtures.tsconfig.json --noEmit",
     "check:registry": "tsx validation/check-registry.ts",
     "check:storybook-docs": "pnpm --filter @nessalabs/storybook test:docs",
     "dev": "pnpm --filter @nessalabs/storybook dev",

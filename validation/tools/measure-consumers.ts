@@ -16,7 +16,7 @@
 import { gzipSync } from "node:zlib"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { access } from "node:fs/promises"
+import { access, readFile } from "node:fs/promises"
 
 import { build, type Metafile } from "esbuild"
 
@@ -30,7 +30,12 @@ interface Measurement {
   name: string
   /** JavaScript a browser fetches before first render. */
   bytes: number
-  /** Stylesheet bytes the same bundle emits. */
+  /**
+   * Stylesheet bytes this JavaScript graph happens to emit — a dependency's
+   * own CSS, pulled in by an import. It is *not* the package's stylesheet: an
+   * installed consumer is told to import `@nessalabs/ui/styles.css` itself,
+   * and that flat cost is reported once below rather than per fixture.
+   */
   cssBytes: number
   gzipBytes: number
   /** The heaviest inputs, for a failure that needs explaining. */
@@ -129,8 +134,8 @@ async function measure(name: string): Promise<Measurement> {
   const reachable = new Set(staticallyReachable(result.metafile, entryKey))
 
   let bytes = 0
+  let gzipBytes = 0
   let cssBytes = 0
-  const buffers: Uint8Array[] = []
   for (const file of result.outputFiles) {
     const key = path.relative(root, file.path).split(path.sep).join("/")
     if (file.path.endsWith(".css")) {
@@ -139,18 +144,46 @@ async function measure(name: string): Promise<Measurement> {
     }
     if (!reachable.has(key)) continue
     bytes += file.contents.byteLength
-    buffers.push(file.contents)
+    // Compressed per file, then summed — not concatenated and compressed once.
+    // Splitting means these are separately served resources, and a browser
+    // gets each one's own gzip stream. Compressing them together lets a later
+    // chunk reuse an earlier one's dictionary, which no transfer ever does,
+    // and the total comes out well under what is actually downloaded.
+    gzipBytes += gzipSync(file.contents).byteLength
   }
   return {
     name,
     bytes,
     cssBytes,
-    gzipBytes: gzipSync(Buffer.concat(buffers)).byteLength,
+    gzipBytes,
     topInputs: topInputs(result.metafile, reachable),
   }
 }
 
 const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)} kB`
+
+/**
+ * The stylesheets a consumer imports by hand, which no fixture's JavaScript
+ * graph can account for.
+ *
+ * The README tells an installed consumer to import `@nessalabs/ui/styles.css`,
+ * so it is part of what they pay and none of the numbers above include it. It
+ * is a flat cost rather than a per-fixture one, so it is reported once.
+ */
+async function reportPackageStylesheets() {
+  const sheets = ["styles.css", "theme.css", "app.css"]
+  process.stdout.write("\nPackage stylesheets, imported by the consumer (flat, not in the rows above)\n")
+  for (const sheet of sheets) {
+    try {
+      const contents = await readFile(path.join(packageRoot, "dist", sheet))
+      process.stdout.write(
+        `  ${sheet.padEnd(14)}${kb(contents.byteLength).padStart(12)}${kb(gzipSync(contents).byteLength).padStart(12)} gzip\n`,
+      )
+    } catch {
+      process.stdout.write(`  ${sheet.padEnd(14)}${"absent".padStart(12)}\n`)
+    }
+  }
+}
 
 async function main() {
   try {
@@ -203,6 +236,7 @@ async function main() {
     process.exitCode = 1
     return
   }
+  await reportPackageStylesheets()
   process.stdout.write(
     `\nPASS consumer budgets — ${consumerBudgets.length} fixtures within budget.\n`,
   )

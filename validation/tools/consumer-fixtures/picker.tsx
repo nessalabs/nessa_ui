@@ -12,7 +12,7 @@ export function App() {
       <Button>Open</Button>
       <ModelPicker
         groups={[{ id: "p", label: "Provider", models: [{ id: "m", label: "Model" }] }]}
-        value="m"
+        value={{ providerId: "p", modelId: "m" }}
         onValueChange={() => {}}
       />
       <SearchableListbox

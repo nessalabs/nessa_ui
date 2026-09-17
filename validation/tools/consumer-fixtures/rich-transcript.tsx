@@ -22,7 +22,7 @@ export function App() {
         <Message>
           <MessageMarkdown>{"# Title\n\nSome **text**."}</MessageMarkdown>
           <CodeBlock code="const a = 1" language="ts" />
-          <MathBlock expression="a^2 + b^2 = c^2" />
+          <MathBlock tex="a^2 + b^2 = c^2" />
           <MermaidDiagram chart="graph TD; A-->B;" />
         </Message>
       </ChatBubble>

@@ -19,10 +19,21 @@
  * failure means something changed the import graph — not that a kilobyte was
  * added — so the response is to look at *why* a fixture moved, then re-record.
  *
+ * Gzip is summed per emitted chunk rather than measured over the chunks
+ * concatenated: splitting means they are separately served resources, each
+ * with its own compression stream, and compressing them together lets a later
+ * chunk reuse an earlier one's dictionary in a way no transfer ever does.
+ *
+ * The JavaScript here is what a browser fetches before first render. It
+ * excludes the renderers behind dynamic imports, and it excludes the
+ * stylesheet an installed consumer imports by hand — `measure:consumers`
+ * prints that separately, because it is a flat cost rather than a per-fixture
+ * one.
+ *
  * ## What the first measurement found
  *
  * `button-only` and `picker` come out within a kilobyte of each other, at
- * ~712 kB minified and ~182 kB gzipped. They should not: one is a single
+ * ~712 kB minified and ~186 kB gzipped. They should not: one is a single
  * control and the other is a popover with a listbox. The reason is in the
  * built artifact — `dist/index.js` statically re-exports `MermaidDiagram`
  * from a chunk that does `import mermaid from "mermaid"` at module scope, and
