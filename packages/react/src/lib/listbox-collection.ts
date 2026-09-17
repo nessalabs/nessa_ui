@@ -95,6 +95,39 @@ export interface ListboxCollection {
 }
 
 /**
+ * Whether Arrow keys visit this row, under a given policy.
+ *
+ * Exported and pure for the same reason as the navigation arithmetic: this is
+ * the function the hook calls, so a test of it is a test of what ships. A test
+ * that rebuilt the filter with its own `.filter(...)` would agree with itself
+ * no matter what the hook did.
+ *
+ * @param behavior - The listbox's disabled-row policy.
+ * @param entry - The row.
+ * @returns Whether navigation stops on it.
+ */
+export function isNavigableUnder(
+  behavior: ListboxDisabledBehavior,
+  entry: ListboxEntry,
+): boolean {
+  return behavior === "focusable" || !entry.disabled
+}
+
+/**
+ * The rows Arrow keys visit, in order, under a given policy.
+ *
+ * @param behavior - The listbox's disabled-row policy.
+ * @param entries - Every rendered row, in document order.
+ * @returns The navigable subset.
+ */
+export function navigableUnder(
+  behavior: ListboxDisabledBehavior,
+  entries: readonly ListboxEntry[],
+): ListboxEntry[] {
+  return entries.filter((entry) => isNavigableUnder(behavior, entry))
+}
+
+/**
  * Whether a keystroke is one the collection moves on.
  *
  * Exported and pure because it is the policy, not an implementation detail:
@@ -183,10 +216,10 @@ export function useListboxCollection({
   const optionRefs = React.useRef(new Map<string, HTMLElement>())
 
   const isNavigable = React.useCallback(
-    (entry: ListboxEntry) => disabledBehavior === "focusable" || !entry.disabled,
+    (entry: ListboxEntry) => isNavigableUnder(disabledBehavior, entry),
     [disabledBehavior],
   )
-  const navigable = entries.filter(isNavigable)
+  const navigable = navigableUnder(disabledBehavior, entries)
   // Keyed on which rows exist, not on the array holding them: `entries` is
   // rebuilt every render, so an effect depending on it would re-run on every
   // render for no reason.

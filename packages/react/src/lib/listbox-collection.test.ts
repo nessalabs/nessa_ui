@@ -5,7 +5,9 @@ import test from "node:test"
 
 import {
   indexOfOrigin,
+  isNavigableUnder,
   isNavigationKey,
+  navigableUnder,
   nextNavigationIndex,
   type ListboxEntry,
 } from "./listbox-collection"
@@ -140,6 +142,9 @@ test("an id that is no longer in the collection enters from the top", () => {
  * `focusable` keeps disabled rows in the sequence so a reader can hear why an
  * option is unavailable; `skipped` steps over them. Both are legitimate — the
  * defect was that each listbox decided privately and neither said so.
+ *
+ * These call the production filter rather than rebuilding it, so a hook that
+ * stopped honouring the policy fails here.
  */
 test("the disabled policy decides which rows navigation visits", () => {
   const entries: ListboxEntry[] = [
@@ -147,17 +152,61 @@ test("the disabled policy decides which rows navigation visits", () => {
     { id: "b", disabled: true },
     { id: "c", disabled: false },
   ]
-  const focusable = entries.filter(() => true)
-  const skipped = entries.filter((entry) => !entry.disabled)
-  assert.deepEqual(focusable.map((entry) => entry.id), ["a", "b", "c"])
-  assert.deepEqual(skipped.map((entry) => entry.id), ["a", "c"])
-  // Wrapping follows the filtered set, so `skipped` never lands on "b".
-  assert.equal(
-    skipped[nextNavigationIndex("ArrowDown", 1, skipped.length)!]!.id,
-    "a",
+  assert.deepEqual(
+    navigableUnder("focusable", entries).map((entry) => entry.id),
+    ["a", "b", "c"],
   )
-  assert.equal(
-    focusable[nextNavigationIndex("ArrowDown", 0, focusable.length)!]!.id,
-    "b",
+  assert.deepEqual(
+    navigableUnder("skipped", entries).map((entry) => entry.id),
+    ["a", "c"],
   )
+  assert.equal(isNavigableUnder("focusable", { id: "b", disabled: true }), true)
+  assert.equal(isNavigableUnder("skipped", { id: "b", disabled: true }), false)
+})
+
+test("wrapping follows the policy's own subset, not the rendered rows", () => {
+  const entries: ListboxEntry[] = [
+    { id: "a", disabled: false },
+    { id: "b", disabled: true },
+    { id: "c", disabled: false },
+  ]
+  // Under `skipped`, ArrowDown from the last navigable row wraps to the first
+  // and never lands on "b".
+  const skipped = navigableUnder("skipped", entries)
+  const fromLast = nextNavigationIndex("ArrowDown", skipped.length - 1, skipped.length)
+  assert.equal(skipped[fromLast!]!.id, "a")
+  // Under `focusable`, the same step from "a" lands on "b" precisely because
+  // it is in the sequence.
+  const focusable = navigableUnder("focusable", entries)
+  const fromFirst = nextNavigationIndex("ArrowDown", 0, focusable.length)
+  assert.equal(focusable[fromFirst!]!.id, "b")
+})
+
+test("a row disabled after render leaves the skipped sequence", () => {
+  const before: ListboxEntry[] = [
+    { id: "a", disabled: false },
+    { id: "b", disabled: false },
+  ]
+  const after: ListboxEntry[] = [
+    { id: "a", disabled: false },
+    { id: "b", disabled: true },
+  ]
+  assert.equal(navigableUnder("skipped", before).length, 2)
+  assert.equal(navigableUnder("skipped", after).length, 1)
+  // And the origin lookup no longer finds it, so the next Arrow enters from
+  // the top rather than moving relative to a row nobody can reach.
+  assert.equal(indexOfOrigin(navigableUnder("skipped", after), "b"), -1)
+})
+
+test("an all-disabled collection is empty under skipped and whole under focusable", () => {
+  const entries: ListboxEntry[] = [
+    { id: "a", disabled: true },
+    { id: "b", disabled: true },
+  ]
+  assert.equal(navigableUnder("skipped", entries).length, 0)
+  // Nowhere to move, which is the guard that keeps a keystroke from being
+  // swallowed for nothing.
+  assert.equal(nextNavigationIndex("ArrowDown", -1, 0), null)
+  assert.equal(navigableUnder("focusable", entries).length, 2)
+  assert.equal(nextNavigationIndex("ArrowDown", -1, 2), 0)
 })
