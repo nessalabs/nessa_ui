@@ -20,6 +20,21 @@ const stableComponent = `
   }
 `
 const stableSearchableListbox = `
+  import { useListboxCollection } from "@/lib/listbox-collection"
+  function SearchableListbox() {
+    const collection = useListboxCollection({ entries, value })
+    return <div data-slot="searchable-listbox-list">
+      <button
+        data-slot="searchable-listbox-option"
+        data-highlighted={collection.highlightedId === itemId ? "true" : "false"}
+        onPointerMove={() => collection.setHighlighted(itemId)}
+        onFocus={() => collection.handleOptionFocus(itemId)}
+      />
+    </div>
+  }
+`
+/** The engine forked back into the component, which the check must reject. */
+const forkedSearchableListbox = `
   function SearchableListbox() {
     const [highlightedId, setHighlightedId] = useState()
     return <div data-slot="searchable-listbox-list">
@@ -324,6 +339,24 @@ test("interaction stability rejects structural and evidence regressions", () => 
       `${stableStory.replace('defaultViewport: "mobile1"', 'defaultViewport: "desktop"')}${providerTabsStory}`,
       stableSearchableListbox,
     ).some((issue) => issue.includes("narrow viewport")),
+  )
+  // A listbox that goes back to running its own navigation is how the
+  // keyboard contract drifted apart in the first place, so the check has to
+  // reject it even though the highlighting inside it is still keyed by id.
+  const forked = interactionStabilityIssues(
+    stableComponent,
+    `${stableStory}${providerTabsStory}`,
+    forkedSearchableListbox,
+  )
+  assert.ok(
+    forked.some((issue) =>
+      issue.includes("must take its navigation from the shared listbox collection"),
+    ),
+    "a forked navigation engine must fail closed",
+  )
+  assert.ok(
+    forked.some((issue) => issue.includes("stable item identity")),
+    "highlighting read from a private copy is not the shared engine's",
   )
   assert.ok(
     interactionStabilityIssues(
