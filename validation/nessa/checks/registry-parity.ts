@@ -45,6 +45,21 @@ export function registryAliasFromSpecifier(specifier: string): { itemName: strin
   const segments = specifier.split("/")
   if (specifier.startsWith("@/components/ui/") && segments[3]) return { itemName: segments[3], targetPrefix: `components/ui/${segments[3]}` }
   if ((specifier.startsWith("@/components/") || specifier.startsWith("@/lib/")) && segments[2]) return { itemName: segments[2], targetPrefix: `${segments[1]}/${segments[2]}` }
+  // The provider surface is the one item that installs whole directories
+  // rather than a module per item: PROVIDER-001 names `provider/` and
+  // `theme/` as the paths it governs, and its four files are one thing a
+  // consumer takes or leaves. Both alias roots therefore resolve to it, and
+  // the prefix is the directory rather than the module inside it.
+  // Two alias roots the provider surface introduces, each owned by one item
+  // whose files all land under that directory — which is what makes the
+  // installability check above meaningful rather than something to work
+  // around. `theme/` depends on `provider/` and never the reverse.
+  if (specifier.startsWith("@/provider/") && segments[2]) {
+    return { itemName: "nessa-provider", targetPrefix: "provider" }
+  }
+  if (specifier.startsWith("@/theme/") && segments[2]) {
+    return { itemName: "nessa-theme-scope", targetPrefix: "theme" }
+  }
   return null
 }
 

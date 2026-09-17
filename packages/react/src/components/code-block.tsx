@@ -11,6 +11,7 @@ import type {
 import { Check, Copy } from "lucide-react"
 
 import { composeEventHandler } from "@/lib/compose"
+import { useOptionalNessaColorMode } from "@/provider/nessa-color-mode"
 import { cn } from "@/lib/utils"
 
 export type CodeBlockMode = "system" | "light" | "dark"
@@ -173,6 +174,24 @@ function useCodeBlockConfig(): CodeBlockConfig {
   return React.useContext(CodeBlockContext)
 }
 
+/**
+ * What `"system"` means when a Nessa provider is above this component.
+ *
+ * It means *the provider's* resolved appearance, not the operating system's.
+ * Without this the two answer the same question separately: a host that put a
+ * dark provider inside a light page would get dark surfaces with light code in
+ * them, because the code block asked the OS and the OS said light. The point
+ * of a resolved mode is that one answer reaches everything.
+ *
+ * Falls through to the old behavior when there is no provider, so adopting one
+ * is not all-or-nothing.
+ */
+function useResolvedAppearance(mode: CodeBlockMode): CodeBlockMode {
+  const nessa = useOptionalNessaColorMode()
+  if (mode !== "system" || !nessa) return mode
+  return nessa.resolvedMode
+}
+
 export interface CodeBlockProviderProps extends CodeBlockConfig {
   children?: React.ReactNode
 }
@@ -289,9 +308,10 @@ function CodeBlock({
   ...props
 }: CodeBlockProps) {
   const config = React.useContext(CodeBlockContext)
+  const requestedMode = mode ?? config.mode ?? "system"
   const resolved = {
     theme: theme ?? config.theme ?? defaultCodeTheme,
-    mode: mode ?? config.mode ?? "system",
+    mode: useResolvedAppearance(requestedMode),
     lineNumbers: lineNumbers ?? config.lineNumbers ?? false,
     wrap: wrap ?? config.wrap ?? false,
   }

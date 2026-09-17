@@ -214,4 +214,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-015",
+    kind: "transition",
+    contractId: "PROVIDER-001",
+    baseRevision: "ae7825a29b596d953eeb5cca1d7c6505442705dd",
+    targets: ["validation/contracts.ts", "validation/nessa/check-metadata.ts"],
+    beforeFingerprint: "e96907fed99ccf15e967acf4914eab3ae1d9288d55ccb75f5f86f83fe5097e2d",
+    afterFingerprint: "0bfdc7b19c1250a3d44d06c3f46b431b71e87c90885003fdec07500b6cf4906b",
+    rationale: "The provider surface exists, so the contract that governs it is enforced rather than planned. NessaProvider and NessaThemeScope own one element each and publish a resolved appearance that is always Light or Dark; `system` is a request that stays in React state and never reaches the DOM. Dark tokens gain a second way in, `[data-nessa-mode=\"dark\"]`, written by the provider and by every theme-bearing scope, so a Dark region resolves against the nearest scope rather than against any Dark ancestor. The new provider-surface check holds the three properties that fail silently: that the resolved mode is exactly Light or Dark, that neither component touches documentElement or body, and that a theme-bearing scope re-emits the mode while a scale-only scope does not.",
+    compatibility: "Additive. `.dark` keeps working exactly as before and is still emitted, so an application that has not adopted the provider is unaffected and no existing token, selector or rendered output changes. The provider is opt-in: a tree without one behaves as it does today. Light-inside-Dark nesting is deliberately not claimed — it needs the complete Light foundation emitted onto every scope selector, which is the token generator TOKEN-001 still tracks — so a nested Light scope inside a Dark one continues to inherit Dark until that lands.",
+    migration: "An application wraps its tree in NessaProvider and passes `mode`/`onModeChange` to connect its own persistence, or leaves it uncontrolled to follow the operating system. Nothing is required of applications that do not: the shadcn-compatible `.dark` class remains the supported path until TOKEN-001 completes the scoped token chain.",
+    supersedes: null,
+    pullRequest: null,
+  },
 ])

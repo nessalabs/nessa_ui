@@ -11,7 +11,14 @@ export interface ThemeTokens {
 export function extractThemeTokens(root: Root): ThemeTokens {
   const result: ThemeTokens = { light: {}, dark: {} }
   root.walkRules((rule) => {
-    const target = rule.selector.trim() === ":root" ? result.light : rule.selector.trim() === ".dark" ? result.dark : null
+    // The Dark block carries two selectors: the shadcn-compatible `.dark`
+    // and Nessa's own scope attribute, which the provider writes. They are
+    // one declaration block with two ways in, so both name the same tokens.
+    const selector = rule.selector.trim().replace(/\s+/g, " ")
+    const isDark =
+      selector === ".dark" ||
+      selector === '.dark, :where([data-nessa-mode="dark"])'
+    const target = selector === ":root" ? result.light : isDark ? result.dark : null
     if (!target) return
     rule.walkDecls(/^--/, (declaration) => {
       target[declaration.prop.slice(2)] = declaration.value.trim()

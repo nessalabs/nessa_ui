@@ -355,6 +355,52 @@
       ]
     },
     {
+      "name": "nessa-provider",
+      "type": "registry:lib",
+      "title": "Nessa provider",
+      "description": "The root of a Nessa tree and its nested theme scopes: one element each carrying the theme, the scale and the resolved appearance, and one context publishing that appearance to the few components that render in it. `system` is a request that stays in React state; what reaches the DOM is always light or dark.",
+      "dependencies": [
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/provider/nessa-color-mode.ts",
+          "type": "registry:lib",
+          "target": "provider/nessa-color-mode.ts"
+        },
+        {
+          "path": "packages/react/src/provider/nessa-scope.tsx",
+          "type": "registry:lib",
+          "target": "provider/nessa-scope.tsx"
+        },
+        {
+          "path": "packages/react/src/provider/nessa-provider.tsx",
+          "type": "registry:lib",
+          "target": "provider/nessa-provider.tsx"
+        }
+      ]
+    },
+    {
+      "name": "nessa-theme-scope",
+      "type": "registry:lib",
+      "title": "Nessa theme scope",
+      "description": "A nested region with its own theme, scale, or both. It re-emits the provider's resolved appearance onto its own element, which is what lets a dark region sit inside a light page: every dark token selector matches the nearest scope rather than any dark ancestor.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-provider",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/theme/nessa-theme-scope.tsx",
+          "type": "registry:lib",
+          "target": "theme/nessa-theme-scope.tsx"
+        }
+      ]
+    },
+    {
       "name": "listbox-collection",
       "type": "registry:lib",
       "title": "Listbox collection",
@@ -516,6 +562,7 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/nessa-provider",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -630,10 +677,11 @@
         "mermaid"
       ],
       "registryDependencies": [
-        "nessalabs/nessa_ui/nessa-base",
-        "nessalabs/nessa_ui/utils",
         "nessalabs/nessa_ui/code-block",
-        "nessalabs/nessa_ui/generating-surface"
+        "nessalabs/nessa_ui/generating-surface",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/nessa-provider",
+        "nessalabs/nessa_ui/utils"
       ],
       "files": [
         {

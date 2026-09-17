@@ -143,7 +143,25 @@
   --nessa-market-loss: oklch(0.55 0.19 27);
 }
 
-.dark {
+/* Dark, anchored to the scope that resolved it.
+
+   `.dark` is the shadcn-compatible selector this file has always carried.
+   `[data-nessa-mode="dark"]` is Nessa's own, written by NessaProvider and by
+   every theme-bearing NessaThemeScope, and it is what makes nesting work: a
+   selector matching the *nearest* scope's attribute rather than any dark
+   ancestor lets a dark region sit inside a light page and resolve on its own.
+
+   `:where()` keeps it at zero specificity, so a consumer override on the same
+   scope wins without an `!important`. Custom properties inherit, so a nested
+   scope redeclaring them is what descendants read — specificity never enters
+   into it across elements.
+
+   Light inside dark is the half this does not yet do: it needs the complete
+   Light foundation emitted onto every scope selector, which is the token
+   generator TOKEN-001 tracks. Until then a nested Light scope inherits the
+   Dark values above it. */
+.dark,
+:where([data-nessa-mode="dark"]) {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
