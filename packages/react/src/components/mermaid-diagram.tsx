@@ -4,6 +4,7 @@ import * as React from "react"
 import mermaid from "mermaid"
 import { Hand, Maximize2, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react"
 
+import { useOptionalNessaColorMode } from "@/provider/nessa-color-mode"
 import { cn } from "@/lib/utils"
 import { mermaidRenderQueue } from "./mermaid-render-queue"
 import { CopyButton, useCodeBlockConfig, type CodeBlockMode } from "./code-block"
@@ -319,7 +320,15 @@ function MermaidDiagram({
   ...props
 }: MermaidDiagramProps) {
   const config = useCodeBlockConfig()
-  const resolvedMode = mode ?? config.mode ?? "system"
+  const requestedMode = mode ?? config.mode ?? "system"
+  // A Nessa provider above this diagram has already resolved what "system"
+  // means, and its answer is the one the surrounding surfaces are drawn in.
+  // Asking the OS separately is how a dark panel ends up holding a light
+  // diagram. Without a provider this falls through to the media query below,
+  // so adopting one is not all-or-nothing.
+  const nessa = useOptionalNessaColorMode()
+  const resolvedMode =
+    requestedMode === "system" && nessa ? nessa.resolvedMode : requestedMode
   // The svg is stored with the chart it was rendered from, so "is the
   // on-screen render current?" is answerable — after streaming ends, the
   // reveal must wait for the final chart's render, not a stale prefix that

@@ -1073,6 +1073,29 @@ export {
   usePortalContainer,
   type PortalContainerProviderProps,
 } from "./lib/portal-container"
+export {
+  NessaColorMode,
+  useNessaColorMode,
+  useOptionalNessaColorMode,
+  type NessaColorModeState,
+  type NessaResolvedColorMode,
+} from "./provider/nessa-color-mode"
+export {
+  NessaProvider,
+  type NessaControlledColorMode,
+  type NessaProviderProps,
+  type NessaUncontrolledColorMode,
+} from "./provider/nessa-provider"
+export {
+  NessaScale,
+  type NessaThemeName,
+  type NessaThemeState,
+} from "./provider/nessa-scope"
+export {
+  NessaThemeScope,
+  useNessaTheme,
+  type NessaThemeScopeProps,
+} from "./theme/nessa-theme-scope"
 export { cn } from "./lib/utils"
 export { VirtualList, type VirtualListProps } from "./components/virtual-list"
 export { GitHistory, layoutGitHistory, type GitHistoryProps, type GitCommit, type GitGraphRow } from "./components/git-history"

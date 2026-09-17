@@ -56,7 +56,7 @@ export const contracts = Object.freeze([
   contract("STYLE-001", "Component class surfaces use semantic tokens only, never raw palette scales or literal color values.", "docs/architecture/design-system-contract.md#styling-discipline-and-inline-style-escape-hatch", "enforced", "style-discipline"),
   contract("STYLE-002", "Class-surface stacking utilities stay on the frozen z-0 through z-50 scale.", "docs/architecture/design-system-contract.md#styling-discipline-and-inline-style-escape-hatch", "enforced", "style-discipline"),
   contract("STYLE-003", "Inline style declarations are limited to custom properties and the computed-geometry allowlist.", "docs/architecture/design-system-contract.md#styling-discipline-and-inline-style-escape-hatch", "enforced", "style-discipline"),
-  contract("PROVIDER-001", "Provider, scope, mode, SSR, wrapper, and context boundaries activate together under their frozen contract.", "docs/architecture/design-system-contract.md#simplified-color-mode-api", "planned", null, "provider-surface"),
+  contract("PROVIDER-001", "Provider, scope, mode, SSR, wrapper, and context boundaries activate together under their frozen contract.", "docs/architecture/design-system-contract.md#simplified-color-mode-api", "enforced", "provider-surface"),
   contract("ICON-001", "Semantic icons activate only with a real consuming component and frozen resolution/accessibility ownership.", "docs/architecture/design-system-contract.md#real-icon-consumer-before-api-stability", "planned", null, "icon-consumer-surface"),
 ] satisfies readonly ContractEntry[])
 

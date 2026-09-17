@@ -5,6 +5,7 @@ import { governanceCheck } from "./governance.ts"
 import { interactionStabilityCheck } from "./interaction-stability.ts"
 import { packageArtifactsBuiltCheck, packageArtifactsCheck } from "./package-artifacts.ts"
 import { parserHygieneCheck } from "./parser-hygiene.ts"
+import { providerSurfaceCheck } from "./provider-surface.ts"
 import { registryParityCheck } from "./registry-parity.ts"
 import { sourceBoundariesCheck } from "./source-boundaries.ts"
 import { storybookCoverageCheck } from "./storybook-coverage.ts"
@@ -23,6 +24,7 @@ export const nessaChecks = Object.freeze([
   storybookCoverageCheck,
   interactionStabilityCheck,
   parserHygieneCheck,
+  providerSurfaceCheck,
   packageArtifactsCheck,
   accessibilityCheck,
   packageArtifactsBuiltCheck,
