@@ -401,6 +401,19 @@
       ]
     },
     {
+      "name": "listbox-collection",
+      "type": "registry:lib",
+      "title": "Listbox collection",
+      "description": "The keyboard and highlight engine Nessa's listboxes share: which rows Arrow keys visit, which row holds the single tab stop, and what happens at a disabled row \u2014 one documented policy rather than whatever each listbox happened to implement.",
+      "files": [
+        {
+          "path": "packages/react/src/lib/listbox-collection.ts",
+          "type": "registry:lib",
+          "target": "lib/listbox-collection.ts"
+        }
+      ]
+    },
+    {
       "name": "compose",
       "type": "registry:lib",
       "title": "Ref and event composition",
@@ -1279,6 +1292,7 @@
         "lucide-react"
       ],
       "registryDependencies": [
+        "nessalabs/nessa_ui/listbox-collection",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
       ],

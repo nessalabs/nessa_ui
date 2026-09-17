@@ -822,12 +822,28 @@ export function interactionStabilityIssues(
   if (hasGeometryTransition(modelClass) || hasGeometryTransition(contentClass)) {
     issues.push("Preview-owned hit-target geometry must not be transitioned.")
   }
+  // Highlighting is keyed on the item's own id, never on its position: a
+  // filtered or reordered list would otherwise move the highlight onto
+  // whichever row inherited the index. The engine holding that state now
+  // lives in the shared collection, so the listbox is checked for reading it
+  // by id rather than for owning the state itself.
   if (
-    !searchableListboxSource.includes("highlightedId === itemId") ||
-    !searchableListboxSource.includes("setHighlightedId(itemId)")
+    !searchableListboxSource.includes("collection.highlightedId === itemId") ||
+    !searchableListboxSource.includes("collection.setHighlighted(itemId)") ||
+    !searchableListboxSource.includes("collection.handleOptionFocus(itemId)")
   ) {
     issues.push(
       "Reusable pointer highlighting must retain stable item identity.",
+    )
+  }
+  // And it must come from the shared engine. Two listboxes maintaining their
+  // own navigation is how the keyboard contract drifted apart the first time.
+  if (
+    !searchableListboxSource.includes('from "@/lib/listbox-collection"') ||
+    !searchableListboxSource.includes("useListboxCollection({")
+  ) {
+    issues.push(
+      "SearchableListbox must take its navigation from the shared listbox collection.",
     )
   }
   const regression = exportedStorySource(storyAst, "StablePointerPreview")
