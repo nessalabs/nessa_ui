@@ -61,7 +61,12 @@ export default defineConfig({
           // engine, and the ones that do would be lost in the noise.
           //
           // A story earns the `cross-engine` tag by depending on something an
-          // engine implements in its own way. Rendering a card does not.
+          // engine implements in its own way. Rendering a card does not — and
+          // neither does measuring one. A story asserting exact pixel geometry
+          // is calibrated to the fonts and layout of the engine and platform
+          // it was written on, so tagging it claims every engine lays out
+          // identically to the subpixel, which is not true and not what this
+          // project is asking.
           name: "storybook-cross-engine",
           testTimeout: 30000,
           // Run through `pnpm test:cross-engine`, not as part of `pnpm test`.
