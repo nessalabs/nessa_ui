@@ -230,6 +230,8 @@ export const TrailingHints: Story = {
 }
 
 export const DisabledItems: Story = {
+  // Cross-engine: roving tabindex, Home/End, and :focus-visible on an editable field.
+  tags: ["cross-engine"],
   parameters: storyDocumentation(
     "Disabled records remain discoverable by keyboard but cannot be selected.",
   ),

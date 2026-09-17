@@ -40,7 +40,10 @@ jobs:
           test "$(pnpm --version)" = "11.9.0"
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Provision Chromium
-        run: pnpm --filter @nessalabs/storybook exec playwright install --with-deps chromium
+      # Every engine the package claims support for. Chromium runs the whole
+      # story suite; Firefox and WebKit run the `cross-engine` subset, which is
+      # the only part whose answer can differ by engine.
+      - name: Provision browser engines
+        run: pnpm --filter @nessalabs/storybook exec playwright install --with-deps chromium firefox webkit
       - name: Run full contract gate
         run: pnpm validate:full

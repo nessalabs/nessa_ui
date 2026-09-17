@@ -292,6 +292,8 @@ function CommentDemo() {
 }
 
 export const CommentMode: Story = {
+  // Cross-engine: Selection and Range APIs, which engines report differently.
+  tags: ["cross-engine"],
   parameters: storyDocumentation(
     "Action clicks stay host-owned: this host swaps the pill's children into a comment composer when Comment is clicked, and back once the comment is saved. The component itself only manages the shelf reveal.",
   ),

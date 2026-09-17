@@ -1,0 +1,35 @@
+{
+  "//": [
+    "The consumer fixtures, typechecked against the package's *built* public",
+    "declarations rather than its source.",
+    "",
+    "esbuild strips types without checking them, so a fixture can bundle",
+    "happily while calling an API that does not exist — which is exactly what",
+    "happened: MathBlock was passed `expression` where it reads `tex`, and",
+    "ModelPicker a string where it takes a provider/model pair. The bytes",
+    "still counted, because importing a component keeps its code either way,",
+    "but the fixtures were no longer the consumer examples they claim to be.",
+    "",
+    "Pointed at dist/index.d.ts, not at src, so this checks what a consumer",
+    "actually installs: a public API change that breaks a fixture fails the",
+    "gate instead of leaving an invalid sample quietly bundling."
+  ],
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "strict": true,
+    "target": "ES2022",
+    "baseUrl": ".",
+    "paths": {
+      "@nessalabs/ui": ["../packages/react/dist/index.d.ts"],
+      "react": ["../packages/react/node_modules/@types/react"],
+      "react/jsx-runtime": ["../packages/react/node_modules/@types/react/jsx-runtime"],
+      "react-dom": ["../packages/react/node_modules/@types/react-dom"]
+    }
+  },
+  "include": ["./tools/consumer-fixtures/**/*.tsx"]
+}

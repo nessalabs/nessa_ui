@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
+import { expect, userEvent, within } from "storybook/test"
 import { Input } from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
@@ -35,6 +36,8 @@ export const Playground: Story = {
 }
 
 export const Invalid: Story = {
+  // Cross-engine: :focus-visible matching on editable fields, which engines differ on.
+  tags: ["cross-engine"],
   parameters: storyDocumentation(
     "Set `aria-invalid` and connect specific error text with `aria-describedby`.",
   ),
@@ -55,4 +58,20 @@ export const Invalid: Story = {
       </p>
     </div>
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const field = canvas.getByRole("textbox", { name: "Email address" })
+    await expect(field).toHaveAttribute("aria-invalid", "true")
+    await expect(field).toHaveAccessibleDescription("Enter a valid email address.")
+
+    // The reason this story is worth running on three engines. Engines differ
+    // on when an editable field matches `:focus-visible` — several match it
+    // for pointer focus too, which is why Nessa's fields draw no ring of their
+    // own and let the row around them own the treatment. Reaching the field by
+    // keyboard must match on all of them; the assertion is the selector, not a
+    // rendered pixel, so it says the same thing everywhere.
+    await userEvent.tab()
+    await expect(field).toHaveFocus()
+    await expect(field.matches(":focus-visible")).toBe(true)
+  },
 }
