@@ -218,7 +218,7 @@ export const amendments: readonly Amendment[] = Object.freeze([
     id: "AMEND-015",
     kind: "transition",
     contractId: "PROVIDER-001",
-    baseRevision: "29128f31c8c0196724ab1c88a465926c1b52515b",
+    baseRevision: "ae7825a29b596d953eeb5cca1d7c6505442705dd",
     targets: ["validation/contracts.ts", "validation/nessa/check-metadata.ts"],
     beforeFingerprint: "e96907fed99ccf15e967acf4914eab3ae1d9288d55ccb75f5f86f83fe5097e2d",
     afterFingerprint: "0bfdc7b19c1250a3d44d06c3f46b431b71e87c90885003fdec07500b6cf4906b",
