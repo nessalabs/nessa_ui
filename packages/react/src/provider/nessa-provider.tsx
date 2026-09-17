@@ -29,10 +29,12 @@ import {
  * appearance, and the scale, and one context publishing the mode to whatever
  * inside needs to render in it.
  *
- * It owns exactly one DOM element and nothing else. It does not touch
- * `documentElement`, it does not touch `body`, and it writes no layout rules —
- * a design system that reached for the document would be unable to appear
- * twice on one page, or inside a host that owns its own root.
+ * It owns one element in the tree it is rendered into — the scope, carrying
+ * the attributes — and one boxless sibling beside it, where the floating
+ * layers opened inside it land. It does not touch `documentElement`, it does
+ * not touch `body`, and it writes no layout rules — a design system that
+ * reached for the document would be unable to appear twice on one page, or
+ * inside a host that owns its own root.
  *
  * `data-nessa-mode` is the contract every dark token selector matches, and it
  * is always `light` or `dark`. A `system` *request* stays in React state; what
@@ -108,6 +110,12 @@ function NessaProvider({
   )
   const mode = isControlled ? controlledMode : uncontrolledMode
 
+  // Only an unsupplied `system` request listens. A controlled resolution is
+  // the application's answer and Nessa must not second-guess it; an explicit
+  // light or dark has nothing to follow.
+  const followsSystem =
+    mode === NessaColorMode.System && suppliedResolvedMode === undefined
+
   // The appearance `system` last resolved to. Seeded from the application's
   // value where there is one, so a server-rendered dark page hydrates dark
   // instead of flashing light on the way to the same answer.
@@ -115,43 +123,49 @@ function NessaProvider({
     suppliedResolvedMode ?? defaultResolvedMode ?? NessaColorMode.Light,
   )
 
+  // The appearance actually committed, whatever produced it.
+  //
+  // Written in an effect rather than during render, so a concurrent render
+  // that React throws away cannot leave its appearance behind as the
+  // committed one. Read during render only by the handoff below, and only for
+  // the value the last commit put on screen.
+  const committedResolved = React.useRef<NessaResolvedColorMode>(
+    mode === NessaColorMode.System
+      ? (suppliedResolvedMode ?? defaultResolvedMode ?? NessaColorMode.Light)
+      : mode,
+  )
+
+  // Entering unsupplied `system` hands over to what is on screen rather than
+  // to the initial seed: the seed answers "what should the first paint be",
+  // which is a different question from "what is on screen right now", and a
+  // Dark page switching to `system` under a Dark OS would otherwise publish
+  // Dark → Light → Dark and flash white on the way to the answer it already
+  // had. `matchMedia` is sampled in the effect below, a commit later; until
+  // then the committed appearance is a better answer than a stale seed.
+  //
+  // Adjusted during render, not in an effect. An effect runs after the commit,
+  // so the wrong appearance would already be on the element and in context by
+  // the time it could repair anything — the very transition being avoided.
+  // Re-rendering from the render phase is React's own answer to exactly this:
+  // the intermediate output is discarded rather than committed, so nothing
+  // downstream ever sees the stale value.
+  const [wasFollowingSystem, setWasFollowingSystem] = React.useState(followsSystem)
+  if (followsSystem !== wasFollowingSystem) {
+    setWasFollowingSystem(followsSystem)
+    if (followsSystem && systemResolved !== committedResolved.current) {
+      setSystemResolved(committedResolved.current)
+    }
+  }
+
   const resolvedMode: NessaResolvedColorMode =
     mode === NessaColorMode.System
       ? (suppliedResolvedMode ?? systemResolved)
       : mode
 
-  // The appearance actually committed, whatever produced it. Entering
-  // unsupplied `system` hands over to this rather than to the initial seed:
-  // the seed answers "what should the first paint be", which is a different
-  // question from "what is on screen right now", and a Dark page switching to
-  // `system` under a Dark OS would otherwise publish Dark → Light → Dark and
-  // flash white on the way to the answer it already had.
-  //
-  // Written in an effect rather than during render, so a concurrent render
-  // that React throws away cannot leave its appearance behind as the
-  // committed one.
-  const committedResolved = React.useRef(resolvedMode)
   React.useEffect(() => {
     committedResolved.current = resolvedMode
   }, [resolvedMode])
 
-  // Only an unsupplied `system` request listens. A controlled resolution is
-  // the application's answer and Nessa must not second-guess it; an explicit
-  // light or dark has nothing to follow.
-  const followsSystem =
-    mode === NessaColorMode.System && suppliedResolvedMode === undefined
-  // Carry the committed appearance into the handoff render. `matchMedia` is
-  // sampled in the effect below, one render later; until then the last thing
-  // on screen is a better answer than a stale seed.
-  React.useEffect(() => {
-    if (!followsSystem) return
-    setSystemResolved((current) =>
-      current === committedResolved.current ? current : committedResolved.current,
-    )
-    // Runs on entry to unsupplied `system` only; the media effect below owns
-    // every later value.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [followsSystem])
   React.useEffect(() => {
     if (!followsSystem || typeof window === "undefined" || !window.matchMedia) {
       return
@@ -159,7 +173,7 @@ function NessaProvider({
     const media = window.matchMedia(darkSchemeQuery)
     // Sampled synchronously as well as subscribed: between the render that
     // entered `system` and this effect the OS may already disagree with the
-    // seed, and waiting for a change event would leave the wrong appearance
+    // handoff, and waiting for a change event would leave the wrong appearance
     // on screen until the user changed their mind.
     setSystemResolved(media.matches ? NessaColorMode.Dark : NessaColorMode.Light)
     // A generation, so an event queued before a mode change cannot commit
@@ -220,12 +234,6 @@ function NessaProvider({
       style: { ...style, colorScheme: resolvedMode },
     }),
     scopeName: "NessaProvider",
-    // Rendered inside the scope element — after the content, and through
-    // `trailing` rather than as part of `children`, because `asChild` takes
-    // exactly one element and a fragment would not be one. A layer portalled
-    // here reads the same tokens and the same resolved mode as the content
-    // that opened it. It draws nothing; Radix positions its own content.
-    trailing: <div ref={setLayerHost} data-slot="nessa-layers" />,
   })
 
   return (
@@ -233,9 +241,72 @@ function NessaProvider({
       <NessaColorModeContext.Provider value={colorModeState}>
         <PortalContainerProvider container={layerHost}>
           {element}
+          <NessaLayerHost
+            theme={theme}
+            resolvedMode={resolvedMode}
+            scale={scale}
+            ref={setLayerHost}
+          />
         </PortalContainerProvider>
       </NessaColorModeContext.Provider>
     </NessaThemeContext.Provider>
+  )
+}
+
+/** The `color-scheme` utility each resolved appearance carries. */
+const layerColorSchemeClassName = {
+  light: "scheme-light",
+  dark: "scheme-dark",
+} as const
+
+/**
+ * The element provider-level floating layers portal into.
+ *
+ * A sibling of the scope, not a child of it, because theme ownership and
+ * clipping ownership are not the same job. The element a host hands the
+ * provider is where that host puts its own `overflow: hidden`, its
+ * `transform`, its flex row — all reasonable things to put on a page region,
+ * and all things a menu must not inherit. Nested inside the scope, this host
+ * would have made the provider's root the clipping and containing-block
+ * ancestor of every layer opened in the tree: a transformed root turns a
+ * fixed-position menu into its descendant and clips it, which is not
+ * something adopting the provider should do to a page.
+ *
+ * It still carries the theme, because it sits inside nothing that could give
+ * it one: the same `data-nessa-theme`, `data-nessa-mode` and
+ * `data-nessa-scale` the scope writes, so a layer that reads its tokens here
+ * reads the same answers as the content that opened it.
+ *
+ * `contents` keeps it from generating a box at all. An ordinary `div` is a
+ * flex or grid item wherever the provider was mounted, so an empty layer host
+ * would move a page's content by a gap's width without anything being open;
+ * a boxless one introduces no layout, no stacking context and no containing
+ * block, and leaves positioning exactly as it was.
+ */
+function NessaLayerHost({
+  theme,
+  resolvedMode,
+  scale,
+  ref,
+}: {
+  theme: NessaThemeName
+  resolvedMode: NessaResolvedColorMode
+  scale: NessaScale
+  ref: React.Ref<HTMLDivElement>
+}) {
+  return (
+    <div
+      // Boxless, and carrying the appearance the scope resolved: `contents`
+      // so it lays nothing out, `scheme-*` so the scrollbars and controls of
+      // a layer opened here agree with its tokens, exactly as they do inside
+      // the scope itself.
+      className={cn("contents", layerColorSchemeClassName[resolvedMode])}
+      data-slot="nessa-layers"
+      data-nessa-theme={theme}
+      data-nessa-mode={resolvedMode}
+      data-nessa-scale={scale}
+      ref={ref}
+    />
   )
 }
 

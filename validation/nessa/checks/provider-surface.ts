@@ -5,6 +5,7 @@ import { checkMetadata } from "../check-metadata.ts"
 
 const providerPath = "packages/react/src/provider/nessa-provider.tsx"
 const colorModePath = "packages/react/src/provider/nessa-color-mode.ts"
+const scopePath = "packages/react/src/provider/nessa-scope.tsx"
 const themeScopePath = "packages/react/src/theme/nessa-theme-scope.tsx"
 const themeCssPath = "packages/react/src/theme.css"
 
@@ -49,9 +50,12 @@ function stringLiterals(ast: ts.SourceFile) {
  * 1. `data-nessa-mode` never carries `system`. It is the attribute every dark
  *    token selector matches, so a third value would leave those selectors
  *    asking a question CSS cannot answer.
- * 2. The provider mutates one element it owns and never the document. A
- *    design system that reached for `documentElement` could not appear twice
- *    on a page, or inside a host that owns its own root.
+ * 2. The provider mutates one element it owns and never the document itself.
+ *    A design system that reached for `documentElement` could not appear twice
+ *    on a page, or inside a host that owns its own root. Its layer host is a
+ *    boxless sibling of that element rather than a child of it, so the scope
+ *    never becomes the clipping or containing-block ancestor of the layers
+ *    opened inside it, and never lays anything out.
  * 3. A theme-bearing scope re-emits the resolved mode. Dark selectors match
  *    the nearest scope rather than any dark ancestor, which is the whole
  *    mechanism behind a light region inside a dark one.
@@ -127,6 +131,41 @@ export const providerSurfaceCheck = defineCheck({
           )
         }
       }
+    }
+    // The provider-level layer host lives outside the root element, carries
+    // the mode the root resolved, and generates no box. Nested inside the
+    // root instead, it would make whatever the host styled that element with
+    // — a transform, an `overflow: hidden`, a flex row — the clipping and
+    // containing-block ancestor of every menu opened in the tree, and would
+    // add a layout item to a page that opened nothing.
+    // The provider-level layer host carries the mode the scope resolved, and
+    // generates no box. Nested inside the scope instead, it would make
+    // whatever the host styled that element with — a transform, an
+    // `overflow: hidden`, a flex row — the clipping and containing-block
+    // ancestor of every layer opened in the tree, and would add a layout item
+    // to a page that opened nothing. `useNessaScopeElement` is what keeps it
+    // outside: the scope renders its children and nothing else, so there is
+    // no slot inside the element for a host to take.
+    if (
+      !providerSource.includes('data-slot="nessa-layers"') ||
+      !providerSource.includes("data-nessa-mode={resolvedMode}") ||
+      !providerSource.includes('"contents"')
+    ) {
+      findings.push(
+        context.fail(
+          "NessaProvider's layer host must sit beside its scope element, carry the resolved mode, and generate no box of its own.",
+          { contractId: "PROVIDER-001", path: providerPath },
+        ),
+      )
+    }
+    const scope = await context.parseTypeScript(scopePath)
+    if (/trailing/.test(scope.getFullText())) {
+      findings.push(
+        context.fail(
+          "A Nessa scope element renders its children and nothing else; a slot inside it would put layers back under the root's clipping.",
+          { contractId: "PROVIDER-001", path: scopePath },
+        ),
+      )
     }
     if (!providerSource.includes("colorScheme: resolvedMode")) {
       findings.push(
