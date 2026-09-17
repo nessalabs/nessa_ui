@@ -239,6 +239,8 @@ export const KimiDarkMode: Story = {
 }
 
 export const ProviderTabs: Story = {
+  // Cross-engine: a portalled popover with roving tabs and measured collision geometry.
+  tags: ["cross-engine"],
   parameters: storyDocumentation(
     "The canonical picker shows one provider catalog at a time with the provider rail fixed to the bottom and explicit keyboard navigation.",
   ),

@@ -119,6 +119,8 @@ export const NestedGroups: Story = {
 }
 
 export const CollapsiblePanel: Story = {
+  // Cross-engine: pointer capture during a separator drag, and keyboard resizing.
+  tags: ["cross-engine"],
   parameters: storyDocumentation(
     "A collapsible panel snaps closed once a drag passes the halfway point below its minimum size, and snaps open the same way. Press Enter on the separator to toggle the collapse from the keyboard.",
   ),

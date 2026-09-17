@@ -143,6 +143,8 @@ function distanceFromEnd(viewport: HTMLElement) {
 }
 
 export const LiveTranscript: Story = {
+  // Cross-engine: scroll anchoring and ResizeObserver timing while content grows.
+  tags: ["cross-engine"],
   parameters: storyDocumentation(
     "A reply streams into the transcript forever: the viewport opens pinned to the live edge and follows each chunk. Scrolling up releases the follow — the recorded position stays put while the stream continues — and the floating button returns and re-pins the reader at the bottom.",
   ),

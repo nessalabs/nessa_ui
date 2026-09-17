@@ -35,6 +35,8 @@ export const Playground: Story = {
 }
 
 export const Invalid: Story = {
+  // Cross-engine: :focus-visible matching on editable fields, which engines differ on.
+  tags: ["cross-engine"],
   parameters: storyDocumentation(
     "Set `aria-invalid` and connect specific error text with `aria-describedby`.",
   ),

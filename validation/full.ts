@@ -67,6 +67,10 @@ export async function validateFull(options: FullValidationOptions = {}): Promise
       ["pnpm", ["typecheck"]],
       ["pnpm", ["test"]],
       ["pnpm", ["test:unit"]],
+      // The server render. No browser suite can cover it: a component that
+      // reads `window` during render throws in Node and is invisible in a
+      // browser, however many engines that browser suite covers.
+      ["pnpm", ["test:ssr"]],
       ["pnpm", ["validate:artifacts"]],
       ["pnpm", ["check:registry"]],
       ["pnpm", ["check:package"]],

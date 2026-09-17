@@ -44,6 +44,42 @@ export default defineConfig({
         plugins: [
           storybookTest({
             configDir: path.join(dirname, ".storybook"),
+            tags: { include: ["cross-engine"] },
+          }),
+        ],
+        test: {
+          // Every engine the package claims support for, on the stories whose
+          // behavior is engine-shaped rather than engine-agnostic.
+          //
+          // It is a separate project, not extra instances on the main one,
+          // because the two answer different questions. The Chromium project
+          // asks whether a component behaves; this one asks whether the
+          // *engine* agrees — focus order, `:focus-visible` matching, event
+          // ordering, transition and animation events, `inert`, scroll
+          // anchoring. Running all thousand-odd stories three times over would
+          // cost an hour to re-confirm a thousand answers that do not vary by
+          // engine, and the ones that do would be lost in the noise.
+          //
+          // A story earns the `cross-engine` tag by depending on something an
+          // engine implements in its own way. Rendering a card does not.
+          name: "storybook-cross-engine",
+          testTimeout: 30000,
+          browser: {
+            enabled: true,
+            provider: playwright({}),
+            headless: true,
+            instances: [
+              { browser: "firefox", name: "firefox" },
+              { browser: "webkit", name: "webkit" },
+            ],
+          },
+        },
+      },
+      {
+        extends: true,
+        plugins: [
+          storybookTest({
+            configDir: path.join(dirname, ".storybook"),
             tags: { include: ["reduced-motion"] },
           }),
         ],

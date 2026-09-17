@@ -82,6 +82,8 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Playground: Story = {
+  // Cross-engine: focus entry, document-wide Tab containment, inert coverage and Escape.
+  tags: ["cross-engine"],
   parameters: storyDocumentation(
     "Open the sheet from the host button. Expand fills the ancestor; the circular close control and Escape both dismiss it, and focus returns to the opener.",
   ),
@@ -106,6 +108,8 @@ export const Playground: Story = {
 }
 
 export const ExpandToggle: Story = {
+  // Cross-engine: Web Animations height interpolation and its settle timer.
+  tags: ["cross-engine"],
   parameters: storyDocumentation(
     "SheetExpand grows the drawer into a filled extra-details surface over the same ancestor; Minimize recedes it. Dragging the grab bar stretches the panel in place the way a phone's bottom sheet does: the bottom edge stays pinned to the frame, the height follows the pointer one-for-one, and the body takes its filled layout for the whole drag so content arrives under the pointer rather than on release. Releasing past the threshold settles into expanded, minimized, or dismissed; releasing short of it returns the panel to where it started. Escape and Done still dismiss.",
   ),

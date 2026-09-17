@@ -244,7 +244,8 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Playground: Story = {
-  tags: ["reduced-motion"],
+  // Cross-engine: textarea autosize measurement and Enter-to-send key handling.
+  tags: ["cross-engine", "reduced-motion"],
   parameters: storyDocumentation(
     "Enter submits by default, while Shift+Enter inserts a line break. The host owns the message value and submit effect.",
   ),

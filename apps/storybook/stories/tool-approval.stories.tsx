@@ -297,7 +297,8 @@ export const ComposerDocked: Story = {
 }
 
 export const AllowFlow: Story = {
-  tags: ["reduced-motion"],
+  // Cross-engine: exit animation timing and focus after a resolved card.
+  tags: ["cross-engine", "reduced-motion"],
   parameters: storyDocumentation(
     "What granting looks like end to end on the docked surface: choosing a scope sets `resolution`, the card goes inert and plays its sink-and-fade exit, and the host's `onExited` swaps in the running ToolCall row plus a note naming the grant's reach, then re-homes focus into the composer — the exiting card released it. The play test grants for the session, asserts the handoff and the focus move, then presses the story's Reset demo scaffolding so the story is left on a live request you can run yourself.",
   ),

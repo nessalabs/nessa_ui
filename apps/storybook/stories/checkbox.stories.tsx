@@ -119,6 +119,8 @@ function SelectAllDemo() {
 }
 
 export const SelectAll: Story = {
+  // Cross-engine: indeterminate state and label-forwarded activation.
+  tags: ["cross-engine"],
   parameters: storyDocumentation(
     "The select-all pattern: the header box is checked when every row is selected and mixed when only some are, so one glance distinguishes \"all\" from \"some\". Toggling it selects or clears every row.",
   ),
