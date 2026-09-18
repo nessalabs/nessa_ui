@@ -8,7 +8,10 @@ import {
   SearchableListbox,
   type SearchableListboxRenderState,
 } from "./searchable-listbox"
-import { usePortalContainer } from "@/lib/portal-container"
+import {
+  useNessaLayerScope,
+  usePortalContainer,
+} from "@/lib/portal-container"
 import { cn } from "@/lib/utils"
 
 /** Describes one selectable model in a provider catalog. */
@@ -201,6 +204,7 @@ function ModelPicker({
   loadingMessage = "Loading models",
 }: ModelPickerProps) {
   const resolvedPortalContainer = usePortalContainer(portalContainer)
+  const layerScope = useNessaLayerScope()
   const effectiveDir = Direction.useDirection(dir)
   const [uncontrolledValue, setUncontrolledValue] =
     React.useState<ModelPickerValue | undefined>(defaultValue)
@@ -463,6 +467,7 @@ function ModelPicker({
       </Popover.Trigger>
       <Popover.Portal container={resolvedPortalContainer}>
         <Popover.Content
+          {...layerScope}
           data-slot="model-picker-content"
           aria-label={contentLabel}
           side={side}

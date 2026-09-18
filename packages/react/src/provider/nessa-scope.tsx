@@ -73,6 +73,13 @@ interface ScopeElementOptions {
   children?: React.ReactNode
   ref?: React.Ref<HTMLElement>
   props: Record<string, unknown>
+  /**
+   * The declarations the scope owns outright, as opposed to the ones a host
+   * merely passed through `props.style`. Only these outrank an `asChild`
+   * child's own style; everything else keeps Slot's ordinary precedence,
+   * where the child wins.
+   */
+  ownedStyle?: React.CSSProperties
   scopeName: string
 }
 
@@ -86,19 +93,60 @@ export function useNessaScopeElement({
   children,
   ref,
   props,
+  ownedStyle,
   scopeName,
 }: ScopeElementOptions): React.ReactElement {
   useFragmentGuard(asChild, children, scopeName)
   useExistingScopeAttributeGuard(asChild, children, scopeName)
+  const hostStyle = props.style as React.CSSProperties | undefined
   if (asChild) {
+    // Reconciled onto the *child*, because Slot does not do what it looks like
+    // it does: `mergeProps` returns `{...slotProps, ...childProps}`, so for any
+    // prop that is not a handler, `style` or `className`, the child wins.
+    // Passing the scope's attributes only to the Slot would let a child declare
+    // `data-nessa-mode="light"` inside a Dark provider — React context saying
+    // one thing while the DOM and the native controls say another — or keep
+    // `system` on the element, defeating the Light-or-Dark invariant the whole
+    // contract rests on.
+    //
+    // Clearing the child's copies is not enough either: a prop cloned as
+    // `undefined` is still an own key of `childProps`, so it wins the same
+    // merge and removes the attribute the scope was trying to write. The
+    // scope's own values therefore go onto the child too, on the winning side
+    // of the merge, and land on the element. A `data-nessa-*` the child brought
+    // that the scope does not own is cleared rather than replaced, since the
+    // scope owns the whole prefix. Everything else the child brought is left
+    // alone.
+    const child = children as React.ReactElement<Record<string, unknown>>
+    const childProps = (child.props ?? {}) as Record<string, unknown>
+    const childStyle = childProps.style as React.CSSProperties | undefined
+    const reconciled = React.cloneElement(child, {
+      ...Object.fromEntries(
+        Object.keys(childProps)
+          .filter((key) => key.startsWith("data-nessa-"))
+          .map((key) => [key, undefined]),
+      ),
+      ...Object.fromEntries(
+        Object.entries(props).filter(([key]) => key.startsWith("data-nessa-")),
+      ),
+      // Ownership stops where the scope's own declarations stop. A `style` a
+      // host passed to the scope is an ordinary style and loses to the child's
+      // in the usual way; only what the scope owns — `color-scheme`, which has
+      // to agree with the attributes beside it — outranks the child.
+      style: { ...hostStyle, ...childStyle, ...ownedStyle },
+    } as Record<string, unknown>)
     return (
       <Slot.Root {...props} ref={ref}>
-        {children as React.ReactElement}
+        {reconciled}
       </Slot.Root>
     )
   }
   return (
-    <div {...props} ref={ref as React.Ref<HTMLDivElement>}>
+    <div
+      {...props}
+      style={{ ...hostStyle, ...ownedStyle }}
+      ref={ref as React.Ref<HTMLDivElement>}
+    >
       {children}
     </div>
   )
@@ -141,7 +189,7 @@ function useExistingScopeAttributeGuard(
     )
     if (!existing.length) return
     console.warn(
-      `${scopeName} owns ${existing.join(", ")} and is replacing the value on its \`asChild\` child.`,
+      `${scopeName} owns ${existing.join(", ")}; the value on its \`asChild\` child is dropped so the scope's own wins.`,
     )
   }, [asChild, children, scopeName])
 }

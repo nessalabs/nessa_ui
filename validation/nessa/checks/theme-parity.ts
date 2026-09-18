@@ -83,8 +83,28 @@ const scaleCss = {
   },
 }
 
-const baseCss = {
-  ...scaleCss,
+/**
+ * The Dark rule a copied consumer needs, which `cssVars.dark` does not give
+ * it.
+ *
+ * shadcn maps `cssVars.dark` onto the host's own `.dark` class, and the
+ * provider does not write that class — it writes `data-nessa-mode`. Without
+ * this rule a registry consumer inside a Dark provider gets the dark
+ * `color-scheme` and Dark React context while every component token stays
+ * Light, which is worse than either answer on its own.
+ *
+ * Built from the package's own parsed Dark tokens rather than written out, so
+ * the two cannot drift.
+ */
+const scopedDarkCss = (dark: Record<string, string>) => ({
+  ':where([data-nessa-mode="dark"])': Object.fromEntries(
+    Object.entries(dark)
+      .filter(([name]) => name !== "nessa-font-sans" && name !== "nessa-font-mono" && name !== "radius")
+      .map(([name, value]) => [`--${name}`, value]),
+  ),
+})
+
+const reducedMotionCss = {
   "@media (prefers-reduced-motion: reduce)": {
     ":root, :where([data-nessa-root], [data-nessa-theme], [data-nessa-scale])": {
       "--nessa-motion-duration-fast": "0ms",
@@ -104,6 +124,7 @@ export const themeParityCheck = defineCheck({
     const registry = await context.readJson<{ items: { name: string; cssVars?: { theme?: Record<string, string>; light?: Record<string, string>; dark?: Record<string, string> }; css?: Record<string, unknown> }[] }>("registry.json")
     const publicBase = await context.readJson<{ cssVars?: { theme?: Record<string, string>; light?: Record<string, string>; dark?: Record<string, string> }; css?: Record<string, unknown> }>("public/r/nessa-base.json")
     const sourceBase = registry.items.find((item) => item.name === "nessa-base")
+    const expectedCss = { ...scaleCss, ...scopedDarkCss(tokens.dark), ...reducedMotionCss }
     if (!sourceBase?.cssVars || !publicBase.cssVars) {
       return [context.fail("nessa-base cssVars are missing.", { contractId: "TOKEN-001" })]
     }
@@ -139,8 +160,8 @@ export const themeParityCheck = defineCheck({
       findings.push(context.fail("Radius drifted across package and registry base.", { contractId: "TOKEN-003" }))
     }
     if (
-      JSON.stringify(sourceBase.css) !== JSON.stringify(baseCss) ||
-      JSON.stringify(publicBase.css) !== JSON.stringify(baseCss)
+      JSON.stringify(sourceBase.css) !== JSON.stringify(expectedCss) ||
+      JSON.stringify(publicBase.css) !== JSON.stringify(expectedCss)
     ) {
       findings.push(context.fail("Scale, typography-helper, or reduced-motion base CSS differs across package and registry artifacts.", { contractId: "TOKEN-003" }))
     }

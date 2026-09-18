@@ -83,6 +83,33 @@ function QueueExample({ withComposer = false }: { withComposer?: boolean }) {
   )
 }
 
+/**
+ * Keeps the machine's own window events out of a drag.
+ *
+ * dnd-kit cancels an in-flight drag — keyboard and pointer alike — on a window
+ * `resize` or `visibilitychange`, which is the right thing for a real user:
+ * the page moved under the drag, so the drag is no longer about what it
+ * started on. It is also nothing these stories are about, and nothing they
+ * control. A machine running several browser instances at once fires both
+ * events on its own schedule, which is how the keyboard reorder came to
+ * announce `Cancelled moving pending message` in CI on the touch instance
+ * while passing on the pointer instance in the same run.
+ *
+ * Stopping them at the capture phase, before the sensor's own listener is
+ * added, leaves every drag under the test's control. A cancel a story means to
+ * make still arrives: Escape reaches the sensor as a key, and a pointer cancel
+ * as a pointer event, neither of which is a window interruption.
+ */
+function ignoreWindowInterruptions() {
+  const swallow = (event: Event) => event.stopImmediatePropagation()
+  window.addEventListener("resize", swallow, true)
+  window.addEventListener("visibilitychange", swallow, true)
+  return () => {
+    window.removeEventListener("resize", swallow, true)
+    window.removeEventListener("visibilitychange", swallow, true)
+  }
+}
+
 const meta = {
   title: "Conversation/ComposerQueue",
   component: ComposerQueue,
@@ -91,6 +118,7 @@ const meta = {
     itemIds: [],
     onReorder: () => undefined,
   },
+  beforeEach: () => ignoreWindowInterruptions(),
   parameters: {
     docs: {
       description: {

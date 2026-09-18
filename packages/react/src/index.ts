@@ -1071,6 +1071,8 @@ export {
 export {
   PortalContainerProvider,
   usePortalContainer,
+  useNessaLayerScope,
+  type NessaLayerScope,
   type PortalContainerProviderProps,
 } from "./lib/portal-container"
 export {

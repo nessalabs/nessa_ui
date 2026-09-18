@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { PortalContainerProvider } from "@/lib/portal-container"
 import {
   NessaColorMode,
   NessaColorModeContext,
@@ -29,6 +30,13 @@ import {
  * `documentElement`, it does not touch `body`, and it writes no layout rules —
  * a design system that reached for the document would be unable to appear
  * twice on one page, or inside a host that owns its own root.
+ *
+ * That includes the floating layers opened inside it. A menu keeps going
+ * wherever it was already going and carries the scope's attributes with it,
+ * rather than being moved under the scope to be themed by ancestry: moving it
+ * would hand the root's `overflow`, `transform` and layout to a layer that
+ * wants none of them, and a provider embedded in a host's own clipping box
+ * would clip every menu opened in it.
  *
  * `data-nessa-mode` is the contract every dark token selector matches, and it
  * is always `light` or `dark`. A `system` *request* stays in React state; what
@@ -104,6 +112,12 @@ function NessaProvider({
   )
   const mode = isControlled ? controlledMode : uncontrolledMode
 
+  // Only an unsupplied `system` request listens. A controlled resolution is
+  // the application's answer and Nessa must not second-guess it; an explicit
+  // light or dark has nothing to follow.
+  const followsSystem =
+    mode === NessaColorMode.System && suppliedResolvedMode === undefined
+
   // The appearance `system` last resolved to. Seeded from the application's
   // value where there is one, so a server-rendered dark page hydrates dark
   // instead of flashing light on the way to the same answer.
@@ -111,16 +125,49 @@ function NessaProvider({
     suppliedResolvedMode ?? defaultResolvedMode ?? NessaColorMode.Light,
   )
 
+  // The appearance actually committed, whatever produced it.
+  //
+  // Written in an effect rather than during render, so a concurrent render
+  // that React throws away cannot leave its appearance behind as the
+  // committed one. Read during render only by the handoff below, and only for
+  // the value the last commit put on screen.
+  const committedResolved = React.useRef<NessaResolvedColorMode>(
+    mode === NessaColorMode.System
+      ? (suppliedResolvedMode ?? defaultResolvedMode ?? NessaColorMode.Light)
+      : mode,
+  )
+
+  // Entering unsupplied `system` hands over to what is on screen rather than
+  // to the initial seed: the seed answers "what should the first paint be",
+  // which is a different question from "what is on screen right now", and a
+  // Dark page switching to `system` under a Dark OS would otherwise publish
+  // Dark → Light → Dark and flash white on the way to the answer it already
+  // had. `matchMedia` is sampled in the effect below, a commit later; until
+  // then the committed appearance is a better answer than a stale seed.
+  //
+  // Adjusted during render, not in an effect. An effect runs after the commit,
+  // so the wrong appearance would already be on the element and in context by
+  // the time it could repair anything — the very transition being avoided.
+  // Re-rendering from the render phase is React's own answer to exactly this:
+  // the intermediate output is discarded rather than committed, so nothing
+  // downstream ever sees the stale value.
+  const [wasFollowingSystem, setWasFollowingSystem] = React.useState(followsSystem)
+  if (followsSystem !== wasFollowingSystem) {
+    setWasFollowingSystem(followsSystem)
+    if (followsSystem && systemResolved !== committedResolved.current) {
+      setSystemResolved(committedResolved.current)
+    }
+  }
+
   const resolvedMode: NessaResolvedColorMode =
     mode === NessaColorMode.System
       ? (suppliedResolvedMode ?? systemResolved)
       : mode
 
-  // Only an unsupplied `system` request listens. A controlled resolution is
-  // the application's answer and Nessa must not second-guess it; an explicit
-  // light or dark has nothing to follow.
-  const followsSystem =
-    mode === NessaColorMode.System && suppliedResolvedMode === undefined
+  React.useEffect(() => {
+    committedResolved.current = resolvedMode
+  }, [resolvedMode])
+
   React.useEffect(() => {
     if (!followsSystem || typeof window === "undefined" || !window.matchMedia) {
       return
@@ -128,7 +175,7 @@ function NessaProvider({
     const media = window.matchMedia(darkSchemeQuery)
     // Sampled synchronously as well as subscribed: between the render that
     // entered `system` and this effect the OS may already disagree with the
-    // seed, and waiting for a change event would leave the wrong appearance
+    // handoff, and waiting for a change event would leave the wrong appearance
     // on screen until the user changed their mind.
     setSystemResolved(media.matches ? NessaColorMode.Dark : NessaColorMode.Light)
     // A generation, so an event queued before a mode change cannot commit
@@ -159,6 +206,19 @@ function NessaProvider({
     [mode, resolvedMode, setMode],
   )
   const themeState = React.useMemo(() => ({ theme, scale }), [scale, theme])
+  // The theme every floating layer below here carries onto its own element.
+  // Panels that own a boundary — a Sheet, a reading view — still publish
+  // their own container nearer the layer and keep it: where a layer lands is
+  // their question, and this only answers what it looks like when it gets
+  // there.
+  const layerScope = React.useMemo(
+    () => ({
+      "data-nessa-theme": theme,
+      "data-nessa-mode": resolvedMode,
+      "data-nessa-scale": scale,
+    }),
+    [resolvedMode, scale, theme],
+  )
 
   useControlledModeWarning(isControlled)
   useResolutionPropWarning(mode, suppliedResolvedMode, defaultResolvedMode)
@@ -173,19 +233,24 @@ function NessaProvider({
       "data-nessa-mode": resolvedMode,
       "data-nessa-scale": scale,
       className: cn(className),
-      // Nessa keeps ownership of `color-scheme` even when a host supplies
-      // styles: it is what makes form controls, scrollbars and the canvas
-      // itself agree with the tokens, and a scope whose controls disagree
-      // with its surface reads as broken rather than as themed.
-      style: { ...style, colorScheme: resolvedMode },
+      style,
     }),
+    // Nessa keeps ownership of `color-scheme` even when a host supplies
+    // styles: it is what makes form controls, scrollbars and the canvas
+    // itself agree with the tokens, and a scope whose controls disagree with
+    // its surface reads as broken rather than as themed. It is the only
+    // declaration the scope owns, so it is the only one that outranks an
+    // `asChild` child's own.
+    ownedStyle: { colorScheme: resolvedMode },
     scopeName: "NessaProvider",
   })
 
   return (
     <NessaThemeContext.Provider value={themeState}>
       <NessaColorModeContext.Provider value={colorModeState}>
-        {element}
+        <PortalContainerProvider container={null} scope={layerScope}>
+          {element}
+        </PortalContainerProvider>
       </NessaColorModeContext.Provider>
     </NessaThemeContext.Provider>
   )

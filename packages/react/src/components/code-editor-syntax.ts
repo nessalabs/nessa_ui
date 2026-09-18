@@ -2,7 +2,12 @@
 
 import * as React from "react"
 import { getSharedHighlighter } from "@pierre/diffs"
-import { defaultCodeTheme, useCodeBlockConfig, type CodeBlockMode } from "./code-block"
+import {
+  defaultCodeTheme,
+  useCodeBlockConfig,
+  useResolvedAppearance,
+  type CodeBlockMode,
+} from "./code-block"
 
 /** One UTF-16 token range with colors from the shared light and dark code themes. */
 export interface CodeSyntaxToken {
@@ -32,6 +37,7 @@ export function useCodeSyntax(code: string, language: string): {
   colors: CodeSyntaxColors | null
 } {
   const config = useCodeBlockConfig()
+  const resolvedMode = useResolvedAppearance(config.mode ?? "system")
   const theme = config.theme ?? defaultCodeTheme
   const light = typeof theme === "string" ? theme : theme.light
   const dark = typeof theme === "string" ? theme : theme.dark
@@ -63,7 +69,11 @@ export function useCodeSyntax(code: string, language: string): {
   }, [code, language, light, dark])
   return {
     tokens: result?.code === code && result.language === language && result.light === light && result.dark === dark ? result.tokens : null,
-    mode: config.mode ?? "system",
+    // The same resolver CodeBlock uses, not a second answer to the same
+    // question. A CodeEditor left at "system" reads the OS while the CodeBlock
+    // beside it reads the provider, and the two render in different
+    // appearances inside one scope.
+    mode: resolvedMode,
     colors: palette?.light === light && palette.dark === dark ? palette.colors : null,
   }
 }

@@ -51,7 +51,14 @@ function Sidebar({
   children,
   ...props
 }: SidebarProps) {
-  const { lastTriggerRef, open, portalContainerRef, setOpen, state } = useSidebar()
+  const {
+    lastTriggerRef,
+    open,
+    pendingTriggerFocusRef,
+    portalContainerRef,
+    setOpen,
+    state,
+  } = useSidebar()
   const isMobile = useIsMobile()
   const mobileTriggerRef = React.useRef<HTMLElement | null>(null)
   const isCollapsed = collapsible !== SidebarCollapsible.None && !open
@@ -66,31 +73,47 @@ function Sidebar({
   /**
    * Restores focus to the trigger associated with a closing mobile Sidebar.
    *
-   * @returns Nothing; focus is moved when an eligible trigger is available.
+   * The trigger a mobile Sidebar was opened from is often not the one it
+   * closes back to: the compact composition swaps its brand trigger for a new
+   * node, so the element focus came from is gone by the time the dialog
+   * closes. Three answers, in the order they can be known — the original
+   * element if it survived, a matching one already mounted, and otherwise a
+   * claim left for the next matching trigger to take as it mounts.
+   *
+   * Deliberately no `requestAnimationFrame`. A frame is a guess about how
+   * long a remount takes, and it is throttled to a crawl in a hidden or busy
+   * document; every frame spent waiting is a frame with focus on `<body>`,
+   * where the next Tab restarts from the top of the page.
+   *
+   * @returns Nothing; focus is moved, or owed to the trigger that mounts next.
    */
   const restoreMobileTrigger = React.useCallback(() => {
     const previousTrigger = lastTriggerRef.current ?? mobileTriggerRef.current
     lastTriggerRef.current = null
+    pendingTriggerFocusRef.current = null
 
     if (previousTrigger?.isConnected) {
       previousTrigger.focus()
       return
     }
 
-    requestAnimationFrame(() => {
-      const triggerLabel = previousTrigger?.getAttribute("aria-label")
-      const mountedTriggers =
-        portalContainerRef.current?.querySelectorAll<HTMLElement>(
-          '[data-slot="sidebar-trigger"]',
-        )
-      const matchingTrigger = Array.from(mountedTriggers ?? []).find(
-        (trigger) =>
-          !triggerLabel || trigger.getAttribute("aria-label") === triggerLabel,
+    const triggerLabel = previousTrigger?.getAttribute("aria-label") ?? ""
+    const mountedTriggers =
+      portalContainerRef.current?.querySelectorAll<HTMLElement>(
+        '[data-slot="sidebar-trigger"]',
       )
+    const matchingTrigger = Array.from(mountedTriggers ?? []).find(
+      (trigger) =>
+        !triggerLabel || trigger.getAttribute("aria-label") === triggerLabel,
+    )
 
-      matchingTrigger?.focus()
-    })
-  }, [lastTriggerRef, portalContainerRef])
+    if (matchingTrigger) {
+      matchingTrigger.focus()
+      return
+    }
+
+    pendingTriggerFocusRef.current = triggerLabel
+  }, [lastTriggerRef, pendingTriggerFocusRef, portalContainerRef])
 
   React.useEffect(() => {
     const wasOpen = previousOpenRef.current
@@ -124,6 +147,8 @@ function Sidebar({
             data-side={side}
             aria-describedby={undefined}
             onOpenAutoFocus={() => {
+              // Nothing is owed focus outside while the dialog holds it.
+              pendingTriggerFocusRef.current = null
               mobileTriggerRef.current =
                 lastTriggerRef.current ??
                 (document.activeElement as HTMLElement | null)
