@@ -258,6 +258,20 @@ export interface PillComposerProps extends React.ComponentProps<"form"> {
   width?: number
   /** Offers a three-line expand control that fills the nearest positioned ancestor. */
   expandable?: boolean
+  /**
+   * Whether the full-pane editor is open, when the host owns that state.
+   * Leave undefined to let the composer own it.
+   */
+  expanded?: boolean
+  /** Whether the full-pane editor starts open, when the composer owns the state. */
+  defaultExpanded?: boolean
+  /**
+   * Called whenever the composer would change expansion: the expand and
+   * minimize controls, Escape, `expandable` being withdrawn, and a submit.
+   * A controlled host decides what to do with each; an uncontrolled one can
+   * use this to follow along.
+   */
+  onExpandedChange?: (expanded: boolean) => void
   submitOnEnter?: boolean
 }
 
@@ -268,8 +282,10 @@ export interface PillComposerProps extends React.ComponentProps<"form"> {
  * row out with PillComposerRow; attachments stack above it and round the
  * pill's corners as it grows. Multiline inputs use rounded rectangular corners.
  * With expandable, three rendered lines reveal a control that fills the nearest
- * positioned ancestor; Escape or Minimize restores the compact editor without
- * remounting it. Hosts define that ancestor to bound expansion to a chat pane.
+ * positioned ancestor; Escape, Minimize, or sending the message restores the
+ * compact editor without remounting it. Hosts define that ancestor to bound
+ * expansion to a chat pane, and a host that needs to decide for itself when the
+ * pane opens and closes controls `expanded` and follows `onExpandedChange`.
  */
 function PillComposer({
   generating = false,
@@ -277,7 +293,11 @@ function PillComposer({
   width,
   submitOnEnter = true,
   expandable = false,
+  expanded: expandedProp,
+  defaultExpanded = false,
+  onExpandedChange,
   onKeyDown,
+  onSubmit,
   className,
   children,
   style,
@@ -287,7 +307,13 @@ function PillComposer({
     React.useState<ChatComposerInputAdapter | null>(null)
   const [multiline, setMultiline] = React.useState(false)
   const [canExpand, setCanExpand] = React.useState(false)
-  const [expandRequested, setExpanded] = React.useState(false)
+  // Expansion is the composer's unless a host claims it. A host that passes
+  // `expanded` owns every transition and is told about each one through
+  // `onExpandedChange`; a host that passes neither gets the behaviour below
+  // and can still follow along through the same callback.
+  const [selfExpanded, setSelfExpanded] = React.useState(defaultExpanded)
+  const controlled = expandedProp !== undefined
+  const expandRequested = expandedProp ?? selfExpanded
   // Expansion is the host's to withdraw. When `expandable` goes false — a
   // responsive breakpoint dropping the affordance, say — the full-pane
   // layout has to come down with the control that exits it; otherwise the
@@ -295,11 +321,21 @@ function PillComposer({
   // rather than only reset in an effect, so the collapse lands in the same
   // commit as the prop change instead of a frame later.
   const expanded = expandable && expandRequested
+  // One door for every transition, so a controlled host hears about the ones
+  // the composer starts by itself — the withdrawal below and the collapse on
+  // submit — and not only the ones a person clicks.
+  const changeExpanded = React.useCallback(
+    (next: boolean) => {
+      if (!controlled) setSelfExpanded(next)
+      onExpandedChange?.(next)
+    },
+    [controlled, onExpandedChange],
+  )
   // And the request itself is dropped, so re-enabling `expandable` does not
   // reopen the pane without anyone asking for it.
   React.useEffect(() => {
-    if (!expandable) setExpanded(false)
-  }, [expandable])
+    if (!expandable && expandRequested) changeExpanded(false)
+  }, [expandable, expandRequested, changeExpanded])
 
   // Measure rendered lines, including wrapping and font/width changes. Keep
   // the input width and control positions stable so changing the corners
@@ -346,9 +382,19 @@ function PillComposer({
           onKeyDown?.(event)
           if (!event.defaultPrevented && event.key === "Escape" && expanded) {
             event.preventDefault()
-            setExpanded(false)
+            changeExpanded(false)
             inputAdapter?.element.focus()
           }
+        }}
+        onSubmit={(event) => {
+          onSubmit?.(event)
+          // Sending is the end of writing. The full-pane editor is there to
+          // draft a long message, and once that message is gone there is
+          // nothing left in it to draft — what stays behind is an empty sheet
+          // over the transcript, hiding the reply it was opened to write to.
+          // A host that needs the pane to survive its own submit — one that
+          // turns the send away, say — controls `expanded` and declines this.
+          if (expandRequested) changeExpanded(false)
         }}
         data-generating={generating || undefined}
         aria-busy={generating || undefined}
@@ -377,7 +423,7 @@ function PillComposer({
               title={expanded ? "Minimize composer" : "Expand composer"}
               aria-expanded={expanded}
               onClick={() => {
-                setExpanded(!expanded)
+                changeExpanded(!expanded)
                 inputAdapter?.element.focus()
               }}
             >

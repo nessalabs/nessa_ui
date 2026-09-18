@@ -4462,6 +4462,116 @@ export const ExpansionWithdrawn: Story = {
   },
 }
 
+export const ExpansionOnSend: Story = {
+  parameters: storyDocumentation(
+    "Sending closes the full-pane editor. The pane exists to draft a long message, so once that message is gone there is nothing left in it to draft — what stays behind is an empty sheet covering the transcript, hiding the very reply it was opened to write to. A host that needs the pane to survive its own submit, because it turned the send away, controls `expanded` and declines the change it hears through `onExpandedChange`. The play test expands and sends in both composers: the uncontrolled one comes down, and the controlled one that refuses its own submit stays up with the draft intact.",
+  ),
+  render: () => {
+    const SendCollapses = () => {
+      // The controlled host refuses every submit, standing in for one that
+      // cannot send yet — an attachment still reading, say — and so keeps the
+      // pane and the draft that is still in it.
+      const [expanded, setExpanded] = React.useState(false)
+      // Set for the duration of a submit, so the collapse the composer asks for
+      // on the way out of `onSubmit` is told apart from Minimize and Escape.
+      const refusing = React.useRef(false)
+      return (
+        <div className="flex flex-wrap gap-4">
+          <div
+            data-testid="send-pane"
+            className="relative flex h-64 w-full max-w-sm flex-col justify-end rounded-2xl bg-muted p-3"
+          >
+            <PillComposer
+              expandable
+              submitOnEnter={false}
+              aria-label="Sending composer"
+              onSubmit={(event) => event.preventDefault()}
+            >
+              <ChatComposerInput aria-label="Sending draft" />
+            </PillComposer>
+          </div>
+          <div
+            data-testid="refused-pane"
+            className="relative flex h-64 w-full max-w-sm flex-col justify-end rounded-2xl bg-muted p-3"
+          >
+            <PillComposer
+              expandable
+              submitOnEnter={false}
+              aria-label="Refusing composer"
+              expanded={expanded}
+              onExpandedChange={(next) => {
+                // Everything but a collapse the submit asked for.
+                if (next || !refusing.current) setExpanded(next)
+              }}
+              onSubmit={(event) => {
+                event.preventDefault()
+                refusing.current = true
+                queueMicrotask(() => {
+                  refusing.current = false
+                })
+              }}
+            >
+              <ChatComposerInput aria-label="Refusing draft" />
+            </PillComposer>
+          </div>
+        </div>
+      )
+    }
+    return <SendCollapses />
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+
+    const pane = canvas.getByTestId("send-pane")
+    const controls = within(pane)
+    const input = controls.getByRole("textbox")
+    const form = controls.getByRole("form") as HTMLFormElement
+    await userEvent.click(input)
+    await userEvent.type(input, "one{Enter}two{Enter}three")
+    await userEvent.click(
+      await controls.findByRole("button", { name: "Expand composer" }),
+    )
+    await waitFor(() =>
+      expect(form.getBoundingClientRect().height).toBeCloseTo(pane.clientHeight, 0),
+    )
+    form.requestSubmit()
+    // The end state, not a proxy: the pane is compact again and the way out of
+    // it is gone, because there is no longer a pane to leave.
+    await waitFor(() => expect(form).not.toHaveAttribute("data-expanded"))
+    await waitFor(() =>
+      expect(form.getBoundingClientRect().height).toBeLessThan(pane.clientHeight),
+    )
+    await expect(
+      controls.queryByRole("button", { name: "Minimize composer" }),
+    ).toBeNull()
+    await userEvent.clear(input)
+
+    const refusedPane = canvas.getByTestId("refused-pane")
+    const refused = within(refusedPane)
+    const refusedInput = refused.getByRole("textbox")
+    const refusedForm = refused.getByRole("form") as HTMLFormElement
+    await userEvent.click(refusedInput)
+    await userEvent.type(refusedInput, "one{Enter}two{Enter}three")
+    await userEvent.click(
+      await refused.findByRole("button", { name: "Expand composer" }),
+    )
+    await waitFor(() =>
+      expect(refusedForm.getBoundingClientRect().height).toBeCloseTo(
+        refusedPane.clientHeight,
+        0,
+      ),
+    )
+    refusedForm.requestSubmit()
+    // A controlled host that says no keeps the pane, and the draft it refused
+    // to send is still in it.
+    await waitFor(() => expect(refusedForm).toHaveAttribute("data-expanded"))
+    await expect(refusedInput).toHaveValue("one\ntwo\nthree")
+    await userEvent.keyboard("{Escape}")
+    await waitFor(() => expect(refusedForm).not.toHaveAttribute("data-expanded"))
+    await userEvent.clear(refusedInput)
+  },
+}
+
 export const Expansion: Story = {
   parameters: storyDocumentation("Plain and rich inputs retain rounded corners as they grow, scroll at their height cap, and reveal Expand at three lines. Expansion fills the positioned chat pane without replacing the input; Minimize or Escape restores its compact size and preserves the draft. Large rich-editor pastes become inline text chips."),
   render: () => <ExpansionExample />,
