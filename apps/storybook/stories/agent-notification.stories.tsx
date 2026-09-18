@@ -11,7 +11,7 @@ const meta = {
   tags: ["autodocs", "test"],
   parameters: {
     layout: "centered",
-    docs: { description: { component: "A full-width glass notification for agent windows. Place above PillComposer. State, retry policy, queue guarantees, and dismissal are host-owned; the component politely announces status and exposes optional Retry and dismiss actions. Connection state is the default vocabulary, not the only one: icon and retryIcon replace the glyphs the state would choose, so the same surface can carry a notice such as an available update. The primary action follows onRetry rather than state — a host does not have to claim the connection is down to get a button — and is disabled, not removed, while connecting or reconnecting. Enable shimmer for a faint, slowly morphing mesh wash (red offline, green connected, blue connecting); it defaults off and stays static under reduced motion." } },
+    docs: { description: { component: "A full-width glass notification for agent windows. Place above PillComposer. State, retry policy, queue guarantees, and dismissal are host-owned; the component politely announces status and exposes optional Retry and dismiss actions. Connection state is the default vocabulary, not the only one: icon and retryIcon replace the glyphs the state would choose, so the same surface can carry a notice such as an available update. The primary action follows onRetry rather than state — a host does not have to claim the connection is down to get a button — and is disabled, not removed, while connecting or reconnecting or while retryPending reports the host's own work in flight. A host that withdraws the action outright while it holds focus does not strand the keyboard user: the status region takes the focus and hands it back when the action returns. Enable shimmer for a faint, slowly morphing mesh wash (red offline, green connected, blue connecting); it defaults off and stays static under reduced motion." } },
   },
   args: { debug: true, state: "disconnected", onRetry: fn(), onDismiss: fn() },
 } satisfies Meta<typeof AgentNotification>
@@ -194,5 +194,85 @@ export const ActionWhileBusy: Story = {
     await expect(notice.getByRole("button", { name: "Retry" })).not.toHaveAttribute("aria-disabled")
     await userEvent.click(notice.getByRole("button", { name: "Retry" }))
     await expect(args.onRetry).toHaveBeenCalledTimes(1)
+  },
+}
+
+/** Lets the play test settle the host's own pending work without a timer. */
+function PendingActionExample(props: React.ComponentProps<typeof AgentNotification>) {
+  const [pending, setPending] = React.useState(true)
+  return (
+    <div className="flex max-w-full flex-col items-start gap-3">
+      <Button onClick={() => setPending(false)}>Finish the work</Button>
+      <AgentNotification {...props} retryPending={pending} />
+    </div>
+  )
+}
+
+export const ActionPending: Story = {
+  tags: ["reduced-motion"],
+  parameters: storyDocumentation("`retryPending` gives a host whose notice is not about the connection the same disabled affordance connecting and reconnecting already have. A host whose retry is already running says so and keeps the control in place, instead of withdrawing `onRetry` and pulling a control out from under whoever is standing on it. Only the action reads as busy: the state still chooses the glyph."),
+  args: { title: "Message not sent", description: "The gateway has no agent configured.", retryLabel: "Retry message", className: "w-[min(24rem,calc(100vw-2rem))]" },
+  render: (args) => <PendingActionExample {...args} />,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    const notice = within(canvasElement.querySelector<HTMLElement>('[data-slot="agent-notification"]')!)
+    const action = notice.getByRole("button", { name: "Retry message" })
+    await expect(action).toHaveAttribute("aria-disabled", "true")
+    // The connection is still the one the state names, so the glyph is the
+    // offline one rather than a spinner: pending belongs to the action alone.
+    await expect(canvasElement.querySelector('[data-slot="agent-notification"] > svg')).toHaveClass("lucide-wifi-off")
+    // Programmatic clicks throughout: a pointer click would move focus to the
+    // control it lands on, which is the thing these assertions are about.
+    action.focus()
+    action.click()
+    await expect(args.onRetry).not.toHaveBeenCalled()
+    await expect(action).toHaveFocus()
+    canvas.getByRole("button", { name: "Finish the work" }).click()
+    await waitFor(() => expect(notice.getByRole("button", { name: "Retry message" })).not.toHaveAttribute("aria-disabled"))
+    // The same element, still focused: nothing was removed and put back.
+    await expect(notice.getByRole("button", { name: "Retry message" })).toBe(action)
+    await expect(action).toHaveFocus()
+    action.click()
+    await expect(args.onRetry).toHaveBeenCalledTimes(1)
+  },
+}
+
+/** Lets the play test withdraw the host's action outright and offer it again. */
+function WithdrawnActionExample({ onRetry, ...props }: React.ComponentProps<typeof AgentNotification>) {
+  const [offered, setOffered] = React.useState(true)
+  return (
+    <div className="flex max-w-full flex-col items-start gap-3">
+      <Button onClick={() => setOffered((current) => !current)}>Toggle action</Button>
+      <AgentNotification {...props} onRetry={offered ? onRetry : undefined} />
+    </div>
+  )
+}
+
+export const ActionWithdrawn: Story = {
+  tags: ["reduced-motion"],
+  parameters: storyDocumentation("Withdrawing `onRetry` removes the control outright, which a host still does when the notice stops having anything to do. Focus does not fall to the document body: the status region takes it, so the explanation is announced and the ring shows where focus went. The region is a waiting room, not a destination — when the host offers the action again it takes the focus back, rather than leaving somebody parked on static text with a ring around the notice for as long as the notice lives."),
+  args: { title: "Message not sent", description: "The gateway has no agent configured.", retryLabel: "Retry message", className: "w-[min(24rem,calc(100vw-2rem))]" },
+  render: (args) => <WithdrawnActionExample {...args} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const element = canvasElement.querySelector<HTMLElement>('[data-slot="agent-notification"]')!
+    const notice = within(element)
+    const toggle = canvas.getByRole("button", { name: "Toggle action" })
+    const status = notice.getByRole("status")
+    notice.getByRole("button", { name: "Retry message" }).focus()
+    // Programmatic clicks: a pointer click would take the focus this asserts on.
+    toggle.click()
+    await waitFor(() => expect(notice.queryByRole("button", { name: "Retry message" })).toBeNull())
+    await expect(status).toHaveFocus()
+    await expect(element.ownerDocument.activeElement).not.toBe(element.ownerDocument.body)
+    toggle.click()
+    await waitFor(() => expect(notice.getByRole("button", { name: "Retry message" })).toHaveFocus())
+    // Focus that has moved on since the rescue is nobody's to take back.
+    toggle.click()
+    await waitFor(() => expect(status).toHaveFocus())
+    toggle.focus()
+    toggle.click()
+    await waitFor(() => expect(notice.getByRole("button", { name: "Retry message" })).toBeInTheDocument())
+    await expect(toggle).toHaveFocus()
   },
 }

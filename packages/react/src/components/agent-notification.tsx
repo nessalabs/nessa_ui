@@ -21,6 +21,8 @@ export interface AgentNotificationProps extends Omit<React.ComponentProps<"div">
   icon?: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>
   /** Shows the primary action, in every state. The host owns requests and retry policy; the action stays visible but disabled while connecting or reconnecting, because that work is already in flight. */
   onRetry?: () => void
+  /** The host's own action is already running. Disables the control in place, the way connecting and reconnecting do, so a host with work in flight does not have to withdraw `onRetry` — withdrawing it removes a control a keyboard user may be standing on. */
+  retryPending?: boolean
   /** Accessible name and hover title for the retry icon. Defaults to Retry. */
   retryLabel?: string
   /** Replaces the action's default arrow when the host's action is not a retry. `retryLabel`, not the glyph, names the action. */
@@ -55,8 +57,11 @@ const shimmerTints: Record<AgentNotificationState, string> = {
  * Announces changes politely; the action and dismissal are controlled by the
  * host. The primary action follows `onRetry` rather than `state`, so a host
  * that owns its own glyph and heading is not making a claim about the
- * connection to get a button; it is disabled while connecting or reconnecting.
- * It never opens a connection, queues messages, or schedules retries.
+ * connection to get a button; it is disabled while connecting or reconnecting,
+ * or whenever the host says its own work is pending. If the action is withdrawn
+ * outright while it holds focus, the status region takes that focus and hands
+ * it back when the action returns. It never opens a connection, queues
+ * messages, or schedules retries.
  */
 function AgentNotification({
   state,
@@ -65,6 +70,7 @@ function AgentNotification({
   description,
   icon: IconOverride,
   onRetry,
+  retryPending = false,
   retryLabel = "Retry",
   retryIcon: RetryIcon = RotateCw,
   onDismiss,
@@ -76,10 +82,24 @@ function AgentNotification({
   const id = React.useId()
   const [dismissing, setDismissing] = React.useState(false)
   const statusRef = React.useRef<HTMLDivElement>(null)
+  // The status region is where focus waits out an action that was withdrawn
+  // under it — a waiting room, not a destination. Parking a keyboard user on
+  // static text and leaving them there is its own dead end: there is nothing to
+  // do, and the focus ring sits on the notice's text for as long as the notice
+  // lives. So remember that the rescue happened, and give focus back to the
+  // action when the host restores it, unless something else has claimed it
+  // since.
+  const rescuedRef = React.useRef(false)
   const retryRef = React.useCallback((node: HTMLButtonElement | null) => {
     if (!node) return
+    if (rescuedRef.current) {
+      rescuedRef.current = false
+      if (node.ownerDocument.activeElement === statusRef.current) node.focus({ preventScroll: true })
+    }
     return () => {
-      if (node.ownerDocument.activeElement === node) statusRef.current?.focus({ preventScroll: true })
+      if (node.ownerDocument.activeElement !== node) return
+      rescuedRef.current = true
+      statusRef.current?.focus({ preventScroll: true })
     }
   }, [])
   const [finishedAnimation, setFinishedAnimation] = React.useState<Animation | null>(null)
@@ -215,6 +235,9 @@ function AgentNotification({
     `color-mix(in oklab, ${tint} 65%, transparent)`,
   ]
   const busy = state === "connecting" || state === "reconnecting"
+  // The glyph still spins for the connection alone; only the action answers to
+  // the host's own pending work.
+  const actionBusy = busy || retryPending
   const Icon = IconOverride ?? (busy ? LoaderCircle : state === "connected" ? Check : WifiOff)
 
   return (
@@ -243,7 +266,7 @@ function AgentNotification({
         {description ? <div className="mt-0.5 nessa-text-1 text-card-foreground/80">{description}</div> : null}
       </div>
       {onRetry ? (
-        <Button type="button" variant="ghost" size="icon" className="relative rounded-full text-muted-foreground" aria-label={retryLabel} title={retryLabel} ref={retryRef} aria-disabled={busy || dismissing || undefined} tabIndex={dismissing ? -1 : undefined} onClick={() => { if (!busy && !animationRef.current) onRetry?.() }}>
+        <Button type="button" variant="ghost" size="icon" className="relative rounded-full text-muted-foreground" aria-label={retryLabel} title={retryLabel} ref={retryRef} aria-disabled={actionBusy || dismissing || undefined} tabIndex={dismissing ? -1 : undefined} onClick={() => { if (!actionBusy && !animationRef.current) onRetry?.() }}>
           <RetryIcon aria-hidden={true} />
         </Button>
       ) : null}
