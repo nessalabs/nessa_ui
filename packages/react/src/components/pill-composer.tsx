@@ -333,8 +333,23 @@ function PillComposer({
   )
   // And the request itself is dropped, so re-enabling `expandable` does not
   // reopen the pane without anyone asking for it.
+  //
+  // Asked once per withdrawal, not once per callback identity. A controlled
+  // host that declines this and records it — to show what happened, say —
+  // rerenders, hands back a fresh `onExpandedChange`, and would otherwise be
+  // asked again by that identity change alone, with its own recording feeding
+  // the next round. The guard clears the moment expansion is offered again or
+  // the request goes away, so the next withdrawal is a fresh episode and is
+  // asked for in its own right.
+  const asked = React.useRef(false)
   React.useEffect(() => {
-    if (!expandable && expandRequested) changeExpanded(false)
+    if (expandable || !expandRequested) {
+      asked.current = false
+      return
+    }
+    if (asked.current) return
+    asked.current = true
+    changeExpanded(false)
   }, [expandable, expandRequested, changeExpanded])
 
   // Measure rendered lines, including wrapping and font/width changes. Keep

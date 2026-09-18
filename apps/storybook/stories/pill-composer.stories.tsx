@@ -4462,6 +4462,91 @@ export const ExpansionWithdrawn: Story = {
   },
 }
 
+export const ExpansionWithdrawnControlled: Story = {
+  parameters: storyDocumentation(
+    "A withdrawal is asked for once, however the host answers it. The composer tells a controlled host that `expandable` has gone false and the pane should come down; a host that declines and records the request rerenders with a fresh `onExpandedChange`, and asking again on that identity alone would feed its own recording back into the next round without either expansion flag moving. The play test refuses every request and records each one in state — the shape that loops — then checks exactly one arrived, that unrelated rerenders add none, and that re-enabling and withdrawing again is asked for in its own right.",
+  ),
+  render: () => {
+    const RefusedWithdrawal = () => {
+      const [expandable, setExpandable] = React.useState(true)
+      const [nudges, setNudges] = React.useState(0)
+      // Refused and recorded: the state update is what hands back a new
+      // callback identity on the next render.
+      const [requests, setRequests] = React.useState<boolean[]>([])
+      return (
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            data-testid="toggle-controlled-expandable"
+            onClick={() => setExpandable((value) => !value)}
+            className="w-fit rounded-md border border-border px-3 py-1 nessa-text-2"
+          >
+            {expandable ? "Withdraw expandable" : "Restore expandable"}
+          </button>
+          {/* An unrelated parent render, which must not be read as a request. */}
+          <button
+            type="button"
+            data-testid="nudge"
+            onClick={() => setNudges((value) => value + 1)}
+            className="w-fit rounded-md border border-border px-3 py-1 nessa-text-2"
+          >
+            Rerender {nudges}
+          </button>
+          <p data-testid="collapse-requests">{requests.length}</p>
+          <div
+            data-testid="controlled-withdraw-pane"
+            className="relative flex h-64 w-full max-w-md flex-col justify-end rounded-2xl bg-muted p-3"
+          >
+            <PillComposer
+              expandable={expandable}
+              submitOnEnter={false}
+              aria-label="Controlled withdrawal composer"
+              // Held open on purpose: the host refuses every collapse, so the
+              // request cannot be silenced by the state going away.
+              expanded
+              onExpandedChange={(next) => setRequests((seen) => [...seen, next])}
+              onSubmit={(event) => event.preventDefault()}
+            >
+              <ChatComposerInput aria-label="Controlled withdrawal draft" />
+            </PillComposer>
+          </div>
+        </div>
+      )
+    }
+    return <RefusedWithdrawal />
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const pane = canvas.getByTestId("controlled-withdraw-pane")
+    const form = within(pane).getByRole("form")
+    const requests = canvas.getByTestId("collapse-requests")
+
+    await expect(requests).toHaveTextContent("0")
+    await expect(form).toHaveAttribute("data-expanded")
+
+    await userEvent.click(canvas.getByTestId("toggle-controlled-expandable"))
+    // One request, and the pane is down on the derived value even though the
+    // host never agreed to it.
+    await waitFor(() => expect(requests).toHaveTextContent("1"))
+    await expect(form).not.toHaveAttribute("data-expanded")
+
+    // The loop, if there were one, is driven by callback identity: rerender the
+    // parent a few times and the count must not move.
+    for (let index = 0; index < 3; index += 1) {
+      await userEvent.click(canvas.getByTestId("nudge"))
+    }
+    await expect(canvas.getByTestId("nudge")).toHaveTextContent("Rerender 3")
+    await expect(requests).toHaveTextContent("1")
+
+    // A later withdrawal is its own episode and is asked for again.
+    await userEvent.click(canvas.getByTestId("toggle-controlled-expandable"))
+    await waitFor(() => expect(form).toHaveAttribute("data-expanded"))
+    await expect(requests).toHaveTextContent("1")
+    await userEvent.click(canvas.getByTestId("toggle-controlled-expandable"))
+    await waitFor(() => expect(requests).toHaveTextContent("2"))
+  },
+}
+
 export const ExpansionOnSend: Story = {
   parameters: storyDocumentation(
     "Sending closes the full-pane editor. The pane exists to draft a long message, so once that message is gone there is nothing left in it to draft — what stays behind is an empty sheet covering the transcript, hiding the very reply it was opened to write to. A host that needs the pane to survive its own submit, because it turned the send away, controls `expanded` and declines the change it hears through `onExpandedChange`. The play test expands and sends in both composers: the uncontrolled one comes down, and the controlled one that refuses its own submit stays up with the draft intact.",
