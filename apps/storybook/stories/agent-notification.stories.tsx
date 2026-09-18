@@ -1,6 +1,7 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { fn, expect, userEvent, within, waitFor } from "storybook/test"
+import { Download, Sparkles } from "lucide-react"
 import { AgentNotification, Button } from "@nessalabs/ui"
 import { storyDocumentation } from "./story-documentation"
 
@@ -10,7 +11,7 @@ const meta = {
   tags: ["autodocs", "test"],
   parameters: {
     layout: "centered",
-    docs: { description: { component: "A full-width glass notification for agent windows. Place above PillComposer. State, retry policy, queue guarantees, and dismissal are host-owned; the component politely announces status and exposes optional Retry and dismiss actions. Enable shimmer for a faint, slowly morphing mesh wash (red offline, green connected, blue connecting); it defaults off and stays static under reduced motion." } },
+    docs: { description: { component: "A full-width glass notification for agent windows. Place above PillComposer. State, retry policy, queue guarantees, and dismissal are host-owned; the component politely announces status and exposes optional Retry and dismiss actions. Connection state is the default vocabulary, not the only one: icon and retryIcon replace the glyphs the state would choose, so the same surface can carry a notice such as an available update. Enable shimmer for a faint, slowly morphing mesh wash (red offline, green connected, blue connecting); it defaults off and stays static under reduced motion." } },
   },
   args: { debug: true, state: "disconnected", onRetry: fn(), onDismiss: fn() },
 } satisfies Meta<typeof AgentNotification>
@@ -25,6 +26,9 @@ export const Banner: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement)
     await expect(canvas.getByRole("status")).toHaveTextContent("Not connected")
+    // Without overrides the glyphs stay state-chosen: offline, and a retry arrow.
+    await expect(canvasElement.querySelector('[data-slot="agent-notification"] > svg')).toHaveClass("lucide-wifi-off")
+    await expect(canvas.getByRole("button", { name: "Retry" }).querySelector("svg")).toHaveClass("lucide-rotate-cw")
     await userEvent.click(canvas.getByRole("button", { name: "Retry" }))
     await expect(args.onRetry).toHaveBeenCalledTimes(1)
     const notice = canvasElement.querySelector<HTMLElement>('[data-slot="agent-notification"]')!
@@ -111,5 +115,33 @@ export const StateUpdates: Story = {
     notice.getAnimations()[0].finish()
     await waitFor(() => expect(args.onDismiss).toHaveBeenCalledTimes(1))
     await expect(notice.getAnimations()).toHaveLength(0)
+  },
+}
+
+export const UpdateAvailable: Story = {
+  tags: ["reduced-motion"],
+  parameters: storyDocumentation("The same surface carrying a notice that is not about the connection. The host replaces both glyphs and names its own action; the heading, explanation, and action remain host-owned, and the wifi-off and retry-arrow defaults are untouched for callers that pass neither icon."),
+  args: {
+    title: "Update available",
+    description: "Version 1.4.2",
+    icon: Sparkles,
+    retryIcon: Download,
+    retryLabel: "Install update",
+    className: "w-[min(24rem,calc(100vw-2rem))]",
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByRole("status")).toHaveTextContent("Update available")
+    const leading = canvasElement.querySelector('[data-slot="agent-notification"] > svg')!
+    await expect(leading).toHaveClass("lucide-sparkles")
+    await expect(leading).not.toHaveClass("lucide-wifi-off")
+    // The override is decorative and sized like the glyph it replaces.
+    await expect(leading).toHaveAttribute("aria-hidden", "true")
+    await expect(leading).toHaveClass("size-4")
+    const action = canvas.getByRole("button", { name: "Install update" })
+    await expect(action.querySelector("svg")).toHaveClass("lucide-download")
+    await expect(action.querySelector(".lucide-rotate-cw")).toBeNull()
+    await userEvent.click(action)
+    await expect(args.onRetry).toHaveBeenCalledTimes(1)
   },
 }

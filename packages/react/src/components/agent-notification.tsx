@@ -17,10 +17,14 @@ export interface AgentNotificationProps extends Omit<React.ComponentProps<"div">
   title?: string
   /** Optional host-owned explanation; no delivery or queue guarantees are implied. */
   description?: string
+  /** Replaces the glyph the state would choose, for a notice that is not about the connection. Stays decorative, and still spins while connecting or reconnecting. */
+  icon?: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>
   /** Called by Retry in the disconnected state. The host owns requests and retry policy. */
   onRetry?: () => void
   /** Accessible name and hover title for the retry icon. Defaults to Retry. */
   retryLabel?: string
+  /** Replaces the action's default arrow when the host's action is not a retry. `retryLabel`, not the glyph, names the action. */
+  retryIcon?: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>
   /** Shows a dismiss action. Called after the exit (immediately under reduced motion). State/content changes cancel a pending exit. The host owns removal and focus placement afterward. */
   onDismiss?: () => void
   /** Development tooling: publishes bounded lifecycle events at window.__nessaAgentNotification. */
@@ -43,17 +47,22 @@ const shimmerTints: Record<AgentNotificationState, string> = {
 }
 
 /**
- * A quiet glass connection surface for agent windows, placed above the pill
- * composer. Announces state changes politely; retry and dismissal are controlled
- * by the host. It never opens a connection, queues messages, or schedules retries.
+ * A quiet glass notice for agent windows, placed above the pill composer.
+ * Connection state is its default vocabulary — headings, tints, and glyphs all
+ * follow `state` — but `title`, `description`, `icon`, and `retryIcon` let a
+ * host say something else on the same surface, such as an available update.
+ * Announces changes politely; the action and dismissal are controlled by the
+ * host. It never opens a connection, queues messages, or schedules retries.
  */
 function AgentNotification({
   state,
   shimmer = false,
   title,
   description,
+  icon: IconOverride,
   onRetry,
   retryLabel = "Retry",
+  retryIcon: RetryIcon = RotateCw,
   onDismiss,
   dismissLabel = "Dismiss notification",
   className,
@@ -202,7 +211,7 @@ function AgentNotification({
     `color-mix(in oklab, ${tint} 65%, transparent)`,
   ]
   const busy = state === "connecting" || state === "reconnecting"
-  const Icon = busy ? LoaderCircle : state === "connected" ? Check : WifiOff
+  const Icon = IconOverride ?? (busy ? LoaderCircle : state === "connected" ? Check : WifiOff)
 
   return (
     <div
@@ -222,7 +231,7 @@ function AgentNotification({
         </div>
       ) : null}
       <Icon
-        aria-hidden="true"
+        aria-hidden={true}
         className={cn("relative size-4 shrink-0 text-muted-foreground", busy && "animate-spin [animation-duration:var(--nessa-motion-duration-ambient)] motion-reduce:animate-none")}
       />
       <div ref={statusRef} role="status" tabIndex={-1} aria-live="polite" aria-atomic="true" className="relative min-w-0 flex-1 break-words rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
@@ -231,7 +240,7 @@ function AgentNotification({
       </div>
       {state === "disconnected" && onRetry ? (
         <Button type="button" variant="ghost" size="icon" className="relative rounded-full text-muted-foreground" aria-label={retryLabel} title={retryLabel} ref={retryRef} aria-disabled={dismissing || undefined} tabIndex={dismissing ? -1 : undefined} onClick={() => { if (!animationRef.current) onRetry?.() }}>
-          <RotateCw aria-hidden="true" />
+          <RetryIcon aria-hidden={true} />
         </Button>
       ) : null}
       {onDismiss ? (
