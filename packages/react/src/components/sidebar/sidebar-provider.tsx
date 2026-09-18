@@ -131,6 +131,18 @@ interface SidebarContextValue {
   portalContainerRef: React.RefObject<HTMLDivElement | null>
   /** Most recent trigger used for mobile focus restoration. */
   lastTriggerRef: React.RefObject<HTMLElement | null>
+  /**
+   * The `aria-label` of a trigger that focus is owed to but which has not
+   * mounted yet, or null when nothing is owed. An empty string claims the
+   * next trigger to mount, whatever it is labelled.
+   *
+   * A closing mobile Sidebar can replace its trigger with a new node rather
+   * than reveal the old one, leaving nothing to restore focus to at the
+   * moment it closes. The claim is left here for that node to take when it
+   * arrives, so restoring focus never depends on guessing how long the
+   * remount takes.
+   */
+  pendingTriggerFocusRef: React.RefObject<string | null>
 }
 
 const SidebarContext = React.createContext<SidebarContextValue | null>(null)
@@ -245,6 +257,7 @@ function SidebarProvider({
   const [uncontrolledOpen, setUncontrolledOpen] = React.useState(defaultOpen)
   const portalContainerRef = React.useRef<HTMLDivElement>(null)
   const lastTriggerRef = React.useRef<HTMLElement>(null)
+  const pendingTriggerFocusRef = React.useRef<string | null>(null)
   const open = openProp ?? uncontrolledOpen
 
   /**
@@ -328,6 +341,7 @@ function SidebarProvider({
       toggleSidebar,
       portalContainerRef,
       lastTriggerRef,
+      pendingTriggerFocusRef,
     }),
     [open, setOpen, toggleSidebar],
   )
