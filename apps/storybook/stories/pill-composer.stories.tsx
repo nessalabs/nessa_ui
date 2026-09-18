@@ -3647,8 +3647,13 @@ export const Notifications: Story = {
     canvas.getByRole("button", { name: "Retry" }).focus()
     await userEvent.keyboard("{Enter}")
     await expect(within(notice()).getByRole("status")).toHaveTextContent("Reconnecting…")
-    await expect(canvas.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument()
-    await expect(within(notice()).getByRole("status")).toHaveFocus()
+    // Mid-reconnect the action is disabled in place rather than removed, so the
+    // key that started the retry does not also throw the caret out of the row.
+    const retry = canvas.getByRole("button", { name: "Retry" })
+    await expect(retry).toHaveAttribute("aria-disabled", "true")
+    await expect(retry).toHaveFocus()
+    await userEvent.keyboard("{Enter}")
+    await expect(within(notice()).getByRole("status")).toHaveTextContent("Reconnecting…")
     await waitFor(() => expect(within(notice()).getByRole("status")).toHaveTextContent("Connected"), { timeout: 4000 })
     const exitingNotice = notice()
     const view = canvasElement.ownerDocument.defaultView!

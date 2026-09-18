@@ -11,7 +11,7 @@ const meta = {
   tags: ["autodocs", "test"],
   parameters: {
     layout: "centered",
-    docs: { description: { component: "A full-width glass notification for agent windows. Place above PillComposer. State, retry policy, queue guarantees, and dismissal are host-owned; the component politely announces status and exposes optional Retry and dismiss actions. Connection state is the default vocabulary, not the only one: icon and retryIcon replace the glyphs the state would choose, so the same surface can carry a notice such as an available update. Enable shimmer for a faint, slowly morphing mesh wash (red offline, green connected, blue connecting); it defaults off and stays static under reduced motion." } },
+    docs: { description: { component: "A full-width glass notification for agent windows. Place above PillComposer. State, retry policy, queue guarantees, and dismissal are host-owned; the component politely announces status and exposes optional Retry and dismiss actions. Connection state is the default vocabulary, not the only one: icon and retryIcon replace the glyphs the state would choose, so the same surface can carry a notice such as an available update. The primary action follows onRetry rather than state — a host does not have to claim the connection is down to get a button — and is disabled, not removed, while connecting or reconnecting. Enable shimmer for a faint, slowly morphing mesh wash (red offline, green connected, blue connecting); it defaults off and stays static under reduced motion." } },
   },
   args: { debug: true, state: "disconnected", onRetry: fn(), onDismiss: fn() },
 } satisfies Meta<typeof AgentNotification>
@@ -29,6 +29,11 @@ export const Banner: Story = {
     // Without overrides the glyphs stay state-chosen: offline, and a retry arrow.
     await expect(canvasElement.querySelector('[data-slot="agent-notification"] > svg')).toHaveClass("lucide-wifi-off")
     await expect(canvas.getByRole("button", { name: "Retry" }).querySelector("svg")).toHaveClass("lucide-rotate-cw")
+    // The disconnected default is unchanged: an enabled action, and both
+    // icon-only controls carry their label as a hover title.
+    await expect(canvas.getByRole("button", { name: "Retry" })).not.toHaveAttribute("aria-disabled")
+    await expect(canvas.getByRole("button", { name: "Retry" })).toHaveAttribute("title", "Retry")
+    await expect(canvas.getByRole("button", { name: "Dismiss notification" })).toHaveAttribute("title", "Dismiss notification")
     await userEvent.click(canvas.getByRole("button", { name: "Retry" }))
     await expect(args.onRetry).toHaveBeenCalledTimes(1)
     const notice = canvasElement.querySelector<HTMLElement>('[data-slot="agent-notification"]')!
@@ -120,8 +125,9 @@ export const StateUpdates: Story = {
 
 export const UpdateAvailable: Story = {
   tags: ["reduced-motion"],
-  parameters: storyDocumentation("The same surface carrying a notice that is not about the connection. The host replaces both glyphs and names its own action; the heading, explanation, and action remain host-owned, and the wifi-off and retry-arrow defaults are untouched for callers that pass neither icon."),
+  parameters: storyDocumentation("The same surface carrying a notice that is not about the connection. The host replaces both glyphs, names its own action, and leaves the connection reported as connected — the action follows onRetry, so the host does not have to claim the agent is offline to get a button. The wifi-off and retry-arrow defaults are untouched for callers that pass neither icon."),
   args: {
+    state: "connected",
     title: "Update available",
     description: "Version 1.4.2",
     icon: Sparkles,
@@ -132,6 +138,7 @@ export const UpdateAvailable: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement)
     await expect(canvas.getByRole("status")).toHaveTextContent("Update available")
+    await expect(canvasElement.querySelector('[data-slot="agent-notification"]')).toHaveAttribute("data-state", "connected")
     const leading = canvasElement.querySelector('[data-slot="agent-notification"] > svg')!
     await expect(leading).toHaveClass("lucide-sparkles")
     await expect(leading).not.toHaveClass("lucide-wifi-off")
@@ -141,7 +148,51 @@ export const UpdateAvailable: Story = {
     const action = canvas.getByRole("button", { name: "Install update" })
     await expect(action.querySelector("svg")).toHaveClass("lucide-download")
     await expect(action.querySelector(".lucide-rotate-cw")).toBeNull()
+    await expect(action).not.toHaveAttribute("aria-disabled")
     await userEvent.click(action)
+    await expect(args.onRetry).toHaveBeenCalledTimes(1)
+  },
+}
+
+/** Lets the play test move the notice out of a busy state without a timer. */
+function BusyActionExample(props: React.ComponentProps<typeof AgentNotification>) {
+  const [state, setState] = React.useState<React.ComponentProps<typeof AgentNotification>["state"]>("connecting")
+  return (
+    <div className="flex max-w-full flex-col items-start gap-3">
+      <Button onClick={() => setState("connected")}>Finish connecting</Button>
+      <AgentNotification {...props} state={state} />
+    </div>
+  )
+}
+
+export const ActionWhileBusy: Story = {
+  tags: ["reduced-motion"],
+  parameters: storyDocumentation("While connecting or reconnecting the action stays in place and is disabled rather than removed: the work it would start is already in flight, the row does not reflow on every connection flap, and a keyboard user who is focused on it does not lose focus. It becomes live again as soon as the state settles."),
+  args: { description: "Establishing a connection to your agent.", className: "w-[min(24rem,calc(100vw-2rem))]" },
+  render: (args) => <BusyActionExample {...args} />,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    const notice = within(canvasElement.querySelector<HTMLElement>('[data-slot="agent-notification"]')!)
+    // The old gate rendered nothing here; the action is now present, disabled.
+    const action = notice.getByRole("button", { name: "Retry" })
+    await expect(action).toHaveAttribute("aria-disabled", "true")
+    // Button's aria-disabled styling is the whole disabled affordance: the
+    // pointer cannot reach it, and it reads at the same half opacity as any
+    // other disabled control in the system.
+    const view = canvasElement.ownerDocument.defaultView!
+    await expect(view.getComputedStyle(action).pointerEvents).toBe("none")
+    await expect(view.getComputedStyle(action).opacity).toBe("0.5")
+    // Disabled, not unfocusable: the control stays reachable and keeps focus,
+    // and activating it from the keyboard still does nothing.
+    action.focus()
+    await userEvent.keyboard("{Enter}")
+    action.click()
+    await expect(args.onRetry).not.toHaveBeenCalled()
+    await expect(action).toHaveFocus()
+    await userEvent.click(canvas.getByRole("button", { name: "Finish connecting" }))
+    await waitFor(() => expect(notice.getByRole("status")).toHaveTextContent("Connected"))
+    await expect(notice.getByRole("button", { name: "Retry" })).not.toHaveAttribute("aria-disabled")
+    await userEvent.click(notice.getByRole("button", { name: "Retry" }))
     await expect(args.onRetry).toHaveBeenCalledTimes(1)
   },
 }

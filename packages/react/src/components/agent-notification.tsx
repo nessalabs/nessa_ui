@@ -19,7 +19,7 @@ export interface AgentNotificationProps extends Omit<React.ComponentProps<"div">
   description?: string
   /** Replaces the glyph the state would choose, for a notice that is not about the connection. Stays decorative, and still spins while connecting or reconnecting. */
   icon?: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>
-  /** Called by Retry in the disconnected state. The host owns requests and retry policy. */
+  /** Shows the primary action, in every state. The host owns requests and retry policy; the action stays visible but disabled while connecting or reconnecting, because that work is already in flight. */
   onRetry?: () => void
   /** Accessible name and hover title for the retry icon. Defaults to Retry. */
   retryLabel?: string
@@ -29,6 +29,7 @@ export interface AgentNotificationProps extends Omit<React.ComponentProps<"div">
   onDismiss?: () => void
   /** Development tooling: publishes bounded lifecycle events at window.__nessaAgentNotification. */
   debug?: boolean
+  /** Accessible name and hover title for the dismiss icon. Defaults to Dismiss notification. */
   dismissLabel?: string
 }
 
@@ -52,7 +53,10 @@ const shimmerTints: Record<AgentNotificationState, string> = {
  * follow `state` — but `title`, `description`, `icon`, and `retryIcon` let a
  * host say something else on the same surface, such as an available update.
  * Announces changes politely; the action and dismissal are controlled by the
- * host. It never opens a connection, queues messages, or schedules retries.
+ * host. The primary action follows `onRetry` rather than `state`, so a host
+ * that owns its own glyph and heading is not making a claim about the
+ * connection to get a button; it is disabled while connecting or reconnecting.
+ * It never opens a connection, queues messages, or schedules retries.
  */
 function AgentNotification({
   state,
@@ -238,13 +242,13 @@ function AgentNotification({
         <div className="nessa-text-2 font-medium">{title ?? titles[state]}</div>
         {description ? <div className="mt-0.5 nessa-text-1 text-card-foreground/80">{description}</div> : null}
       </div>
-      {state === "disconnected" && onRetry ? (
-        <Button type="button" variant="ghost" size="icon" className="relative rounded-full text-muted-foreground" aria-label={retryLabel} title={retryLabel} ref={retryRef} aria-disabled={dismissing || undefined} tabIndex={dismissing ? -1 : undefined} onClick={() => { if (!animationRef.current) onRetry?.() }}>
+      {onRetry ? (
+        <Button type="button" variant="ghost" size="icon" className="relative rounded-full text-muted-foreground" aria-label={retryLabel} title={retryLabel} ref={retryRef} aria-disabled={busy || dismissing || undefined} tabIndex={dismissing ? -1 : undefined} onClick={() => { if (!busy && !animationRef.current) onRetry?.() }}>
           <RetryIcon aria-hidden={true} />
         </Button>
       ) : null}
       {onDismiss ? (
-        <Button type="button" variant="ghost" size="icon" className="relative rounded-full text-muted-foreground" aria-label={dismissLabel} aria-disabled={dismissing || undefined} tabIndex={dismissing ? -1 : undefined} onClick={dismiss}>
+        <Button type="button" variant="ghost" size="icon" className="relative rounded-full text-muted-foreground" aria-label={dismissLabel} title={dismissLabel} aria-disabled={dismissing || undefined} tabIndex={dismissing ? -1 : undefined} onClick={dismiss}>
           <X aria-hidden="true" />
         </Button>
       ) : null}
