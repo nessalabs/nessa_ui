@@ -90,6 +90,7 @@ import {
   DropdownMenuTrigger,
   PillComposer,
   PillComposerRow,
+  type PillComposerExpansionReason,
   SearchableListbox,
   SegmentedControl,
   SegmentedControlOption,
@@ -4459,6 +4460,200 @@ export const ExpansionWithdrawn: Story = {
     )
     await expect(form).not.toHaveAttribute("data-expanded")
     await userEvent.clear(input)
+  },
+}
+
+export const ExpansionWithdrawnControlled: Story = {
+  parameters: storyDocumentation(
+    "A withdrawal is asked for once, however the host answers it. The composer tells a controlled host that `expandable` has gone false and the pane should come down; a host that declines and records the request rerenders with a fresh `onExpandedChange`, and asking again on that identity alone would feed its own recording back into the next round without either expansion flag moving. The play test refuses every request and records each one in state — the shape that loops — then checks exactly one arrived, that unrelated rerenders add none, and that re-enabling and withdrawing again is asked for in its own right.",
+  ),
+  render: () => {
+    const RefusedWithdrawal = () => {
+      const [expandable, setExpandable] = React.useState(true)
+      const [nudges, setNudges] = React.useState(0)
+      // Refused and recorded: the state update is what hands back a new
+      // callback identity on the next render.
+      const [requests, setRequests] = React.useState<PillComposerExpansionReason[]>(
+        [],
+      )
+      return (
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            data-testid="toggle-controlled-expandable"
+            onClick={() => setExpandable((value) => !value)}
+            className="w-fit rounded-md border border-border px-3 py-1 nessa-text-2"
+          >
+            {expandable ? "Withdraw expandable" : "Restore expandable"}
+          </button>
+          {/* An unrelated parent render, which must not be read as a request. */}
+          <button
+            type="button"
+            data-testid="nudge"
+            onClick={() => setNudges((value) => value + 1)}
+            className="w-fit rounded-md border border-border px-3 py-1 nessa-text-2"
+          >
+            Rerender {nudges}
+          </button>
+          <p data-testid="collapse-requests">{requests.length}</p>
+          <p data-testid="collapse-reasons">{requests.join(" ")}</p>
+          <div
+            data-testid="controlled-withdraw-pane"
+            className="relative flex h-64 w-full max-w-md flex-col justify-end rounded-2xl bg-muted p-3"
+          >
+            <PillComposer
+              expandable={expandable}
+              submitOnEnter={false}
+              aria-label="Controlled withdrawal composer"
+              // Held open on purpose: the host refuses every collapse, so the
+              // request cannot be silenced by the state going away.
+              expanded
+              onExpandedChange={(_next, reason) =>
+                setRequests((seen) => [...seen, reason])
+              }
+              onSubmit={(event) => event.preventDefault()}
+            >
+              <ChatComposerInput aria-label="Controlled withdrawal draft" />
+            </PillComposer>
+          </div>
+        </div>
+      )
+    }
+    return <RefusedWithdrawal />
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const pane = canvas.getByTestId("controlled-withdraw-pane")
+    const form = within(pane).getByRole("form")
+    const requests = canvas.getByTestId("collapse-requests")
+
+    await expect(requests).toHaveTextContent("0")
+    await expect(form).toHaveAttribute("data-expanded")
+
+    await userEvent.click(canvas.getByTestId("toggle-controlled-expandable"))
+    // One request, and the pane is down on the derived value even though the
+    // host never agreed to it.
+    await waitFor(() => expect(requests).toHaveTextContent("1"))
+    await expect(canvas.getByTestId("collapse-reasons")).toHaveTextContent(
+      "withdrawal",
+    )
+    await expect(form).not.toHaveAttribute("data-expanded")
+
+    // The loop, if there were one, is driven by callback identity: rerender the
+    // parent a few times and the count must not move.
+    for (let index = 0; index < 3; index += 1) {
+      await userEvent.click(canvas.getByTestId("nudge"))
+    }
+    await expect(canvas.getByTestId("nudge")).toHaveTextContent("Rerender 3")
+    await expect(requests).toHaveTextContent("1")
+
+    // A later withdrawal is its own episode and is asked for again.
+    await userEvent.click(canvas.getByTestId("toggle-controlled-expandable"))
+    await waitFor(() => expect(form).toHaveAttribute("data-expanded"))
+    await expect(requests).toHaveTextContent("1")
+    await userEvent.click(canvas.getByTestId("toggle-controlled-expandable"))
+    await waitFor(() => expect(requests).toHaveTextContent("2"))
+  },
+}
+
+export const ExpansionOnSend: Story = {
+  parameters: storyDocumentation(
+    "Sending closes the full-pane editor. The pane exists to draft a long message, so once that message is gone there is nothing left in it to draft — what stays behind is an empty sheet covering the transcript, hiding the very reply it was opened to write to. A host that needs the pane to survive its own submit, because it turned the send away, controls `expanded` and declines the change whose reason is `\"submit\"`. The play test expands and sends in both composers: the uncontrolled one comes down, and the controlled one that refuses its own submit stays up with the draft intact.",
+  ),
+  render: () => {
+    const SendCollapses = () => {
+      // The controlled host refuses every submit, standing in for one that
+      // cannot send yet — an attachment still reading, say — and so keeps the
+      // pane and the draft that is still in it.
+      const [expanded, setExpanded] = React.useState(false)
+      return (
+        <div className="flex flex-wrap gap-4">
+          <div
+            data-testid="send-pane"
+            className="relative flex h-64 w-full max-w-sm flex-col justify-end rounded-2xl bg-muted p-3"
+          >
+            <PillComposer
+              expandable
+              submitOnEnter={false}
+              aria-label="Sending composer"
+              onSubmit={(event) => event.preventDefault()}
+            >
+              <ChatComposerInput aria-label="Sending draft" />
+            </PillComposer>
+          </div>
+          <div
+            data-testid="refused-pane"
+            className="relative flex h-64 w-full max-w-sm flex-col justify-end rounded-2xl bg-muted p-3"
+          >
+            <PillComposer
+              expandable
+              submitOnEnter={false}
+              aria-label="Refusing composer"
+              expanded={expanded}
+              onExpandedChange={(next, reason) => {
+                // Everything but the collapse this submit asked for.
+                if (next || reason !== "submit") setExpanded(next)
+              }}
+              onSubmit={(event) => event.preventDefault()}
+            >
+              <ChatComposerInput aria-label="Refusing draft" />
+            </PillComposer>
+          </div>
+        </div>
+      )
+    }
+    return <SendCollapses />
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+
+    const pane = canvas.getByTestId("send-pane")
+    const controls = within(pane)
+    const input = controls.getByRole("textbox")
+    const form = controls.getByRole("form") as HTMLFormElement
+    await userEvent.click(input)
+    await userEvent.type(input, "one{Enter}two{Enter}three")
+    await userEvent.click(
+      await controls.findByRole("button", { name: "Expand composer" }),
+    )
+    await waitFor(() =>
+      expect(form.getBoundingClientRect().height).toBeCloseTo(pane.clientHeight, 0),
+    )
+    form.requestSubmit()
+    // The end state, not a proxy: the pane is compact again and the way out of
+    // it is gone, because there is no longer a pane to leave.
+    await waitFor(() => expect(form).not.toHaveAttribute("data-expanded"))
+    await waitFor(() =>
+      expect(form.getBoundingClientRect().height).toBeLessThan(pane.clientHeight),
+    )
+    await expect(
+      controls.queryByRole("button", { name: "Minimize composer" }),
+    ).toBeNull()
+    await userEvent.clear(input)
+
+    const refusedPane = canvas.getByTestId("refused-pane")
+    const refused = within(refusedPane)
+    const refusedInput = refused.getByRole("textbox")
+    const refusedForm = refused.getByRole("form") as HTMLFormElement
+    await userEvent.click(refusedInput)
+    await userEvent.type(refusedInput, "one{Enter}two{Enter}three")
+    await userEvent.click(
+      await refused.findByRole("button", { name: "Expand composer" }),
+    )
+    await waitFor(() =>
+      expect(refusedForm.getBoundingClientRect().height).toBeCloseTo(
+        refusedPane.clientHeight,
+        0,
+      ),
+    )
+    refusedForm.requestSubmit()
+    // A controlled host that says no keeps the pane, and the draft it refused
+    // to send is still in it.
+    await waitFor(() => expect(refusedForm).toHaveAttribute("data-expanded"))
+    await expect(refusedInput).toHaveValue("one\ntwo\nthree")
+    await userEvent.keyboard("{Escape}")
+    await waitFor(() => expect(refusedForm).not.toHaveAttribute("data-expanded"))
+    await userEvent.clear(refusedInput)
   },
 }
 
