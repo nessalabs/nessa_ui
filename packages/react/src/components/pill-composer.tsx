@@ -67,6 +67,24 @@ const pillComposerRimBandClassName =
 export type PillComposerRimVariant = "orbit" | "comet" | "pulse" | "aurora"
 
 /**
+ * Why the composer is proposing an expansion change.
+ *
+ * A host that answers some of them differently gets to say which without
+ * inferring it from timing: `"submit"` is the one a host that turned its own
+ * send away is likely to decline, and the rest are the ways a person leaves
+ * the pane or has it taken from them.
+ */
+export type PillComposerExpansionReason =
+  /** The expand/minimize control in the pane's corner. */
+  | "control"
+  /** Escape, while expanded. */
+  | "escape"
+  /** The form was submitted. */
+  | "submit"
+  /** `expandable` went false with a request standing. */
+  | "withdrawal"
+
+/**
  * The traveling-light overlay: a thin crisp gradient band on the pill's
  * rim, plus a blurred copy bleeding a few pixels inward as a soft glow —
  * nothing renders outside the pill. It fades in and out with `active` and
@@ -266,12 +284,14 @@ export interface PillComposerProps extends React.ComponentProps<"form"> {
   /** Whether the full-pane editor starts open, when the composer owns the state. */
   defaultExpanded?: boolean
   /**
-   * Called whenever the composer would change expansion: the expand and
-   * minimize controls, Escape, `expandable` being withdrawn, and a submit.
-   * A controlled host decides what to do with each; an uncontrolled one can
-   * use this to follow along.
+   * Called whenever the composer would change expansion, with why. A
+   * controlled host decides what to do with each; an uncontrolled one can use
+   * this to follow along.
    */
-  onExpandedChange?: (expanded: boolean) => void
+  onExpandedChange?: (
+    expanded: boolean,
+    reason: PillComposerExpansionReason,
+  ) => void
   submitOnEnter?: boolean
 }
 
@@ -325,9 +345,9 @@ function PillComposer({
   // the composer starts by itself — the withdrawal below and the collapse on
   // submit — and not only the ones a person clicks.
   const changeExpanded = React.useCallback(
-    (next: boolean) => {
+    (next: boolean, reason: PillComposerExpansionReason) => {
       if (!controlled) setSelfExpanded(next)
-      onExpandedChange?.(next)
+      onExpandedChange?.(next, reason)
     },
     [controlled, onExpandedChange],
   )
@@ -349,7 +369,7 @@ function PillComposer({
     }
     if (asked.current) return
     asked.current = true
-    changeExpanded(false)
+    changeExpanded(false, "withdrawal")
   }, [expandable, expandRequested, changeExpanded])
 
   // Measure rendered lines, including wrapping and font/width changes. Keep
@@ -397,7 +417,7 @@ function PillComposer({
           onKeyDown?.(event)
           if (!event.defaultPrevented && event.key === "Escape" && expanded) {
             event.preventDefault()
-            changeExpanded(false)
+            changeExpanded(false, "escape")
             inputAdapter?.element.focus()
           }
         }}
@@ -409,7 +429,7 @@ function PillComposer({
           // over the transcript, hiding the reply it was opened to write to.
           // A host that needs the pane to survive its own submit — one that
           // turns the send away, say — controls `expanded` and declines this.
-          if (expandRequested) changeExpanded(false)
+          if (expandRequested) changeExpanded(false, "submit")
         }}
         data-generating={generating || undefined}
         aria-busy={generating || undefined}
@@ -438,7 +458,7 @@ function PillComposer({
               title={expanded ? "Minimize composer" : "Expand composer"}
               aria-expanded={expanded}
               onClick={() => {
-                changeExpanded(!expanded)
+                changeExpanded(!expanded, "control")
                 inputAdapter?.element.focus()
               }}
             >

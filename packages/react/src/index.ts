@@ -510,6 +510,7 @@ export {
 export {
   PillComposer,
   PillComposerRow,
+  type PillComposerExpansionReason,
   type PillComposerProps,
   type PillComposerRimVariant,
 } from "./components/pill-composer"

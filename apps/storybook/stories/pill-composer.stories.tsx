@@ -90,6 +90,7 @@ import {
   DropdownMenuTrigger,
   PillComposer,
   PillComposerRow,
+  type PillComposerExpansionReason,
   SearchableListbox,
   SegmentedControl,
   SegmentedControlOption,
@@ -4472,7 +4473,9 @@ export const ExpansionWithdrawnControlled: Story = {
       const [nudges, setNudges] = React.useState(0)
       // Refused and recorded: the state update is what hands back a new
       // callback identity on the next render.
-      const [requests, setRequests] = React.useState<boolean[]>([])
+      const [requests, setRequests] = React.useState<PillComposerExpansionReason[]>(
+        [],
+      )
       return (
         <div className="flex flex-col gap-3">
           <button
@@ -4493,6 +4496,7 @@ export const ExpansionWithdrawnControlled: Story = {
             Rerender {nudges}
           </button>
           <p data-testid="collapse-requests">{requests.length}</p>
+          <p data-testid="collapse-reasons">{requests.join(" ")}</p>
           <div
             data-testid="controlled-withdraw-pane"
             className="relative flex h-64 w-full max-w-md flex-col justify-end rounded-2xl bg-muted p-3"
@@ -4504,7 +4508,9 @@ export const ExpansionWithdrawnControlled: Story = {
               // Held open on purpose: the host refuses every collapse, so the
               // request cannot be silenced by the state going away.
               expanded
-              onExpandedChange={(next) => setRequests((seen) => [...seen, next])}
+              onExpandedChange={(_next, reason) =>
+                setRequests((seen) => [...seen, reason])
+              }
               onSubmit={(event) => event.preventDefault()}
             >
               <ChatComposerInput aria-label="Controlled withdrawal draft" />
@@ -4528,6 +4534,9 @@ export const ExpansionWithdrawnControlled: Story = {
     // One request, and the pane is down on the derived value even though the
     // host never agreed to it.
     await waitFor(() => expect(requests).toHaveTextContent("1"))
+    await expect(canvas.getByTestId("collapse-reasons")).toHaveTextContent(
+      "withdrawal",
+    )
     await expect(form).not.toHaveAttribute("data-expanded")
 
     // The loop, if there were one, is driven by callback identity: rerender the
@@ -4549,7 +4558,7 @@ export const ExpansionWithdrawnControlled: Story = {
 
 export const ExpansionOnSend: Story = {
   parameters: storyDocumentation(
-    "Sending closes the full-pane editor. The pane exists to draft a long message, so once that message is gone there is nothing left in it to draft — what stays behind is an empty sheet covering the transcript, hiding the very reply it was opened to write to. A host that needs the pane to survive its own submit, because it turned the send away, controls `expanded` and declines the change it hears through `onExpandedChange`. The play test expands and sends in both composers: the uncontrolled one comes down, and the controlled one that refuses its own submit stays up with the draft intact.",
+    "Sending closes the full-pane editor. The pane exists to draft a long message, so once that message is gone there is nothing left in it to draft — what stays behind is an empty sheet covering the transcript, hiding the very reply it was opened to write to. A host that needs the pane to survive its own submit, because it turned the send away, controls `expanded` and declines the change whose reason is `\"submit\"`. The play test expands and sends in both composers: the uncontrolled one comes down, and the controlled one that refuses its own submit stays up with the draft intact.",
   ),
   render: () => {
     const SendCollapses = () => {
@@ -4557,9 +4566,6 @@ export const ExpansionOnSend: Story = {
       // cannot send yet — an attachment still reading, say — and so keeps the
       // pane and the draft that is still in it.
       const [expanded, setExpanded] = React.useState(false)
-      // Set for the duration of a submit, so the collapse the composer asks for
-      // on the way out of `onSubmit` is told apart from Minimize and Escape.
-      const refusing = React.useRef(false)
       return (
         <div className="flex flex-wrap gap-4">
           <div
@@ -4584,17 +4590,11 @@ export const ExpansionOnSend: Story = {
               submitOnEnter={false}
               aria-label="Refusing composer"
               expanded={expanded}
-              onExpandedChange={(next) => {
-                // Everything but a collapse the submit asked for.
-                if (next || !refusing.current) setExpanded(next)
+              onExpandedChange={(next, reason) => {
+                // Everything but the collapse this submit asked for.
+                if (next || reason !== "submit") setExpanded(next)
               }}
-              onSubmit={(event) => {
-                event.preventDefault()
-                refusing.current = true
-                queueMicrotask(() => {
-                  refusing.current = false
-                })
-              }}
+              onSubmit={(event) => event.preventDefault()}
             >
               <ChatComposerInput aria-label="Refusing draft" />
             </PillComposer>
