@@ -40,6 +40,102 @@ function stringLiterals(ast: ts.SourceFile) {
   return found
 }
 
+/** Names bound to a hook's result, e.g. `const layerScope = useNessaLayerScope()`. */
+function hookBindings(ast: ts.SourceFile, hookName: string): Set<string> {
+  const names = new Set<string>()
+  ast.forEachChild(function visit(node) {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      ts.isCallExpression(node.initializer) &&
+      ts.isIdentifier(node.initializer.expression) &&
+      node.initializer.expression.text === hookName
+    ) {
+      names.add(node.name.text)
+    }
+    ts.forEachChild(node, visit)
+  })
+  return names
+}
+
+/** Whether anything *inside* this element spreads one of the scope bindings. */
+function carriesLayerScope(element: ts.JsxElement, scopes: ReadonlySet<string>): boolean {
+  let found = false
+  const visit = (node: ts.Node): void => {
+    if (found) return
+    if (
+      ts.isJsxSpreadAttribute(node) &&
+      ts.isIdentifier(node.expression) &&
+      scopes.has(node.expression.text)
+    ) {
+      found = true
+      return
+    }
+    ts.forEachChild(node, visit)
+  }
+  // The children only: a spread on the portal itself lands on a wrapper that
+  // draws nothing, not on the element whose tokens are being asked about.
+  for (const child of element.children) visit(child)
+  return found
+}
+
+/**
+ * Portals whose destination the provider governs, and whose content does not
+ * carry the scope onto itself.
+ *
+ * A portal reached through `usePortalContainer` is one the provider answers
+ * for: it lands in a panel's own container, or in the body, and in the second
+ * case it leaves the tree entirely. The tokens its class names read are
+ * declared on `data-nessa-*`, so an element that arrives without them renders
+ * against whatever the page resolved rather than against the scope it was
+ * opened from — a picker in a Dark provider on a Light page coming up light.
+ *
+ * Calling the hook is not the claim; spreading it onto the element is. This
+ * reads the JSX rather than the file's text so a call whose result goes
+ * nowhere fails exactly as a missing call does.
+ *
+ * @returns One description per offending portal, empty when the file governs
+ * no portal or every governed portal carries the scope.
+ */
+export function unscopedPortalLayers(ast: ts.SourceFile): string[] {
+  const containers = hookBindings(ast, "usePortalContainer")
+  if (!containers.size) return []
+  const scopes = hookBindings(ast, "useNessaLayerScope")
+  const offenders: string[] = []
+  ast.forEachChild(function visit(node) {
+    if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
+      const opening = ts.isJsxElement(node) ? node.openingElement : node
+      const tag = opening.tagName.getText(ast)
+      if (tag === "Portal" || tag.endsWith(".Portal")) {
+        const container = opening.attributes.properties.find(
+          (property): property is ts.JsxAttribute =>
+            ts.isJsxAttribute(property) && property.name.getText(ast) === "container",
+        )
+        const destination =
+          container?.initializer &&
+          ts.isJsxExpression(container.initializer) &&
+          container.initializer.expression &&
+          ts.isIdentifier(container.initializer.expression)
+            ? container.initializer.expression.text
+            : null
+        // A portal pointed somewhere else — a panel's own ref, a container a
+        // caller passed in — is not the provider's to answer for.
+        if (destination && containers.has(destination)) {
+          const carried =
+            ts.isJsxElement(node) && carriesLayerScope(node, scopes)
+          if (!carried) {
+            const { line } = ast.getLineAndCharacterOfPosition(node.getStart(ast))
+            offenders.push(`${tag} at line ${line + 1}`)
+          }
+        }
+      }
+    }
+    ts.forEachChild(node, visit)
+  })
+  return offenders
+}
+
 /**
  * PROVIDER-001: the provider surface, checked against the parts of its frozen
  * contract a source reader can settle.
@@ -159,21 +255,21 @@ export const providerSurfaceCheck = defineCheck({
         ),
       )
     }
-    // And every layer the provider governs actually carries it. A component
-    // that resolves the container without the scope portals its content out
-    // of the tree and leaves behind the tokens its class names read.
+    // And every layer the provider governs actually carries it, read from the
+    // JSX rather than from the file's text: the claim is the scope reaching
+    // the element, not the hook being called somewhere above it.
     for (const layerPath of context.files.match([
       "packages/react/src/components/**/*.tsx",
     ])) {
-      const layerSource = await context.readText(layerPath)
-      if (!layerSource.includes("= usePortalContainer(")) continue
-      if (layerSource.includes("useNessaLayerScope()")) continue
-      findings.push(
-        context.fail(
-          `${layerPath} resolves a Nessa portal container without carrying the scope onto the layer it draws.`,
-          { contractId: "PROVIDER-001", path: layerPath },
-        ),
-      )
+      const layer = await context.parseTypeScript(layerPath)
+      for (const offender of unscopedPortalLayers(layer)) {
+        findings.push(
+          context.fail(
+            `${layerPath} portals through ${offender} without carrying the scope onto the layer it draws.`,
+            { contractId: "PROVIDER-001", path: layerPath },
+          ),
+        )
+      }
     }
     if (!providerSource.includes("colorScheme: resolvedMode")) {
       findings.push(
