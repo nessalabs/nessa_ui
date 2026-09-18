@@ -2,7 +2,11 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import ts from "typescript"
 
-import { unscopedPortalLayers } from "../nessa/checks/provider-surface.ts"
+import {
+  layerModeAttribute,
+  publishedLayerScopeKeys,
+  unscopedPortalLayers,
+} from "../nessa/checks/provider-surface.ts"
 
 const parse = (source: string) =>
   ts.createSourceFile("fixture.tsx", source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TSX)
@@ -106,4 +110,69 @@ function SubContent() {
   return (<Menu.Portal container={container}><Menu.SubContent /></Menu.Portal>)
 }`
   assert.deepEqual(unscopedPortalLayers(parse(source)), ["Menu.Portal at line 9"])
+})
+
+test("a layer that writes the mode out carries it as surely as one that spreads it", () => {
+  // The rule is the attribute arriving, not the mechanism that brought it.
+  assert.deepEqual(
+    unscopedPortalLayers(
+      parse(`function Layer() {
+  const container = usePortalContainer()
+  const { resolvedMode } = useNessaColorMode()
+  return (<Menu.Portal container={container}><Menu.Content data-nessa-mode={resolvedMode} /></Menu.Portal>)
+}`),
+    ),
+    [],
+  )
+  // A neighbouring attribute from the same family is not the one that matters.
+  assert.deepEqual(
+    unscopedPortalLayers(
+      parse(`function Layer() {
+  const container = usePortalContainer()
+  const { theme } = useNessaTheme()
+  return (<Menu.Portal container={container}><Menu.Content data-nessa-theme={theme} /></Menu.Portal>)
+}`),
+    ),
+    ["Menu.Portal at line 4"],
+  )
+})
+
+test("the published layer scope is read through the binding and the memo", () => {
+  const memo = `function Provider() {
+  const layerScope = React.useMemo(() => ({
+    "data-nessa-theme": theme,
+    "data-nessa-mode": resolvedMode,
+    "data-nessa-scale": scale,
+  }), [resolvedMode, scale, theme])
+  return (<PortalContainerProvider container={null} scope={layerScope}>{element}</PortalContainerProvider>)
+}`
+  assert.deepEqual(publishedLayerScopeKeys(parse(memo)), [
+    "data-nessa-theme",
+    layerModeAttribute,
+    "data-nessa-scale",
+  ])
+  // Inline, and through a plain binding.
+  assert.deepEqual(
+    publishedLayerScopeKeys(
+      parse('const view = <PortalContainerProvider container={null} scope={{ "data-nessa-mode": resolved }}>{children}</PortalContainerProvider>'),
+    ),
+    [layerModeAttribute],
+  )
+  assert.deepEqual(
+    publishedLayerScopeKeys(
+      parse('const scope = { "data-nessa-mode": resolved }; const view = <PortalContainerProvider container={null} scope={scope}>{children}</PortalContainerProvider>'),
+    ),
+    [layerModeAttribute],
+  )
+  // A scope that publishes everything except the mode, and no scope at all.
+  assert.deepEqual(
+    publishedLayerScopeKeys(
+      parse('const view = <PortalContainerProvider container={null} scope={{ "data-nessa-theme": theme }}>{children}</PortalContainerProvider>'),
+    ),
+    ["data-nessa-theme"],
+  )
+  assert.equal(
+    publishedLayerScopeKeys(parse('const view = <PortalContainerProvider container={host}>{children}</PortalContainerProvider>')),
+    null,
+  )
 })

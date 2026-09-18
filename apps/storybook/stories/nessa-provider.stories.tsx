@@ -279,9 +279,9 @@ export const LayersAreThemedWithoutBeingClipped: Story = {
     const menu = await within(document.body).findByRole("menu")
 
     // Themed: the same scope answers, and so the same resolved token values.
-    await expect(
-      menu.closest("[data-nessa-mode]")?.getAttribute("data-nessa-mode"),
-    ).toBe(NessaColorMode.Dark)
+    // On the menu itself, not on an ancestor: the layer carries the scope
+    // rather than being placed under something that has one.
+    await expect(menu.getAttribute("data-nessa-mode")).toBe(NessaColorMode.Dark)
     await expect(
       getComputedStyle(menu).getPropertyValue("--popover").trim(),
     ).toBe(getComputedStyle(scope).getPropertyValue("--popover").trim())

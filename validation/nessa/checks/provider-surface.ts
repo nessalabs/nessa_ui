@@ -59,7 +59,17 @@ function hookBindings(ast: ts.SourceFile, hookName: string): Set<string> {
   return names
 }
 
-/** Whether anything *inside* this element spreads one of the scope bindings. */
+export const layerModeAttribute = "data-nessa-mode"
+
+/**
+ * Whether anything *inside* this element carries the resolved mode.
+ *
+ * Either by spreading a binding the layer-scope hook returned, whose contents
+ * the provider check settles separately, or by writing the attribute out. The
+ * rule is about the attribute arriving, not about the mechanism that brought
+ * it: `data-nessa-mode` is what every dark token selector matches, so an
+ * element without it resolves against whatever the page did.
+ */
 function carriesLayerScope(element: ts.JsxElement, scopes: ReadonlySet<string>): boolean {
   let found = false
   const visit = (node: ts.Node): void => {
@@ -72,12 +82,94 @@ function carriesLayerScope(element: ts.JsxElement, scopes: ReadonlySet<string>):
       found = true
       return
     }
+    if (ts.isJsxAttribute(node) && node.name.getText(node.getSourceFile()) === layerModeAttribute) {
+      found = true
+      return
+    }
     ts.forEachChild(node, visit)
   }
   // The children only: a spread on the portal itself lands on a wrapper that
   // draws nothing, not on the element whose tokens are being asked about.
   for (const child of element.children) visit(child)
   return found
+}
+
+/** The object literal behind a value, through a binding and a `useMemo`. */
+function objectLiteralBehind(
+  ast: ts.SourceFile,
+  expression: ts.Expression,
+): ts.ObjectLiteralExpression | null {
+  let current: ts.Expression = expression
+  while (ts.isParenthesizedExpression(current)) current = current.expression
+  if (ts.isObjectLiteralExpression(current)) return current
+  if (ts.isCallExpression(current)) {
+    const callee = current.expression
+    const name = ts.isPropertyAccessExpression(callee) ? callee.name.text : ts.isIdentifier(callee) ? callee.text : null
+    if (name === "useMemo" && current.arguments[0] && ts.isArrowFunction(current.arguments[0])) {
+      const body = (current.arguments[0] as ts.ArrowFunction).body
+      return ts.isBlock(body) ? null : objectLiteralBehind(ast, body)
+    }
+    return null
+  }
+  if (!ts.isIdentifier(current)) return null
+  let resolved: ts.ObjectLiteralExpression | null = null
+  const name = current.text
+  ast.forEachChild(function visit(node) {
+    if (
+      resolved === null &&
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === name &&
+      node.initializer
+    ) {
+      resolved = objectLiteralBehind(ast, node.initializer)
+    }
+    ts.forEachChild(node, visit)
+  })
+  return resolved
+}
+
+/** Property names an object literal assigns, quoted or not. */
+function objectKeys(object: ts.ObjectLiteralExpression): string[] {
+  return object.properties.flatMap((property) => {
+    if (!ts.isPropertyAssignment(property)) return []
+    const name = property.name
+    if (ts.isStringLiteral(name) || ts.isIdentifier(name)) return [name.text]
+    return []
+  })
+}
+
+/**
+ * The attribute names the provider publishes for its layers to carry.
+ *
+ * A layer spreading the hook's result is only carrying the mode if the mode
+ * is in what the provider put there, so this settles the other end of the
+ * chain the portal scan checks: published here, spread onto the element
+ * there.
+ *
+ * @returns The keys, or null when no `scope` is published at all.
+ */
+export function publishedLayerScopeKeys(ast: ts.SourceFile): string[] | null {
+  let keys: string[] | null = null
+  ast.forEachChild(function visit(node) {
+    const opening = ts.isJsxElement(node)
+      ? node.openingElement
+      : ts.isJsxSelfClosingElement(node)
+        ? node
+        : null
+    if (opening && opening.tagName.getText(ast) === "PortalContainerProvider") {
+      const scope = opening.attributes.properties.find(
+        (property): property is ts.JsxAttribute =>
+          ts.isJsxAttribute(property) && property.name.getText(ast) === "scope",
+      )
+      if (scope?.initializer && ts.isJsxExpression(scope.initializer) && scope.initializer.expression) {
+        const object = objectLiteralBehind(ast, scope.initializer.expression)
+        if (object) keys = objectKeys(object)
+      }
+    }
+    ts.forEachChild(node, visit)
+  })
+  return keys
 }
 
 /**
@@ -235,13 +327,24 @@ export const providerSurfaceCheck = defineCheck({
     // host's own clipping box would clip every menu opened inside it, and an
     // empty layer host would lay a page out differently for having adopted
     // the provider at all.
-    if (
-      !providerSource.includes("scope={layerScope}") ||
-      providerSource.includes("createPortal")
-    ) {
+    if (providerSource.includes("createPortal")) {
       findings.push(
         context.fail(
           "NessaProvider must publish its layer scope for layers to carry, not a container that moves them under its own element.",
+          { contractId: "PROVIDER-001", path: providerPath },
+        ),
+      )
+    }
+    // The other end of the chain the portal scan checks. A layer spreading
+    // the hook's result carries the mode only if the provider put the mode
+    // there, and `data-nessa-mode` is the one that fails silently: it is what
+    // every dark token selector matches, so a layer without it resolves
+    // against whatever the page did rather than against its own scope.
+    const publishedScope = publishedLayerScopeKeys(provider)
+    if (!publishedScope?.includes(layerModeAttribute)) {
+      findings.push(
+        context.fail(
+          `NessaProvider must publish ${layerModeAttribute} on the layer scope; a layer that carries the rest resolves its dark tokens against the page.`,
           { contractId: "PROVIDER-001", path: providerPath },
         ),
       )
