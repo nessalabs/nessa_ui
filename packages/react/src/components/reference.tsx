@@ -4,7 +4,10 @@ import * as React from "react"
 import { HoverCard, Slot } from "radix-ui"
 import { ArrowUpRight, ChevronLeft, ChevronRight } from "lucide-react"
 
-import { usePortalContainer } from "@/lib/portal-container"
+import {
+  useNessaLayerScope,
+  usePortalContainer,
+} from "@/lib/portal-container"
 import { cn } from "@/lib/utils"
 
 /**
@@ -347,6 +350,7 @@ function ReferenceContent({
   ...props
 }: ReferenceContentProps) {
   const resolvedPortalContainer = usePortalContainer(portalContainer)
+  const layerScope = useNessaLayerScope()
   const { closeCard, registerContent, isWithinTrigger } =
     useReference("ReferenceContent")
 
@@ -375,6 +379,7 @@ function ReferenceContent({
   return (
     <HoverCard.Portal container={resolvedPortalContainer}>
       <HoverCard.Content
+        {...layerScope}
         ref={composedRef}
         data-slot="reference-content"
         side={side}

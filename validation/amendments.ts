@@ -228,4 +228,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-016",
+    kind: "transition",
+    contractId: "PROVIDER-001",
+    baseRevision: "5a9e97214580e1c125004da6ef21fe791387f19b",
+    targets: ["validation/nessa/check-metadata.ts"],
+    beforeFingerprint: "0bfdc7b19c1250a3d44d06c3f46b431b71e87c90885003fdec07500b6cf4906b",
+    afterFingerprint: "1478cfcbe36c7482ca688a93fb840ee58c94d9b28f54f3b151a994501a049752",
+    rationale: "PROVIDER-001 governed the provider's own two files, and the provider's answer stops being its own business the moment a layer leaves the tree. A menu portalled to the body keeps its semantic class names and leaves behind the `data-nessa-*` attributes the tokens those names read are declared on, so a picker opened inside a Dark provider on a Light page renders light — a failure that looks like a styling bug in the menu rather than a boundary the contract never covered. The fix is for the layer to carry the scope onto its own element rather than for the provider to move the layer under one: moving it themes by ancestry and, in the same stroke, hands the root's `overflow`, `transform` and layout to a menu that wants none of them, so a provider embedded in a host's own clipping box would clip every layer opened inside it. Carrying is only safe if every governed layer actually carries, which is a per-component fact, so the check's inputs widen to the components and to the portal-container module that publishes the scope.",
+    compatibility: "Strictly widens what PROVIDER-001 reads; no requirement is weakened and no exception is added. The provider's own three properties are unchanged, and the scope element it owns is still the only DOM surface Nessa mutates — this transition removes the layer host that briefly was a second one. Rendered output changes only for layers that were already inside a provider and already portalled out of it: they now resolve the provider's tokens instead of the page's, which is what the attributes were introduced to do. Layers that do not resolve a Nessa portal container — Drawer, the mobile Sidebar dialog, and the base Popover, Tooltip, Select and Dialog primitives — are untouched and behave exactly as they did before the provider existed. `color-scheme` moves from the provider's inline style alone to the mode selectors in theme.css, so a scope declares it wherever the attribute lands; the provider still writes its own, at the same value.",
+    migration: "A component that resolves a Nessa portal container through `usePortalContainer` also calls `useNessaLayerScope` and spreads the result onto the element it draws — the content, not the portal — or PROVIDER-001 fails naming the file. Applications need change nothing: a layer opened inside a provider now reads that provider's theme wherever it portals, and an application that wants a layer to escape its panel's boundary still passes an explicit container as before.",
+    supersedes: null,
+    pullRequest: null,
+  },
 ])

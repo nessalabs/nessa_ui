@@ -5,7 +5,10 @@ import { ChevronDown } from "lucide-react"
 import { DropdownMenu } from "radix-ui"
 
 import { composeRefs } from "@/lib/compose"
-import { usePortalContainer } from "@/lib/portal-container"
+import {
+  useNessaLayerScope,
+  usePortalContainer,
+} from "@/lib/portal-container"
 import { cn } from "@/lib/utils"
 import { Button, type ButtonProps } from "./button"
 import { JsonTree } from "./json-tree"
@@ -728,6 +731,7 @@ function ToolApprovalActionMenu({
   // No prop of its own: a layer with no opinion belongs to whatever panel
   // it was opened from, and to the body when there is none.
   const portalContainer = usePortalContainer()
+  const layerScope = useNessaLayerScope()
   const resolution = React.useContext(ToolApprovalResolutionContext)
   const [open, setOpen] = React.useState(false)
   // Radix never reports the force-close below through onOpenChange, so sync
@@ -762,6 +766,7 @@ function ToolApprovalActionMenu({
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal container={portalContainer}>
         <DropdownMenu.Content
+          {...layerScope}
           data-slot="tool-approval-action-menu-content"
           side="top"
           align="end"

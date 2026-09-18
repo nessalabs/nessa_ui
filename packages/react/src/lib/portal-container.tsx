@@ -24,11 +24,48 @@ import * as React from "react"
  * A layer with no panel above it reads `null` and portals to the body, which
  * is the behavior everything had before this existed.
  */
-const PortalContainerContext = React.createContext<HTMLElement | null>(null)
+/**
+ * The theme a floating layer carries with it.
+ *
+ * The layer's own element wears these, wherever it lands. That is the half of
+ * the problem the container does not solve: a menu portalled to the body keeps
+ * its semantic class names but leaves behind the `data-nessa-*` attributes the
+ * tokens those names read are declared on, so a picker opened inside a Dark
+ * provider on a Light page renders light.
+ *
+ * Carrying the theme is deliberately not the same as moving the layer.
+ * Relocating it under the scope would theme it by ancestry and, in the same
+ * move, hand the scope's `overflow`, `transform` and layout to a menu that
+ * wants none of them. These attributes travel instead; where the layer lands
+ * stays the container's question.
+ */
+export interface NessaLayerScope {
+  "data-nessa-theme"?: string
+  "data-nessa-mode"?: string
+  "data-nessa-scale"?: string
+}
+
+interface PortalContainerState {
+  container: HTMLElement | null
+  scope: NessaLayerScope
+}
+
+const emptyLayerScope: NessaLayerScope = {}
+
+const PortalContainerContext = React.createContext<PortalContainerState>({
+  container: null,
+  scope: emptyLayerScope,
+})
 
 export interface PortalContainerProviderProps {
   /** The element floating layers below this point portal into. */
   container: HTMLElement | null
+  /**
+   * The theme layers below this point carry. Omitted by a panel, which owns
+   * where its layers land but not what they look like: the scope it is
+   * itself inside is already the right answer, and inherits.
+   */
+  scope?: NessaLayerScope
   children?: React.ReactNode
 }
 
@@ -42,10 +79,17 @@ export interface PortalContainerProviderProps {
  */
 function PortalContainerProvider({
   container,
+  scope,
   children,
 }: PortalContainerProviderProps) {
+  const inherited = React.useContext(PortalContainerContext)
+  const inheritedScope = inherited.scope
+  const value = React.useMemo(
+    () => ({ container, scope: scope ?? inheritedScope }),
+    [container, inheritedScope, scope],
+  )
   return (
-    <PortalContainerContext.Provider value={container}>
+    <PortalContainerContext.Provider value={value}>
       {children}
     </PortalContainerContext.Provider>
   )
@@ -63,8 +107,20 @@ function PortalContainerProvider({
 function usePortalContainer(
   explicit?: HTMLElement | null,
 ): HTMLElement | null {
-  const inherited = React.useContext(PortalContainerContext)
-  return explicit !== undefined ? explicit : inherited
+  const { container } = React.useContext(PortalContainerContext)
+  return explicit !== undefined ? explicit : container
+}
+
+/**
+ * The attributes this floating layer puts on its own element.
+ *
+ * Spread onto the element the layer actually draws — the content, not the
+ * portal — so the tokens resolve there however far from the scope it landed.
+ * Empty outside a provider, where there is no theme to carry and the layer
+ * behaves exactly as it did before one existed.
+ */
+function useNessaLayerScope(): NessaLayerScope {
+  return React.useContext(PortalContainerContext).scope
 }
 
 /**
@@ -79,4 +135,9 @@ function usePortalContainerHost() {
   return { container, setContainer }
 }
 
-export { PortalContainerProvider, usePortalContainer, usePortalContainerHost }
+export {
+  PortalContainerProvider,
+  useNessaLayerScope,
+  usePortalContainer,
+  usePortalContainerHost,
+}

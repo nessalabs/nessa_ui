@@ -3,10 +3,7 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
-import {
-  PortalContainerProvider,
-  usePortalContainerHost,
-} from "@/lib/portal-container"
+import { PortalContainerProvider } from "@/lib/portal-container"
 import {
   NessaColorMode,
   NessaColorModeContext,
@@ -29,12 +26,17 @@ import {
  * appearance, and the scale, and one context publishing the mode to whatever
  * inside needs to render in it.
  *
- * It owns one element in the tree it is rendered into — the scope, carrying
- * the attributes — and one boxless sibling beside it, where the floating
- * layers opened inside it land. It does not touch `documentElement`, it does
- * not touch `body`, and it writes no layout rules — a design system that
- * reached for the document would be unable to appear twice on one page, or
- * inside a host that owns its own root.
+ * It owns exactly one DOM element and nothing else. It does not touch
+ * `documentElement`, it does not touch `body`, and it writes no layout rules —
+ * a design system that reached for the document would be unable to appear
+ * twice on one page, or inside a host that owns its own root.
+ *
+ * That includes the floating layers opened inside it. A menu keeps going
+ * wherever it was already going and carries the scope's attributes with it,
+ * rather than being moved under the scope to be themed by ancestry: moving it
+ * would hand the root's `overflow`, `transform` and layout to a layer that
+ * wants none of them, and a provider embedded in a host's own clipping box
+ * would clip every menu opened in it.
  *
  * `data-nessa-mode` is the contract every dark token selector matches, and it
  * is always `light` or `dark`. A `system` *request* stays in React state; what
@@ -204,15 +206,19 @@ function NessaProvider({
     [mode, resolvedMode, setMode],
   )
   const themeState = React.useMemo(() => ({ theme, scale }), [scale, theme])
-  // Where floating layers land when nothing nearer owns one. A menu portalled
-  // to the body leaves the scope entirely: its content keeps the semantic
-  // class names but none of the `data-nessa-*` attributes those tokens are
-  // declared on, so a picker opened inside a Dark provider on a Light page
-  // renders light. Panels that own a boundary — a Sheet, a reading view —
-  // still publish their own container nearer the layer and keep it, because
-  // routing their layers out here would undo their inertness and focus
-  // boundaries.
-  const { container: layerHost, setContainer: setLayerHost } = usePortalContainerHost()
+  // The theme every floating layer below here carries onto its own element.
+  // Panels that own a boundary — a Sheet, a reading view — still publish
+  // their own container nearer the layer and keep it: where a layer lands is
+  // their question, and this only answers what it looks like when it gets
+  // there.
+  const layerScope = React.useMemo(
+    () => ({
+      "data-nessa-theme": theme,
+      "data-nessa-mode": resolvedMode,
+      "data-nessa-scale": scale,
+    }),
+    [resolvedMode, scale, theme],
+  )
 
   useControlledModeWarning(isControlled)
   useResolutionPropWarning(mode, suppliedResolvedMode, defaultResolvedMode)
@@ -227,86 +233,26 @@ function NessaProvider({
       "data-nessa-mode": resolvedMode,
       "data-nessa-scale": scale,
       className: cn(className),
-      // Nessa keeps ownership of `color-scheme` even when a host supplies
-      // styles: it is what makes form controls, scrollbars and the canvas
-      // itself agree with the tokens, and a scope whose controls disagree
-      // with its surface reads as broken rather than as themed.
-      style: { ...style, colorScheme: resolvedMode },
+      style,
     }),
+    // Nessa keeps ownership of `color-scheme` even when a host supplies
+    // styles: it is what makes form controls, scrollbars and the canvas
+    // itself agree with the tokens, and a scope whose controls disagree with
+    // its surface reads as broken rather than as themed. It is the only
+    // declaration the scope owns, so it is the only one that outranks an
+    // `asChild` child's own.
+    ownedStyle: { colorScheme: resolvedMode },
     scopeName: "NessaProvider",
   })
 
   return (
     <NessaThemeContext.Provider value={themeState}>
       <NessaColorModeContext.Provider value={colorModeState}>
-        <PortalContainerProvider container={layerHost}>
+        <PortalContainerProvider container={null} scope={layerScope}>
           {element}
-          <NessaLayerHost
-            theme={theme}
-            resolvedMode={resolvedMode}
-            scale={scale}
-            ref={setLayerHost}
-          />
         </PortalContainerProvider>
       </NessaColorModeContext.Provider>
     </NessaThemeContext.Provider>
-  )
-}
-
-/** The `color-scheme` utility each resolved appearance carries. */
-const layerColorSchemeClassName = {
-  light: "scheme-light",
-  dark: "scheme-dark",
-} as const
-
-/**
- * The element provider-level floating layers portal into.
- *
- * A sibling of the scope, not a child of it, because theme ownership and
- * clipping ownership are not the same job. The element a host hands the
- * provider is where that host puts its own `overflow: hidden`, its
- * `transform`, its flex row — all reasonable things to put on a page region,
- * and all things a menu must not inherit. Nested inside the scope, this host
- * would have made the provider's root the clipping and containing-block
- * ancestor of every layer opened in the tree: a transformed root turns a
- * fixed-position menu into its descendant and clips it, which is not
- * something adopting the provider should do to a page.
- *
- * It still carries the theme, because it sits inside nothing that could give
- * it one: the same `data-nessa-theme`, `data-nessa-mode` and
- * `data-nessa-scale` the scope writes, so a layer that reads its tokens here
- * reads the same answers as the content that opened it.
- *
- * `contents` keeps it from generating a box at all. An ordinary `div` is a
- * flex or grid item wherever the provider was mounted, so an empty layer host
- * would move a page's content by a gap's width without anything being open;
- * a boxless one introduces no layout, no stacking context and no containing
- * block, and leaves positioning exactly as it was.
- */
-function NessaLayerHost({
-  theme,
-  resolvedMode,
-  scale,
-  ref,
-}: {
-  theme: NessaThemeName
-  resolvedMode: NessaResolvedColorMode
-  scale: NessaScale
-  ref: React.Ref<HTMLDivElement>
-}) {
-  return (
-    <div
-      // Boxless, and carrying the appearance the scope resolved: `contents`
-      // so it lays nothing out, `scheme-*` so the scrollbars and controls of
-      // a layer opened here agree with its tokens, exactly as they do inside
-      // the scope itself.
-      className={cn("contents", layerColorSchemeClassName[resolvedMode])}
-      data-slot="nessa-layers"
-      data-nessa-theme={theme}
-      data-nessa-mode={resolvedMode}
-      data-nessa-scale={scale}
-      ref={ref}
-    />
   )
 }
 

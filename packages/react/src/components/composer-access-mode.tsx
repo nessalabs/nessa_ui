@@ -3,7 +3,10 @@
 import * as React from "react"
 import { DropdownMenu } from "radix-ui"
 
-import { usePortalContainer } from "@/lib/portal-container"
+import {
+  useNessaLayerScope,
+  usePortalContainer,
+} from "@/lib/portal-container"
 import { cn } from "@/lib/utils"
 
 export type ComposerAccessModeValue =
@@ -139,6 +142,7 @@ const ComposerAccessMode = React.forwardRef<
     ref,
   ) => {
     const resolvedPortalContainer = usePortalContainer(portalContainer)
+    const layerScope = useNessaLayerScope()
     const [uncontrolledValue, setUncontrolledValue] =
       React.useState<ComposerAccessModeValue>(defaultValue)
     const value = valueProp ?? uncontrolledValue
@@ -179,6 +183,7 @@ const ComposerAccessMode = React.forwardRef<
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal container={resolvedPortalContainer}>
           <DropdownMenu.Content
+            {...layerScope}
             data-slot="composer-access-mode-content"
             side="top"
             align="start"

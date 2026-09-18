@@ -5,7 +5,10 @@ import { BrainCircuit, ChevronRight, Zap } from "lucide-react"
 import { Direction, Popover, Slider } from "radix-ui"
 
 import type { ModelThinkingLevel } from "./model-capabilities"
-import { usePortalContainer } from "@/lib/portal-container"
+import {
+  useNessaLayerScope,
+  usePortalContainer,
+} from "@/lib/portal-container"
 import { cn } from "@/lib/utils"
 
 export type ModelThinkingIconProps = React.ComponentProps<"svg">
@@ -712,6 +715,7 @@ function ModelThinkingControl({
   fastMode,
 }: ModelThinkingControlProps) {
   const resolvedPortalContainer = usePortalContainer(portalContainer)
+  const layerScope = useNessaLayerScope()
   const effectiveDir = Direction.useDirection(dir)
   const [uncontrolledValue, setUncontrolledValue] = React.useState(
     defaultValue ?? levels[0]?.value,
@@ -781,6 +785,7 @@ function ModelThinkingControl({
       </Popover.Trigger>
       {!unavailable ? <Popover.Portal container={resolvedPortalContainer}>
         <Popover.Content
+          {...layerScope}
           data-slot="model-thinking-content"
           data-model-capability-control="thinking-content"
           aria-label={contentLabel}

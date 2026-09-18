@@ -73,6 +73,13 @@ interface ScopeElementOptions {
   children?: React.ReactNode
   ref?: React.Ref<HTMLElement>
   props: Record<string, unknown>
+  /**
+   * The declarations the scope owns outright, as opposed to the ones a host
+   * merely passed through `props.style`. Only these outrank an `asChild`
+   * child's own style; everything else keeps Slot's ordinary precedence,
+   * where the child wins.
+   */
+  ownedStyle?: React.CSSProperties
   scopeName: string
 }
 
@@ -86,10 +93,12 @@ export function useNessaScopeElement({
   children,
   ref,
   props,
+  ownedStyle,
   scopeName,
 }: ScopeElementOptions): React.ReactElement {
   useFragmentGuard(asChild, children, scopeName)
   useExistingScopeAttributeGuard(asChild, children, scopeName)
+  const hostStyle = props.style as React.CSSProperties | undefined
   if (asChild) {
     // Reconciled onto the *child*, because Slot does not do what it looks like
     // it does: `mergeProps` returns `{...slotProps, ...childProps}`, so for any
@@ -111,7 +120,6 @@ export function useNessaScopeElement({
     const child = children as React.ReactElement<Record<string, unknown>>
     const childProps = (child.props ?? {}) as Record<string, unknown>
     const childStyle = childProps.style as React.CSSProperties | undefined
-    const ownedStyle = props.style as React.CSSProperties | undefined
     const reconciled = React.cloneElement(child, {
       ...Object.fromEntries(
         Object.keys(childProps)
@@ -121,9 +129,11 @@ export function useNessaScopeElement({
       ...Object.fromEntries(
         Object.entries(props).filter(([key]) => key.startsWith("data-nessa-")),
       ),
-      // Merged here rather than beside the child's style, so `colorScheme`
-      // wins without dropping the declarations the host set.
-      style: { ...childStyle, ...ownedStyle },
+      // Ownership stops where the scope's own declarations stop. A `style` a
+      // host passed to the scope is an ordinary style and loses to the child's
+      // in the usual way; only what the scope owns — `color-scheme`, which has
+      // to agree with the attributes beside it — outranks the child.
+      style: { ...hostStyle, ...childStyle, ...ownedStyle },
     } as Record<string, unknown>)
     return (
       <Slot.Root {...props} ref={ref}>
@@ -132,7 +142,11 @@ export function useNessaScopeElement({
     )
   }
   return (
-    <div {...props} ref={ref as React.Ref<HTMLDivElement>}>
+    <div
+      {...props}
+      style={{ ...hostStyle, ...ownedStyle }}
+      ref={ref as React.Ref<HTMLDivElement>}
+    >
       {children}
     </div>
   )

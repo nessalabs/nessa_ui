@@ -52,10 +52,10 @@ function stringLiterals(ast: ts.SourceFile) {
  *    asking a question CSS cannot answer.
  * 2. The provider mutates one element it owns and never the document itself.
  *    A design system that reached for `documentElement` could not appear twice
- *    on a page, or inside a host that owns its own root. Its layer host is a
- *    boxless sibling of that element rather than a child of it, so the scope
- *    never becomes the clipping or containing-block ancestor of the layers
- *    opened inside it, and never lays anything out.
+ *    on a page, or inside a host that owns its own root. The layers opened
+ *    inside it are not Nessa's to move either: they carry the scope onto
+ *    their own element and stay where they were going, so the root never
+ *    becomes their clipping or containing-block ancestor.
  * 3. A theme-bearing scope re-emits the resolved mode. Dark selectors match
  *    the nearest scope rather than any dark ancestor, which is the whole
  *    mechanism behind a light region inside a dark one.
@@ -132,28 +132,20 @@ export const providerSurfaceCheck = defineCheck({
         }
       }
     }
-    // The provider-level layer host lives outside the root element, carries
-    // the mode the root resolved, and generates no box. Nested inside the
-    // root instead, it would make whatever the host styled that element with
-    // — a transform, an `overflow: hidden`, a flex row — the clipping and
-    // containing-block ancestor of every menu opened in the tree, and would
-    // add a layout item to a page that opened nothing.
-    // The provider-level layer host carries the mode the scope resolved, and
-    // generates no box. Nested inside the scope instead, it would make
-    // whatever the host styled that element with — a transform, an
-    // `overflow: hidden`, a flex row — the clipping and containing-block
-    // ancestor of every layer opened in the tree, and would add a layout item
-    // to a page that opened nothing. `useNessaScopeElement` is what keeps it
-    // outside: the scope renders its children and nothing else, so there is
-    // no slot inside the element for a host to take.
+    // The provider carries the theme to its layers rather than relocating
+    // them under the scope. The element an application hands the provider is
+    // where that application puts its own `overflow`, `transform` and layout;
+    // a layer routed into it inherits all three, so a provider embedded in a
+    // host's own clipping box would clip every menu opened inside it, and an
+    // empty layer host would lay a page out differently for having adopted
+    // the provider at all.
     if (
-      !providerSource.includes('data-slot="nessa-layers"') ||
-      !providerSource.includes("data-nessa-mode={resolvedMode}") ||
-      !providerSource.includes('"contents"')
+      !providerSource.includes("scope={layerScope}") ||
+      providerSource.includes("createPortal")
     ) {
       findings.push(
         context.fail(
-          "NessaProvider's layer host must sit beside its scope element, carry the resolved mode, and generate no box of its own.",
+          "NessaProvider must publish its layer scope for layers to carry, not a container that moves them under its own element.",
           { contractId: "PROVIDER-001", path: providerPath },
         ),
       )
@@ -164,6 +156,22 @@ export const providerSurfaceCheck = defineCheck({
         context.fail(
           "A Nessa scope element renders its children and nothing else; a slot inside it would put layers back under the root's clipping.",
           { contractId: "PROVIDER-001", path: scopePath },
+        ),
+      )
+    }
+    // And every layer the provider governs actually carries it. A component
+    // that resolves the container without the scope portals its content out
+    // of the tree and leaves behind the tokens its class names read.
+    for (const layerPath of context.files.match([
+      "packages/react/src/components/**/*.tsx",
+    ])) {
+      const layerSource = await context.readText(layerPath)
+      if (!layerSource.includes("= usePortalContainer(")) continue
+      if (layerSource.includes("useNessaLayerScope()")) continue
+      findings.push(
+        context.fail(
+          `${layerPath} resolves a Nessa portal container without carrying the scope onto the layer it draws.`,
+          { contractId: "PROVIDER-001", path: layerPath },
         ),
       )
     }

@@ -4,7 +4,10 @@ import * as React from "react"
 import { ContextMenu as ContextMenuPrimitive } from "radix-ui"
 import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react"
 
-import { usePortalContainer } from "@/lib/portal-container"
+import {
+  useNessaLayerScope,
+  usePortalContainer,
+} from "@/lib/portal-container"
 import { cn } from "@/lib/utils"
 import { popoverSurfaceVariants } from "./popover-surface"
 
@@ -70,9 +73,11 @@ function ContextMenuContent({
   // No prop of its own: a layer with no opinion belongs to whatever panel
   // it was opened from, and to the body when there is none.
   const portalContainer = usePortalContainer()
+  const layerScope = useNessaLayerScope()
   return (
     <ContextMenuPrimitive.Portal container={portalContainer}>
       <ContextMenuPrimitive.Content
+        {...layerScope}
         data-slot="context-menu-content"
         collisionPadding={12}
         className={cn(
@@ -93,9 +98,11 @@ function ContextMenuSubContent({
   // No prop of its own: a layer with no opinion belongs to whatever panel
   // it was opened from, and to the body when there is none.
   const portalContainer = usePortalContainer()
+  const layerScope = useNessaLayerScope()
   return (
     <ContextMenuPrimitive.Portal container={portalContainer}>
       <ContextMenuPrimitive.SubContent
+        {...layerScope}
         data-slot="context-menu-sub-content"
         collisionPadding={12}
         sideOffset={4}

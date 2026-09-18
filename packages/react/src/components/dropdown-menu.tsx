@@ -4,7 +4,10 @@ import * as React from "react"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 import { Check, ChevronRight, Circle } from "lucide-react"
 
-import { usePortalContainer } from "@/lib/portal-container"
+import {
+  useNessaLayerScope,
+  usePortalContainer,
+} from "@/lib/portal-container"
 import { cn } from "@/lib/utils"
 import { popoverSurfaceVariants } from "./popover-surface"
 
@@ -58,9 +61,11 @@ function DropdownMenuContent({
   ...props
 }: DropdownMenuContentProps) {
   const resolvedPortalContainer = usePortalContainer(portalContainer)
+  const layerScope = useNessaLayerScope()
   return (
     <DropdownMenuPrimitive.Portal container={resolvedPortalContainer}>
       <DropdownMenuPrimitive.Content
+        {...layerScope}
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}

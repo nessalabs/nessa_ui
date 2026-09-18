@@ -160,8 +160,19 @@
    Light foundation emitted onto every scope selector, which is the token
    generator TOKEN-001 tracks. Until then a nested Light scope inherits the
    Dark values above it. */
+/* The Light half of the same statement. A scope that resolved Light needs to
+   say so where it is, or a Light layer inside a Dark page would keep the dark
+   scrollbars and controls it inherited. */
+:where([data-nessa-mode="light"]) {
+  color-scheme: light;
+}
+
 .dark,
 :where([data-nessa-mode="dark"]) {
+  /* Declared with the tokens, not only on the provider's element: a floating
+     layer carries the attribute to wherever it portalled, and its scrollbars
+     and form controls have to agree with the surface it is drawn on. */
+  color-scheme: dark;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
