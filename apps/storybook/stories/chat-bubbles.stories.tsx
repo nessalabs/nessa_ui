@@ -373,7 +373,38 @@ export const Conversation: Story = {
     const first = canvasElement.querySelector<HTMLElement>(
       '[data-slot="chat-message"]',
     )!
-    await expect(getComputedStyle(first).filter).toBe("none")
+    // The frost state is `data-dimmed`; the blur is a 120ms transition of
+    // it. Only the first is a fact about the component. A transition's
+    // computed value is interpolated against the document timeline, which
+    // advances with rendering updates rather than with script, so a page
+    // the suite has starved of frames reports the same mid-transition
+    // `blur(4.95px) saturate(0.7)` however many times it is asked — script
+    // keeps running, timers keep firing, and the value never moves. A test
+    // that waits for `filter` to read `none` is waiting on frames, not on
+    // the transcript, and loses that wait on whichever engine the run
+    // starves first. So the behavior is asserted on the attribute. The
+    // filter is read only under reduced motion, where the transition is
+    // zeroed and the computed value is exact the moment the class changes
+    // — that is what still pins frost to blur, and the tapback dim to
+    // opacity alone.
+    const settled =
+      canvasElement.ownerDocument.defaultView!.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches
+    const expectFrost = async (message: HTMLElement) => {
+      await expect(message).toHaveAttribute("data-dimmed", "frost")
+      if (settled) {
+        await expect(getComputedStyle(message).filter).toContain("blur")
+      }
+    }
+    const expectSharp = async (message: HTMLElement) => {
+      await expect(message).not.toHaveAttribute("data-dimmed")
+      if (settled) {
+        await expect(getComputedStyle(message).filter).toBe("none")
+        await expect(getComputedStyle(message).opacity).toBe("1")
+      }
+    }
+    await expectSharp(first)
     await expect(canvas.getByText("Delivered")).toBeInTheDocument()
     const quote = canvasElement.querySelector<HTMLElement>(
       '[data-slot="chat-message-quote"]',
@@ -391,46 +422,55 @@ export const Conversation: Story = {
       ),
     })
     // The tapback menu applies only the light dim — opacity, never blur.
-    await expect(getComputedStyle(first).filter).toBe("none")
     await waitFor(() => {
-      expect(Number(getComputedStyle(first).opacity)).toBeLessThan(1)
+      expect(first).toHaveAttribute("data-dimmed", "soft")
     })
+    if (settled) {
+      await expect(getComputedStyle(first).filter).toBe("none")
+      await expect(Number(getComputedStyle(first).opacity)).toBeLessThan(1)
+    }
     await userEvent.click(await body.findByRole("menuitem", { name: "Reply" }))
     await waitFor(() => {
-      expect(getComputedStyle(first).filter).toContain("blur")
+      expect(first).toHaveAttribute("data-dimmed", "frost")
     })
+    await expectFrost(first)
     // The reply target's thread stays sharp: the target itself and the
     // "thanks" reply chained onto it.
-    await expect(getComputedStyle(messages[1]!).filter).toBe("none")
-    await expect(getComputedStyle(messages[2]!).filter).toBe("none")
+    await expectSharp(messages[1]!)
+    await expectSharp(messages[2]!)
     await userEvent.keyboard("{Escape}")
     await waitFor(() => {
-      expect(getComputedStyle(first).filter).toBe("none")
+      expect(first).not.toHaveAttribute("data-dimmed")
     })
+    await expectSharp(first)
     await userEvent.pointer({
       keys: "[MouseRight]",
       target: canvas.getByLabelText("Reply to: thanks"),
     })
     await userEvent.click(await body.findByRole("menuitem", { name: "Reply" }))
     await waitFor(() => {
-      expect(getComputedStyle(first).filter).toContain("blur")
+      expect(first).toHaveAttribute("data-dimmed", "frost")
     })
+    await expectFrost(first)
     // In the focused thread the redundant quote hides.
-    await expect(getComputedStyle(messages[1]!).filter).toBe("none")
-    await expect(getComputedStyle(messages[2]!).filter).toBe("none")
+    await expectSharp(messages[1]!)
+    await expectSharp(messages[2]!)
     await expect(
       canvasElement.querySelector('[data-slot="chat-message-quote"]'),
     ).not.toBeInTheDocument()
     await userEvent.keyboard("{Escape}")
     await waitFor(() => {
-      expect(getComputedStyle(first).filter).toBe("none")
+      expect(first).not.toHaveAttribute("data-dimmed")
     })
+    await expectSharp(first)
     // Reacting from the tapback row lands the badge without any frost.
     await userEvent.pointer({
       keys: "[MouseRight]",
       target: canvas.getByLabelText("Reply to: thanks"),
     })
-    await expect(getComputedStyle(first).filter).toBe("none")
+    await waitFor(() => {
+      expect(first).toHaveAttribute("data-dimmed", "soft")
+    })
     await userEvent.click(
       await body.findByRole("menuitem", { name: "React with love" }),
     )
