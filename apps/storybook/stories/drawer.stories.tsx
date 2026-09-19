@@ -140,6 +140,24 @@ export const SidePanel: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     const body = within(canvasElement.ownerDocument.body)
+    // Whether the panel's slide is a transition at all. `translate` reads
+    // `none` only once the engine has sampled that transition to its end,
+    // and sampling is a rendering update rather than script: a page the
+    // suite has starved of frames reports the same mid-slide offset however
+    // many times it is asked, so a `waitFor` on the arrived value spends its
+    // whole budget re-reading one frozen number while script runs on
+    // normally. DrawerContent already refuses that dependency for itself —
+    // it flushes the closed offset by reading layout rather than by waiting
+    // a frame, so a drawer opened in a hidden tab is not stranded off-screen
+    // — and this test should not reintroduce it. The open state is asserted
+    // on `data-state`, which script sets, and the width on `offsetWidth`,
+    // which is layout and so cannot move with a translation. The arrived
+    // offset is read only here, where the transition is zeroed and the
+    // computed value is therefore exact the moment the class changes.
+    const settled =
+      canvasElement.ownerDocument.defaultView!.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches
 
     const trigger = canvas.getByRole("button", { name: "Open contact" })
     await userEvent.click(trigger)
@@ -153,14 +171,16 @@ export const SidePanel: Story = {
 
     // The panel is anchored to the right edge at the default 28rem.
     await waitFor(async () => {
-      const box = drawer.getBoundingClientRect()
-      await expect(Math.round(box.width)).toBe(448)
-      await expect(Math.round(box.right)).toBe(
-        canvasElement.ownerDocument.documentElement.clientWidth,
-      )
+      await expect(drawer).toHaveAttribute("data-state", "open")
+    })
+    await expect(drawer.offsetWidth).toBe(448)
+    if (settled) {
       // Fully arrived: the closed offset has been transitioned away.
       await expect(getComputedStyle(drawer).translate).toBe("none")
-    })
+      await expect(Math.round(drawer.getBoundingClientRect().right)).toBe(
+        canvasElement.ownerDocument.documentElement.clientWidth,
+      )
+    }
 
     await userEvent.click(body.getByRole("button", { name: "Close" }))
     // The exit is animated, not cut: while the panel still runs a non-zero
