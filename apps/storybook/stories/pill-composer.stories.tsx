@@ -23,6 +23,8 @@ import {
   FilePreviewMarkdown,
   SelectionTooltip,
   SelectionTooltipAction,
+  SelectionTooltipCompose,
+  SelectionTooltipComposeTrigger,
   SelectionTooltipLabel,
   SelectionTooltipSeparator,
   ChatComposerEditor,
@@ -105,7 +107,7 @@ import {
 } from "@nessalabs/ui"
 import { Archive, Bell, Braces, Check, ChevronLeft, ChevronRight, Copy, FileSearch, FileText, Folder, GitFork, History, Image as ImageIcon, Info, Paperclip, Pencil, Pin, Plus, RefreshCw, Share, SlidersHorizontal, Sparkles, Puzzle, Square, ThumbsUp, ThumbsDown, X } from "lucide-react"
 
-import { ChatAddIcon, CommentIcon } from "./icons/nucleo"
+import { ChatAddIcon } from "./icons/nucleo"
 import { storyDocumentation } from "./story-documentation"
 import {
   filterSlashSections,
@@ -307,19 +309,17 @@ function DocumentSurface({
     left: number
     top: number
   } | null>(null)
-  const [mode, setMode] = React.useState<"actions" | "comment">("actions")
-  const [draft, setDraft] = React.useState("")
+  const [composing, setComposing] = React.useState(false)
   /** Saves the tooltip comment and puts the surface back to rest. */
-  const commitComment = () => {
-    if (!selection || !draft.trim()) return
-    onComment(selection.text, draft.trim())
-    setDraft("")
-    setMode("actions")
+  const commitComment = (comment: string) => {
+    if (!selection) return
+    onComment(selection.text, comment)
+    setComposing(false)
     containerRef.current?.ownerDocument.getSelection()?.removeAllRanges()
     setSelection(null)
   }
   const captureSelection = () => {
-    if (mode === "comment") return
+    if (composing) return
     const container = containerRef.current
     const live = container?.ownerDocument.getSelection()
     if (!container || !live || live.isCollapsed) {
@@ -361,83 +361,44 @@ function DocumentSurface({
             selection.top >= 48 && "-translate-y-full",
           )}
           style={{
-            // The comment composer is wider than the action pill, so it
-            // centers on the surface; the action pill hugs the selection,
-            // clamped so neither ever clips at the panel's edges.
-            left:
-              mode === "comment"
-                ? "50%"
-                : Math.min(
-                    Math.max(selection.left, 120),
-                    (containerRef.current?.clientWidth ?? 480) - 120,
-                  ),
-            top:
-              selection.top >= 48
-                ? selection.top - 8
-                : selection.top + 28,
+            // One footprint for both states — the composer takes the pill's
+            // own row rather than widening it — so the pill just hugs the
+            // selection, clamped so it never clips at the panel's edges.
+            left: Math.min(
+              Math.max(selection.left, 120),
+              (containerRef.current?.clientWidth ?? 480) - 120,
+            ),
+            top: selection.top >= 48 ? selection.top - 8 : selection.top + 28,
           }}
+          composing={composing}
+          onComposingChange={setComposing}
         >
-          {mode === "actions" ? (
-            <>
-              <SelectionTooltipAction
-                aria-label="Add to chat"
-                tooltip="Add to chat"
-                onClick={() => {
-                  onAttach(selection.text)
-                  containerRef.current?.ownerDocument.getSelection()?.removeAllRanges()
-                  setSelection(null)
-                }}
-              >
-                <ChatAddIcon aria-hidden="true" />
-                <SelectionTooltipLabel>Add to chat</SelectionTooltipLabel>
-              </SelectionTooltipAction>
-              <SelectionTooltipSeparator />
-              <SelectionTooltipAction
-                aria-label="Comment"
-                tooltip="Comment on the selection"
-                onClick={() => setMode("comment")}
-              >
-                <CommentIcon aria-hidden="true" />
-                <SelectionTooltipLabel>Comment</SelectionTooltipLabel>
-              </SelectionTooltipAction>
-            </>
-          ) : (
-            // The pill swaps its actions for a comment composer in place —
-            // saving posts the note with the selected passage attached, and
-            // the document never leaves the screen.
-            <>
-              <Input
-                autoFocus
-                aria-label="Comment"
-                placeholder="Comment on the selection"
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter" || !draft.trim()) return
-                  event.preventDefault()
-                  commitComment()
-                }}
-                className="h-8 w-52 border-0 bg-transparent shadow-none dark:bg-transparent"
-              />
-              <SelectionTooltipAction
-                aria-label="Save comment"
-                tooltip="Save comment"
-                onClick={commitComment}
-              >
-                <Check aria-hidden="true" />
-              </SelectionTooltipAction>
-              <SelectionTooltipAction
-                aria-label="Cancel comment"
-                tooltip="Cancel"
-                onClick={() => {
-                  setDraft("")
-                  setMode("actions")
-                }}
-              >
-                <X aria-hidden="true" />
-              </SelectionTooltipAction>
-            </>
-          )}
+          {/* Commenting happens in the pill: the avatar holds its place,
+              the actions slide out, and the composer slides into the row
+              they vacate. Saving posts the note with the passage attached,
+              and the document never leaves the screen. */}
+          <SelectionTooltipComposeTrigger aria-label="Comment">
+            <RandomAvatar seed="nessa" busy={composing} className="size-5" />
+            <SelectionTooltipLabel>Comment</SelectionTooltipLabel>
+          </SelectionTooltipComposeTrigger>
+          <SelectionTooltipSeparator />
+          <SelectionTooltipAction
+            aria-label="Add to chat"
+            tooltip="Add to chat"
+            onClick={() => {
+              onAttach(selection.text)
+              containerRef.current?.ownerDocument.getSelection()?.removeAllRanges()
+              setSelection(null)
+            }}
+          >
+            <ChatAddIcon aria-hidden="true" />
+            <SelectionTooltipLabel>Add to chat</SelectionTooltipLabel>
+          </SelectionTooltipAction>
+          <SelectionTooltipCompose
+            aria-label="Comment"
+            placeholder="Comment on the selection"
+            onSubmit={commitComment}
+          />
         </SelectionTooltip>
       ) : null}
     </div>

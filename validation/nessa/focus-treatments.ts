@@ -328,7 +328,7 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     layer: "outline",
     state: "focus-visible",
     className: "focus-visible:outline-ring",
-    count: 3,
+    count: 5,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -623,11 +623,15 @@ export const focusGeometryClasses = Object.freeze([
   { component: "reference", className: "focus-visible:outline-2", count: 6 },
   { component: "reference", className: "focus-visible:outline-offset-2", count: 3 },
   { component: "reference", className: "focus-visible:-outline-offset-2", count: 3 },
+  // The composer's own input is deliberately absent from this inventory: it
+  // draws no ring at all. The composer opens already focused, so a ring
+  // would fire every time the pill morphs, and a text field marks itself
+  // with the caret.
   // Every selection-tooltip outline draws inset: the shelf is a clipping
   // scroll region, and an outset outline on its items or on the shelf itself
   // would be swallowed at the overflow edge.
-  { component: "selection-tooltip", className: "focus-visible:outline-2", count: 3 },
-  { component: "selection-tooltip", className: "focus-visible:-outline-offset-2", count: 3 },
+  { component: "selection-tooltip", className: "focus-visible:outline-2", count: 5 },
+  { component: "selection-tooltip", className: "focus-visible:-outline-offset-2", count: 5 },
   // The fold toggles routinely sit inside clipping scroll regions (the
   // tool-approval payload, say), so their lone outline draws inset.
   { component: "json-tree", className: "focus-visible:outline-2", count: 1 },
