@@ -186,7 +186,7 @@ export const Playground: Story = {
 
 export const LiveAndCard: Story = {
   parameters: storyDocumentation(
-    "While the agent is still working the cue shimmers, its RandomAvatar is busy, and the group is aria-busy. Clicking Exploring… opens the live tools in the extra-details sheet. A named beat — a spawned explorer — uses the card with that agent’s avatar instead of a counted summary.",
+    "While the agent is still working the cue shimmers, its RandomAvatar is busy, and the group is aria-busy. Clicking Exploring… opens the live tools in the extra-details sheet. A named beat — a spawned explorer — uses the card with that agent’s avatar instead of a counted summary. The last four rows show the mark slot’s sizing rule: a bare glyph is drawn at 14px, and one that arrives with its own size-* keeps it, in the cue and the card alike.",
   ),
   render: () => {
     function Example() {
@@ -218,6 +218,24 @@ export const LiveAndCard: Story = {
               icon={<RandomAvatar seed="explorer" busy className="size-7" />}
               title="Explore chat UI components"
               meta="Working · Explorer"
+            />
+            <AgentActivityCue
+              icon={<FileSearch data-testid="sized-glyph" className="size-5" />}
+            >
+              Read 4 files
+            </AgentActivityCue>
+            <AgentActivityCue icon={<FileSearch data-testid="bare-glyph" />}>
+              Read 2 more
+            </AgentActivityCue>
+            <AgentActivityCard
+              icon={<FileSearch data-testid="sized-glyph" className="size-5" />}
+              title="Scan the design system"
+              meta="Done · 12 files"
+            />
+            <AgentActivityCard
+              icon={<FileSearch data-testid="bare-glyph" />}
+              title="Scan the tokens"
+              meta="Done · 3 files"
             />
           </div>
           {open ? (
@@ -270,6 +288,24 @@ export const LiveAndCard: Story = {
       "aria-busy",
       "true",
     )
+    // The cue and the card hold that rule in separate class strings, so each
+    // is measured in both slots: a bare glyph drawn at 14px, a sized one left
+    // alone. The avatar's own fill is RandomAvatar's invariant, measured
+    // there.
+    const sized = canvasElement.querySelectorAll("[data-testid=sized-glyph]")
+    await expect(sized).toHaveLength(2)
+    for (const glyph of sized) {
+      const box = glyph.getBoundingClientRect()
+      await expect(box.width).toBeCloseTo(20, 1)
+      await expect(box.height).toBeCloseTo(20, 1)
+    }
+    const bare = canvasElement.querySelectorAll("[data-testid=bare-glyph]")
+    await expect(bare).toHaveLength(2)
+    for (const glyph of bare) {
+      const box = glyph.getBoundingClientRect()
+      await expect(box.width).toBeCloseTo(14, 1)
+      await expect(box.height).toBeCloseTo(14, 1)
+    }
     await expect(
       canvas.queryByRole("button", { name: /searching composer/i }),
     ).toBeNull()

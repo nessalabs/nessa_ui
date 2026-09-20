@@ -518,8 +518,14 @@ export interface RandomAvatarProps extends React.ComponentProps<"div"> {
  * its motion by `speed` and `flood`.
  *
  * It sizes itself from the box — set `size-*` (or width and height) through
- * `className` and the painting follows. `children` render above the picture,
- * which is where a presence dot or status badge belongs.
+ * `className` and the painting follows, even inside a host slot that sizes
+ * plain glyphs with a rule of its own. `children` render above the picture,
+ * which is where a presence dot or status badge belongs, and keep whatever
+ * size they are given — only the picture is pinned to the box.
+ *
+ * The wrapper is `data-slot="random-avatar"` and the picture inside it is
+ * `data-slot="random-avatar-paint"`. Both are stable: hosts size the wrapper,
+ * and the paint slot is what holds the picture to it.
  *
  * Each avatar carries `data-figure`, a short description of what was painted
  * (`"4w@210"` — four washes, base hue 210; `"5w@140x3"` for a group of three).
@@ -849,7 +855,19 @@ function RandomAvatar({
       data-busy={busy ? "" : undefined}
       aria-busy={busy || undefined}
       className={cn(
-        "relative isolate size-8 shrink-0 select-none overflow-hidden rounded-full",
+        // The paint surface below is `size-full`, one class (0,1,0). Hosts
+        // size their glyph slots with a descendant rule written for flat
+        // glyphs — `[&_svg]:size-3.5` (0,1,1), or the opt-out form
+        // `[&_svg:not([class*='size-'])]:size-4` (0,2,1) — either of which
+        // outranks it and would shrink the painting to glyph size in the
+        // corner of its own disc. Re-asserting the fill from here, with the
+        // wrapper's own slot qualifying the rule, is (0,3,0): it beats every
+        // descendant form in the package outright, so the avatar covers its
+        // disc without relying on the paint's class list to exempt it, and
+        // without `!important` or inline geometry. It names the paint slot
+        // rather than `> svg` because a badge passed as `children` is a
+        // sibling of the picture and must keep the size the host gave it.
+        "relative isolate size-8 shrink-0 select-none overflow-hidden rounded-full [&[data-slot=random-avatar]>[data-slot=random-avatar-paint]]:size-full",
         className,
       )}
       {...props}
@@ -861,6 +879,7 @@ function RandomAvatar({
           image. */}
       <svg
         ref={svgRef}
+        data-slot="random-avatar-paint"
         viewBox="0 0 100 100"
         className="absolute inset-0 size-full"
         role={label === undefined ? undefined : "img"}

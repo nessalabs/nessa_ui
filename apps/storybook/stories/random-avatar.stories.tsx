@@ -8,6 +8,7 @@ import {
   randomAvatarTones,
   RandomAvatar,
 } from "@nessalabs/ui"
+import { Check } from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"
 
@@ -684,5 +685,79 @@ export const TintedWheel: Story = {
       [...drawn].map((node) => node.getAttribute("data-figure")),
     )
     await expect(figures.size).toBeGreaterThan(1)
+  },
+}
+
+export const InsideAGlyphSlot: Story = {
+  parameters: storyDocumentation(
+    "An avatar dropped into a host's icon slot. Icon slots size their contents with a descendant rule written for flat glyphs — a blanket `[&_svg]:size-3.5`, the `:not([class*='size-'])` opt-out Button and the menus use, or a `:not()` keyed on something else entirely — and every one of those outranks the single class the avatar paints itself with. The avatar re-asserts the fill from its own wrapper at a specificity none of them reach, so the painting covers its whole disc in any slot rather than shrinking to glyph size in the top-left corner. The re-assertion names the picture, not every svg in the disc: the last slot hangs a badge on the avatar, and that badge keeps the size the host gave it. The play test measures each disc against its paint surface, and the badge against neither.",
+  ),
+  args: { seed: "glyph-slot" },
+  render: () => (
+    <div className="flex items-center gap-4">
+      {(
+        [
+          ["[&_svg]:size-3.5", "size-4"],
+          ["[&_svg]:size-3.5", "size-7"],
+          ["[&_svg]:size-4", "size-5"],
+          ["[&_svg:not([aria-hidden])]:size-4", "size-6"],
+          ["[&_svg:not([class*='size-'])]:size-4", "size-8"],
+        ] as const
+      ).map(([slot, disc], index) => (
+        <span
+          key={slot + disc}
+          data-testid={`slot-${index}`}
+          className={`flex shrink-0 items-center justify-center ${slot}`}
+        >
+          <RandomAvatar
+            seed={`glyph-slot-${index}`}
+            // The fourth slot's rule is keyed on `aria-hidden`, not on a
+            // size class, so the paint's own `size-full` does not exempt it.
+            // Only a named avatar — whose painting is an `img` and carries no
+            // `aria-hidden` — is actually exposed to that rule.
+            name={index === 3 ? `Agent ${index}` : undefined}
+            className={disc}
+          >
+            {index === 4 ? (
+              <Check
+                data-testid="badge"
+                className="absolute right-0 bottom-0 size-2 text-foreground"
+              />
+            ) : null}
+          </RandomAvatar>
+        </span>
+      ))}
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const slots = canvasElement.querySelectorAll("[data-testid^=slot-]")
+    await expect(slots).toHaveLength(5)
+    for (const slot of slots) {
+      const avatar = slot.querySelector("[data-slot=random-avatar]")
+      const paint = avatar?.querySelector("[data-slot=random-avatar-paint]")
+      await expect(avatar).not.toBeNull()
+      await expect(paint).not.toBeNull()
+      const disc = avatar!.getBoundingClientRect()
+      const mark = paint!.getBoundingClientRect()
+      await expect(disc.width).toBeGreaterThan(0)
+      await expect(mark.width).toBeCloseTo(disc.width, 1)
+      await expect(mark.height).toBeCloseTo(disc.height, 1)
+      await expect(mark.left).toBeCloseTo(disc.left, 1)
+      await expect(mark.top).toBeCloseTo(disc.top, 1)
+    }
+    // A badge passed as `children` is a sibling of the picture, not the
+    // picture. The avatar's fill names the paint slot, so the badge keeps the
+    // size the host gave it rather than being stretched over the whole disc.
+    const badge = canvasElement.querySelector("[data-testid=badge]")
+    await expect(badge).not.toBeNull()
+    const badgeBox = badge!.getBoundingClientRect()
+    // Measured against its own disc rather than against 8px: the badge is
+    // `size-2` on a `size-8` avatar, and both scale with the ambient
+    // `--spacing`, so the ratio holds at any UI scale.
+    const lastDisc = slots[4]!
+      .querySelector("[data-slot=random-avatar]")!
+      .getBoundingClientRect()
+    await expect(badgeBox.width).toBeCloseTo(lastDisc.width / 4, 1)
+    await expect(badgeBox.height).toBeCloseTo(lastDisc.height / 4, 1)
   },
 }
