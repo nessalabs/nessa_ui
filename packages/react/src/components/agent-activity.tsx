@@ -383,7 +383,7 @@ function AgentActivityCard({
       {icon != null ? (
         <span
           aria-hidden="true"
-          className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-(--nessa-chat-accent-ink) [&_svg:not([class*='size-'])]:size-3.5 [&_[data-slot=random-avatar]]:size-7"
+          className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-(--nessa-chat-accent-ink) [&>svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_[data-slot=random-avatar]]:size-7"
         >
           {icon}
         </span>

@@ -690,11 +690,16 @@ export const TintedWheel: Story = {
 
 export const InsideAGlyphSlot: Story = {
   parameters: storyDocumentation(
-    "An avatar dropped into a host's icon slot. Icon slots size their contents with a descendant rule written for flat glyphs — a blanket `[&_svg]:size-3.5`, the `:not([class*='size-'])` opt-out Button and the menus use, or a `:not()` keyed on something else entirely — and every one of those outranks the single class the avatar paints itself with. The avatar re-asserts the fill from its own wrapper at a specificity none of them reach, so the painting covers its whole disc in any slot rather than shrinking to glyph size in the top-left corner. The re-assertion names the picture, not every svg in the disc: the last slot hangs a badge on the avatar, and that badge keeps the size the host gave it. The play test measures each disc against its paint surface, and the badge against neither.",
+    "An avatar dropped into a host's icon slot. Icon slots size their contents with a descendant rule written for flat glyphs — a blanket `[&_svg]:size-3.5`, the `:not([class*='size-'])` opt-out Button and the menus use, or a `:not()` keyed on something else entirely — and every one of those outranks the single class an svg can carry. The avatar holds its painting to the disc inline instead, which no selector and no cascade layer can outrank, so the painting covers its whole disc in any slot rather than shrinking to glyph size in the top-left corner. The last slot is the case a consumer hits rather than this repo: a host stylesheet compiled separately, landing in the `utilities` layer that this package's own layer is declared before, where layer order decides ahead of specificity. The fill covers the picture only — the fourth slot hangs a badge on the avatar, and that badge keeps the size the host gave it. The play test measures each disc against its paint surface, and the badge against neither.",
   ),
   args: { seed: "glyph-slot" },
   render: () => (
     <div className="flex items-center gap-4">
+      {/* The last slot's rule stands in for a host stylesheet compiled
+          against its own Tailwind: it lands in `utilities`, which this
+          package's `nessa-components` layer is declared before, so it wins
+          over anything the package can write regardless of specificity. */}
+      <style>{`@layer utilities { .host-glyph-slot svg { width: 0.875rem; height: 0.875rem; } }`}</style>
       {(
         [
           ["[&_svg]:size-3.5", "size-4"],
@@ -702,6 +707,7 @@ export const InsideAGlyphSlot: Story = {
           ["[&_svg]:size-4", "size-5"],
           ["[&_svg:not([aria-hidden])]:size-4", "size-6"],
           ["[&_svg:not([class*='size-'])]:size-4", "size-8"],
+          ["host-glyph-slot", "size-9"],
         ] as const
       ).map(([slot, disc], index) => (
         <span
@@ -731,7 +737,7 @@ export const InsideAGlyphSlot: Story = {
   ),
   play: async ({ canvasElement }) => {
     const slots = canvasElement.querySelectorAll("[data-testid^=slot-]")
-    await expect(slots).toHaveLength(5)
+    await expect(slots).toHaveLength(6)
     for (const slot of slots) {
       const avatar = slot.querySelector("[data-slot=random-avatar]")
       const paint = avatar?.querySelector("[data-slot=random-avatar-paint]")

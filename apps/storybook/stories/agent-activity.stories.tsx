@@ -186,7 +186,7 @@ export const Playground: Story = {
 
 export const LiveAndCard: Story = {
   parameters: storyDocumentation(
-    "While the agent is still working the cue shimmers, its RandomAvatar is busy, and the group is aria-busy. Clicking Exploring… opens the live tools in the extra-details sheet. A named beat — a spawned explorer — uses the card with that agent’s avatar instead of a counted summary. The last four rows show the mark slot’s sizing rule: a bare glyph is drawn at 14px, and one that arrives with its own size-* keeps it, in the cue and the card alike.",
+    "While the agent is still working the cue shimmers, its RandomAvatar is busy, and the group is aria-busy. Clicking Exploring… opens the live tools in the extra-details sheet. A named beat — a spawned explorer — uses the card with that agent’s avatar instead of a counted summary. The last five rows show the mark slot’s sizing rule: a bare glyph is drawn at 14px, and one that arrives with its own size-* keeps it, in the cue and the card alike — including a glyph larger than the card’s circle, which keeps its size and is clipped rather than being squeezed narrow.",
   ),
   render: () => {
     function Example() {
@@ -236,6 +236,11 @@ export const LiveAndCard: Story = {
               icon={<FileSearch data-testid="bare-glyph" />}
               title="Scan the tokens"
               meta="Done · 3 files"
+            />
+            <AgentActivityCard
+              icon={<FileSearch data-testid="huge-glyph" className="size-10" />}
+              title="Scan the icons"
+              meta="Done · 40 files"
             />
           </div>
           {open ? (
@@ -299,6 +304,15 @@ export const LiveAndCard: Story = {
       await expect(box.width).toBeCloseTo(20, 1)
       await expect(box.height).toBeCloseTo(20, 1)
     }
+    // A glyph larger than the card's 28px slot keeps its own size and is
+    // clipped by the circle, as the slot's JSDoc promises. It is a flex item
+    // in a fixed-width box, so without an explicit `shrink-0` on the child
+    // the 40px glyph would be squeezed to 28px wide and stay 40px tall.
+    const huge = canvasElement.querySelector("[data-testid=huge-glyph]")
+    await expect(huge).not.toBeNull()
+    const hugeBox = huge!.getBoundingClientRect()
+    await expect(hugeBox.width).toBeCloseTo(40, 1)
+    await expect(hugeBox.height).toBeCloseTo(40, 1)
     const bare = canvasElement.querySelectorAll("[data-testid=bare-glyph]")
     await expect(bare).toHaveLength(2)
     for (const glyph of bare) {

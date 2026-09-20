@@ -525,7 +525,8 @@ export interface RandomAvatarProps extends React.ComponentProps<"div"> {
  *
  * The wrapper is `data-slot="random-avatar"` and the picture inside it is
  * `data-slot="random-avatar-paint"`. Both are stable: hosts size the wrapper,
- * and the paint slot is what holds the picture to it.
+ * and the picture is held to it inline, so it survives a host stylesheet in a
+ * later cascade layer than this package's.
  *
  * Each avatar carries `data-figure`, a short description of what was painted
  * (`"4w@210"` — four washes, base hue 210; `"5w@140x3"` for a group of three).
@@ -855,19 +856,7 @@ function RandomAvatar({
       data-busy={busy ? "" : undefined}
       aria-busy={busy || undefined}
       className={cn(
-        // The paint surface below is `size-full`, one class (0,1,0). Hosts
-        // size their glyph slots with a descendant rule written for flat
-        // glyphs — `[&_svg]:size-3.5` (0,1,1), or the opt-out form
-        // `[&_svg:not([class*='size-'])]:size-4` (0,2,1) — either of which
-        // outranks it and would shrink the painting to glyph size in the
-        // corner of its own disc. Re-asserting the fill from here, with the
-        // wrapper's own slot qualifying the rule, is (0,3,0): it beats every
-        // descendant form in the package outright, so the avatar covers its
-        // disc without relying on the paint's class list to exempt it, and
-        // without `!important` or inline geometry. It names the paint slot
-        // rather than `> svg` because a badge passed as `children` is a
-        // sibling of the picture and must keep the size the host gave it.
-        "relative isolate size-8 shrink-0 select-none overflow-hidden rounded-full [&[data-slot=random-avatar]>[data-slot=random-avatar-paint]]:size-full",
+        "relative isolate size-8 shrink-0 select-none overflow-hidden rounded-full",
         className,
       )}
       {...props}
@@ -877,11 +866,23 @@ function RandomAvatar({
           presence dot or badge a host puts on top — out of the accessibility
           tree. An empty name is treated as no name rather than as an unnamed
           image. */}
+      {/* The fill is inline because no class can be relied on to hold it.
+          Hosts size their icon slots with a descendant rule written for flat
+          glyphs — `[&_svg]:size-3.5` and friends — and a host that compiles
+          its own Tailwind emits that rule into the `utilities` layer, which
+          this package's own `nessa-components` layer is declared before.
+          Layer order is resolved ahead of specificity, so no selector written
+          here can outrank it; the painting would render at glyph size in the
+          corner of its own disc. An inline declaration sits outside the
+          layered cascade altogether. It covers the picture only: a badge
+          passed as `children` is a sibling and keeps the size the host gave
+          it, and the disc itself stays sized by `className` as before. */}
       <svg
         ref={svgRef}
         data-slot="random-avatar-paint"
         viewBox="0 0 100 100"
-        className="absolute inset-0 size-full"
+        className="absolute inset-0"
+        style={{ width: "100%", height: "100%" }}
         role={label === undefined ? undefined : "img"}
         aria-label={label}
         aria-hidden={label === undefined ? true : undefined}
