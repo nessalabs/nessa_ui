@@ -518,8 +518,15 @@ export interface RandomAvatarProps extends React.ComponentProps<"div"> {
  * its motion by `speed` and `flood`.
  *
  * It sizes itself from the box — set `size-*` (or width and height) through
- * `className` and the painting follows. `children` render above the picture,
- * which is where a presence dot or status badge belongs.
+ * `className` and the painting follows, even inside a host slot that sizes
+ * plain glyphs with a rule of its own. `children` render above the picture,
+ * which is where a presence dot or status badge belongs, and keep whatever
+ * size they are given — only the picture is pinned to the box.
+ *
+ * The wrapper is `data-slot="random-avatar"` and the picture inside it is
+ * `data-slot="random-avatar-paint"`. Both are stable: hosts size the wrapper,
+ * and the picture is held to it inline, so it survives a host stylesheet in a
+ * later cascade layer than this package's.
  *
  * Each avatar carries `data-figure`, a short description of what was painted
  * (`"4w@210"` — four washes, base hue 210; `"5w@140x3"` for a group of three).
@@ -859,10 +866,23 @@ function RandomAvatar({
           presence dot or badge a host puts on top — out of the accessibility
           tree. An empty name is treated as no name rather than as an unnamed
           image. */}
+      {/* The fill is inline because no class can be relied on to hold it.
+          Hosts size their icon slots with a descendant rule written for flat
+          glyphs — `[&_svg]:size-3.5` and friends — and a host that compiles
+          its own Tailwind emits that rule into the `utilities` layer, which
+          this package's own `nessa-components` layer is declared before.
+          Layer order is resolved ahead of specificity, so no selector written
+          here can outrank it; the painting would render at glyph size in the
+          corner of its own disc. An inline declaration sits outside the
+          layered cascade altogether. It covers the picture only: a badge
+          passed as `children` is a sibling and keeps the size the host gave
+          it, and the disc itself stays sized by `className` as before. */}
       <svg
         ref={svgRef}
+        data-slot="random-avatar-paint"
         viewBox="0 0 100 100"
-        className="absolute inset-0 size-full"
+        className="absolute inset-0"
+        style={{ width: "100%", height: "100%" }}
         role={label === undefined ? undefined : "img"}
         aria-label={label}
         aria-hidden={label === undefined ? true : undefined}

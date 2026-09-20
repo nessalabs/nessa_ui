@@ -8,6 +8,7 @@ import {
   randomAvatarTones,
   RandomAvatar,
 } from "@nessalabs/ui"
+import { Check } from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"
 
@@ -684,5 +685,92 @@ export const TintedWheel: Story = {
       [...drawn].map((node) => node.getAttribute("data-figure")),
     )
     await expect(figures.size).toBeGreaterThan(1)
+  },
+}
+
+export const InsideAGlyphSlot: Story = {
+  parameters: storyDocumentation(
+    "An avatar dropped into a host's icon slot. Icon slots size their contents with a descendant rule written for flat glyphs — a blanket `[&_svg]:size-3.5`, the `:not([class*='size-'])` opt-out Button and the menus use, or a `:not()` keyed on something else entirely — and every one of those outranks the single class an svg can carry. The avatar holds its painting to the disc inline instead, which no selector and no cascade layer can outrank, so the painting covers its whole disc in any slot rather than shrinking to glyph size in the top-left corner. The last slot is the case a consumer hits rather than this repo: a host stylesheet compiled separately, landing in the `utilities` layer that this package's own layer is declared before, where layer order decides ahead of specificity. The fill covers the picture only — the fourth slot hangs a badge on the avatar, and that badge keeps the size the host gave it. The play test measures each disc against its paint surface, and the badge against neither.",
+  ),
+  args: { seed: "glyph-slot" },
+  render: () => (
+    <div className="flex items-center gap-4">
+      {/* The last slot's rule stands in for a host stylesheet compiled
+          against its own Tailwind: it lands in `utilities`, which this
+          package's `nessa-components` layer is declared before, so it wins
+          over anything the package can write regardless of specificity. */}
+      <style>{`@layer utilities { .host-glyph-slot svg { width: 0.875rem; height: 0.875rem; } }`}</style>
+      {(
+        [
+          ["[&_svg]:size-3.5", "size-4"],
+          ["[&_svg]:size-3.5", "size-7"],
+          ["[&_svg]:size-4", "size-5"],
+          ["[&_svg:not([aria-hidden])]:size-4", "size-6"],
+          ["[&_svg:not([class*='size-'])]:size-4", "size-8"],
+          ["host-glyph-slot", "size-9"],
+        ] as const
+      ).map(([slot, disc], index) => (
+        <span
+          key={slot + disc}
+          data-testid={`slot-${index}`}
+          className={`flex shrink-0 items-center justify-center ${slot}`}
+        >
+          <RandomAvatar
+            seed={`glyph-slot-${index}`}
+            // This story measures boxes, not paint. The grain filter is a
+            // feTurbulence pass per avatar and by far the most expensive
+            // thing on screen here, so it is off: six of them would cost
+            // the rest of the suite main-thread time for nothing the
+            // assertions look at.
+            grain={0}
+            washes={[1, 1]}
+            // The fourth slot's rule is keyed on `aria-hidden`, not on a
+            // size class, so the paint's own `size-full` does not exempt it.
+            // Only a named avatar — whose painting is an `img` and carries no
+            // `aria-hidden` — is actually exposed to that rule.
+            name={index === 3 ? `Agent ${index}` : undefined}
+            className={disc}
+          >
+            {index === 4 ? (
+              <Check
+                data-testid="badge"
+                className="absolute right-0 bottom-0 size-2 text-foreground"
+              />
+            ) : null}
+          </RandomAvatar>
+        </span>
+      ))}
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const slots = canvasElement.querySelectorAll("[data-testid^=slot-]")
+    await expect(slots).toHaveLength(6)
+    for (const slot of slots) {
+      const avatar = slot.querySelector("[data-slot=random-avatar]")
+      const paint = avatar?.querySelector("[data-slot=random-avatar-paint]")
+      await expect(avatar).not.toBeNull()
+      await expect(paint).not.toBeNull()
+      const disc = avatar!.getBoundingClientRect()
+      const mark = paint!.getBoundingClientRect()
+      await expect(disc.width).toBeGreaterThan(0)
+      await expect(mark.width).toBeCloseTo(disc.width, 1)
+      await expect(mark.height).toBeCloseTo(disc.height, 1)
+      await expect(mark.left).toBeCloseTo(disc.left, 1)
+      await expect(mark.top).toBeCloseTo(disc.top, 1)
+    }
+    // A badge passed as `children` is a sibling of the picture, not the
+    // picture. The avatar's fill names the paint slot, so the badge keeps the
+    // size the host gave it rather than being stretched over the whole disc.
+    const badge = canvasElement.querySelector("[data-testid=badge]")
+    await expect(badge).not.toBeNull()
+    const badgeBox = badge!.getBoundingClientRect()
+    // Measured against its own disc rather than against 8px: the badge is
+    // `size-2` on a `size-8` avatar, and both scale with the ambient
+    // `--spacing`, so the ratio holds at any UI scale.
+    const lastDisc = slots[4]!
+      .querySelector("[data-slot=random-avatar]")!
+      .getBoundingClientRect()
+    await expect(badgeBox.width).toBeCloseTo(lastDisc.width / 4, 1)
+    await expect(badgeBox.height).toBeCloseTo(lastDisc.height / 4, 1)
   },
 }

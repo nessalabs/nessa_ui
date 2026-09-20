@@ -432,12 +432,33 @@ export const MoveColumns: Story = {
     // The drop settles against the release position, not against the
     // net-zero pose the threshold crossing rendered.
     const doneHandle = canvas.getByRole("button", { name: "Move Done column" })
-    const doneRect = doneHandle.getBoundingClientRect()
     // Aimed at the row's leading edge rather than a neighbour's boundary,
     // so the drop clears every insertion threshold decisively.
     const leadColumn = canvasElement.querySelector<HTMLElement>(
       '[data-slot="kanban-column"][data-column-id="progress"]',
     )
+    // Measured only once the slide from the keyboard moves has landed. The
+    // columns travel by `transition-transform`, and a rect read mid-flight
+    // aims the drop at a place the board is still leaving — which lands it
+    // one position short on a machine slow enough to still be animating.
+    // The settled state is an identity transform, not "nothing running":
+    // a transition that has not started yet also has none running.
+    await waitFor(
+      () => {
+        for (const column of canvasElement.querySelectorAll(
+          '[data-slot="kanban-column"]',
+        )) {
+          const transform = getComputedStyle(column).transform
+          expect(
+            transform === "none" || transform === "matrix(1, 0, 0, 1, 0, 0)",
+          ).toBe(true)
+        }
+      },
+      // Generous: the point is to outlast a slide delivered slowly by a
+      // loaded machine, which is the case this wait exists for.
+      { timeout: 5000 },
+    )
+    const doneRect = doneHandle.getBoundingClientRect()
     const leadRect = leadColumn!.getBoundingClientRect()
 
     doneHandle.dispatchEvent(
