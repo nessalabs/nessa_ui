@@ -158,9 +158,14 @@ function ActivityShimmer({
 const cueClassName =
   "flex w-fit min-w-0 max-w-full items-center gap-1.5 rounded-md px-1 py-0.5 font-sans nessa-text-2 text-muted-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none"
 
-/** Leading mark on a cue: SVG glyphs stay 14px; RandomAvatar fills 16px. */
+/**
+ * Leading mark on a cue. A bare lucide or nucleo glyph is drawn at 14px; one
+ * that carries a `size-*` class keeps it — the same opt-out form as button
+ * and the menus. RandomAvatar does not depend on this: it pins its own paint
+ * surface to its disc, so the `size-4` here is the disc, not the painting.
+ */
 const cueIconClassName =
-  "flex shrink-0 items-center justify-center text-(--nessa-chat-accent-ink) [&_svg]:size-3.5 [&_[data-slot=random-avatar]]:size-4"
+  "flex shrink-0 items-center justify-center text-(--nessa-chat-accent-ink) [&_svg:not([class*='size-'])]:size-3.5 [&_[data-slot=random-avatar]]:size-4"
 
 export type AgentActivityCueProps = {
   /**
@@ -171,8 +176,8 @@ export type AgentActivityCueProps = {
   status?: AgentActivityStatus
   /**
    * The leading mark — typically a RandomAvatar that is `busy` while the
-   * agent is still working and still once it is not. The cue owns sizing,
-   * so pass the bare element.
+   * agent is still working and still once it is not. The cue sizes the mark,
+   * so pass the bare element; a glyph that carries its own `size-*` keeps it.
    */
   icon?: React.ReactNode
 } & (
@@ -346,7 +351,8 @@ export interface AgentActivityCardProps
   /**
    * The leading identity. Pass a RandomAvatar (`busy` while that agent is
    * working) the same way a subagent chip does; the card sizes it to the
-   * chip avatar. SVG glyphs still fit the circle.
+   * chip avatar. A bare SVG glyph is drawn at 14px inside the circle; one
+   * that carries its own `size-*` keeps it, and is clipped past 28px.
    */
   icon?: React.ReactNode
 }
@@ -377,7 +383,7 @@ function AgentActivityCard({
       {icon != null ? (
         <span
           aria-hidden="true"
-          className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-(--nessa-chat-accent-ink) [&_svg]:size-3.5 [&_[data-slot=random-avatar]]:size-7"
+          className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-(--nessa-chat-accent-ink) [&>svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_[data-slot=random-avatar]]:size-7"
         >
           {icon}
         </span>
