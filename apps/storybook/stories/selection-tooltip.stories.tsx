@@ -625,6 +625,177 @@ export const ControlledShelf: Story = {
   },
 }
 
+function HostControlledDemo() {
+  const [composing, setComposing] = React.useState(false)
+  const [declineClose, setDeclineClose] = React.useState(false)
+  const [panelMounted, setPanelMounted] = React.useState(true)
+  const [refState, setRefState] = React.useState<"attached" | "detached">(
+    "detached",
+  )
+  const panelRef = React.useRef<HTMLDivElement | null>(null)
+  return (
+    <div className="flex w-[30rem] flex-col items-start gap-3 rounded-3xl border border-border bg-card p-6">
+      <SelectionTooltip
+        composing={composing}
+        onComposingChange={(next) => {
+          // A host that declines a close — a "discard this draft?" prompt
+          // in a real product — keeps the composer open on the request.
+          if (!next && declineClose) return
+          setComposing(next)
+        }}
+      >
+        <SelectionTooltipComposeTrigger aria-label="Comment">
+          <RandomAvatar seed="nessa" busy={composing} className="size-5" />
+          <SelectionTooltipLabel>Comment</SelectionTooltipLabel>
+        </SelectionTooltipComposeTrigger>
+        <SelectionTooltipSeparator />
+        <SelectionTooltipAction aria-label="Add to chat" tooltip="Add to chat">
+          <ChatAddIcon aria-hidden="true" />
+          <SelectionTooltipLabel>Add to chat</SelectionTooltipLabel>
+        </SelectionTooltipAction>
+        <SelectionTooltipCompose placeholder="Add a comment…" />
+        {panelMounted && (
+          <SelectionTooltipPanel
+            // Both ref shapes at once: an object ref the host reads, and a
+            // callback ref whose cleanup must run on unmount. Neither may
+            // cost the band its own measurement.
+            ref={(node) => {
+              panelRef.current = node
+              setRefState(node === null ? "detached" : "attached")
+              return () => {
+                panelRef.current = null
+                setRefState("detached")
+              }
+            }}
+            className="w-72"
+          >
+            <p className="leading-5">
+              A posted comment, tall enough to measure.
+            </p>
+          </SelectionTooltipPanel>
+        )}
+      </SelectionTooltip>
+
+      <p className="font-sans text-sm text-muted-foreground">
+        Panel ref: <span data-testid="ref-state">{refState}</span>
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={() => setComposing(false)}>
+          Close from the host
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setDeclineClose(!declineClose)}
+        >
+          {declineClose ? "Accept closes" : "Decline closes"}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPanelMounted(!panelMounted)}
+        >
+          {panelMounted ? "Unmount panel" : "Mount panel"}
+        </Button>
+        <Button variant="outline" size="sm">
+          Somewhere else
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+export const HostControlled: Story = {
+  parameters: storyDocumentation(
+    "The host owns the composer here: it can decline a close, close from its own control, and hold a ref to the panel. A declined close leaves focus alone — including later, when the host does close — the panel's ref reaches its content without costing the band its own measurement, and a key pressed while an input method is composing belongs to the candidate window rather than to the composer.",
+  ),
+  render: () => <HostControlledDemo />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const trigger = canvas.getByRole("button", { name: "Comment" })
+    const panel = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="selection-tooltip-panel"]',
+    )
+    const content = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="selection-tooltip-panel-content"]',
+    )
+    await expect(panel).not.toBeNull()
+    await expect(content).not.toBeNull()
+    if (panel === null || content === null) return
+
+    // A consumer's ref reaches the band's content, and the band still
+    // measures itself: a ref that replaced the internal one would leave the
+    // height at zero for ever.
+    await expect(canvas.getByTestId("ref-state")).toHaveTextContent("attached")
+    // The band settles at its content's height — the end state, not a
+    // frame of the opening transition.
+    await waitFor(() =>
+      expect(panel.getBoundingClientRect().height).toBeCloseTo(
+        content.getBoundingClientRect().height,
+        0,
+      ),
+    )
+    await expect(content.getBoundingClientRect().height).toBeGreaterThan(0)
+    // The callback ref's cleanup runs when the panel goes away.
+    await userEvent.click(canvas.getByRole("button", { name: "Unmount panel" }))
+    await expect(canvas.getByTestId("ref-state")).toHaveTextContent("detached")
+    await userEvent.click(canvas.getByRole("button", { name: "Mount panel" }))
+    await expect(canvas.getByTestId("ref-state")).toHaveTextContent("attached")
+
+    // Escape belonging to an input method's candidate window is not a
+    // command to the composer: the draft and the composer both survive it.
+    await userEvent.click(trigger)
+    const input = canvas.getByRole("textbox", { name: "Write a comment" })
+    await waitFor(() => expect(input).toHaveFocus())
+    await userEvent.type(input, "半角")
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        cancelable: true,
+        isComposing: true,
+      }),
+    )
+    await expect(trigger).toHaveAttribute("aria-expanded", "true")
+    await expect(input).toHaveValue("半角")
+    // An ordinary Escape still closes it.
+    await userEvent.keyboard("{Escape}")
+    await expect(trigger).toHaveAttribute("aria-expanded", "false")
+
+    // A close the host declines must not leave an intention behind. The
+    // user asks to close, the host refuses, the user walks off to another
+    // control — and the later, real close leaves that focus alone.
+    await userEvent.click(canvas.getByRole("button", { name: "Decline closes" }))
+    await userEvent.click(trigger)
+    const reopened = canvas.getByRole("textbox", { name: "Write a comment" })
+    await waitFor(() => expect(reopened).toHaveFocus())
+    await userEvent.keyboard("{Escape}")
+    await expect(trigger).toHaveAttribute("aria-expanded", "true")
+    const elsewhere = canvas.getByRole("button", { name: "Somewhere else" })
+    elsewhere.focus()
+    await expect(elsewhere).toHaveFocus()
+    await userEvent.click(canvas.getByRole("button", { name: "Accept closes" }))
+    elsewhere.focus()
+    const closeFromHost = canvas.getByRole("button", {
+      name: "Close from the host",
+    })
+    closeFromHost.click()
+    await waitFor(() =>
+      expect(trigger).toHaveAttribute("aria-expanded", "false"),
+    )
+    await expect(elsewhere).toHaveFocus()
+
+    // The positive control: a close that strands focus inside the composer
+    // still hands it back to the pill.
+    await userEvent.click(trigger)
+    const again = canvas.getByRole("textbox", { name: "Write a comment" })
+    await waitFor(() => expect(again).toHaveFocus())
+    closeFromHost.click()
+    await waitFor(() => expect(trigger).toHaveFocus())
+    trigger.blur()
+  },
+}
+
 export const BelowSelection: Story = {
   parameters: storyDocumentation(
     "side=\"bottom\" floats the pill under the selection with the arrow pointing up; the arrow can be dropped entirely with arrow={false}.",

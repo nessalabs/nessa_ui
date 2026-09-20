@@ -192,9 +192,6 @@ function SelectionTooltip({
   // blurring the now-inert input looks exactly like the user clicking blank
   // page — so the body alone is not evidence that focus belongs back here.
   const composeHadFocusRef = React.useRef(false)
-  // Set when a close leaves focus inside the composer, consumed by the
-  // layout effect below once the row is interactive again.
-  const restorePendingRef = React.useRef(false)
   // Focus the pill puts back is never ringed. A focus ring answers "where
   // did my keyboard land?", and nobody's keyboard landed here — the composer
   // closed and the pill returned focus to where it came from, by pointer or
@@ -245,16 +242,11 @@ function SelectionTooltip({
   // Written as a callback rather than a ref assigned during render, which
   // would hand a discarded concurrent render's closure to the next caller.
   const closeComposing = React.useCallback(() => {
-    if (
-      composeRef.current !== null &&
-      composeRef.current.contains(document.activeElement)
-    ) {
-      // Closing while focus is in the composer would strand it in an inert
-      // subtree, so focus has to move — but not yet. The row items are
-      // still inert for this render, and focus() on an inert element is a
-      // no-op, so the hand-back waits for the commit that revives them.
-      restorePendingRef.current = true
-    }
+    // Nothing is decided about focus here. A close can be declined by a
+    // controlled host, and a request that never lands must not leave an
+    // intention behind to act on at some later close the user has since
+    // walked away from. Whether focus needs handing back is read from the
+    // DOM in the layout effect below, after a close actually commits.
     if (!isComposingControlled) setUncontrolledComposing(false)
     onComposingChange?.(false)
   }, [isComposingControlled, onComposingChange])
@@ -340,10 +332,6 @@ function SelectionTooltip({
   // drops focus to the body. The trigger is where that focus belongs.
   const previousComposingRef = React.useRef(resolvedComposing)
   React.useLayoutEffect(() => {
-    // A host that declines a close — a "discard this draft?" confirmation,
-    // say — leaves the request behind. It must not survive to steal focus at
-    // some later close the user did not connect to it.
-    if (resolvedComposing) restorePendingRef.current = false
     // Opened by a host flipping `composing` rather than through
     // setComposing: the origin was never captured, so capture it now, while
     // the composer has not taken focus yet.
@@ -356,20 +344,23 @@ function SelectionTooltip({
       // composer's own focus tracking is what separates that from a click on
       // blank page, which also leaves the body focused but never asked for
       // the pill to take focus back.
+      // Only rescue focus that the close itself stranded: still inside the
+      // now-inert composer, or dropped to the body as the browser blurred
+      // it. Focus the user has since moved to a real control of their own —
+      // including after a close this host declined earlier — is theirs, and
+      // the pill does not pull it back.
       const active = document.activeElement
       if (
-        restorePendingRef.current ||
-        (composeHadFocusRef.current &&
-          (active === null ||
-            active.tagName === "BODY" ||
-            composeRef.current?.contains(active) === true))
+        composeHadFocusRef.current &&
+        (active === null ||
+          active.tagName === "BODY" ||
+          composeRef.current?.contains(active) === true)
       ) {
         // Now that the row is interactive again, focus can land where it
         // came from — the action or toggle that opened the composer.
         restoreFocus()
       }
       composeReturnRef.current = null
-      restorePendingRef.current = false
       composeHadFocusRef.current = false
     }
     previousComposingRef.current = resolvedComposing
@@ -1094,8 +1085,12 @@ function SelectionTooltipCompose({
           onValueChange?.(event.target.value)
         }}
         onKeyDown={(event) => {
-          // Enter confirms an IME candidate before it ever means "send".
-          if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+          // While an input method is composing, these keys belong to the
+          // candidate window: Enter confirms a candidate and Escape cancels
+          // one. Neither is a command to this composer, and reading Escape
+          // as "close" would throw the whole draft away mid-word.
+          if (event.nativeEvent.isComposing) return
+          if (event.key === "Enter") {
             event.preventDefault()
             submit()
           }
@@ -1154,10 +1149,30 @@ function SelectionTooltipPanel({
   children,
   onFocus,
   onBlur,
+  ref,
   ...props
 }: SelectionTooltipPanelProps) {
   const pill = React.useContext(SelectionTooltipContext)
   const contentRef = React.useRef<HTMLDivElement | null>(null)
+  // Composed rather than spread: left in `props`, a consumer's ref would
+  // land on the element after `ref={contentRef}` and replace it, and the
+  // band would then measure nothing and never open. Honors the callback-ref
+  // cleanup contract, like the other parts.
+  const composedRef = React.useCallback(
+    (node: HTMLDivElement) => {
+      contentRef.current = node
+      let consumerCleanup: (() => void) | void
+      if (typeof ref === "function") consumerCleanup = ref(node)
+      else if (ref) ref.current = node
+      return () => {
+        contentRef.current = null
+        if (typeof consumerCleanup === "function") consumerCleanup()
+        else if (typeof ref === "function") ref(null)
+        else if (ref) ref.current = null
+      }
+    },
+    [ref],
+  )
   const hadFocusRef = React.useRef(false)
   const wasOpenRef = React.useRef(open)
   const [height, setHeight] = React.useState(0)
@@ -1203,7 +1218,7 @@ function SelectionTooltipPanel({
       className="relative overflow-hidden rounded-b-xl transition-[height] [transition-duration:var(--nessa-motion-duration-normal)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none"
     >
       <div
-        ref={contentRef}
+        ref={composedRef}
         inert={open ? undefined : true}
         onFocus={(event) => {
           onFocus?.(event)
