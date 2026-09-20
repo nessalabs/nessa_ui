@@ -717,6 +717,13 @@ export const InsideAGlyphSlot: Story = {
         >
           <RandomAvatar
             seed={`glyph-slot-${index}`}
+            // This story measures boxes, not paint. The grain filter is a
+            // feTurbulence pass per avatar and by far the most expensive
+            // thing on screen here, so it is off: six of them would cost
+            // the rest of the suite main-thread time for nothing the
+            // assertions look at.
+            grain={0}
+            washes={[1, 1]}
             // The fourth slot's rule is keyed on `aria-hidden`, not on a
             // size class, so the paint's own `size-full` does not exempt it.
             // Only a named avatar — whose painting is an `img` and carries no
