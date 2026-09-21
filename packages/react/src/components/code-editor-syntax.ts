@@ -1,9 +1,9 @@
 "use client"
 
 import * as React from "react"
-import { getSharedHighlighter } from "@pierre/diffs"
 import {
   defaultCodeTheme,
+  loadHighlighter,
   useCodeBlockConfig,
   useResolvedAppearance,
   type CodeBlockMode,
@@ -45,7 +45,14 @@ export function useCodeSyntax(code: string, language: string): {
   const [palette, setPalette] = React.useState<{ light: string; dark: string; colors: CodeSyntaxColors } | null>(null)
   React.useEffect(() => {
     let canceled = false
-    void getSharedHighlighter({ themes: [...new Set([light, dark])], langs: [] }).then(async (highlighter) => {
+    // The highlighter is fetched, not imported: holding `@pierre/diffs` at
+    // module scope puts Shiki in every consumer's first paint, and this hook
+    // only ever needs it inside an effect. Tokenising is already asynchronous,
+    // so the import adds no state the hook did not already have. Routed
+    // through CodeBlock's loader rather than imported directly, because the
+    // themes asked for below are registered there.
+    void loadHighlighter().then(async ({ getSharedHighlighter }) => {
+      const highlighter = await getSharedHighlighter({ themes: [...new Set([light, dark])], langs: [] })
       if (canceled) return
       setPalette((current) => current?.light === light && current.dark === dark ? current : {
         light, dark,

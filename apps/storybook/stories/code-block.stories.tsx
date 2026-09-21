@@ -53,7 +53,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A syntax-highlighted code block backed by Pierre's Shiki-based rendering engine. Standalone it renders any snippet with dark and light theme support, an optional file header, line numbers, and line wrapping; MessageMarkdown composes it automatically for fenced code. Appearance resolves from props first, then the nearest CodeBlockProvider, then defaults — so a host sets its code theme once at the root and every code surface in the app follows, exactly like the app's light and dark mode.",
+          "A syntax-highlighted code block backed by Pierre's Shiki-based rendering engine. Standalone it renders any snippet with dark and light theme support, an optional file header, line numbers, and line wrapping; MessageMarkdown composes it automatically for fenced code. Appearance resolves from props first, then the nearest CodeBlockProvider, then defaults — so a host sets its code theme once at the root and every code surface in the app follows, exactly like the app's light and dark mode. The engine itself is fetched by the first code block on the page rather than imported with the package, so the first one holds a skeleton approximating its height for a moment and later ones paint immediately; preloadCodeHighlighter moves that fetch to a quieter time.",
       },
     },
   },

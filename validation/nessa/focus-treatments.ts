@@ -22,7 +22,9 @@ const composerFocusComponents = Object.freeze([
   { component: "chat-overlay", count: 1 },
   // The chip, the collapsed-count control, and the discard-all button.
   { component: "chat-tray", count: 3 },
-  { component: "code-block", count: 1 },
+  // The copy control, and the plain-text surface shown when the highlighter
+  // never arrives — it scrolls, so it takes focus.
+  { component: "code-block", count: 2 },
   { component: "composer-access-mode", count: 2 },
   { component: "composer-queue", count: 7 },
   { component: "mermaid-diagram", count: 6 },
@@ -35,7 +37,9 @@ const composerFocusComponents = Object.freeze([
   // for pointer focus too, so an outline there would box the row permanently.
   { component: "searchable-listbox", count: 1 },
   { component: "sectioned-listbox", count: 1 },
-  { component: "tool-call", count: 3 },
+  // The disclosure trigger, the tabs and the file chips, plus the plain-text
+  // surface a diff degrades to, which scrolls and so takes focus.
+  { component: "tool-call", count: 4 },
   // The label is the only target; the rules either side are decoration.
   { component: "transcript-divider", count: 1 },
   // Close and Expand share the circular recipe; Done is the trailing pill.
