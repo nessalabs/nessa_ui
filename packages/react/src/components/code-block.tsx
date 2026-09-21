@@ -1,8 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { preloadHighlighter, registerCustomTheme } from "@pierre/diffs"
-import { File } from "@pierre/diffs/react"
 import type {
   DiffsThemeNames,
   SupportedLanguages,
@@ -129,7 +127,150 @@ const nessaDarkTheme = {
   ],
 }
 
-registerCustomTheme("nessa-dark", async () => nessaDarkTheme)
+/**
+ * The highlighter, loaded the first time something actually renders code.
+ *
+ * Pierre's engine and the Shiki grammars under it are the heaviest thing this
+ * package installs, and `@pierre/diffs` runs work at module scope, so a static
+ * import of it is a side effect no bundler may drop. Held statically here it
+ * reached every consumer — an app rendering a Button downloaded a syntax
+ * highlighter — and it did so unconditionally once code-block landed in a
+ * chunk shared with modules the entry needs. Behind a dynamic import it is
+ * fetched by the code block that needs it, which is the treatment
+ * message-markdown already gives KaTeX and Mermaid.
+ *
+ * The promise is memoised, so the custom theme is registered exactly once and
+ * before anything can render with it: `File` is only reachable through this
+ * loader, and `registerCustomTheme` runs before the loader resolves.
+ */
+let highlighter: Promise<{
+  File: typeof import("@pierre/diffs/react").File
+  preloadHighlighter: typeof import("@pierre/diffs").preloadHighlighter
+  getSharedHighlighter: typeof import("@pierre/diffs").getSharedHighlighter
+}> | null = null
+
+/**
+ * Every route to the highlighter goes through here, because registration is
+ * not optional: `defaultCodeTheme` names "nessa-dark", and asking the engine
+ * for a theme it was never handed fails. While the registration was a module
+ * side effect of this file, importing anything from it was enough; now that
+ * it travels with the dynamic import, a surface that loaded `@pierre/diffs`
+ * on its own would race it. So ToolCallDiff and useCodeSyntax await this too,
+ * and the theme is registered once for all three.
+ */
+/**
+ * The rejections that mean "a module this boundary owns never arrived".
+ *
+ * Marked per error rather than recorded in a flag, because a flag answers the
+ * wrong question. Asking "has any chunk ever failed?" lets one stale fetch
+ * turn every later throw on the page — including the engine's own transient
+ * incremental-update errors — into a silently degraded surface for the rest
+ * of the session. Asking "is *this* the error a failed import threw?" keeps
+ * the boundary to the one failure it can actually answer for.
+ *
+ * A WeakSet rather than a property on the error: some rejections are frozen,
+ * and nothing here should mutate a value it did not create. React.lazy caches
+ * its rejection and re-throws the same object on every later render, so the
+ * mark survives as long as the failure does.
+ */
+const unarrivedModules = new WeakSet<object>()
+
+/** Marks a rejection as a module that never arrived, then re-throws it. */
+function rethrowAsUnarrived(error: unknown): never {
+  if (typeof error === "object" && error !== null) unarrivedModules.add(error)
+  throw error
+}
+
+function isUnarrivedModule(error: unknown): boolean {
+  return (
+    typeof error === "object" && error !== null && unarrivedModules.has(error)
+  )
+}
+
+function loadHighlighter() {
+  highlighter ??= Promise.all([
+    import("@pierre/diffs"),
+    import("@pierre/diffs/react"),
+  ])
+    .then(([diffs, react]) => {
+      diffs.registerCustomTheme("nessa-dark", async () => nessaDarkTheme)
+      return {
+        File: react.File,
+        preloadHighlighter: diffs.preloadHighlighter,
+        getSharedHighlighter: diffs.getSharedHighlighter,
+      }
+    })
+    .catch((error: unknown) => {
+      // The memo is cleared before the rejection travels, so one bad moment —
+      // a cold service worker, a captive portal, a dropped request during
+      // `preloadCodeHighlighter` at boot — does not decide that this session
+      // has no highlighter. The next caller starts a fresh attempt. What
+      // cannot retry is a `React.lazy` that already rejected: React caches
+      // that, which is what the boundary below is for.
+      highlighter = null
+      return rethrowAsUnarrived(error)
+    })
+  return highlighter
+}
+
+const LazyFile = React.lazy(() =>
+  loadHighlighter().then((module) => ({ default: module.File })),
+)
+
+export interface LazyHighlighterBoundaryProps {
+  /** Shown instead of the children once a render below has thrown. */
+  fallback: React.ReactNode
+  children: React.ReactNode
+}
+
+/**
+ * Keeps a highlighter that never arrives inside the code surface.
+ *
+ * Fetching the engine is a network request, and a tab held open across a
+ * deploy asks for a chunk whose hashed name is gone. Unhandled, that
+ * rejection travels past the Suspense boundary and unmounts the host
+ * application's React root — a whole app blanked by scrolling to a code
+ * block. Every surface that renders through `loadHighlighter` wraps itself in
+ * this and degrades to something that still shows the content.
+ *
+ * It handles that failure and only that failure. A boundary here catches
+ * everything the subtree throws, and the engine throws from its own
+ * incremental-update paths — which a streaming diff exercises on every token.
+ * Latching on one of those would pin a component to plain text for the rest
+ * of the session and swallow the completed, valid render that arrives a
+ * moment later. So the fallback is shown only for a rejection marked as a
+ * module that never arrived; anything else is re-thrown, reaching the host
+ * exactly as it did before this boundary existed.
+ *
+ * Surfaces that defer a module of their own — ToolCallDiff fetches its diff
+ * surface alongside the engine — mark their own load failures the same way,
+ * through `rethrowAsUnarrived`. A boundary that only knew about the engine
+ * would re-throw theirs and blank the application, which is the failure it
+ * was built to prevent.
+ *
+ * That is also why there is no reset key. The failure it does keep cannot be
+ * retried: `React.lazy` caches its rejection and `highlighter` never
+ * reassigns a settled promise, so remounting on content change would cost a
+ * remount per streamed token for a recovery that cannot happen.
+ */
+class LazyHighlighterBoundary extends React.Component<
+  LazyHighlighterBoundaryProps,
+  { error: unknown }
+> {
+  state: { error: unknown } = { error: null }
+
+  static getDerivedStateFromError(error: unknown) {
+    return { error }
+  }
+
+  render() {
+    if (this.state.error !== null) {
+      if (!isUnarrivedModule(this.state.error)) throw this.state.error
+      return this.props.fallback
+    }
+    return this.props.children
+  }
+}
 
 /**
  * The default syntax theme pair: Nessa's own restrained near-black dark
@@ -151,8 +292,11 @@ export const defaultCodeTheme: ThemesType = {
  *
  * `langs` are the file types the app expects to render, and `theme`
  * defaults to the same pair CodeBlock itself uses. Resolves when the
- * highlighter is warm, and rejects only if the load itself fails — nothing
- * downstream depends on it, so a rejection is safe to ignore.
+ * highlighter is warm, and rejects if the load itself fails. Attach a handler
+ * to that rejection: nothing downstream depends on the result — a failed
+ * attempt is discarded, so the first code block to render simply tries again
+ * — but an ignored rejection is still an unhandled one, and reaches whatever
+ * the host has watching for those.
  */
 export async function preloadCodeHighlighter(
   langs: readonly SupportedLanguages[],
@@ -160,6 +304,7 @@ export async function preloadCodeHighlighter(
 ): Promise<void> {
   const themes =
     typeof theme === "string" ? [theme] : [theme.dark, theme.light]
+  const { preloadHighlighter } = await loadHighlighter()
   await preloadHighlighter({ themes, langs: [...langs] })
 }
 
@@ -289,6 +434,30 @@ export interface CodeBlockProps
 }
 
 /**
+ * What a code block looks like while its highlighter is still arriving.
+ *
+ * The height approximates the block from its line count instead of being a
+ * fixed bar, which keeps a short snippet from reserving a screenful. It is an
+ * approximation and not a reservation: the cap at 24 lines, wrapped long
+ * lines, and the optional file header all mean the real block can land taller
+ * than the skeleton that stood in for it.
+ */
+function CodeBlockSkeleton({ code }: { code: string }) {
+  const lines = Math.min(code.split("\n").length, 24)
+  return (
+    <div
+      data-slot="code-block-skeleton"
+      // Hidden rather than marked busy: a bare div with no role and no name
+      // carries nothing for `aria-busy` to qualify, and a screen reader has
+      // no use for an empty box. The code arrives as its own insertion.
+      aria-hidden="true"
+      className="w-full motion-safe:animate-pulse rounded-xl bg-muted/60"
+      style={{ height: `calc(${lines} * 1.5rem + 1.5rem)` }}
+    />
+  )
+}
+
+/**
  * A syntax-highlighted code block backed by Pierre's rendering engine
  * (Shiki-based highlighting with dark and light themes). Standalone it
  * renders any snippet; MessageMarkdown composes it automatically for fenced
@@ -344,7 +513,33 @@ function CodeBlock({
       )}
       {...props}
     >
-      <File file={file} options={options} />
+      {/*
+        The engine arrives with the first code block on the page, so the
+        first one waits on a fetch where later ones do not. The skeleton
+        holds the block's own geometry rather than collapsing the layout,
+        and the copy control stays outside the boundary: the code is already
+        here, only its colouring is not.
+      */}
+      <LazyHighlighterBoundary
+        fallback={
+          <pre
+            data-slot="code-block-plain"
+            // Focusable because it scrolls: the degraded surface is the only
+            // way to read the code once the engine is gone, and a keyboard
+            // user must be able to reach the part of it that is off-screen.
+            tabIndex={0}
+            role="region"
+            aria-label={filename ?? "Code"}
+            className="w-full overflow-auto rounded-xl bg-muted/40 p-4 font-mono text-foreground outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            {code}
+          </pre>
+        }
+      >
+        <React.Suspense fallback={<CodeBlockSkeleton code={code} />}>
+          <LazyFile file={file} options={options} />
+        </React.Suspense>
+      </LazyHighlighterBoundary>
       <CopyButton text={code} label="Copy code" />
     </div>
   )
@@ -354,6 +549,14 @@ export {
   CodeBlock,
   CodeBlockProvider,
   CopyButton,
+  // Internal: the other code surfaces await the loader so the custom theme is
+  // registered before they ask the engine for it, share the boundary that
+  // keeps a failed fetch inside the component, and mark their own failed
+  // imports so that boundary recognises them. None of the three is part of
+  // the package's public API.
+  LazyHighlighterBoundary,
+  loadHighlighter,
+  rethrowAsUnarrived,
   useCodeBlockConfig,
   useResolvedAppearance,
 }

@@ -73,7 +73,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "One tool invocation in an agent transcript: a compact disclosure row that names the tool — shimmering while it runs — and expands into the call's details. Compose the body from ToolCallTabs (input and output payloads), ToolCallDiff (an edit as a unified diff), and ToolCallFile (clickable chips for touched files). Hosts map their own tool names to icons and pass the match to the trigger.",
+          "One tool invocation in an agent transcript: a compact disclosure row that names the tool — shimmering while it runs — and expands into the call's details. Compose the body from ToolCallTabs (input and output payloads), ToolCallDiff (an edit as a unified diff), and ToolCallFile (clickable chips for touched files). Hosts map their own tool names to icons and pass the match to the trigger. ToolCallDiff fetches Pierre's engine when the first diff is shown rather than importing it with the package, so a transcript with no edits in it never downloads one.",
       },
     },
   },

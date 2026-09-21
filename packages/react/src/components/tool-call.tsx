@@ -1,18 +1,40 @@
 "use client"
 
 import * as React from "react"
-import { parseDiffFromFile } from "@pierre/diffs"
-import type {
-  DiffsThemeNames,
-  SupportedLanguages,
-  ThemesType,
-} from "@pierre/diffs"
-import { FileDiff } from "@pierre/diffs/react"
+import type { DiffsThemeNames, ThemesType } from "@pierre/diffs"
 import { ChevronRight, FileText } from "lucide-react"
 import { Collapsible, Tabs } from "radix-ui"
 
 import { cn } from "@/lib/utils"
-import { useCodeBlockConfig, type CodeBlockConfig } from "./code-block"
+import {
+  LazyHighlighterBoundary,
+  loadHighlighter,
+  rethrowAsUnarrived,
+  useCodeBlockConfig,
+  type CodeBlockConfig,
+} from "./code-block"
+
+/**
+ * Pierre's diff engine, fetched by the first diff rendered rather than
+ * imported by the barrel. `@pierre/diffs` runs work at module scope, so a
+ * static import of it is a side effect no bundler may drop, and holding one
+ * here put a syntax highlighter in the first paint of every app that imports
+ * anything from this package. The parse travels with the renderer — see
+ * tool-call-diff-surface.
+ */
+const ToolCallDiffSurface = React.lazy(() =>
+  // The loader comes along so the custom theme is registered before the diff
+  // renders with it; it resolves from the same modules this import fetches,
+  // so awaiting both costs nothing beyond the one fetch.
+  //
+  // Either leg can fail, and this one is its own hashed chunk: a deploy can
+  // remove it while the engine's chunks are still reachable. Both rejections
+  // are marked the same way, so the boundary recognises a diff surface that
+  // never arrived instead of re-throwing it into the host application.
+  Promise.all([import("./tool-call-diff-surface"), loadHighlighter()])
+    .then(([module]) => ({ default: module.ToolCallDiffSurface }))
+    .catch(rethrowAsUnarrived),
+)
 
 /**
  * The lifecycle of a tool call: `running` while the tool executes (the trigger
@@ -342,6 +364,19 @@ function ToolCallTabs({
  * The default syntax theme pair, mirroring CodeBlock's defaults so tool-call
  * diffs match every other code surface.
  */
+/**
+ * How tall to hold the region open while Pierre's engine is on its way.
+ *
+ * A unified diff is roughly the changed lines of both sides plus context, so
+ * the larger side is the closer guess than either alone. Capped so a
+ * thousand-line rewrite reserves a screenful rather than a scrollbar of
+ * empty pulse.
+ */
+function diffSkeletonLines(from: string, to: string): number {
+  const lines = Math.max(from.split("\n").length, to.split("\n").length)
+  return Math.min(Math.max(lines, 3), 24)
+}
+
 const defaultDiffTheme: ThemesType = {
   dark: "nessa-dark",
   light: "light-plus",
@@ -390,15 +425,7 @@ function ToolCallDiff({
     lineNumbers: lineNumbers ?? config.lineNumbers ?? false,
     wrap: wrap ?? config.wrap ?? true,
   }
-  const fileDiff = React.useMemo(() => {
-    const name = filename ?? `edit.${language ?? "txt"}`
-    const lang =
-      language !== undefined ? (language as SupportedLanguages) : undefined
-    return parseDiffFromFile(
-      { name, contents: from, ...(lang !== undefined && { lang }) },
-      { name, contents: to, ...(lang !== undefined && { lang }) },
-    )
-  }, [filename, from, language, to])
+  const name = filename ?? `edit.${language ?? "txt"}`
   const options = React.useMemo(
     () => ({
       diffStyle,
@@ -444,7 +471,59 @@ function ToolCallDiff({
       }
       {...props}
     >
-      <FileDiff fileDiff={fileDiff} options={options} />
+      {/*
+        The engine arrives with the first diff on screen: the skeleton holds
+        the region open until it does, and if it never does the edited file
+        still reads as plain text rather than taking the transcript with it.
+      */}
+      <LazyHighlighterBoundary
+        fallback={
+          <div data-slot="tool-call-diff-plain" className="w-full">
+            {/*
+              A diff is not its after-state, and this surface cannot show the
+              difference any more: say so, rather than letting a file listing
+              pass for a review of what changed.
+            */}
+            <p className="nessa-text-2 px-1 pb-2 text-muted-foreground">
+              The diff could not be loaded. Showing {name} after the edit.
+            </p>
+            <pre
+              // Focusable because it scrolls: this is the only remaining way
+              // to read the edit, and a keyboard user must reach the part of
+              // it that is off-screen.
+              tabIndex={0}
+              role="region"
+              aria-label={`${name} after the edit`}
+              className="w-full overflow-auto rounded-xl bg-muted/40 p-4 font-mono text-foreground outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              {to}
+            </pre>
+          </div>
+        }
+      >
+        <React.Suspense
+          fallback={
+            <div
+              data-slot="tool-call-diff-skeleton"
+              aria-hidden="true"
+              // Sized from the edit rather than a fixed bar, so a long edit
+              // does not open a 96px gap and then shove the transcript down
+              // when the real diff lands. An approximation, not a
+              // reservation: hunks, wrapping and the file header all move it.
+              style={{ height: `calc(${diffSkeletonLines(from, to)} * 1.5rem + 1.5rem)` }}
+              className="w-full motion-safe:animate-pulse rounded-xl bg-muted/60"
+            />
+          }
+        >
+          <ToolCallDiffSurface
+            from={from}
+            to={to}
+            name={name}
+            {...(language !== undefined && { language })}
+            options={options}
+          />
+        </React.Suspense>
+      </LazyHighlighterBoundary>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Measures what three representative consumers pay for the built package.
+ * Measures what four representative consumers pay for the built package.
  *
  * The fixtures import from `@nessalabs/ui` exactly as an installed app would,
  * and are bundled against `packages/react/dist` — the real artifact, not the
@@ -92,8 +92,13 @@ function staticallyReachable(metafile: Metafile, entryKey: string): string[] {
 }
 
 async function measure(name: string): Promise<Measurement> {
+  const entryPoint = path.join(
+    root,
+    "validation/tools/consumer-fixtures",
+    `${name}.tsx`,
+  )
   const result = await build({
-    entryPoints: [path.join(root, "validation/tools/consumer-fixtures", `${name}.tsx`)],
+    entryPoints: [entryPoint],
     bundle: true,
     format: "esm",
     target: "es2022",
@@ -127,17 +132,35 @@ async function measure(name: string): Promise<Measurement> {
     write: false,
     logLevel: "silent",
   })
+  // Matched against the fixture's own path, not merely "has an entryPoint".
+  // esbuild names a dynamically imported module as an entry point of its own,
+  // so with splitting on, hundreds of outputs carry `entryPoint` and the first
+  // one in key order is whichever chunk the package happens to defer first.
+  // Taking that one silently measured a leaf of the graph instead of the
+  // fixture — and it reported a Button-only app at 407 kB with no Mermaid in
+  // sight, which is exactly the answer this file exists to be suspicious of.
+  const fixtureEntry = path
+    .relative(process.cwd(), entryPoint)
+    .split(path.sep)
+    .join("/")
   const entryKey = Object.keys(result.metafile.outputs).find(
-    (key) => result.metafile.outputs[key]?.entryPoint,
+    (key) => result.metafile.outputs[key]?.entryPoint === fixtureEntry,
   )
-  if (!entryKey) throw new Error(`${name} produced no entry chunk`)
+  if (!entryKey) {
+    throw new Error(`${name} produced no output for ${fixtureEntry}`)
+  }
   const reachable = new Set(staticallyReachable(result.metafile, entryKey))
 
   let bytes = 0
   let gzipBytes = 0
   let cssBytes = 0
   for (const file of result.outputFiles) {
-    const key = path.relative(root, file.path).split(path.sep).join("/")
+    // Keyed the same way the metafile is — relative to the working directory,
+    // which is what esbuild's `absWorkingDir` defaults to. Keying these
+    // against the repository root instead matched nothing whenever the two
+    // differed, and a fixture whose chunks all miss the reachable set
+    // measures 0 kB and passes. A gate that fails open is worse than none.
+    const key = path.relative(process.cwd(), file.path).split(path.sep).join("/")
     if (file.path.endsWith(".css")) {
       cssBytes += file.contents.byteLength
       continue
@@ -207,7 +230,8 @@ async function main() {
     const measurement = await measure(budget.name)
     const over =
       measurement.bytes > budget.maximumBytes ||
-      measurement.gzipBytes > budget.maximumGzipBytes
+      measurement.gzipBytes > budget.maximumGzipBytes ||
+      measurement.cssBytes > budget.maximumCssBytes
     process.stdout.write(
       `${budget.name.padEnd(18)}${kb(measurement.bytes).padStart(12)}${kb(measurement.gzipBytes).padStart(12)}` +
         `${kb(measurement.cssBytes).padStart(12)}` +
@@ -215,8 +239,10 @@ async function main() {
     )
     if (over) {
       failures.push(
-        `${budget.name} is ${kb(measurement.bytes)} / ${kb(measurement.gzipBytes)} gzip, ` +
-          `over ${kb(budget.maximumBytes)} / ${kb(budget.maximumGzipBytes)}.\n` +
+        `${budget.name} is ${kb(measurement.bytes)} / ${kb(measurement.gzipBytes)} gzip ` +
+          `and ${kb(measurement.cssBytes)} of css, over ` +
+          `${kb(budget.maximumBytes)} / ${kb(budget.maximumGzipBytes)} / ` +
+          `${kb(budget.maximumCssBytes)} css.\n` +
           `  ${budget.rationale}\n` +
           `  Heaviest inputs:\n` +
           measurement.topInputs

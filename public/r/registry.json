@@ -1790,6 +1790,11 @@
           "path": "packages/react/src/components/tool-call.tsx",
           "type": "registry:ui",
           "target": "components/ui/tool-call.tsx"
+        },
+        {
+          "path": "packages/react/src/components/tool-call-diff-surface.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/tool-call-diff-surface.tsx"
         }
       ]
     },
@@ -2802,8 +2807,7 @@
       "description": "Reusable editable code surface with a searchable language picker and replaceable editor content.",
       "dependencies": [
         "lucide-react",
-        "radix-ui",
-        "@pierre/diffs"
+        "radix-ui"
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/button",
