@@ -48,8 +48,6 @@ const composerFocusComponents = Object.freeze([
   { component: "agent-activity", count: 3 },
   // Each circular action is one target; the title and rows are not controls.
   { component: "agent-details", count: 1 },
-  // The conversation row. The search field is an Input and draws its own ring.
-  { component: "conversation-history", count: 1 },
   // One row control in each list; the picker's check and the digest's unread
   // dot are decoration inside that control, not targets of their own.
   { component: "message-actions/contact-choices", count: 1 },
@@ -62,6 +60,7 @@ type FocusComponent =
   | "input"
   | "code-editor"
   | "conversation-rail"
+  | "conversation-history"
   | "event-calendar"
   | "gantt-chart/gantt-chart-grid"
   | "radar-chart/radar-chart"
@@ -182,6 +181,18 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   } as const)),
+  // The conversation row, each row action it reveals, and the empty state
+  // that takes focus when the last row goes. The search field is an Input
+  // and draws its own ring.
+  {
+    component: "conversation-history",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 3,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
   {
     component: "reference",
     layer: "outline",
@@ -609,6 +620,12 @@ export const focusGeometryClasses = Object.freeze([
     { component, className: "focus-visible:outline-2", count },
     { component, className: "focus-visible:outline-offset-2", count },
   ] as const),
+  // The row and its actions share one outset outline; the tray's inner layer
+  // pads the actions so it clears the tray's clipping edge. A row slid open is clipped at its own
+  // edges, so there its outline draws inset instead.
+  { component: "conversation-history", className: "focus-visible:outline-2", count: 3 },
+  { component: "conversation-history", className: "focus-visible:outline-offset-2", count: 3 },
+  { component: "conversation-history", className: "focus-visible:-outline-offset-2", count: 1 },
   // The scrollable list region draws its outline inset so the card's
   // overflow clipping cannot swallow it; the row action and toggle buttons
   // sit inside padded rows and keep the standard outset offset.

@@ -618,6 +618,8 @@ export {
 } from "./components/agent-details"
 export {
   ConversationHistory,
+  type ConversationHistoryAction,
+  type ConversationHistoryActionState,
   type ConversationHistoryEntry,
   type ConversationHistoryProps,
 } from "./components/conversation-history"

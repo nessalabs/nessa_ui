@@ -911,7 +911,7 @@
       "name": "conversation-history",
       "type": "registry:ui",
       "title": "Conversation History",
-      "description": "A searchable roster of conversations: host-owned rows with a project-seeded RandomAvatar (same project, same painting), title, preview, project, pin, and relative time. Selecting a row reports its id.",
+      "description": "A searchable roster of conversations: host-owned rows with a project-seeded RandomAvatar (same project, same painting), title, preview, project, pin, and relative time. Selecting a row reports its id. Optional Mail-style row actions reveal on swipe or from the keyboard.",
       "dependencies": [
         "lucide-react"
       ],
@@ -926,6 +926,11 @@
           "path": "packages/react/src/components/conversation-history.tsx",
           "type": "registry:ui",
           "target": "components/ui/conversation-history.tsx"
+        },
+        {
+          "path": "packages/react/src/components/conversation-history-swipe.ts",
+          "type": "registry:ui",
+          "target": "components/ui/conversation-history-swipe.ts"
         }
       ]
     },

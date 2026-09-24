@@ -32,6 +32,12 @@ reference implementation:
 - Stories enable `debug` by default — the running Storybook is always
   traceable.
 
+ConversationHistory's row swipe follows the same shape at
+`window.__nessaConversationHistory[<instance id>]`: presses, axis
+decisions (`via` pointer type or `wheel`), per-move samples (`ev: "f"`),
+releases, settles, confirmations, actions, and focus rescues, with a
+`snapshot()` of each row's swipe state.
+
 ## Workflow
 
 1. Reproduce the glitch in the running Storybook (a human doing the real
