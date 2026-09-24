@@ -128,6 +128,15 @@ export interface ConversationHistoryProps
   /** Shown when `conversations` is empty. */
   emptyMessage?: string
   /**
+   * Development tooling: records row presses, axis decisions, drag samples,
+   * releases, settles, confirmations, actions, and focus rescues into a ring
+   * buffer published at `window.__nessaConversationHistory[<instance id>]`,
+   * with a `snapshot()` of every row's swipe state — so a gesture glitch
+   * (trackpad inertia, settle and focus ordering) can be reproduced once
+   * and read back as data. No-op unless set.
+   */
+  debug?: boolean
+  /**
    * The actions a row reveals, primary first. Called for every row on every
    * render. Define each action object once (outside render); returning a
    * fresh array of those same objects is fine. A row given no
@@ -147,6 +156,15 @@ export interface ConversationHistoryProps
 }
 
 const noActions: readonly ConversationHistoryAction[] = Object.freeze([])
+
+/** One flat trace entry; see `debug`. */
+type TraceEntry = Record<string, string | number | boolean | null>
+
+/** The trace sink handed to rows: `null` unless `debug` is set. */
+type Trace = ((entry: TraceEntry) => void) | null
+
+/** How many trace entries the ring buffer keeps. */
+const traceLimit = 4000
 
 const reducedMotionQuery = "(prefers-reduced-motion: reduce)"
 
@@ -271,6 +289,8 @@ interface ConversationHistoryRowProps {
   onSelect: (conversationId: string) => void
   /** Speaks a short status through the list's live region; "" clears it. */
   onAnnounce: (message: string) => void
+  /** Records a trace entry when the list is in `debug`. */
+  trace: Trace
   onAction: (
     conversationId: string,
     actionId: string,
@@ -328,6 +348,7 @@ function sameRowProps(
     previous.onOpenChange === next.onOpenChange &&
     previous.onSelect === next.onSelect &&
     previous.onAnnounce === next.onAnnounce &&
+    previous.trace === next.trace &&
     previous.onAction === next.onAction
   )
 }
@@ -348,6 +369,7 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
   onOpenChange,
   onSelect,
   onAnnounce,
+  trace,
   onAction,
 }: ConversationHistoryRowProps) {
   const id = conversation.id
@@ -370,6 +392,7 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
       onOpenChange,
       onAction,
       onAnnounce,
+      trace,
       confirming: confirmingId !== null,
     }
   })
@@ -383,6 +406,7 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
     onOpenChange,
     onAction,
     onAnnounce,
+    trace,
     confirming: false,
   })
 
@@ -436,16 +460,21 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
       showSwipe({ phase, displacement })
       const row = rowRef.current
       const duration = row ? rowSettleDurationMs(row) : 0
-      if (duration <= 0) {
+      latest.current.trace?.({ ev: "settle", row: id, phase, to: Math.round(displacement), ms: duration })
+      const finish = () => {
+        latest.current.trace?.({ ev: "settled", row: id, phase })
         done()
+      }
+      if (duration <= 0) {
+        finish()
         return
       }
       settleTimerRef.current = setTimeout(() => {
         settleTimerRef.current = null
-        done()
+        finish()
       }, duration)
     },
-    [clearSettleTimer, showSwipe],
+    [clearSettleTimer, id, showSwipe],
   )
 
   /** Whether focus is anywhere inside this row right now. */
@@ -462,6 +491,13 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
   const applyRelease = React.useCallback(
     (release: SwipeRelease, measured: SwipeGeometry) => {
       const { onOpenChange: setOpen, onAction: act } = latest.current
+      latest.current.trace?.({
+        ev: "release",
+        row: id,
+        kind: release.kind,
+        action: release.kind === "commit" ? release.actionId : null,
+        at: Math.round(swipeRef.current?.displacement ?? 0),
+      })
       if (release.kind === "closed") {
         setOpen(id, false)
         settle("settling", 0, () => showSwipe(null))
@@ -475,6 +511,7 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
           pendingCommitRef.current = null
           showSwipe(null)
           setOpen(id, false)
+          latest.current.trace?.({ ev: "action", row: id, action: release.actionId, via: "swipe" })
           act(id, release.actionId, holdsFocus())
         })
       }
@@ -509,6 +546,13 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
   /** Claims the single open slot and records what the gesture measures against. */
   const beginSwipe = React.useCallback(
     (measured: RowMeasurement) => {
+      latest.current.trace?.({
+        ev: "begin",
+        row: id,
+        open: Math.round(measured.geometry.openWidth),
+        commit: Math.round(measured.geometry.commitWidth),
+        dir: measured.direction,
+      })
       clearSettleTimer()
       setGeometry(measured.geometry)
       setDirection(measured.direction)
@@ -542,6 +586,23 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
     }
     settle("settling", 0, () => showSwipe(null))
   }, [clearWheel, endPointer, open, settle, showSwipe])
+
+  // An action taken away while it waited for confirmation takes the
+  // confirmation with it; otherwise every remaining action would stay
+  // stepped aside and inert. Its button unmounted, so focus returns to the
+  // row rather than falling out of the page.
+  React.useLayoutEffect(() => {
+    if (confirmingId === null) return
+    if (actions.some((action) => action.id === confirmingId)) return
+    trace?.({ ev: "confirm-lost", row: id, action: confirmingId })
+    setConfirmingId(null)
+    onAnnounce("")
+    const ownerDocument = itemRef.current?.ownerDocument
+    const active = ownerDocument?.activeElement
+    if (!active || active === ownerDocument?.body) {
+      itemRef.current?.focus({ preventScroll: true })
+    }
+  }, [actions, confirmingId, id, onAnnounce, trace])
 
   // A row whose actions were taken away while it was open has nothing left
   // to show; give up the open slot.
@@ -636,6 +697,9 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
         gesture.dx += deltaX
         gesture.dy += wheelDeltaInPixels(event.deltaY, event.deltaMode, pageSize)
         gesture.axis = resolveSwipeAxis(gesture.dx, gesture.dy)
+        if (gesture.axis !== "pending") {
+          latest.current.trace?.({ ev: "axis", row: id, via: "wheel", axis: gesture.axis })
+        }
         // Chrome only lets a page cancel the first event of a trackpad
         // sequence; the rest arrive uncancellable. So a gesture leaning
         // sideways is claimed before its axis is certain — otherwise the
@@ -685,6 +749,7 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
     if (event.pointerType === "mouse" && event.button !== 0) return
     if (swipeRef.current?.phase === "committing") return
     if (trayRef.current?.contains(event.target as Node)) return
+    latest.current.trace?.({ ev: "press", row: id, pointer: event.pointerType, open })
     const row = event.currentTarget
     const measured = measureRow(row, actions.length)
     const gesture: PointerSwipe = {
@@ -709,6 +774,9 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
       const dy = moved.clientY - gesture.originY
       if (gesture.axis === "pending") {
         gesture.axis = resolveSwipeAxis(dx, dy)
+        if (gesture.axis !== "pending") {
+          latest.current.trace?.({ ev: "axis", row: id, via: moved.pointerType, axis: gesture.axis })
+        }
         if (gesture.axis === "y") {
           endPointer()
           return
@@ -732,6 +800,7 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
       )
       gesture.samples.push({ time: moved.timeStamp, displacement })
       if (gesture.samples.length > swipeSampleLimit) gesture.samples.shift()
+      latest.current.trace?.({ ev: "f", row: id, d: Math.round(displacement) })
       showSwipe({ phase: "tracking", displacement })
     }
 
@@ -772,6 +841,7 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
         // The finger is still down; the click it lifts into must not select.
         swallowClickRef.current = true
         endPointer()
+        latest.current.trace?.({ ev: "longpress", row: id })
         openActionsRef.current()
       }, longPressMs)
     }
@@ -1066,6 +1136,7 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
                       if (swipeRef.current?.phase === "committing") return
                       if (needsConfirm && !confirming) {
                         setConfirmingId(action.id)
+                        trace?.({ ev: "confirm", row: id, action: action.id })
                         // Focus stays put and only the name changes, which
                         // screen readers do not reliably speak; say it.
                         // The button's new name, so the words stay the
@@ -1076,6 +1147,7 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
                         return
                       }
                       closeActions()
+                      trace?.({ ev: "action", row: id, action: action.id, via: "press" })
                       onAction(id, action.id, true)
                     }}
                     className={cn(
@@ -1189,12 +1261,29 @@ function ConversationHistory({
   emptyMessage = "No conversations",
   rowActions,
   onRowAction,
+  debug = false,
   className,
   ...props
 }: ConversationHistoryProps) {
   const searchId = React.useId()
+  const instanceId = React.useId()
   const reducedMotion = useReducedMotion()
   const hasRowActions = rowActions !== undefined
+
+  // Dev-only event ring buffer. `trace` is null unless `debug`, so every
+  // call site is one optional call and the production cost is nil.
+  const traceBufferRef = React.useRef<TraceEntry[]>([])
+  const trace = React.useMemo<Trace>(
+    () =>
+      debug
+        ? (entry) => {
+            const buffer = traceBufferRef.current
+            buffer.push({ t: Math.round(performance.now()), ...entry })
+            if (buffer.length > traceLimit) buffer.splice(0, buffer.length - traceLimit)
+          }
+        : null,
+    [debug],
+  )
   // Rows share one height: a line any row uses is held by every row.
   const reservePreview = conversations.some((conversation) => Boolean(conversation.preview))
   const reserveProject = conversations.some((conversation) => Boolean(conversation.project))
@@ -1207,8 +1296,10 @@ function ConversationHistory({
   const searchRef = React.useRef<HTMLInputElement>(null)
   const [openRowId, setOpenRowId] = React.useState<string | null>(null)
   const openRowIdRef = React.useRef(openRowId)
+  const traceRef = React.useRef(trace)
   React.useLayoutEffect(() => {
     openRowIdRef.current = openRowId
+    traceRef.current = trace
   })
   // A press that closed an open row is spent on closing it: the click it
   // produces must not select whichever row it landed on.
@@ -1216,8 +1307,42 @@ function ConversationHistory({
   // Where focus was when a pressed action may remove its own row.
   const focusRescueRef = React.useRef<number | null>(null)
 
+  React.useEffect(() => {
+    if (!debug) return
+    const host = window as unknown as {
+      __nessaConversationHistory?: Record<string, unknown>
+    }
+    host.__nessaConversationHistory = host.__nessaConversationHistory ?? {}
+    host.__nessaConversationHistory[instanceId] = {
+      events: traceBufferRef.current,
+      snapshot: () => ({
+        openRowId: openRowIdRef.current,
+        rows: Array.from(
+          listRef.current?.querySelectorAll<HTMLElement>(
+            "[data-slot=conversation-history-row]",
+          ) ?? [],
+          (row) => ({
+            id: row.getAttribute("data-conversation-id"),
+            swipe: row.getAttribute("data-swipe"),
+            armed: row.hasAttribute("data-armed"),
+            translate:
+              row.querySelector<HTMLElement>("[data-slot=conversation-history-item]")
+                ?.style.translate ?? "",
+          }),
+        ),
+        focused:
+          listRef.current?.ownerDocument.activeElement?.getAttribute("aria-label") ??
+          null,
+      }),
+    }
+    return () => {
+      delete host.__nessaConversationHistory?.[instanceId]
+    }
+  }, [debug, instanceId])
+
   /** Makes one row the open row, or frees the slot if that row held it. */
   const setRowOpen = React.useCallback((conversationId: string, open: boolean) => {
+    traceRef.current?.({ ev: "open", row: conversationId, open })
     setOpenRowId((current) =>
       open ? conversationId : current === conversationId ? null : current,
     )
@@ -1270,6 +1395,7 @@ function ConversationHistory({
         return
       }
       swallowClickRef.current = Boolean(target && listRef.current?.contains(target))
+      traceRef.current?.({ ev: "outside", closed: openId })
       setOpenRowId(null)
     }
     document.addEventListener("pointerdown", onPointerDown, true)
@@ -1292,6 +1418,7 @@ function ConversationHistory({
     if (index === null) return
     focusRescueRef.current = null
     if (index < 0) return
+    trace?.({ ev: "rescue", index })
     // Focus still somewhere real means the host put it there, or the row
     // was not removed; only focus that fell out of the page is rescued.
     const ownerDocument = (listRef.current ?? emptyRef.current ?? searchRef.current)
@@ -1403,6 +1530,7 @@ function ConversationHistory({
               onOpenChange={setRowOpen}
               onSelect={selectRow}
               onAnnounce={setAnnouncement}
+              trace={trace}
               onAction={runRowAction}
             />
           ))}

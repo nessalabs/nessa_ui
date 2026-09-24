@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite"
 import { Archive, BellOff, Trash2 } from "lucide-react"
 import { expect, fireEvent, userEvent, waitFor, within } from "storybook/test"
 import {
+  Checkbox,
   ConversationHistory,
   type ConversationHistoryAction,
   type ConversationHistoryEntry,
@@ -162,6 +163,9 @@ function SwipeActionsExample() {
           value={value}
           onValueChange={setValue}
           rowActions={() => swipeActions}
+          // Stories run traced, so a glitch can be read back from
+          // window.__nessaConversationHistory.
+          debug
           onRowAction={(conversationId, actionId) => {
             setLog((entries) => [...entries, `${actionId}:${conversationId}`])
             // Archiving removes the row. Deleting is only logged: a real host
@@ -418,6 +422,19 @@ export const SwipeActions: Story = {
       ).not.toBeInTheDocument(),
     )
     await expect(log).toHaveTextContent("delete:audit, delete:chat-1, archive:chat-1")
+    // The debug trace recorded the gesture as data: the swipe commit, and
+    // the release that produced it.
+    const traced = Object.values(
+      (canvasElement.ownerDocument.defaultView as unknown as {
+        __nessaConversationHistory: Record<string, { events: Record<string, unknown>[] }>
+      }).__nessaConversationHistory,
+    ).flatMap((handle) => handle.events)
+    await expect(traced).toContainEqual(
+      expect.objectContaining({ ev: "action", row: "chat-1", action: "archive", via: "swipe" }),
+    )
+    await expect(traced).toContainEqual(
+      expect.objectContaining({ ev: "release", row: "chat-1", kind: "commit" }),
+    )
     await selectionUnchanged()
     // Nothing is left displaced or waiting to settle.
     for (const item of within(
@@ -488,6 +505,13 @@ export const SwipeActionsReducedMotion: Story = {
 
 // A host-drawn action face: the component keeps the button, its colors and
 // states, and its accessible name; the host draws what is inside.
+const deleteAction: ConversationHistoryAction = {
+  id: "delete",
+  label: "Delete",
+  icon: <Trash2 />,
+  tone: "destructive",
+}
+
 const customActions: readonly ConversationHistoryAction[] = [
   {
     id: "mute",
@@ -503,8 +527,11 @@ const customActions: readonly ConversationHistoryAction[] = [
     ),
     confirm: true,
   },
-  { id: "delete", label: "Delete", icon: <Trash2 />, tone: "destructive" },
+  deleteAction,
 ]
+
+// What the host offers once muting is no longer allowed.
+const deleteOnly: readonly ConversationHistoryAction[] = [deleteAction]
 
 export const CustomActionContent: Story = {
   parameters: storyDocumentation(
@@ -512,12 +539,21 @@ export const CustomActionContent: Story = {
   ),
   render: () => {
     const [log, setLog] = React.useState<readonly string[]>([])
+    const [muteAllowed, setMuteAllowed] = React.useState(true)
     return (
       <div className="flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-3">
+        <label className="flex items-center gap-2 px-4 font-sans nessa-text-2 text-foreground">
+          <Checkbox
+            checked={muteAllowed}
+            onChange={(event) => setMuteAllowed(event.target.checked)}
+          />
+          Allow muting
+        </label>
         <div className="h-72 rounded-[2rem] bg-background p-4">
           <ConversationHistory
             conversations={catalog}
-            rowActions={() => customActions}
+            debug
+            rowActions={() => (muteAllowed ? customActions : deleteOnly)}
             onRowAction={(conversationId, actionId) =>
               setLog((entries) => [...entries, `${actionId}:${conversationId}`])
             }
@@ -562,5 +598,29 @@ export const CustomActionContent: Story = {
     await userEvent.keyboard("{Escape}")
     canvas.getByRole("list", { name: "Conversations" }).dispatchEvent(new Event("scroll"))
     await expectClosed(audit)
+
+    // Muting is withdrawn while it waits for confirmation: the confirmation
+    // goes with it, the remaining action is usable again, and focus returns
+    // to the row instead of falling out of the page.
+    audit.focus()
+    await userEvent.keyboard("{Shift>}{F10}{/Shift}")
+    await waitFor(() =>
+      expect(canvas.getByRole("button", { name: "Mute Repo audit" })).toHaveFocus(),
+    )
+    await userEvent.keyboard("{Enter}")
+    const status = canvasElement.querySelector("[data-slot=conversation-history-status]")!
+    await expect(status).toHaveTextContent("Confirm: Mute Repo audit")
+    // A click with no press, so the open row is not closed by it.
+    fireEvent.click(canvas.getByRole("checkbox", { name: "Allow muting" }))
+    await waitFor(() =>
+      expect(canvas.queryByRole("button", { name: /Mute Repo audit/ })).not.toBeInTheDocument(),
+    )
+    const remaining = canvas.getByRole("button", { name: "Delete Repo audit" })
+    await expect(remaining).not.toHaveAttribute("inert")
+    await expect(status).toHaveTextContent("")
+    await expect(audit).toHaveFocus()
+    await userEvent.keyboard("{Escape}")
+    await expectClosed(audit)
+    fireEvent.click(canvas.getByRole("checkbox", { name: "Allow muting" }))
   },
 }
