@@ -19,6 +19,13 @@ export const contrastMatrix = Object.freeze([
   { foreground: "--muted-foreground", background: "--popover", minimum: 4.5, role: "normal-text" },
   { foreground: "--accent-foreground", background: "--accent", minimum: 4.5, role: "normal-text" },
   { foreground: "--destructive-foreground", background: "--destructive", minimum: 4.5, role: "normal-text" },
+  // A destructive row action keeps its label in the foreground colour on a
+  // destructive wash (resting at 10%, deepening to 20% while it asks to be
+  // confirmed, and 25% under the pointer then); only its icon is red.
+  // Checked at the deepest wash, the one that costs the label the most
+  // contrast, on both surfaces a list sits on.
+  { foreground: "--foreground", background: "--background", overlay: { token: "--destructive", opacity: 0.25 }, minimum: 4.5, role: "normal-text" },
+  { foreground: "--foreground", background: "--card", overlay: { token: "--destructive", opacity: 0.25 }, minimum: 4.5, role: "normal-text" },
   { foreground: "--input", background: "--background", minimum: 3, role: "required-boundary" },
   { foreground: "--border", background: "--background", minimum: 3, role: "required-boundary" },
   { foreground: "--ring", background: "--background", minimum: 3, role: "focus-source" },
