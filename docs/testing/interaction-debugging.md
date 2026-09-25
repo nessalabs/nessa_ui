@@ -35,8 +35,10 @@ reference implementation:
 ConversationHistory's row swipe follows the same shape at
 `window.__nessaConversationHistory[<instance id>]`: presses, axis
 decisions (`via` pointer type or `wheel`), per-move samples (`ev: "f"`),
-releases, settles, confirmations, actions, and focus rescues, with a
-`snapshot()` of each row's swipe state.
+trackpad inertia (`ev: "coast"` with the fingers' `reach` and release
+speed `v` when a wheel swipe's deltas turn into decaying inertia, and
+`ev: "resume"` when fingers land again), releases, settles, confirmations,
+actions, and focus rescues, with a `snapshot()` of each row's swipe state.
 
 ## Workflow
 

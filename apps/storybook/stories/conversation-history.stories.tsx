@@ -205,6 +205,25 @@ function swipeRow(
   }
 }
 
+/**
+ * Two-finger trackpad deltas: the fingers speed up and lift, and macOS keeps
+ * the scroll going with a decaying inertia tail several times longer than
+ * the flick itself.
+ */
+function trackpadFlick(fingers: readonly number[]) {
+  const deltas = [...fingers]
+  const last = fingers[fingers.length - 1] ?? 0
+  for (let delta = last * 0.96; delta >= 0.5; delta *= 0.96) deltas.push(delta)
+  return deltas
+}
+
+/** Sends horizontal wheel deltas to a row, as a trackpad would. */
+function wheelRow(item: HTMLElement, deltas: readonly number[]) {
+  for (const deltaX of deltas) {
+    item.dispatchEvent(new WheelEvent("wheel", { deltaX, bubbles: true, cancelable: true }))
+  }
+}
+
 /** Waits until React has rendered and the browser has painted what it did. */
 function nextFrames() {
   return new Promise((resolve) =>
@@ -227,7 +246,7 @@ async function expectClosed(item: HTMLElement) {
 
 export const SwipeActions: Story = {
   parameters: storyDocumentation(
-    "Rows given `rowActions` swipe like Mail. Drag a row toward its leading edge (touch, pen, mouse, or a two-finger trackpad swipe) to reveal Archive and Delete; let go past half the tray and it rests open, short of that it springs back. Keep going past 60% of the row and Archive fills the tray — letting go archives it as the row slides out. Delete is destructive, so it never runs from a swipe: pressing it grows it to fill the tray as Confirm, and only a second press deletes. A touch long-press opens the actions without swiping. Every row is the same height. From the keyboard, ContextMenu or Shift+F10 on a focused row opens its actions; Escape closes them and returns focus to the row. One row is open at a time, and neither opening nor closing a row selects it.",
+    "Rows given `rowActions` swipe like Mail. Drag a row toward its leading edge (touch, pen, mouse, or a two-finger trackpad swipe) to reveal Archive and Delete; let go past half the tray and it rests open, short of that it springs back. Keep going past 60% of the row and Archive fills the tray — letting go archives it as the row slides out. On a trackpad only the fingers' own travel counts toward that: the inertia that carries on after a short flick can open the row but never archive it. Delete is destructive, so it never runs from a swipe: pressing it grows it to fill the tray as Confirm, and only a second press deletes. The actions sit on quiet theme surfaces — Archive on the secondary surface, Delete on a light destructive wash with a red icon that deepens while it asks to be confirmed. A touch long-press opens the actions without swiping. Every row is the same height. From the keyboard, ContextMenu or Shift+F10 on a focused row opens its actions; Escape closes them and returns focus to the row. One row is open at a time, and neither opening nor closing a row selects it.",
   ),
   render: () => <SwipeActionsExample />,
   play: async ({ canvasElement }) => {
@@ -397,6 +416,18 @@ export const SwipeActions: Story = {
     canvas.getByRole("list", { name: "Conversations" }).dispatchEvent(new Event("scroll"))
     await expectClosed(tokens)
 
+    // A short two-finger flick reveals the actions and no more, however far
+    // the trackpad's inertia carries on after the fingers lift: summed, this
+    // flick travels past the commit threshold, but only the fingers' 90 px
+    // count, so Archive neither arms nor runs.
+    wheelRow(tokens, trackpadFlick([2, 6, 12, 18, 24, 28]))
+    await nextFrames()
+    await expect(rowOf(tokens)).not.toHaveAttribute("data-armed")
+    await waitFor(() => expect(rowOf(tokens)).toHaveAttribute("data-swipe", "open"))
+    await expect(log).not.toHaveTextContent("archive")
+    canvas.getByRole("list", { name: "Conversations" }).dispatchEvent(new Event("scroll"))
+    await expectClosed(tokens)
+
     // A still touch press opens the actions without a swipe, and lifting the
     // finger does not select the row.
     const panel = canvas.getByRole("button", { name: /^panel layout/i })
@@ -436,6 +467,34 @@ export const SwipeActions: Story = {
       expect.objectContaining({ ev: "release", row: "chat-1", kind: "commit" }),
     )
     await selectionUnchanged()
+
+    // A deliberate, long two-finger drag is the fingers' own travel: it arms
+    // Archive past the threshold and commits when the fingers stop.
+    wheelRow(panel, [3, 6, 9, ...Array.from({ length: 30 }, (_, index) => (index % 2 ? 9 : 11))])
+    await waitFor(() => expect(rowOf(panel)).toHaveAttribute("data-armed"))
+    await waitFor(() =>
+      expect(
+        canvas.queryByRole("button", { name: /^panel layout/i }),
+      ).not.toBeInTheDocument(),
+    )
+    await expect(log).toHaveTextContent(
+      "delete:audit, delete:chat-1, archive:chat-1, archive:panel",
+    )
+    const wheelTrace = Object.values(
+      (canvasElement.ownerDocument.defaultView as unknown as {
+        __nessaConversationHistory: Record<string, { events: Record<string, unknown>[] }>
+      }).__nessaConversationHistory,
+    ).flatMap((handle) => handle.events)
+    // The flick was released where its inertia began; the drag never coasted.
+    await expect(wheelTrace).toContainEqual(
+      expect.objectContaining({ ev: "coast", row: "tokens" }),
+    )
+    await expect(wheelTrace).not.toContainEqual(
+      expect.objectContaining({ ev: "coast", row: "panel" }),
+    )
+    await expect(wheelTrace).toContainEqual(
+      expect.objectContaining({ ev: "release", row: "panel", kind: "commit" }),
+    )
     // Nothing is left displaced or waiting to settle.
     for (const item of within(
       canvas.getByRole("list", { name: "Conversations" }),

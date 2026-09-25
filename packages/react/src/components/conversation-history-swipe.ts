@@ -1,4 +1,4 @@
-/** @responsibility Decides what a ConversationHistory row swipe means — which axis a gesture belongs to, how far the row may travel, and whether a release closes it, rests it open, or commits its primary action. */
+/** @responsibility Decides what a ConversationHistory row swipe means — which axis a gesture belongs to, how far the row may travel, which of a trackpad's wheel deltas are the fingers' and which are inertia, and whether a release closes it, rests it open, or commits its primary action. */
 
 /**
  * One action a row can reveal. Only the fields the gesture decides on are
@@ -82,6 +82,60 @@ export const swipeContentFadeSpan = 0.5
 
 /** The pixel height of one line for line-based wheel deltas. */
 export const wheelLineHeightPx = 16
+
+/**
+ * How many times wheel deltas must shrink, without growing in between,
+ * before they can be inertia rather than fingers.
+ */
+export const wheelMomentumRun = 4
+
+/**
+ * How far below the delta a shrinking run started from the latest delta must
+ * have fallen for the run to be inertia. Fingers wobble; inertia only decays.
+ */
+export const wheelMomentumDecay = 0.75
+
+/**
+ * How much faster than the one before a wheel delta must be to count as the
+ * fingers speeding up. Inertia never speeds up, but its deltas are rounded
+ * and its timing jitters, so a rise inside this margin proves nothing.
+ */
+export const wheelGrowthMargin = 1.1
+
+/**
+ * The shortest gap between wheel events, in milliseconds, that is worth
+ * timing. Across a shorter gap, events that arrive together are compared by
+ * size alone.
+ */
+export const wheelTimedGapMs = 1
+
+/**
+ * How long, in milliseconds, each half of a trend spans. Single deltas
+ * wobble under fingers and tick under rounding; the pace of one stretch
+ * against the stretch before tells a decay from a wobble, and measuring by
+ * time rather than by event keeps the reading the same at any refresh rate.
+ */
+export const wheelTrendWindowMs = 40
+
+/**
+ * The per-millisecond retention of pace a run must beat for it to have
+ * stopped decaying. Trackpad inertia keeps about 0.998 of its speed per
+ * millisecond; fingers holding a speed, however unsteadily, keep all of it.
+ */
+export const wheelTrendRetention = 0.999
+
+/**
+ * For events too close together to time, how many deltas each half of a
+ * trend holds, and the share of the earlier half's size the later must keep.
+ */
+export const wheelTrendSpan = 3
+export const wheelTrendFloor = 0.97
+
+/** How many recent deltas a wheel swipe keeps for reading its trend. */
+const wheelTrendLimit = 48
+
+/** How many recent positions a wheel swipe keeps for its release speed. */
+const wheelSampleLimit = 8
 
 /**
  * Decides which axis a gesture belongs to from its travel so far.
@@ -366,4 +420,337 @@ export function swipeContentOpacity(
     Math.max((progress - swipeContentFadeStart) / swipeContentFadeSpan, 0),
     1,
   )
+}
+
+/**
+ * One horizontal wheel gesture, split into what the fingers did and what
+ * the trackpad's inertia added after they lifted.
+ *
+ * Browsers do not say when fingers leave a trackpad: macOS keeps sending
+ * wheel events for a second or more after a flick, decaying smoothly, and
+ * they arrive exactly as the fingers' own did. Summed together, a short
+ * flick travels several hundred pixels and a row commits that was only
+ * nudged. So the travel is read the way the fingers made it. Fingers wobble
+ * — their deltas rise and fall around a speed — while inertia only ever
+ * decays, so a run of shrinking deltas that keeps losing pace over time and
+ * has fallen well below where it started is inertia, and the row is
+ * released at the delta the run started from. A run whose pace stops
+ * falling was the fingers after all, and the reach catches up with it.
+ *
+ * A mouse's accelerated horizontal wheel can slow the same way, and is read
+ * the same way: a spin that eases off is released where it peaked, and the
+ * next notches wait for it to go idle or to speed up again.
+ */
+export interface WheelSwipeTrack {
+  /** `fingers` while the deltas may be the fingers'; `coasting` once they are inertia. */
+  phase: "fingers" | "coasting"
+  /** How far the gesture has moved the row since it began, inertia included. */
+  travel: number
+  /**
+   * How far the fingers moved it: `travel` less any shrinking run that may
+   * be inertia. Only this decides whether a release commits.
+   */
+  reach: number
+  /** Release speed toward the leading edge once coasting, in px/ms. */
+  velocity: number
+  /**
+   * Whether the deltas ever grew. Fingers always speed up from rest; a
+   * gesture that has only ever slowed down is the tail of an earlier one.
+   */
+  grew: boolean
+  /** How many deltas in the current run have been smaller than the one before. */
+  shrinking: number
+  /** How many deltas the current run holds, its peak included. */
+  runLength: number
+  /** The previous non-zero delta, and the time it took to arrive. */
+  previous: number
+  previousGap: number
+  /** The latest deltas' sizes and gaps, for telling a decay from a wobble. */
+  recent: readonly { size: number; gap: number }[]
+  /**
+   * The delta the current shrinking run started from, the time it took to
+   * arrive, and the release speed there.
+   */
+  peak: number
+  peakGap: number
+  peakVelocity: number
+  /** When the previous event arrived. */
+  time: number
+  samples: readonly SwipeSample[]
+}
+
+/** What one wheel delta did to a gesture. */
+export interface WheelSwipeStep {
+  track: WheelSwipeTrack
+  /**
+   * `move`: the row follows. `coast`: the deltas turned out to be inertia;
+   * release the row now, from `track.reach`. `ignore`: more inertia, which
+   * moves nothing. `resume`: fingers are back on the trackpad; `track` is a
+   * fresh gesture starting from wherever the row is.
+   */
+  event: "move" | "coast" | "ignore" | "resume"
+}
+
+/**
+ * Starts tracking a wheel gesture once its axis is known.
+ *
+ * @param travel - Displacement toward the leading edge the undecided
+ * deltas already made.
+ * @param time - When the deciding event arrived, in milliseconds.
+ * @param seed - What was learned while the axis was undecided.
+ * @param seed.previous - The last undecided delta, toward the leading edge.
+ * @param seed.grew - Whether the undecided deltas ever grew.
+ * @returns A gesture the fingers are moving.
+ */
+export function startWheelSwipe(
+  travel: number,
+  time: number,
+  { previous = 0, grew = false }: { previous?: number; grew?: boolean } = {},
+): WheelSwipeTrack {
+  return {
+    phase: "fingers",
+    travel,
+    reach: travel,
+    velocity: 0,
+    grew,
+    shrinking: 0,
+    runLength: 0,
+    previous,
+    previousGap: 0,
+    recent: [],
+    peak: 0,
+    peakGap: 0,
+    peakVelocity: 0,
+    time,
+    samples: [{ time, displacement: travel }],
+  }
+}
+
+/**
+ * How a wheel delta compares with the one before, as the ratio of their
+ * sizes and of their speeds. A delta has only grown when both did and only
+ * shrunk when both did: one that is larger only because it spans more time
+ * — two frames the browser coalesced into one, or an event that came late —
+ * is not faster, and one that is faster only because its timestamp came
+ * early is no larger.
+ */
+function wheelDeltaRatios(
+  delta: number,
+  gap: number,
+  earlier: number,
+  earlierGap: number,
+) {
+  const size = Math.abs(delta) / Math.abs(earlier)
+  // Only two timed gaps give a speed; an untimed one — events that arrived
+  // together, or a gesture's seeded first delta — leaves size to decide.
+  const pace =
+    gap >= wheelTimedGapMs && earlierGap >= wheelTimedGapMs
+      ? size * (earlierGap / gap)
+      : size
+  return { size, pace }
+}
+
+/**
+ * Whether a run's latest deltas have stopped decaying. The latest
+ * `wheelTrendWindowMs` of them are compared with the stretch before, by
+ * summed size over summed time — so a late or coalesced inertia event,
+ * larger only because it covers more time, changes nothing — and hold when
+ * they keep more pace than inertia could over the time between the two.
+ * Events too close together to time are compared by count and size instead.
+ * Both stretches must lie inside the run.
+ *
+ * @param recent - The latest deltas' sizes and gaps, oldest first.
+ * @param runLength - How many of the latest deltas belong to the run.
+ * @returns `true` when the deltas are no longer decaying.
+ */
+function wheelTrendHolds(
+  recent: readonly { size: number; gap: number }[],
+  runLength: number,
+) {
+  const inRun = recent.slice(-runLength)
+  if (inRun.some((entry) => entry.gap < wheelTimedGapMs)) {
+    if (inRun.length < wheelTrendSpan * 2) return false
+    const sizes = inRun.slice(-wheelTrendSpan * 2).map((entry) => entry.size)
+    const before = sizes.slice(0, wheelTrendSpan).reduce((a, b) => a + b, 0)
+    const after = sizes.slice(wheelTrendSpan).reduce((a, b) => a + b, 0)
+    return before > 0 && after / before >= wheelTrendFloor
+  }
+  // Walk back from the latest delta, filling the later stretch and then
+  // the earlier one with at least `wheelTrendWindowMs` each.
+  const stretches = [
+    { size: 0, time: 0 },
+    { size: 0, time: 0 },
+  ]
+  let filling = 0
+  for (let index = inRun.length - 1; index >= 0 && filling < 2; index -= 1) {
+    const entry = inRun[index]!
+    stretches[filling]!.size += entry.size
+    stretches[filling]!.time += entry.gap
+    if (stretches[filling]!.time >= wheelTrendWindowMs) filling += 1
+  }
+  if (filling < 2) return false
+  const [after, before] = stretches as [
+    { size: number; time: number },
+    { size: number; time: number },
+  ]
+  if (!(before.size > 0)) return false
+  const ratio = after.size / after.time / (before.size / before.time)
+  const between = (after.time + before.time) / 2
+  return ratio >= wheelTrendRetention ** between
+}
+
+/**
+ * Advances a wheel gesture by one delta.
+ *
+ * @param track - The gesture so far.
+ * @param delta - The event's displacement toward the leading edge, in pixels.
+ * @param time - When the event arrived, in milliseconds.
+ * @returns The advanced gesture and what the row should do.
+ */
+export function stepWheelSwipe(
+  track: WheelSwipeTrack,
+  delta: number,
+  time: number,
+): WheelSwipeStep {
+  if (delta === 0 || !Number.isFinite(delta)) {
+    return { track, event: track.phase === "coasting" ? "ignore" : "move" }
+  }
+  const gap = time - track.time
+  const reversed = track.previous !== 0 && Math.sign(delta) !== Math.sign(track.previous)
+  // Inertia strictly decays. A delta exactly the size of the last — a
+  // mouse's horizontal wheel notches, however far apart — or about as fast
+  // as it — fingers holding a steady speed, or inertia's rounding — neither
+  // starts a run nor ends one.
+  const ratios =
+    track.previous !== 0 && !reversed && Math.abs(delta) !== Math.abs(track.previous)
+      ? wheelDeltaRatios(delta, gap, track.previous, track.previousGap)
+      : null
+  const grew =
+    ratios !== null && ratios.size > wheelGrowthMargin && ratios.pace > wheelGrowthMargin
+  const smaller = ratios !== null && ratios.size < 1 && ratios.pace < 1
+
+  if (track.phase === "coasting") {
+    // Inertia never turns around and never speeds up, so either means the
+    // fingers are down again — even fingers creeping slowly on.
+    if (reversed || grew) {
+      return {
+        track: startWheelSwipe(delta, time, { previous: delta, grew: true }),
+        event: "resume",
+      }
+    }
+    return {
+      track: { ...track, previous: delta, previousGap: gap, time },
+      event: "ignore",
+    }
+  }
+
+  const travel = track.travel + delta
+  const samples = [...track.samples, { time, displacement: travel }].slice(
+    -wheelSampleLimit,
+  )
+  let { reach, shrinking, runLength, peak, peakGap, peakVelocity } = track
+  const recent = [
+    ...(reversed ? [] : track.recent),
+    { size: Math.abs(delta), gap },
+  ].slice(-wheelTrendLimit)
+  if (track.previous === 0 || reversed || grew) {
+    shrinking = 0
+    runLength = 0
+    reach = travel
+  } else if (shrinking === 0) {
+    if (smaller) {
+      // The previous delta may be the last the fingers made: measure the
+      // release there, before any inertia.
+      peak = track.previous
+      peakGap = track.previousGap
+      peakVelocity = swipeVelocity(track.samples, track.time)
+      reach = track.travel
+      shrinking = 1
+      // A run holds its peak and every delta since.
+      runLength = 2
+    } else {
+      reach = travel
+    }
+  } else {
+    runLength += 1
+    if (smaller) shrinking += 1
+    // Inertia keeps decaying; fingers holding a speed, however unsteadily,
+    // stop decaying within a few deltas, and that ends the run. The trend
+    // is read inside the run only, so the fingers' own speeding up before
+    // it cannot pass for a recovery.
+    // `recent` holds deltas stepped through, not the seeded one, so the
+    // run's peak may be missing from it; the run is the latest of them.
+    if (wheelTrendHolds(recent, runLength)) {
+      shrinking = 0
+      runLength = 0
+      reach = travel
+    }
+  }
+  const next: WheelSwipeTrack = {
+    ...track,
+    travel,
+    reach,
+    grew: track.grew || grew,
+    shrinking,
+    runLength,
+    previous: delta,
+    previousGap: gap,
+    recent,
+    peak,
+    peakGap,
+    peakVelocity,
+    time,
+    samples,
+  }
+  if (
+    shrinking >= wheelMomentumRun &&
+    wheelDeltaRatios(delta, gap, peak, peakGap).pace <= wheelMomentumDecay
+  ) {
+    return {
+      track: {
+        ...next,
+        phase: "coasting",
+        // Left over from an earlier gesture, it was never thrown at all.
+        velocity: next.grew ? peakVelocity : 0,
+      },
+      event: "coast",
+    }
+  }
+  return { track: next, event: "move" }
+}
+
+/**
+ * Decides what a released wheel gesture does. The release is judged at the
+ * fingers' reach, so inertia can carry a row open but never into a commit;
+ * and it is thrown only when inertia followed it, since fingers that stopped
+ * before lifting leave none.
+ *
+ * @param release - The gesture and the row it moved.
+ * @param release.track - The gesture.
+ * @param release.start - The row's displacement when the gesture began.
+ * @param release.geometry - The row's swipe geometry.
+ * @param release.committable - The action a full swipe commits, or `null`.
+ * @returns What the row settles into.
+ */
+export function settleWheelSwipe({
+  track,
+  start,
+  geometry,
+  committable,
+}: {
+  track: WheelSwipeTrack
+  start: number
+  geometry: SwipeGeometry
+  committable: string | null
+}): SwipeRelease {
+  return settleSwipe({
+    displacement: clampSwipeDisplacement(
+      start + track.reach,
+      geometry,
+      committable !== null,
+    ),
+    velocity: track.phase === "coasting" ? track.velocity : 0,
+    geometry,
+    committable,
+  })
 }

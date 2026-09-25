@@ -11,6 +11,9 @@ import {
   presentedSwipeDisplacement,
   resolveSwipeAxis,
   settleSwipe,
+  settleWheelSwipe,
+  startWheelSwipe,
+  stepWheelSwipe,
   swipeArmed,
   swipeDisplacement,
   swipeGeometry,
@@ -25,6 +28,7 @@ import {
   type SwipeGeometry,
   type SwipeRelease,
   type SwipeSample,
+  type WheelSwipeTrack,
 } from "./conversation-history-swipe"
 import { Input } from "./input"
 import { RandomAvatar } from "./random-avatar"
@@ -62,9 +66,10 @@ export interface ConversationHistoryAction {
   /** A decorative icon drawn above the label. */
   icon?: React.ReactNode
   /**
-   * `destructive` paints the action in the destructive token. A destructive
-   * action is never committed by a full swipe, even when it comes first, and
-   * asks for confirmation unless `confirm` says otherwise.
+   * `destructive` marks the action with the destructive token — a light
+   * wash and a destructive icon, deepening while it asks to be confirmed.
+   * A destructive action is never committed by a full swipe, even when it
+   * comes first, and asks for confirmation unless `confirm` says otherwise.
    */
   tone?: SwipeCommitCandidate["tone"]
   /**
@@ -129,7 +134,8 @@ export interface ConversationHistoryProps
   emptyMessage?: string
   /**
    * Development tooling: records row presses, axis decisions, drag samples,
-   * releases, settles, confirmations, actions, and focus rescues into a ring
+   * trackpad inertia (`coast`, `resume`), releases, settles, confirmations,
+   * actions, and focus rescues into a ring
    * buffer published at `window.__nessaConversationHistory[<instance id>]`,
    * with a `snapshot()` of every row's swipe state — so a gesture glitch
    * (trackpad inertia, settle and focus ordering) can be reproduced once
@@ -243,6 +249,12 @@ interface SwipeState {
   phase: SwipePhase
   /** Displacement toward the leading edge, in pixels. */
   displacement: number
+  /**
+   * The displacement a release here is judged at, when that is not where the
+   * row is drawn: a wheel swipe is drawn where its deltas put it but judged
+   * where the fingers left it, so inertia never arms or commits a row.
+   */
+  reach?: number
 }
 
 interface PointerSwipe {
@@ -265,10 +277,17 @@ interface WheelSwipe {
   /** Summed pixel deltas while the axis is still undecided. */
   dx: number
   dy: number
+  /**
+   * The last horizontal delta while the axis was undecided, and whether
+   * those deltas ever grew — so a gesture that is only inertia left over
+   * from an earlier one is known as such from its first events.
+   */
+  pendingDelta: number
+  pendingGrew: boolean
   /** The displacement the row had when the axis was decided. */
   start: number
-  /** Displacement added by the gesture since then. */
-  travel: number
+  /** The fingers' travel and the inertia's since then. */
+  track: WheelSwipeTrack | null
   geometry: SwipeGeometry | null
   direction: SwipeDirection
   /** When the last event of the gesture arrived, from `performance.now()`. */
@@ -643,6 +662,19 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
   React.useEffect(() => {
     const row = rowRef.current
     if (!row || !hasActions) return
+    /** Settles a wheel gesture, judged where the fingers left the row. */
+    const releaseWheel = (gesture: WheelSwipe) => {
+      if (!gesture.geometry || !gesture.track) return
+      applyRelease(
+        settleWheelSwipe({
+          track: gesture.track,
+          start: gesture.start,
+          geometry: gesture.geometry,
+          committable: committableSwipeAction(latest.current.actions),
+        }),
+        gesture.geometry,
+      )
+    }
     // One timer per gesture, re-checked when it fires, rather than one
     // cleared and re-armed on every event of a 120 Hz scroll.
     const armIdle = () => {
@@ -655,12 +687,10 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
           return
         }
         clearWheel()
-        if (!gesture?.geometry || gesture.axis !== "x") return
-        release(
-          gesture.geometry,
-          0,
-          committableSwipeAction(latest.current.actions),
-        )
+        // A coasting gesture was released when its inertia began; its end
+        // only frees the row for the next one.
+        if (gesture?.axis !== "x" || gesture.track?.phase !== "fingers") return
+        releaseWheel(gesture)
       }
       wheelTimerRef.current = setTimeout(check, wheelSwipeIdleMs)
     }
@@ -673,8 +703,10 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
           axis: "pending",
           dx: 0,
           dy: 0,
+          pendingDelta: 0,
+          pendingGrew: false,
           start: 0,
-          travel: 0,
+          track: null,
           geometry: null,
           direction: "ltr",
           last: 0,
@@ -696,6 +728,12 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
         // a scroll.
         gesture.dx += deltaX
         gesture.dy += wheelDeltaInPixels(event.deltaY, event.deltaMode, pageSize)
+        if (deltaX !== 0) {
+          gesture.pendingGrew ||=
+            Math.sign(deltaX) === Math.sign(gesture.pendingDelta) &&
+            Math.abs(deltaX) > Math.abs(gesture.pendingDelta)
+          gesture.pendingDelta = deltaX
+        }
         gesture.axis = resolveSwipeAxis(gesture.dx, gesture.dy)
         if (gesture.axis !== "pending") {
           latest.current.trace?.({ ev: "axis", row: id, via: "wheel", axis: gesture.axis })
@@ -717,25 +755,70 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
         gesture.geometry = measured.geometry
         gesture.direction = measured.direction
         // The travel that decided the axis counts toward the swipe.
-        gesture.travel = wheelSwipeDisplacement(gesture.dx, gesture.direction)
+        gesture.track = startWheelSwipe(
+          wheelSwipeDisplacement(gesture.dx, gesture.direction),
+          event.timeStamp,
+          {
+            previous: wheelSwipeDisplacement(gesture.pendingDelta, gesture.direction),
+            grew: gesture.pendingGrew,
+          },
+        )
         beginSwipe(measured)
-      } else {
-        gesture.travel += wheelSwipeDisplacement(deltaX, gesture.direction)
+      } else if (gesture.track) {
+        // The whole gesture is this row's, inertia included: nothing of it
+        // may scroll an ancestor or navigate history.
+        event.preventDefault()
+        // Once committed, the rest of the inertia has nothing left to move;
+        // and a press that took the row over during inertia owns it now.
+        if (swipeRef.current?.phase === "committing" || pointerRef.current) return
+        const step = stepWheelSwipe(
+          gesture.track,
+          wheelSwipeDisplacement(deltaX, gesture.direction),
+          event.timeStamp,
+        )
+        gesture.track = step.track
+        if (step.event === "ignore") return
+        if (step.event === "coast") {
+          latest.current.trace?.({
+            ev: "coast",
+            row: id,
+            reach: Math.round(gesture.start + step.track.reach),
+            v: Math.round(step.track.velocity * 1000) / 1000,
+          })
+          releaseWheel(gesture)
+          return
+        }
+        if (step.event === "resume") {
+          const measured = measureRow(row, latest.current.actions.length)
+          gesture.start = restingDisplacement(measured.geometry)
+          gesture.geometry = measured.geometry
+          latest.current.trace?.({ ev: "resume", row: id, from: Math.round(gesture.start) })
+          beginSwipe(measured)
+        }
       }
-      if (!gesture.geometry) return
+      if (!gesture.geometry || !gesture.track) return
       event.preventDefault()
+      const canCommit = committableSwipeAction(latest.current.actions) !== null
       showSwipe({
         phase: "tracking",
         displacement: clampSwipeDisplacement(
-          gesture.start + gesture.travel,
+          gesture.start + gesture.track.travel,
           gesture.geometry,
-          committableSwipeAction(latest.current.actions) !== null,
+          canCommit,
+        ),
+        reach: clampSwipeDisplacement(
+          gesture.start + gesture.track.reach,
+          gesture.geometry,
+          canCommit,
         ),
       })
     }
     row.addEventListener("wheel", onWheel, { passive: false })
     return () => row.removeEventListener("wheel", onWheel)
-  }, [beginSwipe, clearWheel, hasActions, release, restingDisplacement, showSwipe])
+  }, [applyRelease, beginSwipe, clearWheel, hasActions, id, restingDisplacement, showSwipe])
+
+  /** Whether fingers on a trackpad are swiping this row right now. */
+  const wheelSwiping = () => wheelRef.current?.track?.phase === "fingers"
 
   // Not the overlay panels' useDragGesture: that one tracks a single axis and
   // captures the pointer at the press, where a row must wait to learn the
@@ -745,7 +828,7 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
     // Any press starts a fresh click: a flag left by a swipe whose finger
     // lifted without clicking must not eat this one.
     swallowClickRef.current = false
-    if (pointerRef.current || wheelRef.current?.axis === "x") return
+    if (pointerRef.current || wheelSwiping()) return
     if (event.pointerType === "mouse" && event.button !== 0) return
     if (swipeRef.current?.phase === "committing") return
     if (trayRef.current?.contains(event.target as Node)) return
@@ -862,7 +945,7 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
    */
   const openActions = () => {
     const row = rowRef.current
-    if (!row || !hasActions || pointerRef.current || wheelRef.current?.axis === "x") {
+    if (!row || !hasActions || pointerRef.current || wheelSwiping()) {
       return
     }
     if (swipeRef.current?.phase === "committing") return
@@ -909,7 +992,7 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
     committing ||
     (tracking &&
       geometry !== null &&
-      swipeArmed(swipe.displacement, geometry, committable !== null))
+      swipeArmed(swipe.reach ?? swipe.displacement, geometry, committable !== null))
   const trayVisible = hasActions && (open || swipe !== null)
   // While confirming, the confirming action takes the tray the way the
   // primary action does when armed; the others step aside.
@@ -1154,10 +1237,22 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
                       // A transparent border is invisible until forced colors paint it,
                       // which is then the action's only visible edge.
                       "flex min-w-0 grow basis-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-lg border border-transparent px-1 font-sans nessa-text-1 font-medium",
-                      "transition-[flex-grow,opacity,background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)]",
-                      action.tone === "destructive"
-                        ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        : "bg-primary text-primary-foreground hover:bg-primary/90",
+                      "transition-[flex-grow,opacity,color,background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)]",
+                      // Quiet surfaces, like a secondary button: the tray
+                      // sits beside the row's text and must not outshout
+                      // it. A destructive action is marked by a red wash
+                      // and a red icon — its label stays in the foreground
+                      // colour, which is what holds text contrast on the
+                      // wash — and while it asks to be confirmed the wash
+                      // deepens and gains a destructive edge.
+                      action.tone !== "destructive"
+                        ? "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                        : cn(
+                            "text-foreground [&_svg]:text-destructive",
+                            confirming
+                              ? "border-destructive/60 bg-destructive/20 hover:bg-destructive/25"
+                              : "bg-destructive/10 hover:bg-destructive/15",
+                          ),
                       // The expanded action — armed by a full swipe, or
                       // waiting to be confirmed — takes the whole tray, so
                       // what happens next is plain before it happens.
@@ -1217,7 +1312,11 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
  * tray and the row rests open; short of that it springs back. Swipe on past
  * at least 60% of the row (further when the tray is wide) and the primary
  * (first) action fills the tray; letting go there commits it as the row
- * slides out. A host that keeps the row sees it slide back closed. A touch
+ * slides out. On a trackpad, only the fingers' own travel counts toward
+ * that: the inertia macOS keeps sending after a flick can carry a row open,
+ * never into a commit, so a short flick reveals the actions and a commit
+ * takes a long, deliberate drag. A host that keeps the row sees it slide
+ * back closed. A touch
  * or pen long-press opens the actions without a swipe. One row is open at
  * a time; a press anywhere else, a scroll, or a tap on the open row closes
  * it without selecting anything, and a swipe never selects the row it
