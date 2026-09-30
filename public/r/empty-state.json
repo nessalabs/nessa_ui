@@ -1,0 +1,22 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "empty-state",
+  "title": "Empty state",
+  "description": "What a surface shows when it has nothing to show: a title, an optional description and action, and a compact variant for inside a card or pane.",
+  "dependencies": [
+    "class-variance-authority"
+  ],
+  "registryDependencies": [
+    "nessalabs/nessa_ui/nessa-base",
+    "nessalabs/nessa_ui/utils"
+  ],
+  "files": [
+    {
+      "path": "packages/react/src/components/empty-state.tsx",
+      "content": "import * as React from \"react\"\nimport { cva, type VariantProps } from \"class-variance-authority\"\n\nimport { cn } from \"@/lib/utils\"\n\n/**\n * Creates the class names for an empty state's frame. `default` is sized to\n * stand in for a page or a panel's whole body; `compact` fits inside a card\n * or a pane beside other content.\n */\nconst emptyStateVariants = cva(\n  \"flex min-w-0 flex-col items-center justify-center text-center font-sans\",\n  {\n    variants: {\n      variant: {\n        default: \"gap-1.5 px-6 py-12\",\n        compact: \"gap-1 px-4 py-6\",\n      },\n    },\n    defaultVariants: { variant: \"default\" },\n  },\n)\n\n/** Creates the class names for the title, one type level larger in the default frame. */\nconst emptyStateTitleVariants = cva(\"max-w-full font-medium text-foreground\", {\n  variants: {\n    variant: {\n      default: \"nessa-text-5\",\n      compact: \"nessa-text-4\",\n    },\n  },\n  defaultVariants: { variant: \"default\" },\n})\n\n/** Creates the class names for the description, held to a readable measure. */\nconst emptyStateDescriptionVariants = cva(\n  \"max-w-sm text-muted-foreground text-pretty\",\n  {\n    variants: {\n      variant: {\n        default: \"nessa-text-4\",\n        compact: \"nessa-text-2\",\n      },\n    },\n    defaultVariants: { variant: \"default\" },\n  },\n)\n\nexport interface EmptyStateProps\n  extends Omit<React.ComponentProps<\"div\">, \"title\" | \"children\">,\n    VariantProps<typeof emptyStateVariants> {\n  /** What is empty, in a few words: \"No runs yet\". */\n  title: React.ReactNode\n  /** Why it is empty or what would fill it, in a sentence. */\n  description?: React.ReactNode\n  /** The way forward, usually one `Button`. */\n  action?: React.ReactNode\n}\n\n/**\n * What a surface shows when it has nothing to show: a short title, an\n * optional sentence of explanation, and an optional action, centred in the\n * space the content would take. Every word and the action are the caller's.\n *\n * It renders no heading element, because its level depends on where it sits;\n * the title is plain emphasised text. It is not a live region either — a\n * surface that empties while someone watches should announce that itself.\n */\nfunction EmptyState({\n  title,\n  description,\n  action,\n  variant,\n  className,\n  ...props\n}: EmptyStateProps) {\n  return (\n    <div\n      data-slot=\"empty-state\"\n      data-variant={variant ?? \"default\"}\n      className={cn(emptyStateVariants({ variant }), className)}\n      {...props}\n    >\n      <div\n        data-slot=\"empty-state-title\"\n        className={emptyStateTitleVariants({ variant })}\n      >\n        {title}\n      </div>\n      {description ? (\n        <div\n          data-slot=\"empty-state-description\"\n          className={emptyStateDescriptionVariants({ variant })}\n        >\n          {description}\n        </div>\n      ) : null}\n      {action ? (\n        <div\n          data-slot=\"empty-state-action\"\n          className={variant === \"compact\" ? \"mt-2\" : \"mt-4\"}\n        >\n          {action}\n        </div>\n      ) : null}\n    </div>\n  )\n}\n\nexport { EmptyState }\n",
+      "type": "registry:ui",
+      "target": "components/ui/empty-state.tsx"
+    }
+  ],
+  "type": "registry:ui"
+}
