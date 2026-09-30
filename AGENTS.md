@@ -30,10 +30,12 @@ Git state.
   for at most three rounds. Findings still open after the third mean something
   is structurally wrong: stop patching, write down what is mostly producing
   them, make that structural change, and review again — at most two more
-  rounds. Still open after those, stop the work: push what is done to the
-  branch, and hand it off in a draft pull request and on its issue — what is
+  rounds. Still open after those, stop the work and hand it off — what is
   done, what is not, the open findings with their evidence, the diagnosis, and
-  the suggested next step.
+  the suggested next step: pushed to the authorized branch in a draft pull
+  request and on its issue when one exists; otherwise reported locally, asking
+  for authorization before creating a branch or pushing (the branch rules
+  above still hold).
 - Keep the issue you are working on current, not only its board Status: a
   **Status** section at the top of its description naming the remote branch(es)
   that hold the work, the pull request, a Mermaid sequence diagram of the flow
