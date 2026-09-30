@@ -87,7 +87,14 @@ describe("niceTicks", () => {
   })
 
   it("caps the tick count", () => {
-    assert.ok(niceTicks(0, 1, 1e6).length <= MAX_TICK_COUNT * 4 + 3)
+    const limit = Math.ceil(MAX_TICK_COUNT * Math.SQRT2) + 2
+    assert.ok(niceTicks(0, 1, 1e6).length <= limit)
+    assert.ok(niceTicks(0, 1.41, MAX_TICK_COUNT).length <= limit)
+    assert.deepEqual(niceTicks(0, 1, 1e6), niceTicks(0, 1, MAX_TICK_COUNT))
+  })
+
+  it("gives one tick for a value too small to widen", () => {
+    assert.deepEqual(niceTicks(5e-324, 5e-324, 5), [5e-324])
   })
 
   it("first and last tick always bound the input", () => {

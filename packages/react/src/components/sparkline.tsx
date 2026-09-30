@@ -22,7 +22,12 @@ export type SparklineMarkers = "none" | "records" | "all"
 /** Properties accepted by the Sparkline. */
 export interface SparklineProps
   extends Omit<React.ComponentProps<"div">, "children"> {
-  /** The series, in data units. Order does not matter; points with a non-finite coordinate are skipped. */
+  /**
+   * The series, in data units. Order does not matter; points with a
+   * non-finite coordinate are skipped. A series whose points all share one x —
+   * a single reading — is drawn level across the whole box, with its dots at
+   * the right-hand end.
+   */
   points: readonly ChartPoint[]
   /**
    * Which direction of the value axis is an improvement. The step variant
@@ -108,7 +113,8 @@ function useMeasuredBox(ref: React.RefObject<HTMLElement | null>) {
  * improvement; the `line` variant joins every point. Optional dots mark the
  * record-setting points (or every point), a dashed line marks a reference
  * value, and the line takes the current text colour, so a host tints it with a
- * text utility. It is not interactive, and renders nothing until measured.
+ * text utility. A single reading is held level across the box. It is not
+ * interactive, and renders nothing until measured.
  */
 function Sparkline({
   points,

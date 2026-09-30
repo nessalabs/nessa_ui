@@ -155,7 +155,9 @@ function ChartTooltip({
 
   // A rectangle boundary cannot resize on its own; only an element (or a ref
   // to one) is worth observing, and a rectangle literal must not resubscribe
-  // on every render.
+  // on every render. A ref is read when the card mounts: a host that points
+  // the same ref at a different element later passes a new boundary (or
+  // remounts the card) to have that element's resizes followed too.
   const observedBoundary =
     boundary && (isRefObject(boundary) || "getBoundingClientRect" in boundary)
       ? boundary

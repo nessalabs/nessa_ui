@@ -139,12 +139,13 @@ const FOLDERS = [
   { path: "src/desktop", added: 412, removed: 96 },
   { path: "src/runtime", added: 120, removed: 134 },
   { path: "docs", added: 38, removed: 2 },
+  { path: "LICENSE", added: 1, removed: 1 },
 ]
 const BUSIEST = Math.max(...FOLDERS.map((folder) => folder.added + folder.removed))
 
 export const AgainstMax: Story = {
   parameters: storyDocumentation(
-    "`max` measures each bar against a larger value — here the busiest folder — so a column of bars compares across rows while each still splits into its own parts; the rest of the track stays empty. A `summary` replaces the default spoken list with the host's own sentence. The play test proves the filled length follows each row's total against the maximum.",
+    "`max` measures each bar against a larger value — here the busiest folder — so a column of bars compares across rows while each still splits into its own parts; the rest of the track stays empty. A `summary` replaces the default spoken list with the host's own sentence. The last row is far below the maximum, so its fill is held at the few pixels its two segments need rather than losing one. The play test proves the painted length follows each row's total against the maximum, that the tiny row sits at that floor, and that no segment paints past its fill.",
   ),
   args: { segments: [], formatValue: String },
   render: () => (
@@ -181,10 +182,22 @@ export const AgainstMax: Story = {
       const trackBox = track.getBoundingClientRect()
       const painted =
         segments[segments.length - 1]!.getBoundingClientRect().right - trackBox.left
-      await expect(painted / trackBox.width).toBeCloseTo(
-        (folder.added + folder.removed) / BUSIEST,
-        2,
-      )
+      const share = (folder.added + folder.removed) / BUSIEST
+      // Two segments need 4px each and a 2px gap. A row whose share is
+      // narrower than that is held at the floor instead of losing a part.
+      const floor = 2 * 4 + 2
+      if (share * trackBox.width >= floor) {
+        await expect(painted / trackBox.width).toBeCloseTo(share, 2)
+      } else {
+        await expect(painted).toBeGreaterThanOrEqual(floor - 0.5)
+        await expect(painted).toBeLessThan(floor + 2)
+      }
+      // The fill is never narrower than what its segments need, so nothing
+      // paints past it.
+      const fill = bar.querySelector('[data-slot="proportion-bar-fill"]')!
+      await expect(
+        segments[segments.length - 1]!.getBoundingClientRect().right,
+      ).toBeLessThanOrEqual(fill.getBoundingClientRect().right + 0.5)
       await expect(track).toHaveAttribute(
         "aria-label",
         `${folder.added} lines added, ${folder.removed} removed`,

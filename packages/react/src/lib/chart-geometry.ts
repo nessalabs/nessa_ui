@@ -71,8 +71,8 @@ export function linearScale(
  * @param min - The smallest value the axis must show.
  * @param max - The largest value the axis must show.
  * @param count - Roughly how many ticks to produce; the result may carry a
- *   few more or fewer, because only round steps are used. Clamped to
- *   1..{@link MAX_TICK_COUNT}.
+ *   few more or fewer (up to about √2 times as many), because only round
+ *   steps are used. Clamped to 1..{@link MAX_TICK_COUNT}.
  * @returns Ascending, distinct tick values, free of floating-point residue
  *   such as `0.30000000000000004`.
  */
@@ -88,6 +88,9 @@ export function niceTicks(min: number, max: number, count: number): number[] {
       low -= pad
       high += pad
     }
+    // A value so close to zero that a tenth of it underflows cannot be
+    // widened: it is its own single tick.
+    if (low === high) return [low]
   }
   const bounds = [low, high]
   const intervals = Math.min(
@@ -132,7 +135,11 @@ export function niceTicks(min: number, max: number, count: number): number[] {
   return distinct ? ticks : bounds
 }
 
-/** The most ticks {@link niceTicks} will produce an axis for. */
+/**
+ * The largest tick count {@link niceTicks} honours; a larger request is
+ * treated as this. Rounding the step can still yield up to about √2 times the
+ * count, plus the two bounding ticks.
+ */
 export const MAX_TICK_COUNT = 100
 
 /** Points with a finite position on both axes, in ascending x order. */
