@@ -121,6 +121,25 @@ export const ValueText: Story = {
   },
 }
 
+export const OwnsItsValue: Story = {
+  parameters: storyDocumentation(
+    "What assistive technology reads is always what is drawn: an `aria-valuenow` or `aria-valuetext` passed beside `value` does not override the meter's own.",
+  ),
+  render: () => (
+    <Meter
+      value={0.5}
+      label="Usage"
+      {...{ "aria-valuenow": 90, "aria-valuetext": "90%" }}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const { meter, fill } = meterParts(canvasElement, "Usage")
+    await expect(meter).toHaveAttribute("aria-valuenow", "50")
+    await expect(meter).not.toHaveAttribute("aria-valuetext")
+    await expect(filledShare(meter, fill)).toBeCloseTo(0.5, 2)
+  },
+}
+
 export const LabelledByCaption: Story = {
   parameters: storyDocumentation(
     "When a visible caption already says what is measured, name the meter by it with `aria-labelledby` instead of writing the same words again in `label`.",
@@ -290,3 +309,4 @@ export const Motion: Story = {
     await expect(canvasElement.getAnimations({ subtree: true })).toHaveLength(0)
   },
 }
+

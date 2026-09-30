@@ -49,7 +49,16 @@ function clampFraction(value: number) {
 interface MeterBaseProps
   extends Omit<
     React.ComponentProps<"span">,
-    "children" | "role" | "aria-label" | "aria-labelledby"
+    | "children"
+    | "role"
+    | "aria-label"
+    | "aria-labelledby"
+    // The meter owns its value as assistive technology reads it, derived from
+    // `value` and `valueText`; the render applies these last as well.
+    | "aria-valuemin"
+    | "aria-valuemax"
+    | "aria-valuenow"
+    | "aria-valuetext"
   > {
   /**
    * How full the track is, as a fraction from 0 to 1. Values outside that
@@ -114,12 +123,6 @@ function Meter({
 
   return (
     <span
-      role="meter"
-      aria-label={label}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={percent}
-      aria-valuetext={valueText}
       data-slot="meter"
       data-tone={tone}
       className={cn(
@@ -127,6 +130,14 @@ function Meter({
         className,
       )}
       {...props}
+      // After the caller's props, so what assistive technology reads is always
+      // what is drawn: JSX lets any hyphenated attribute through the types.
+      role="meter"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={percent}
+      aria-valuetext={valueText}
     >
       <span
         data-slot="meter-fill"
