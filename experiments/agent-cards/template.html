@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agent Cards Spike</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --page: #0a0a0b; --page-ink: #e9e7e4; --muted: #8a8784;
+    --chip: rgba(255,255,255,.06); --chip-on: #f1efec; --chip-on-ink: #111;
+    --ease: cubic-bezier(0.2, 0, 0, 1); --dur: 260ms; --focus: #9ab4ff;
+  }
+  :root[data-theme="light"] {
+    --page: #f2f1ee; --page-ink: #1a1918; --muted: #6d6a66;
+    --chip: rgba(0,0,0,.05); --chip-on: #1a1918; --chip-on-ink: #fff; --focus: #2d5bff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--page); color: var(--page-ink);
+    font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
+    padding: 40px 16px 64px; transition: background var(--dur) var(--ease);
+  }
+  main { display: grid; gap: 28px; width: 100%; max-width: 1180px; margin: 0 auto; }
+  header { display: flex; flex-wrap: wrap; gap: 16px; align-items: end; justify-content: space-between; }
+  header h1 { font-size: 15px; font-weight: 500; margin: 0; }
+  header p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+  .seg { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 999px; background: var(--chip); }
+  .chip {
+    font: inherit; font-size: 13px; color: var(--page-ink); background: transparent; border: 0;
+    border-radius: 999px; padding: 6px 12px; cursor: pointer; white-space: nowrap;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+  }
+  .chip:hover { background: var(--chip); }
+  .chip[aria-pressed="true"] { background: var(--chip-on); color: var(--chip-on-ink); }
+  .chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* Hover modes. Every effect reads these multipliers, so a mode is just a
+     different set of numbers. */
+  .deck {
+    --tilt: 1; --par: 1; --card-scale: 1.02; --pop: 1.03; --lift: -3px; --icon-tilt: 0; --glare: 1;
+  }
+  .deck[data-hover="card"] { --par: 0; --pop: 1; --lift: 0px; }
+  .deck[data-hover="logo"] { --tilt: 0; --card-scale: 1; --par: 1.4; --pop: 1.14; --lift: -10px; --icon-tilt: 1.6; --glare: 0; }
+  .deck[data-hover="subtle"] { --tilt: 0; --par: 0; --icon-tilt: 0; --glare: 0; }
+  .deck { display: grid; gap: 20px; justify-content: center; grid-template-columns: repeat(auto-fill, minmax(200px, 250px)); }
+  .deck[data-layout="horizontal"] { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+  .deck[data-single] { grid-template-columns: minmax(0, 340px); }
+  .deck[data-single][data-layout="horizontal"] { grid-template-columns: minmax(0, 620px); }
+  .deck[data-single] .agent-card:not(.is-shown) { display: none; }
+
+  /* ───────── The card ───────── */
+  .agent-card {
+    --top: #222; --bottom: #000; --glow: #444; --planet: #111; --planet-lit: #888;
+    --rim: rgba(255,255,255,.14); --ink: #f3f1ee; --halo: rgba(255,255,255,.12); --shade: rgba(0,0,0,.5);
+    /* tilt inputs, written by the pointer handler */
+    --rx: 0deg; --ry: 0deg; --px: 0; --py: 0; --gx: 50%; --gy: 30%; --s: 1; --lift-now: 0px; --pop-now: 1;
+
+    position: relative; isolation: isolate; overflow: hidden; container-type: inline-size;
+    aspect-ratio: 4 / 5; width: 100%;
+    border: 0; padding: 0; margin: 0; cursor: pointer; text-align: left;
+    border-radius: 24px;
+    background:
+      radial-gradient(120% 70% at 18% 0%, color-mix(in oklab, var(--glow) 55%, transparent), transparent 60%),
+      linear-gradient(170deg, var(--top) 0%, var(--bottom) 78%);
+    box-shadow:
+      inset 0 0 0 1px var(--rim),
+      inset 0 1px 0 0 color-mix(in oklab, var(--planet-lit) 45%, transparent),
+      0 1px 2px rgba(0,0,0,.35),
+      0 18px 40px -18px color-mix(in oklab, var(--glow) 70%, transparent);
+    transform: perspective(900px) rotateX(calc(var(--rx) * var(--tilt))) rotateY(calc(var(--ry) * var(--tilt))) scale(var(--s));
+    transition: transform 520ms var(--ease), box-shadow var(--dur) var(--ease);
+    font: inherit; color: var(--ink); -webkit-tap-highlight-color: transparent;
+    will-change: transform;
+  }
+  .agent-card:hover { --s: var(--card-scale); --lift-now: var(--lift); --pop-now: var(--pop); }
+  /* while the pointer is moving the tilt tracks it closely; on leave it eases home */
+  .agent-card.is-tracking { transition: transform 90ms linear, box-shadow var(--dur) var(--ease); }
+  .agent-card:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+  .agent-card[aria-pressed="true"] {
+    box-shadow:
+      inset 0 0 0 1.5px color-mix(in oklab, var(--planet-lit) 80%, transparent),
+      inset 0 1px 0 0 color-mix(in oklab, var(--planet-lit) 60%, transparent),
+      0 1px 2px rgba(0,0,0,.35),
+      0 24px 60px -16px color-mix(in oklab, var(--glow) 95%, transparent);
+  }
+
+  .agent-card .planet {
+    position: absolute; z-index: -1; pointer-events: none;
+    width: 170%; aspect-ratio: 1; left: -92%; top: 72%; border-radius: 50%;
+    background: radial-gradient(90% 60% at 64% 0%, color-mix(in oklab, var(--planet-lit) 55%, var(--planet)) 0%, var(--planet) 16%, var(--bottom) 46%);
+    box-shadow:
+      inset 0 1.5px 0 0 color-mix(in oklab, var(--planet-lit) 85%, transparent),
+      0 -8px 36px -10px color-mix(in oklab, var(--planet-lit) 30%, transparent);
+    translate: calc(var(--px) * -8px * var(--par)) calc(var(--py) * -6px * var(--par));
+    transition: translate 520ms var(--ease);
+  }
+  .agent-card .orbit {
+    position: absolute; z-index: -1; pointer-events: none;
+    width: 200%; aspect-ratio: 1; left: 26%; top: 52%; border-radius: 50%;
+    border: 1px solid color-mix(in oklab, var(--planet-lit) 22%, transparent);
+    background: radial-gradient(circle at 30% 20%, color-mix(in oklab, var(--glow) 18%, transparent), transparent 50%);
+    translate: calc(var(--px) * -4px * var(--par)) calc(var(--py) * -3px * var(--par));
+    transition: translate 520ms var(--ease);
+  }
+  .agent-card .halo {
+    position: absolute; z-index: -1; pointer-events: none; inset: 18% 8% 10%;
+    background: radial-gradient(closest-side, var(--halo), transparent);
+    opacity: .4; transition: opacity var(--dur) var(--ease);
+  }
+  .agent-card:hover .halo, .agent-card[aria-pressed="true"] .halo { opacity: .8; }
+  /* moving specular glare that follows the pointer */
+  .agent-card .glare {
+    position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: inherit;
+    background: radial-gradient(60% 50% at var(--gx) var(--gy), rgba(255,255,255,.16), transparent 70%);
+    mix-blend-mode: soft-light; opacity: 0; transition: opacity 400ms var(--ease);
+  }
+  .agent-card:hover .glare { opacity: var(--glare); }
+  .agent-card.is-tracking .glare { transition: opacity 400ms var(--ease); }
+
+  .agent-card::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23g)'/%3E%3C/svg%3E");
+    background-size: 200px; mix-blend-mode: overlay; opacity: .22;
+  }
+  .agent-card::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1; border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255,255,255,.045), transparent 20%);
+  }
+
+  .agent-card .label {
+    position: absolute; top: 20px; left: 22px; right: 22px; z-index: 1;
+    font-size: clamp(18px, 7.5cqi, 24px); font-weight: 500; letter-spacing: -0.01em;
+    translate: calc(var(--px) * 3px * var(--par)) calc(var(--py) * 2px * var(--par)); transition: translate 520ms var(--ease);
+  }
+  .agent-card .meta { display: none; }
+  .agent-card .check {
+    position: absolute; top: 18px; right: 18px; z-index: 1;
+    width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+    background: color-mix(in oklab, var(--ink) 92%, transparent); color: var(--bottom);
+    transform: scale(.6); opacity: 0;
+    transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease);
+  }
+  .agent-card[aria-pressed="true"] .check { transform: scale(1); opacity: 1; }
+  .agent-card .icon {
+    position: absolute; z-index: 1; left: 50%; top: 56%;
+    width: 72%; aspect-ratio: 1;
+    /* the icon floats "above" the card: it parallaxes further than the scenery */
+    translate: calc(-50% + var(--px) * 12px * var(--par)) calc(-50% + var(--py) * 10px * var(--par));
+    transform: perspective(600px) rotateX(calc(var(--rx) * var(--icon-tilt))) rotateY(calc(var(--ry) * var(--icon-tilt))) translateY(var(--lift-now)) scale(var(--pop-now));
+    filter: drop-shadow(0 14px 18px var(--shade)) drop-shadow(0 2px 3px var(--shade));
+    transition: transform 420ms var(--ease), translate 520ms var(--ease), filter var(--dur) var(--ease);
+  }
+  .deck[data-hover="logo"] .agent-card:hover .icon { filter: drop-shadow(0 26px 24px var(--shade)) drop-shadow(0 4px 6px var(--shade)); }
+  .agent-card.is-tracking .icon, .agent-card.is-tracking .label,
+  .agent-card.is-tracking .planet, .agent-card.is-tracking .orbit { transition: transform 160ms var(--ease), translate 90ms linear, filter var(--dur) var(--ease); }
+  .agent-card .icon canvas { width: 100%; height: 100%; display: block; animation: icon-in 500ms var(--ease) both; }
+  @keyframes icon-in { from { opacity: 0; transform: scale(.94); } }
+
+  /* ───────── Horizontal layout ───────── */
+  .deck[data-layout="horizontal"] .agent-card { aspect-ratio: 16 / 7; }
+  .deck[data-layout="horizontal"] .agent-card:hover { --s: calc(1 + (var(--card-scale) - 1) * .75); }
+  .deck[data-layout="horizontal"] .label { right: 48%; }
+  .deck[data-layout="horizontal"] .meta {
+    display: block; position: absolute; z-index: 1; left: 22px; right: 50%; top: 58px;
+    font-size: 13px; line-height: 1.4; color: color-mix(in oklab, var(--ink) 68%, transparent);
+    translate: calc(var(--px) * 3px * var(--par)) calc(var(--py) * 2px * var(--par)); transition: translate 520ms var(--ease);
+  }
+  .deck[data-layout="horizontal"] .check { top: auto; bottom: 18px; left: 22px; right: auto; }
+  .deck[data-layout="horizontal"] .icon {
+    left: auto; right: 4%; top: 50%; width: auto; height: 92%;
+    translate: calc(var(--px) * 12px * var(--par)) calc(-50% + var(--py) * 8px * var(--par));
+  }
+  .deck[data-layout="horizontal"] .planet { width: 78%; left: -30%; top: 58%; }
+  .deck[data-layout="horizontal"] .orbit { width: 110%; left: 42%; top: 24%; }
+  .deck[data-layout="horizontal"] .halo { inset: 0 0 0 42%; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .agent-card, .agent-card * { transition-duration: 0ms !important; }
+    .agent-card:hover { --s: 1; }
+  }
+
+  /* ───────── Tones ───────── */
+  .tone-claude {
+    --top: #b4501f; --bottom: #2a0e04; --glow: #e0692a; --planet: #7a3312; --planet-lit: #ff9a5a;
+    --rim: rgba(255,210,180,.16); --ink: #fff1e8; --halo: rgba(255,140,80,.22); --shade: rgba(40,10,0,.55);
+  }
+  .tone-codex {
+    --top: #f7f3ec; --bottom: #d8cfc1; --glow: #ffffff; --planet: #e9e2d7; --planet-lit: #ffffff;
+    --rim: rgba(60,45,25,.10); --ink: #1d1b18; --halo: rgba(255,255,255,.55); --shade: rgba(90,70,45,.35);
+  }
+  .tone-openclaw {
+    --top: #b8262c; --bottom: #420a0d; --glow: #e8403f; --planet: #971c22; --planet-lit: #ff7d6a;
+    --rim: rgba(255,190,180,.18); --ink: #fff0ec; --halo: rgba(255,110,90,.26); --shade: rgba(50,0,4,.5);
+  }
+  .tone-hermes {
+    --top: #1f58e0; --bottom: #030b2c; --glow: #3474ff; --planet: #1143bd; --planet-lit: #6aa2ff;
+    --rim: rgba(180,205,255,.16); --ink: #eef3ff; --halo: rgba(90,140,255,.24); --shade: rgba(0,6,30,.55);
+  }
+  .tone-pi {
+    --top: #1b1a19; --bottom: #050505; --glow: #2b241f; --planet: #2a211b; --planet-lit: #b88a66;
+    --rim: rgba(255,240,225,.10); --ink: #f1ede8; --halo: rgba(214,170,132,.14); --shade: rgba(0,0,0,.55);
+  }
+  .tone-kimi {
+    --top: #0d236e; --bottom: #02061a; --glow: #1c43bd; --planet: #0b2780; --planet-lit: #4a7cff;
+    --rim: rgba(160,185,255,.14); --ink: #e9eeff; --halo: rgba(60,110,255,.22); --shade: rgba(0,3,20,.6);
+  }
+  .tone-deepseek {
+    --top: #4a86ff; --bottom: #1238c0; --glow: #7aa6ff; --planet: #2f64f2; --planet-lit: #a9c8ff;
+    --rim: rgba(220,232,255,.24); --ink: #ffffff; --halo: rgba(200,220,255,.28); --shade: rgba(4,20,90,.45);
+  }
+  .tone-local {
+    --top: #1e1e21; --bottom: #060607; --glow: #38383d; --planet: #26262a; --planet-lit: #a2a2aa;
+    --rim: rgba(255,255,255,.10); --ink: #f0f0f2; --halo: rgba(200,200,210,.12); --shade: rgba(0,0,0,.6);
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Agent cards — spike</h1>
+      <p>CSS card layers + Three.js-rendered icons. Move the pointer over a card to tilt it; click to select.</p>
+    </div>
+    <button class="chip" id="theme" aria-pressed="false">Light page</button>
+  </header>
+
+  <div class="toolbar">
+    <div class="seg" role="group" aria-label="Show">
+      <button class="chip" data-show="all" aria-pressed="true">All</button>
+%CHIPS%
+    </div>
+    <div class="seg" role="group" aria-label="Layout">
+      <button class="chip" data-layout="vertical" aria-pressed="true">Vertical</button>
+      <button class="chip" data-layout="horizontal" aria-pressed="false">Horizontal</button>
+    </div>
+    <div class="seg" role="group" aria-label="Hover effect">
+      <button class="chip" data-hover="full" aria-pressed="true">Tilt + pop</button>
+      <button class="chip" data-hover="card" aria-pressed="false">Card only</button>
+      <button class="chip" data-hover="logo" aria-pressed="false">Logo only</button>
+      <button class="chip" data-hover="subtle" aria-pressed="false">Subtle</button>
+    </div>
+  </div>
+
+  <div class="deck" id="deck" data-layout="vertical" data-hover="full" role="group" aria-label="Choose an agent">
+%CARDS%
+  </div>
+</main>
+
+<script>
+  const deck = document.getElementById('deck');
+  const cards = [...deck.querySelectorAll('.agent-card')];
+  const press = (group, match) => group.forEach(b => b.setAttribute('aria-pressed', String(match(b))));
+
+  // Selection
+  cards.forEach(card => card.addEventListener('click', () => press(cards, c => c === card)));
+
+  // Show: all, or a single agent
+  const showChips = [...document.querySelectorAll('[data-show]')];
+  showChips.forEach(chip => chip.addEventListener('click', () => {
+    const id = chip.dataset.show;
+    press(showChips, c => c === chip);
+    if (id === 'all') delete deck.dataset.single; else deck.dataset.single = id;
+    cards.forEach(c => c.classList.toggle('is-shown', c.dataset.agent === id));
+  }));
+
+  // Layout
+  const layoutChips = [...document.querySelectorAll('.chip[data-layout]')];
+  layoutChips.forEach(chip => chip.addEventListener('click', () => {
+    press(layoutChips, c => c === chip);
+    deck.dataset.layout = chip.dataset.layout;
+  }));
+
+  // Hover effect
+  const hoverChips = [...document.querySelectorAll('.chip[data-hover]')];
+  hoverChips.forEach(chip => chip.addEventListener('click', () => {
+    press(hoverChips, c => c === chip);
+    deck.dataset.hover = chip.dataset.hover;
+  }));
+
+  // Page theme
+  const theme = document.getElementById('theme');
+  theme.addEventListener('click', () => {
+    const light = document.documentElement.dataset.theme !== 'light';
+    document.documentElement.dataset.theme = light ? 'light' : 'dark';
+    theme.textContent = light ? 'Dark page' : 'Light page';
+    theme.setAttribute('aria-pressed', String(light));
+  });
+
+  // 3D tilt: the card leans toward the pointer, the glare follows it,
+  // and the icon/label/scenery parallax at different depths.
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  cards.forEach(card => {
+    let frame = 0;
+    card.addEventListener('pointermove', e => {
+      if (reduce.matches || e.pointerType === 'touch') return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const r = card.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width - .5;   // -0.5 … 0.5
+        const y = (e.clientY - r.top) / r.height - .5;
+        const wide = r.width > r.height * 1.2;
+        const max = wide ? 7 : 12;                       // wide cards lean less
+        card.classList.add('is-tracking');
+        card.style.setProperty('--rx', (-y * max).toFixed(2) + 'deg');
+        card.style.setProperty('--ry', (x * max).toFixed(2) + 'deg');
+        card.style.setProperty('--px', (x * 2).toFixed(3));
+        card.style.setProperty('--py', (y * 2).toFixed(3));
+        card.style.setProperty('--gx', ((x + .5) * 100).toFixed(1) + '%');
+        card.style.setProperty('--gy', ((y + .5) * 100).toFixed(1) + '%');
+      });
+    });
+    card.addEventListener('pointerleave', () => {
+      cancelAnimationFrame(frame);
+      card.classList.remove('is-tracking');
+      ['--rx', '--ry', '--px', '--py', '--gx', '--gy'].forEach(p => card.style.removeProperty(p));
+    });
+  });
+</script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module" src="icons3d.js"></script>
+</body>
+</html>
