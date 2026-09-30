@@ -1001,6 +1001,42 @@ export {
   type PieChartSort,
 } from "./components/pie-chart"
 export {
+  bestSoFar,
+  intersectChartRects,
+  linePath,
+  linearScale,
+  niceTicks,
+  placeChartTooltip,
+  proportionWeights,
+  stepPath,
+  type ChartBetter,
+  type ChartPoint,
+  type ChartRect,
+  type ChartScale,
+  type ChartTooltipPlacement,
+  type ChartTooltipPlacementInput,
+  type ChartTooltipSide,
+  type ProportionWeighting,
+  type StepPathOptions,
+} from "./lib/chart-geometry"
+export {
+  Sparkline,
+  type SparklineMarkers,
+  type SparklineProps,
+} from "./components/sparkline"
+export {
+  ChartTooltip,
+  type ChartTooltipBoundary,
+  type ChartTooltipProps,
+} from "./components/chart-tooltip"
+export {
+  ProportionBar,
+  proportionBarTones,
+  type ProportionBarProps,
+  type ProportionBarSegment,
+  type ProportionBarTone,
+} from "./components/proportion-bar"
+export {
   FilePreview,
   FilePreviewAudio,
   FilePreviewContent,

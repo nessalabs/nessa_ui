@@ -1,0 +1,252 @@
+"use client"
+
+/** @responsibility Renders a small step or line chart sized by its container — a best-so-far step line or a plain polyline over a series of points, with optional point markers, a reference line and an area wash — named by the host. Geometry comes from lib/chart-geometry. */
+
+import * as React from "react"
+
+import {
+  bestSoFar,
+  linePath,
+  linearScale,
+  stepPath,
+  type ChartBetter,
+  type ChartPoint,
+  type ChartScale,
+} from "@/lib/chart-geometry"
+import { useComposedRefs } from "@/lib/compose"
+import { cn } from "@/lib/utils"
+
+/** Which points a sparkline draws a dot for. */
+export type SparklineMarkers = "none" | "records" | "all"
+
+/** Properties accepted by the Sparkline. */
+export interface SparklineProps
+  extends Omit<React.ComponentProps<"div">, "children"> {
+  /** The series, in data units. Order does not matter; points with a non-finite coordinate are skipped. */
+  points: readonly ChartPoint[]
+  /**
+   * Which direction of the value axis is an improvement. The step variant
+   * keeps the running maximum for `up` and the running minimum for `down`,
+   * and in both variants a point that sets a new best is a *record*.
+   * Defaults to `up`.
+   */
+  better?: ChartBetter
+  /**
+   * `step` (default) draws the best so far: flat until a record, then a step
+   * to it. `line` joins every point in order.
+   */
+  variant?: "step" | "line"
+  /**
+   * `none` (default) draws only the line. `records` adds a dot at every
+   * record-setting point, `all` a dot at every point with the records drawn
+   * stronger. Either also marks where the line ends.
+   */
+  markers?: SparklineMarkers
+  /**
+   * A value, in data units, to draw as a dashed horizontal reference — a
+   * target, a baseline, a previous best. It is always inside the plotted
+   * range.
+   */
+  reference?: number
+  /** Washes the area under the line. Defaults to true. */
+  area?: boolean
+  /**
+   * A fixed value range, `[min, max]`, for sparklines that must share a scale
+   * (a column of them, compared by eye). Omitted, the range fits the points
+   * and the reference.
+   */
+  yDomain?: readonly [number, number]
+  /**
+   * The accessible name — what the line shows, in the host's words. Without
+   * one (and without `aria-labelledby`), the sparkline is treated as
+   * decoration and hidden from assistive technology.
+   */
+  "aria-label"?: string
+}
+
+/** Room kept between the plot and its box, so strokes and dots are never cut. */
+const INSET = 4
+
+/** Radii of the dots, in pixels. */
+const DOT_RADIUS = { point: 1.5, record: 2.5, end: 3.5 } as const
+
+function useMeasuredBox(ref: React.RefObject<HTMLElement | null>) {
+  const [box, setBox] = React.useState<{ width: number; height: number } | null>(
+    null,
+  )
+  React.useLayoutEffect(() => {
+    const element = ref.current
+    if (!element || typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[entries.length - 1]!.contentRect
+      const width = Math.round(rect.width)
+      const height = Math.round(rect.height)
+      setBox((previous) =>
+        previous && previous.width === width && previous.height === height
+          ? previous
+          : { width, height },
+      )
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [ref])
+  return box
+}
+
+/**
+ * A small chart that fills whatever box the host gives it — set its height
+ * with a class, or size its parent. The `step` variant draws the best value
+ * so far, keeping the running maximum when `better` is `up` and the running
+ * minimum when it is `down`, so the line only ever moves in the direction of
+ * improvement; the `line` variant joins every point. Optional dots mark the
+ * record-setting points (or every point), a dashed line marks a reference
+ * value, and the line takes the current text colour, so a host tints it with a
+ * text utility. It is not interactive, and renders nothing until measured.
+ */
+function Sparkline({
+  points,
+  better = "up",
+  variant = "step",
+  markers = "none",
+  reference,
+  area = true,
+  yDomain,
+  className,
+  ref: forwardedRef,
+  ...props
+}: SparklineProps) {
+  const boxRef = React.useRef<HTMLDivElement>(null)
+  const composedRef = useComposedRefs(boxRef, forwardedRef)
+  const box = useMeasuredBox(boxRef)
+  const named =
+    props["aria-label"] !== undefined || props["aria-labelledby"] !== undefined
+
+  const shape = React.useMemo(() => {
+    if (!box || box.width <= 0 || box.height <= 0) return null
+    const plotted = points.filter(
+      (point) => Number.isFinite(point.x) && Number.isFinite(point.y),
+    )
+    if (plotted.length === 0) return null
+    const xs = plotted.map((point) => point.x)
+    const ys = plotted.map((point) => point.y)
+    const hasReference = reference !== undefined && Number.isFinite(reference)
+    if (hasReference) ys.push(reference)
+    const [low, high] =
+      yDomain && Number.isFinite(yDomain[0]) && Number.isFinite(yDomain[1])
+        ? yDomain
+        : [Math.min(...ys), Math.max(...ys)]
+    const scale: ChartScale = {
+      x: linearScale(
+        [Math.min(...xs), Math.max(...xs)],
+        [INSET, box.width - INSET],
+      ),
+      y: linearScale([low, high], [box.height - INSET, INSET]),
+    }
+    const records = bestSoFar(plotted, better)
+    const recordSet = new Set(records)
+    const line =
+      variant === "step"
+        ? stepPath(plotted, scale, { better })
+        : linePath(plotted, scale)
+    const lastX = Math.max(...xs)
+    const end =
+      variant === "step"
+        ? { x: lastX, y: records[records.length - 1]!.y }
+        : plotted.reduce((latest, point) => (point.x >= latest.x ? point : latest))
+    return {
+      line,
+      area: `${line}V${box.height}H${scale.x(Math.min(...xs))}Z`,
+      dots: plotted
+        .filter((point) => markers === "all" || recordSet.has(point))
+        .map((point) => ({
+          cx: scale.x(point.x),
+          cy: scale.y(point.y),
+          record: recordSet.has(point),
+        })),
+      end: { cx: scale.x(end.x), cy: scale.y(end.y) },
+      reference: hasReference ? scale.y(reference) : null,
+    }
+  }, [box, points, better, variant, markers, reference, yDomain])
+
+  return (
+    <div
+      ref={composedRef}
+      data-slot="sparkline"
+      data-variant={variant}
+      data-better={better}
+      role={named ? "img" : undefined}
+      aria-hidden={named ? undefined : true}
+      className={cn(
+        "relative h-full min-h-0 w-full min-w-0 text-foreground",
+        className,
+      )}
+      {...props}
+    >
+      {shape && box ? (
+        <svg
+          aria-hidden="true"
+          className="absolute inset-0 size-full overflow-visible"
+          width={box.width}
+          height={box.height}
+        >
+          {area ? (
+            <path
+              data-slot="sparkline-area"
+              d={shape.area}
+              className="fill-current stroke-none opacity-10"
+            />
+          ) : null}
+          {shape.reference !== null ? (
+            <line
+              data-slot="sparkline-reference"
+              x1={0}
+              x2={box.width}
+              y1={shape.reference}
+              y2={shape.reference}
+              strokeDasharray="3 3"
+              className="stroke-muted-foreground opacity-60"
+            />
+          ) : null}
+          {markers !== "none"
+            ? shape.dots.map((dot, index) => (
+                <circle
+                  key={index}
+                  data-slot="sparkline-marker"
+                  data-record={dot.record ? "true" : "false"}
+                  cx={dot.cx}
+                  cy={dot.cy}
+                  r={dot.record ? DOT_RADIUS.record : DOT_RADIUS.point}
+                  className={
+                    dot.record
+                      ? "fill-current"
+                      : "fill-muted-foreground opacity-60"
+                  }
+                />
+              ))
+            : null}
+          <path
+            data-slot="sparkline-line"
+            d={shape.line}
+            fill="none"
+            strokeWidth={1.75}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            className="stroke-current"
+          />
+          {markers !== "none" ? (
+            <circle
+              data-slot="sparkline-end"
+              cx={shape.end.cx}
+              cy={shape.end.cy}
+              r={DOT_RADIUS.end}
+              strokeWidth={2}
+              className="fill-current stroke-background"
+            />
+          ) : null}
+        </svg>
+      ) : null}
+    </div>
+  )
+}
+
+export { Sparkline }
