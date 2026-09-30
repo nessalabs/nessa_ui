@@ -132,7 +132,9 @@ function ownOptions(track: HTMLElement) {
  * values would lose. An ancestor's scale shows as the rendered width parting
  * from the layout width, and is divided back out — but only past a whole
  * pixel, because `offsetWidth` is itself rounded and a sub-pixel difference is
- * that rounding, not a transform.
+ * that rounding, not a transform. The vertical offset comes from layout
+ * instead: a held option is nudged down a pixel by a transform, and a
+ * placement taken mid-press must not keep that nudge after it is released.
  */
 function measurePressed(track: HTMLElement) {
   const pressed = ownOptions(track).find(
@@ -146,7 +148,10 @@ function measurePressed(track: HTMLElement) {
   const ratio = scaled ? trackBox.width / track.offsetWidth : 1
   return {
     x: (box.left - trackBox.left) / ratio - track.clientLeft,
-    y: (box.top - trackBox.top) / ratio - track.clientTop,
+    y:
+      pressed.offsetParent === track
+        ? pressed.offsetTop
+        : (box.top - trackBox.top) / ratio - track.clientTop,
     width: box.width / ratio,
     height: box.height / ratio,
   }
@@ -205,7 +210,8 @@ export interface SegmentedControlProps
  * them. The lens is measured from the pressed option before first paint and
  * again whenever the track or an option resizes or the options change, so
  * labels of any width land exactly; it glides only when the selection moves
- * and holds still under `prefers-reduced-motion`.
+ * and holds still under `prefers-reduced-motion`. A glass control is not
+ * meant to be nested inside another one's track.
  */
 function SegmentedControl({
   className,

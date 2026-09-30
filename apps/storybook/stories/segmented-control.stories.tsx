@@ -191,12 +191,15 @@ export const Glass: Story = {
     await expect(group).toHaveAttribute("data-variant", "glass")
     await expect(group).toHaveAttribute("data-lens", "placed")
     // First paint: placed, not glided into place, and the pressed option's
-    // pending fill handed over without a fade laid over the lens.
+    // pending fill handed over without a fade laid over the lens. The
+    // configuration is asserted rather than live animations, which a slow
+    // run could see only after a short fade had already ended.
     await expect(lens).not.toHaveAttribute("data-animate")
-    await expect(lens!.getAnimations()).toHaveLength(0)
+    await expect(getComputedStyle(lens!).transitionProperty).toBe("none")
     await expect(
-      group.querySelector('[aria-pressed="true"]')!.getAnimations(),
-    ).toHaveLength(0)
+      getComputedStyle(group.querySelector('[aria-pressed="true"]')!)
+        .transitionProperty,
+    ).not.toContain("background")
     await expectLensOnPressed(canvasElement, name)
 
     const timeline = canvas.getByRole("button", { name: "Timeline" })

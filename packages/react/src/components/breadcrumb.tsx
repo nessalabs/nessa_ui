@@ -80,10 +80,13 @@ function Breadcrumb({
               // Every step gives up width in proportion to its length; an
               // earlier step is also capped, so a long ancestor cannot take
               // the line from the place the reader is in, and floored, so it
-              // stays a target of at least 32px beside its separator.
+              // stays a target of at least 32px beside its separator (the
+              // first step has none, so its floor is the button's own).
               className={cn(
                 "flex shrink items-center gap-0.5",
-                current ? "min-w-0" : "min-w-12 max-w-40",
+                current
+                  ? "min-w-0"
+                  : cn("max-w-40", index > 0 ? "min-w-12" : "min-w-8"),
               )}
             >
               {index > 0 ? (

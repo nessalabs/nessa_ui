@@ -60,7 +60,10 @@ export interface AvatarStackProps
     VariantProps<typeof avatarStackFaceVariants> {
   /** Everyone in the group, in the order the caller wants them shown. */
   items: readonly AvatarStackItem[]
-  /** How many faces to show before the rest collapse into a count. Defaults to 3. */
+  /**
+   * How many faces to show before the rest collapse into a count. Defaults
+   * to 3; pass `Infinity` to show everyone.
+   */
   max?: number
   /**
    * Names the whole group for assistive technology, such as "6 agents". The

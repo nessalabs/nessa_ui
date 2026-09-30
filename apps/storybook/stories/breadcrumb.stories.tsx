@@ -106,33 +106,41 @@ const longTrail: BreadcrumbStep[] = [
 
 export const LongLabels: Story = {
   parameters: storyDocumentation(
-    "The overflow case: labels far longer than the pane they sit in. The trail stays on one line; every step truncates in proportion to its length, earlier steps capped so the current place keeps the most room, and each keeps its full label as its accessible name and hover text. The play test asserts the trail fits its pane on a single line, that squeezed steps stay at least 24px wide, that the labels are visibly cut, and that each step is still found by its full name.",
+    "The overflow case: labels far longer than the pane they sit in. The trail stays on one line; every step truncates in proportion to its length, earlier steps capped so the current place keeps the most room, and each keeps its full label as its accessible name and hover text. A second copy sits in a pane too narrow for proportional shrinking to leave usable steps, where the earlier steps hold their 32px floor. The play test asserts both trails fit their panes on a single line, that the narrow trail's steps keep that floor, that the labels are visibly cut, and that each step is still found by its full name.",
   ),
   render: () => (
-    <div className="w-80 rounded-lg border border-border p-2">
-      <Breadcrumb back items={longTrail} label="Run trail" />
+    <div className="flex flex-col items-start gap-3">
+      <div className="w-80 rounded-lg border border-border p-2">
+        <Breadcrumb back items={longTrail} label="Run trail" />
+      </div>
+      <div className="w-36 rounded-lg border border-border p-2">
+        <Breadcrumb back items={longTrail} label="Narrow run trail" />
+      </div>
     </div>
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     const nav = canvas.getByRole("navigation", { name: "Run trail" })
-    // The list itself fits: nothing spills past the box it is laid out in.
-    const list = within(nav).getByRole("list")
-    await expect(list.scrollWidth).toBeLessThanOrEqual(list.clientWidth)
-    // Squeezed steps stay targets: never narrower than 24px.
-    for (const button of within(nav).getAllByRole("button")) {
-      await expect(button.getBoundingClientRect().width).toBeGreaterThanOrEqual(
-        24,
-      )
+    const narrow = canvas.getByRole("navigation", { name: "Narrow run trail" })
+    for (const trail of [nav, narrow]) {
+      // The list itself fits: nothing spills past the box it is laid out in.
+      const list = within(trail).getByRole("list")
+      await expect(list.scrollWidth).toBeLessThanOrEqual(list.clientWidth)
+      const centres = within(trail)
+        .getAllByRole("listitem")
+        .map((item) => {
+          const box = item.getBoundingClientRect()
+          return box.top + box.height / 2
+        })
+      for (const centre of centres) {
+        await expect(Math.abs(centre - centres[0])).toBeLessThan(1)
+      }
     }
-    const centres = within(nav)
-      .getAllByRole("listitem")
-      .map((item) => {
-        const box = item.getBoundingClientRect()
-        return box.top + box.height / 2
-      })
-    for (const centre of centres) {
-      await expect(Math.abs(centre - centres[0])).toBeLessThan(1)
+    // Squeezed hard, earlier steps stop at their floor and stay targets.
+    for (const button of within(narrow).getAllByRole("button")) {
+      await expect(button.getBoundingClientRect().width).toBeGreaterThanOrEqual(
+        32,
+      )
     }
     for (const item of longTrail) {
       const step = item.onSelect
