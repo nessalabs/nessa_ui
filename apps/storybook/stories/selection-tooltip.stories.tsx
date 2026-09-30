@@ -25,6 +25,7 @@ import {
   useSelectionTooltip,
 } from "@nessalabs/ui"
 
+import { finishStoryTransitions } from "./finish-story-transitions"
 import { ChatAddIcon, CommentIcon } from "./icons/nucleo"
 import { storyDocumentation } from "./story-documentation"
 
@@ -446,11 +447,24 @@ export const CommentMode: Story = {
     await waitFor(() => expect(send).toBeEnabled())
     await userEvent.click(send)
 
-    // The comment lands in the band beneath the row, which grows open.
+    // The comment lands in the band beneath the row, which grows open — all
+    // the way to its content, not merely off zero. The band's height is a
+    // transition, and a transition only advances on rendering frames, which a
+    // loaded CI runner can withhold for longer than the wait: settle it rather
+    // than race it.
     await expect(await canvas.findByText("Needs a citation")).toBeVisible()
-    await waitFor(() =>
-      expect(panel.getBoundingClientRect().height).toBeGreaterThan(0),
+    const panelContent = panel.querySelector<HTMLElement>(
+      '[data-slot="selection-tooltip-panel-content"]',
     )
+    await expect(panelContent).not.toBeNull()
+    if (panelContent === null) return
+    await waitFor(() => {
+      finishStoryTransitions(canvasElement)
+      expect(panel.getBoundingClientRect().height).toBeCloseTo(
+        panelContent.getBoundingClientRect().height,
+        1,
+      )
+    })
     // The comment's mark lines up with the trigger's: one column, whatever
     // the two sizes are.
     const postedMark = panel.querySelector<HTMLElement>(
@@ -496,9 +510,10 @@ export const CommentMode: Story = {
     const clearAll = canvas.getByRole("button", { name: "Clear all" })
     clearAll.focus()
     await userEvent.click(clearAll)
-    await waitFor(() =>
-      expect(panel.getBoundingClientRect().height).toBe(0),
-    )
+    await waitFor(() => {
+      finishStoryTransitions(canvasElement)
+      expect(panel.getBoundingClientRect().height).toBe(0)
+    })
     await expect(canvas.queryByText("Needs a citation")).toBeNull()
     // The control that shut the band took focus down with it, so the band
     // hands focus back to the row rather than dropping it on the document.
