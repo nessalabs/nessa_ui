@@ -104,6 +104,16 @@ A future chart with its own semantic axis (pass/fail, over/under budget)
 should follow this shape — a named pair of tokens and an exported mapping —
 rather than borrowing ramp slots.
 
+The metric primitives borrow this pair for now. `Delta`, `Meter`, and
+`StatusLabel` paint their `good` and `bad` tones in `--nessa-market-gain` and
+`--nessa-market-loss`, because it is the only favourable/unfavourable pair the
+matrix already holds to text contrast on every surface. That makes a retune of
+the market pair a retune of those tones too — a theme that shows a rising price
+in red also shows a `good` change in red. The borrowing ends when a status
+colour role (good, bad, warning) exists in the token chain; those three
+components then name it instead, and `warning`, which has no hue until then,
+takes its own.
+
 ## The closing-ring trio is a named set, not three ramp slots
 
 `ActivityRings` is the other case that does not colour by category. A set of
