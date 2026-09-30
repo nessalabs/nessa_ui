@@ -63,15 +63,18 @@ export function linearScale(
  * The inputs are forgiving rather than strict. `min` and `max` are swapped
  * when reversed. Equal bounds are widened around the value (to `[0, 1]` at
  * zero, by a tenth of its magnitude elsewhere) so a flat series still gets an
- * axis. A non-finite bound gives no ticks at all.
+ * axis. A non-finite bound gives no ticks at all. A range that floating point
+ * cannot step through evenly — a window a few units wide around 10^18, or one
+ * too wide to measure — gives just its two bounds rather than duplicate or
+ * non-finite ticks.
  *
  * @param min - The smallest value the axis must show.
  * @param max - The largest value the axis must show.
  * @param count - Roughly how many ticks to produce; the result may carry a
- *   few more or fewer, because only round steps are used. Clamped to at
- *   least 1.
- * @returns Ascending tick values, free of floating-point residue such as
- *   `0.30000000000000004`.
+ *   few more or fewer, because only round steps are used. Clamped to
+ *   1..{@link MAX_TICK_COUNT}.
+ * @returns Ascending, distinct tick values, free of floating-point residue
+ *   such as `0.30000000000000004`.
  */
 export function niceTicks(min: number, max: number, count: number): number[] {
   if (!Number.isFinite(min) || !Number.isFinite(max)) return []
@@ -86,9 +89,14 @@ export function niceTicks(min: number, max: number, count: number): number[] {
       high += pad
     }
   }
-  const intervals = Math.max(1, Number.isFinite(count) ? Math.round(count) : 1)
+  const bounds = [low, high]
+  const intervals = Math.min(
+    MAX_TICK_COUNT,
+    Math.max(1, Number.isFinite(count) ? Math.round(count) : 1),
+  )
   const raw = (high - low) / intervals
   const exponent = Math.floor(Math.log10(raw))
+  if (!Number.isFinite(exponent)) return bounds
   const error = raw / Math.pow(10, exponent)
   // The thresholds are the geometric midpoints between neighbouring round
   // steps, so the chosen step is the one nearest the raw one on a log scale.
@@ -97,21 +105,35 @@ export function niceTicks(min: number, max: number, count: number): number[] {
   // Ticks are built as integer multiples and only then scaled, dividing by an
   // integer inverse for fractional steps: 3 / 10 is exactly 0.3, while 3 * 0.1
   // is not.
-  if (exponent >= 0) {
-    const step = factor * Math.pow(10, exponent)
-    const first = Math.floor(low / step)
-    const last = Math.ceil(high / step)
-    const ticks: number[] = []
-    for (let index = first; index <= last; index += 1) ticks.push(index * step)
-    return ticks
+  const step = exponent >= 0 ? factor * Math.pow(10, exponent) : 0
+  const inverse = exponent >= 0 ? 0 : Math.pow(10, -exponent) / factor
+  const toIndex = (value: number) => (exponent >= 0 ? value / step : value * inverse)
+  const fromIndex = (index: number) => (exponent >= 0 ? index * step : index / inverse)
+  const first = Math.floor(toIndex(low))
+  const last = Math.ceil(toIndex(high))
+  // Past 2^53 an index no longer counts one by one, and a step count far past
+  // the request means the step collapsed against the magnitude: either way
+  // the ticks would repeat or never end.
+  if (
+    !Number.isSafeInteger(first) ||
+    !Number.isSafeInteger(last) ||
+    last - first > intervals * 4 + 2
+  ) {
+    return bounds
   }
-  const inverse = Math.pow(10, -exponent) / factor
-  const first = Math.floor(low * inverse)
-  const last = Math.ceil(high * inverse)
   const ticks: number[] = []
-  for (let index = first; index <= last; index += 1) ticks.push(index / inverse)
-  return ticks
+  for (let offset = 0; offset <= last - first; offset += 1) {
+    ticks.push(fromIndex(first + offset))
+  }
+  const distinct = ticks.every(
+    (tick, index) =>
+      Number.isFinite(tick) && (index === 0 || tick > ticks[index - 1]!),
+  )
+  return distinct ? ticks : bounds
 }
+
+/** The most ticks {@link niceTicks} will produce an axis for. */
+export const MAX_TICK_COUNT = 100
 
 /** Points with a finite position on both axes, in ascending x order. */
 function plottable(points: readonly ChartPoint[]): ChartPoint[] {

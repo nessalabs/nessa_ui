@@ -13,7 +13,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Parts of a whole as one bar. Each segment is sized by its share, and keeps at least a few pixels however small, so no part with a value disappears. `weighting=\"log\"` sizes each segment by `ln(1 + value / smallest)` instead, where `smallest` is the smallest positive value in the bar: order and equal values are kept, units do not matter, and a part a thousand times larger than the smallest is drawn about ten times wider rather than a thousand — so a handful of cases beside ten thousand still reads as a segment. Log widths are no longer shares, which is why the exact values belong in the legend or the summary. Segments take the categorical chart ramp's strong step in input order, so a segment keeps its colour when another is added or overtakes it; a `tone` names a ramp slot or one of two neutrals, and `color` takes any CSS colour. `max` measures the bar against a larger value, leaving the rest of the track empty. The optional legend lists each label with its value as the host formats it. The bar speaks a summary of the same values (`summary` replaces it), and is hidden from assistive technology while the legend says the same thing; the host names the whole with `aria-label`.",
+          "Parts of a whole as one bar. Each segment is sized by its share, and keeps at least a few pixels however small, so no part with a value disappears. `weighting=\"log\"` sizes each segment by `ln(1 + value / smallest)` instead, where `smallest` is the smallest positive value in the bar: order and equal values are kept, units do not matter, and a part a thousand times larger than the smallest is drawn about ten times wider rather than a thousand — so a handful of cases beside ten thousand still reads as a segment. Log widths are no longer shares, which is why the exact values belong in the legend or the summary. Segments take the categorical chart ramp's strong step by input position, so a segment keeps its colour while values change and segments are appended; a host that removes or reorders segments pins colours with a tone. A `tone` names a ramp slot or one of two neutrals, and `color` takes any CSS colour. `max` measures the bar against a larger value, leaving the rest of the track empty. The optional legend lists each label with its value as the host formats it. The bar speaks a summary of the same values (`summary` replaces it), and is hidden from assistive technology while the legend says the same thing; the host names the whole with `aria-label`.",
       },
     },
   },
@@ -146,7 +146,7 @@ export const AgainstMax: Story = {
   parameters: storyDocumentation(
     "`max` measures each bar against a larger value — here the busiest folder — so a column of bars compares across rows while each still splits into its own parts; the rest of the track stays empty. A `summary` replaces the default spoken list with the host's own sentence. The play test proves the filled length follows each row's total against the maximum.",
   ),
-  args: { segments: [] },
+  args: { segments: [], formatValue: String },
   render: () => (
     <ul className="m-0 flex w-96 list-none flex-col gap-3 p-0 font-sans">
       {FOLDERS.map((folder) => (
@@ -156,7 +156,9 @@ export const AgainstMax: Story = {
             className="flex-1"
             size="sm"
             max={BUSIEST}
+            formatValue={String}
             data-testid={folder.path}
+            aria-label={`Lines changed in ${folder.path}`}
             summary={`${folder.added} lines added, ${folder.removed} removed`}
             segments={[
               { id: "added", label: "Added", value: folder.added, tone: "series-6" },
@@ -173,10 +175,16 @@ export const AgainstMax: Story = {
         `[data-testid="${folder.path}"]`,
       )!
       const track = bar.querySelector('[data-slot="proportion-bar-track"]')!
-      const fill = bar.querySelector('[data-slot="proportion-bar-fill"]')!
-      const ratio =
-        fill.getBoundingClientRect().width / track.getBoundingClientRect().width
-      await expect(ratio).toBeCloseTo((folder.added + folder.removed) / BUSIEST, 2)
+      const segments = bar.querySelectorAll('[data-slot="proportion-bar-segment"]')
+      // What is actually painted: the last segment's right edge, not the
+      // fill's declared width.
+      const trackBox = track.getBoundingClientRect()
+      const painted =
+        segments[segments.length - 1]!.getBoundingClientRect().right - trackBox.left
+      await expect(painted / trackBox.width).toBeCloseTo(
+        (folder.added + folder.removed) / BUSIEST,
+        2,
+      )
       await expect(track).toHaveAttribute(
         "aria-label",
         `${folder.added} lines added, ${folder.removed} removed`,

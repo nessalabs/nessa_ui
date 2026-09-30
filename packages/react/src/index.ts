@@ -1005,6 +1005,7 @@ export {
   intersectChartRects,
   linePath,
   linearScale,
+  MAX_TICK_COUNT,
   niceTicks,
   placeChartTooltip,
   proportionWeights,

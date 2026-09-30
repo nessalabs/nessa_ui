@@ -71,9 +71,11 @@ export interface ProportionBarSegment {
   /** Magnitude of the part. Zero, negative and non-finite values draw no segment. */
   value: number
   /**
-   * The segment's colour. Omitted, segments take ramp slots in input order,
-   * so a segment keeps its colour when another is added, removed or
-   * overtaken. A segment's `color` wins over its tone.
+   * The segment's colour. Omitted, segments take ramp slots by input
+   * position, so a segment keeps its colour while values change and while
+   * segments are appended after it; removing or reordering segments shifts
+   * the slots of those after the change, so a host that does either pins
+   * colours with a tone. A segment's `color` wins over its tone.
    */
   tone?: ProportionBarTone
   /** Any CSS colour, for a colour the tones do not name. */
@@ -83,6 +85,10 @@ export interface ProportionBarSegment {
 /** Properties accepted by the ProportionBar. */
 export interface ProportionBarProps
   extends Omit<React.ComponentProps<"div">, "children"> {
+  /**
+   * The parts, in the order they are drawn left to right and listed in the
+   * legend. Ids must be unique.
+   */
   segments: readonly ProportionBarSegment[]
   /**
    * How values become widths. `linear` (default) makes widths the shares.
@@ -97,17 +103,25 @@ export interface ProportionBarProps
   /**
    * The value a full track stands for. Omitted, the segments fill the track.
    * Given, they fill `sum / max` of it and the rest stays empty — for a
-   * column of bars measured against the largest.
+   * column of bars measured against the largest. The fill never drops below
+   * what its segments' minimum widths and gaps need (about 4px a segment and
+   * 2px between), so a row far below the maximum reads a little long rather
+   * than losing a part.
    */
   max?: number
   /** Shows a legend of every segment's label and formatted value. */
   legend?: boolean
-  /** Formats a value in the legend and the default summary. Defaults to `String`. */
-  formatValue?: (value: number, segment: ProportionBarSegment) => string
   /**
-   * What a screen reader hears for the bar itself, instead of the default
-   * `"label value"` list. The bar is hidden from assistive technology while
-   * the legend is shown, since the legend already says the same thing.
+   * Formats a value for the legend and the default summary — units,
+   * grouping and locale are the host's.
+   */
+  formatValue: (value: number, segment: ProportionBarSegment) => string
+  /**
+   * What a screen reader hears for the bar itself. The default reads each
+   * segment's label and formatted value, joined by commas; a host whose
+   * language wants other wording passes its own sentence. The bar is hidden
+   * from assistive technology while the legend is shown, since the legend
+   * already says the same thing.
    */
   summary?: string
   /** Bar thickness. `sm` is 6px, `md` (default) 10px. */
@@ -138,7 +152,7 @@ function ProportionBar({
   weighting = "linear",
   max,
   legend = false,
-  formatValue = (value) => String(value),
+  formatValue,
   summary,
   size = "md",
   className,
@@ -167,10 +181,14 @@ function ProportionBar({
       .map((segment) => `${segment.label} ${formatValue(segment.value, segment)}`)
       .join(", ")
 
+  const named =
+    props["aria-label"] !== undefined || props["aria-labelledby"] !== undefined
+
   return (
     <div
       data-slot="proportion-bar"
-      role="group"
+      // A group only when it has a name to carry; unnamed, it is plain layout.
+      role={named ? "group" : undefined}
       className={cn("flex min-w-0 flex-col gap-2 font-sans", className)}
       {...props}
     >
@@ -192,7 +210,10 @@ function ProportionBar({
       >
         <div
           data-slot="proportion-bar-fill"
-          className="flex h-full gap-0.5"
+          // Never narrower than the segments' minimum widths and gaps, or
+          // they would overflow the fill and the row would read longer than
+          // its share without the fill knowing.
+          className="flex h-full min-w-max gap-0.5"
           style={{ width: `${fill * 100}%` }}
         >
           {segments.map((segment, index) =>

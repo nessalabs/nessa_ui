@@ -206,3 +206,30 @@ export const SharedScale: Story = {
     await expect(references[0]!.getAttribute("y1")).toBe(references[1]!.getAttribute("y1"))
   },
 }
+
+export const SingleReading: Story = {
+  parameters: storyDocumentation(
+    "A series with one reading — the first attempt of many to come — has no run to draw along, so the reading is held level across the box and marked at its end rather than collapsing to a path with no length. The play test proves the line spans the box and the end marker sits on it.",
+  ),
+  args: {
+    points: [{ x: 1, y: 42 }],
+    markers: "records",
+    "aria-label": "Best score so far: 42, from one attempt",
+  },
+  render: (args) => (
+    <div className="w-72">
+      <Sparkline {...args} className="h-14" />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const root = await canvas.findByRole("img", { name: /^Best score so far: 42/ })
+    const line = await drawnLine(canvasElement)
+    const width = root.getBoundingClientRect().width
+    const box = line.getBoundingClientRect()
+    await expect(box.width).toBeGreaterThan(width - 16)
+    const end = canvasElement.querySelector('[data-slot="sparkline-end"]')!
+    const y = Number(/^M[\d.]+,(-?[\d.]+)/.exec(line.getAttribute("d")!)![1])
+    await expect(Number(end.getAttribute("cy"))).toBeCloseTo(y, 1)
+  },
+}

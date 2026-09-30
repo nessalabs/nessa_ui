@@ -29,10 +29,12 @@ export type ChartTooltipBoundary =
 export interface ChartTooltipProps extends React.ComponentProps<"div"> {
   /**
    * The point the card describes, in pixels, in the coordinate space of the
-   * card's containing block — the nearest positioned ancestor, normally the
-   * chart's own `relative` wrapper. That is the space a chart's own scales
+   * card's containing block: the chart's own positioned (`relative`) wrapper,
+   * which the host must provide. That is the space a chart's own scales
    * already produce, so a host passes `{ x: scale.x(value), y: scale.y(value) }`
-   * unchanged.
+   * unchanged. The card is absolutely positioned inside that wrapper; it
+   * cannot be made `fixed`, and it stays hidden while it has no containing
+   * block to measure from.
    */
   anchor: { x: number; y: number }
   /**
@@ -60,6 +62,7 @@ interface Placement {
   side: ChartTooltipSide
 }
 
+/** Whether a boundary is a ref to an element rather than an element or a rectangle. */
 function isRefObject(
   boundary: ChartTooltipBoundary,
 ): boundary is React.RefObject<Element | null> {
@@ -109,17 +112,19 @@ function ChartTooltip({
     // is the one ancestor this reads — found by layout, not by name.
     const container = card?.offsetParent
     if (!card || !container) return
-    const view = card.ownerDocument.defaultView
     const origin = container.getBoundingClientRect()
     // Absolute offsets start inside the container's border and move with its
     // scrolled content.
     const originX = origin.left + container.clientLeft - container.scrollLeft
     const originY = origin.top + container.clientTop - container.scrollTop
+    // The layout viewport, without classic scrollbars: `innerWidth` counts
+    // them, and a card placed by it can land under one.
+    const root = card.ownerDocument.documentElement
     const viewport: ChartRect = {
       left: 0,
       top: 0,
-      width: view?.innerWidth ?? 0,
-      height: view?.innerHeight ?? 0,
+      width: root.clientWidth,
+      height: root.clientHeight,
     }
     const given = boundary ? boundaryRect(boundary) : null
     const placed = placeChartTooltip({
@@ -148,7 +153,16 @@ function ChartTooltip({
   // Before paint, so the card never shows at an unplaced position.
   React.useLayoutEffect(place)
 
-  // Content that grows, a window that resizes and a pane that scrolls all
+  // A rectangle boundary cannot resize on its own; only an element (or a ref
+  // to one) is worth observing, and a rectangle literal must not resubscribe
+  // on every render.
+  const observedBoundary =
+    boundary && (isRefObject(boundary) || "getBoundingClientRect" in boundary)
+      ? boundary
+      : null
+
+  // Content that grows, a boundary or wrapper that resizes (a split dragged, a
+  // sidebar collapsed), a window that resizes and a pane that scrolls all
   // move the card relative to its boundary without a render of its own.
   const placeRef = React.useRef(place)
   React.useLayoutEffect(() => {
@@ -163,6 +177,12 @@ function ChartTooltip({
     const observer =
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(replace)
     observer?.observe(card)
+    if (card.offsetParent) observer?.observe(card.offsetParent)
+    const boundaryElement =
+      observedBoundary && isRefObject(observedBoundary)
+        ? observedBoundary.current
+        : observedBoundary
+    if (boundaryElement) observer?.observe(boundaryElement)
     ownerDocument.addEventListener("scroll", replace, {
       capture: true,
       passive: true,
@@ -173,7 +193,7 @@ function ChartTooltip({
       ownerDocument.removeEventListener("scroll", replace, { capture: true })
       view?.removeEventListener("resize", replace)
     }
-  }, [])
+  }, [observedBoundary])
 
   return (
     <PopoverSurface

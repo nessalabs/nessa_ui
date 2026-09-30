@@ -8,6 +8,7 @@ import {
   intersectChartRects,
   linePath,
   linearScale,
+  MAX_TICK_COUNT,
   niceTicks,
   placeChartTooltip,
   proportionWeights,
@@ -70,6 +71,23 @@ describe("niceTicks", () => {
     assert.deepEqual(niceTicks(Number.NaN, 10, 5), [])
     assert.deepEqual(niceTicks(0, Number.POSITIVE_INFINITY, 5), [])
     assert.deepEqual(niceTicks(0, 10, 0), [0, 10])
+  })
+
+  it("never loops, repeats or overflows where floating point cannot step evenly", () => {
+    // Nanosecond timestamps over a narrow window: the index passes 2^53.
+    assert.deepEqual(niceTicks(1.7e18, 1.7e18 + 256, 5), [1.7e18, 1.7e18 + 256])
+    const wider = niceTicks(1.7e18, 1.7e18 + 1000, 5)
+    assert.equal(new Set(wider).size, wider.length)
+    // Too wide to measure: the span itself is infinite.
+    assert.deepEqual(niceTicks(-1e308, 1e308, 5), [-1e308, 1e308])
+    // A step below the smallest normal double.
+    const tiny = niceTicks(0, 1e-310, 5)
+    assert.ok(tiny.every(Number.isFinite))
+    assert.equal(new Set(tiny).size, tiny.length)
+  })
+
+  it("caps the tick count", () => {
+    assert.ok(niceTicks(0, 1, 1e6).length <= MAX_TICK_COUNT * 4 + 3)
   })
 
   it("first and last tick always bound the input", () => {

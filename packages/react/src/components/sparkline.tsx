@@ -44,8 +44,9 @@ export interface SparklineProps
   markers?: SparklineMarkers
   /**
    * A value, in data units, to draw as a dashed horizontal reference — a
-   * target, a baseline, a previous best. It is always inside the plotted
-   * range.
+   * target, a baseline, a previous best. The fitted range always includes
+   * it; a pinned `yDomain` does not, and a reference outside it is drawn past
+   * the box edge.
    */
   reference?: number
   /** Washes the area under the line. Defaults to true. */
@@ -53,7 +54,9 @@ export interface SparklineProps
   /**
    * A fixed value range, `[min, max]`, for sparklines that must share a scale
    * (a column of them, compared by eye). Omitted, the range fits the points
-   * and the reference.
+   * and the reference. Points and a reference outside a pinned range are
+   * drawn past the box edge rather than clamped, so a host should pick a range
+   * that holds its data.
    */
   yDomain?: readonly [number, number]
   /**
@@ -70,6 +73,10 @@ const INSET = 4
 /** Radii of the dots, in pixels. */
 const DOT_RADIUS = { point: 1.5, record: 2.5, end: 3.5 } as const
 
+/**
+ * The element's content-box size in whole pixels, tracked as it resizes, or
+ * null until the first measurement — which never happens on a server.
+ */
 function useMeasuredBox(ref: React.RefObject<HTMLElement | null>) {
   const [box, setBox] = React.useState<{ width: number; height: number } | null>(
     null,
@@ -135,27 +142,32 @@ function Sparkline({
       yDomain && Number.isFinite(yDomain[0]) && Number.isFinite(yDomain[1])
         ? yDomain
         : [Math.min(...ys), Math.max(...ys)]
+    const firstX = Math.min(...xs)
+    const lastX = Math.max(...xs)
+    // Every point at one x — a single reading — has no run to draw along, so
+    // the reading is held level across the box, ending (with its dots) at the
+    // right, instead of collapsing to a path with no length.
+    const flat = firstX === lastX
     const scale: ChartScale = {
-      x: linearScale(
-        [Math.min(...xs), Math.max(...xs)],
-        [INSET, box.width - INSET],
-      ),
+      x: flat
+        ? () => box.width - INSET
+        : linearScale([firstX, lastX], [INSET, box.width - INSET]),
       y: linearScale([low, high], [box.height - INSET, INSET]),
     }
     const records = bestSoFar(plotted, better)
     const recordSet = new Set(records)
-    const line =
-      variant === "step"
-        ? stepPath(plotted, scale, { better })
-        : linePath(plotted, scale)
-    const lastX = Math.max(...xs)
     const end =
       variant === "step"
         ? { x: lastX, y: records[records.length - 1]!.y }
         : plotted.reduce((latest, point) => (point.x >= latest.x ? point : latest))
+    const line = flat
+      ? `M${INSET},${scale.y(end.y)}H${box.width - INSET}`
+      : variant === "step"
+        ? stepPath(plotted, scale, { better })
+        : linePath(plotted, scale)
     return {
       line,
-      area: `${line}V${box.height}H${scale.x(Math.min(...xs))}Z`,
+      area: `${line}V${box.height}H${flat ? INSET : scale.x(firstX)}Z`,
       dots: plotted
         .filter((point) => markers === "all" || recordSet.has(point))
         .map((point) => ({
