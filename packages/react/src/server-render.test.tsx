@@ -17,12 +17,15 @@ import { Badge } from "./components/badge"
 import { Breadcrumb } from "./components/breadcrumb"
 import { Button } from "./components/button"
 import { Card, CardContent } from "./components/card"
+import { ChartTooltip } from "./components/chart-tooltip"
 import { Checkbox } from "./components/checkbox"
 import { EmptyState } from "./components/empty-state"
 import { Input } from "./components/input"
 import { Message } from "./components/message"
+import { ProportionBar } from "./components/proportion-bar"
 import { SearchableListbox } from "./components/searchable-listbox"
 import { SectionedListbox } from "./components/sectioned-listbox"
+import { Sparkline } from "./components/sparkline"
 import {
   SegmentedControl,
   SegmentedControlOption,
@@ -157,6 +160,30 @@ test("a glass segmented control marks its selection before the lens exists", () 
   assert.ok(markup.includes('data-lens="pending"'))
   assert.ok(!markup.includes("segmented-control-lens"))
   assert.ok(markup.includes('aria-pressed="true"'))
+})
+
+test("the chart primitives render on the server, measuring nothing until hydrated", () => {
+  const sparkline = server(
+    <Sparkline points={[{ x: 0, y: 1 }, { x: 1, y: 2 }]} aria-label="Trend" />,
+  )
+  assert.ok(sparkline.includes('aria-label="Trend"'))
+  assert.ok(!sparkline.includes("<svg"))
+  const bar = server(
+    <ProportionBar
+      legend
+      formatValue={String}
+      segments={[
+        { id: "a", label: "Alpha", value: 3 },
+        { id: "b", label: "Beta", value: 1 },
+      ]}
+    />,
+  )
+  assert.ok(bar.includes("Alpha") && bar.includes("Beta"))
+  assert.ok(
+    server(
+      <ChartTooltip anchor={{ x: 10, y: 20 }}>Reading</ChartTooltip>,
+    ).includes("Reading"),
+  )
 })
 
 test("a conversation surface renders its content on the server", () => {
