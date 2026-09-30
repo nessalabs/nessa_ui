@@ -87,6 +87,23 @@ describe("niceTicks", () => {
     assert.equal(new Set(tiny).size, tiny.length)
   })
 
+  it("keeps a flat range finite at the edges of the number line", () => {
+    for (const value of [Number.MAX_VALUE, -Number.MAX_VALUE]) {
+      const ticks = niceTicks(value, value, 5)
+      assert.ok(ticks.length >= 2, `${ticks}`)
+      assert.ok(ticks.every(Number.isFinite), `${ticks}`)
+      assert.ok(ticks[0]! <= value && ticks[ticks.length - 1]! >= value)
+    }
+    assert.ok(niceTicks(0, Number.MAX_VALUE, 5).every(Number.isFinite))
+    assert.ok(niceTicks(-Number.MAX_VALUE, Number.MAX_VALUE, 5).every(Number.isFinite))
+  })
+
+  it("widens a flat range at zero to [0, 1]", () => {
+    const ticks = niceTicks(0, 0, 5)
+    assert.equal(ticks[0], 0)
+    assert.equal(ticks[ticks.length - 1], 1)
+  })
+
   it("caps the tick count", () => {
     const limit = Math.ceil(MAX_TICK_COUNT * Math.SQRT2) + 2
     assert.ok(niceTicks(0, 1, 1e6).length <= limit)
@@ -310,6 +327,32 @@ describe("proportionWeights", () => {
     counts.forEach((weight, index) =>
       assert.ok(Math.abs(weight - scaled[index]!) < 1e-12),
     )
+  })
+
+  it("stays finite and sums to 1 at extreme magnitudes", () => {
+    const sum = (values: number[]) => values.reduce((total, value) => total + value, 0)
+    assert.deepEqual(proportionWeights([1e308, 1e308], "linear"), [0.5, 0.5])
+    for (const weight of proportionWeights(
+      [Number.MAX_VALUE, Number.MAX_VALUE, Number.MAX_VALUE],
+      "log",
+    )) {
+      assert.ok(Math.abs(weight - 1 / 3) < 1e-12)
+    }
+    for (const values of [
+      [1e-308, 1e308],
+      [Number.MIN_VALUE, Number.MAX_VALUE],
+      [5e-324, 1, 1e308],
+    ]) {
+      for (const weighting of ["linear", "log"] as const) {
+        const weights = proportionWeights(values, weighting)
+        assert.ok(weights.every(Number.isFinite), `${weighting} ${weights}`)
+        assert.ok(Math.abs(sum(weights) - 1) < 1e-12, `${weighting} ${weights}`)
+      }
+      const log = proportionWeights(values, "log")
+      for (let index = 1; index < log.length; index += 1) {
+        assert.ok(log[index]! > log[index - 1]!, `log order ${log}`)
+      }
+    }
   })
 
   it("weighs zero, negative and non-finite values as nothing", () => {

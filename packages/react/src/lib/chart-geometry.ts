@@ -84,9 +84,10 @@ export function niceTicks(min: number, max: number, count: number): number[] {
     if (low === 0) {
       high = 1
     } else {
+      // Clamped to the finite range: a tenth past ±MAX_VALUE is Infinity.
       const pad = Math.abs(low) / 10
-      low -= pad
-      high += pad
+      low = Math.max(low - pad, -Number.MAX_VALUE)
+      high = Math.min(high + pad, Number.MAX_VALUE)
     }
     // A value so close to zero that a tenth of it underflows cannot be
     // widened: it is its own single tick.
@@ -328,13 +329,27 @@ export function proportionWeights(
   const positive = values.map((value) =>
     Number.isFinite(value) && value > 0 ? value : 0,
   )
-  const smallest = Math.min(...positive.filter((value) => value > 0))
+  const present = positive.filter((value) => value > 0)
+  if (present.length === 0) return positive.map(() => 0)
+  const smallest = Math.min(...present)
+  const largest = Math.max(...present)
   const raw =
-    weighting === "log" && Number.isFinite(smallest)
-      ? positive.map((value) => (value > 0 ? Math.log1p(value / smallest) : 0))
-      : positive
+    weighting === "log"
+      ? positive.map((value) => {
+          if (value === 0) return 0
+          const ratio = value / smallest
+          // Two finite values can be too far apart for their ratio to be
+          // finite; past that point ln(1 + r) and ln(r) are the same number,
+          // and the difference of logs never overflows.
+          return Number.isFinite(ratio)
+            ? Math.log1p(ratio)
+            : Math.log(value) - Math.log(smallest)
+        })
+      : // Divided by the largest first, so a sum of values near MAX_VALUE
+        // cannot overflow to Infinity.
+        positive.map((value) => value / largest)
   const total = raw.reduce((sum, value) => sum + value, 0)
-  return total > 0 ? raw.map((value) => value / total) : raw.map(() => 0)
+  return raw.map((value) => value / total)
 }
 
 /** A rectangle in viewport pixels. `DOMRect` satisfies it. */
