@@ -12,17 +12,24 @@ import { renderToStaticMarkup } from "react-dom/server"
 // importing the package needs a bundler that handles CSS side effects) but it
 // is not what this file is testing, and going through it would mean this
 // never ran.
+import { AvatarStack } from "./components/avatar-stack"
 import { Badge } from "./components/badge"
+import { Breadcrumb } from "./components/breadcrumb"
 import { Button } from "./components/button"
 import { Card, CardContent } from "./components/card"
 import { ChartTooltip } from "./components/chart-tooltip"
 import { Checkbox } from "./components/checkbox"
+import { EmptyState } from "./components/empty-state"
 import { Input } from "./components/input"
 import { Message } from "./components/message"
 import { ProportionBar } from "./components/proportion-bar"
 import { SearchableListbox } from "./components/searchable-listbox"
 import { SectionedListbox } from "./components/sectioned-listbox"
 import { Sparkline } from "./components/sparkline"
+import {
+  SegmentedControl,
+  SegmentedControlOption,
+} from "./components/segmented-control"
 import {
   Tabs,
   TabsContent,
@@ -112,6 +119,47 @@ test("the listboxes render their rows on the server", () => {
   )
   assert.ok(sectioned.includes("Section"))
   assert.ok(sectioned.includes("Alpha"))
+})
+
+test("identity and navigation primitives render on the server", () => {
+  const stack = server(
+    <AvatarStack
+      label="4 agents"
+      items={[
+        { seed: "a", name: "Ada" },
+        { seed: "b", name: "Grace" },
+        { seed: "c", name: "Linus" },
+        { seed: "d", name: "Edsger" },
+      ]}
+    />,
+  )
+  assert.ok(stack.includes('aria-label="4 agents"'))
+  assert.ok(stack.includes("+1"))
+  const trail = server(
+    <Breadcrumb
+      label="Trail"
+      items={[{ label: "Home", onSelect: () => {} }, { label: "Here" }]}
+    />,
+  )
+  assert.ok(trail.includes('aria-current="page"'))
+  assert.ok(server(<EmptyState title="Nothing yet" />).includes("Nothing yet"))
+})
+
+/**
+ * The glass lens is measured in the browser, so a server render has no lens
+ * to draw. The pressed option has to carry the selection itself until it is
+ * placed, or the control would render with nothing chosen.
+ */
+test("a glass segmented control marks its selection before the lens exists", () => {
+  const markup = server(
+    <SegmentedControl variant="glass" aria-label="View" defaultValue="b">
+      <SegmentedControlOption value="a">A</SegmentedControlOption>
+      <SegmentedControlOption value="b">B</SegmentedControlOption>
+    </SegmentedControl>,
+  )
+  assert.ok(markup.includes('data-lens="pending"'))
+  assert.ok(!markup.includes("segmented-control-lens"))
+  assert.ok(markup.includes('aria-pressed="true"'))
 })
 
 test("the chart primitives render on the server, measuring nothing until hydrated", () => {

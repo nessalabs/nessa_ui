@@ -567,6 +567,26 @@
       ]
     },
     {
+      "name": "empty-state",
+      "type": "registry:ui",
+      "title": "Empty state",
+      "description": "What a surface shows when it has nothing to show: a title, an optional description and action, and a compact variant for inside a card or pane.",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/empty-state.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/empty-state.tsx"
+        }
+      ]
+    },
+    {
       "name": "card",
       "type": "registry:ui",
       "title": "Card",
@@ -2053,12 +2073,14 @@
       "name": "segmented-control",
       "type": "registry:ui",
       "title": "Segmented control",
-      "description": "A compact single-choice switcher: a bordered pill of pressed/unpressed buttons for view and scale toggles, with controlled or uncontrolled value state.",
+      "description": "A compact single-choice switcher: a bordered pill of pressed/unpressed buttons for view and scale toggles, with controlled or uncontrolled value state, and a glass variant whose selection rides a sliding lens.",
       "dependencies": [
-        "class-variance-authority"
+        "class-variance-authority",
+        "react-dom"
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
       ],
@@ -2067,6 +2089,27 @@
           "path": "packages/react/src/components/segmented-control.tsx",
           "type": "registry:ui",
           "target": "components/ui/segmented-control.tsx"
+        }
+      ]
+    },
+    {
+      "name": "breadcrumb",
+      "type": "registry:ui",
+      "title": "Breadcrumb",
+      "description": "A one-line way-back trail in a named nav: earlier steps are buttons that return to them, the last is the current place, the first may lead with a back chevron, and long labels truncate with their full text kept.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/breadcrumb.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/breadcrumb.tsx"
         }
       ]
     },
@@ -2613,6 +2656,27 @@
           "path": "packages/react/src/components/random-avatar.tsx",
           "type": "registry:ui",
           "target": "components/ui/random-avatar.tsx"
+        }
+      ]
+    },
+    {
+      "name": "avatar-stack",
+      "type": "registry:ui",
+      "title": "Avatar stack",
+      "description": "A face pile: the first few members of a group as overlapping RandomAvatars, then a count of the rest, with each face named and an optional quiet working ring.",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/random-avatar",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/avatar-stack.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/avatar-stack.tsx"
         }
       ]
     },

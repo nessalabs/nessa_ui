@@ -21,7 +21,17 @@ export {
   type ActivityRingsLayoutRing,
   type ActivityRingsProps,
 } from "./components/activity-rings"
+export {
+  AvatarStack,
+  type AvatarStackItem,
+  type AvatarStackProps,
+} from "./components/avatar-stack"
 export { Badge, badgeVariants, type BadgeProps } from "./components/badge"
+export {
+  Breadcrumb,
+  type BreadcrumbStep,
+  type BreadcrumbProps,
+} from "./components/breadcrumb"
 export { Button, buttonVariants, type ButtonProps } from "./components/button"
 export {
   Card,
@@ -45,6 +55,7 @@ export {
   checkboxCheckPath,
   type CheckboxProps,
 } from "./components/checkbox"
+export { EmptyState, type EmptyStateProps } from "./components/empty-state"
 export {
   ConversationRail,
   ConversationRailItem,
