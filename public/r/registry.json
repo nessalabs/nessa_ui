@@ -584,6 +584,87 @@
       ]
     },
     {
+      "name": "meter",
+      "type": "registry:ui",
+      "title": "Meter",
+      "description": "A thin track filled to a fraction, exposed to assistive technology as a meter with its value, in a neutral, good, or bad tone; the fill glides between values and jumps under reduced motion.",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/meter.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/meter.tsx"
+        }
+      ]
+    },
+    {
+      "name": "delta",
+      "type": "registry:ui",
+      "title": "Delta",
+      "description": "A signed change written with a plus or a true minus sign, in the good, bad, or neutral tone its caller judged it.",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/delta.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/delta.tsx"
+        }
+      ]
+    },
+    {
+      "name": "stat",
+      "type": "registry:ui",
+      "title": "Stat",
+      "description": "A figure with its caption: a headline value in tabular numerals, an optional dimmer whole it is part of and change slot, in sm, md, or hero lg sizes.",
+      "dependencies": [
+        "class-variance-authority"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/stat.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/stat.tsx"
+        }
+      ]
+    },
+    {
+      "name": "status-label",
+      "type": "registry:ui",
+      "title": "Status label",
+      "description": "A state as a small mark and a word in a neutral, good, bad, warning, or active tone, with no pill or fill behind it.",
+      "dependencies": [
+        "class-variance-authority",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/status-label.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/status-label.tsx"
+        }
+      ]
+    },
+    {
       "name": "checkbox",
       "type": "registry:ui",
       "title": "Checkbox",
