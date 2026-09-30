@@ -32,10 +32,9 @@ Git state.
   them, make that structural change, and review again — at most two more
   rounds. Still open after those, stop the work and hand it off — what is
   done, what is not, the open findings with their evidence, the diagnosis, and
-  the suggested next step: pushed to the authorized branch in a draft pull
-  request and on its issue when one exists; otherwise reported locally, asking
-  for authorization before creating a branch or pushing (the branch rules
-  above still hold).
+  the suggested next step — pushed to a branch of its own, never `main`, in a
+  draft pull request and on its issue. This rule is the authorization for that
+  branch and push, when the work was not already on one.
 - Keep the issue you are working on current, not only its board Status: a
   **Status** section at the top of its description naming the remote branch(es)
   that hold the work, the pull request, a Mermaid sequence diagram of the flow
