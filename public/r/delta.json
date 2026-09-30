@@ -1,0 +1,22 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "delta",
+  "title": "Delta",
+  "description": "A signed change written with a plus or a true minus sign, in the good, bad, or neutral tone its caller judged it.",
+  "dependencies": [
+    "class-variance-authority"
+  ],
+  "registryDependencies": [
+    "nessalabs/nessa_ui/nessa-base",
+    "nessalabs/nessa_ui/utils"
+  ],
+  "files": [
+    {
+      "path": "packages/react/src/components/delta.tsx",
+      "content": "import * as React from \"react\"\nimport { cva } from \"class-variance-authority\"\n\nimport { cn } from \"@/lib/utils\"\n\n/** The true minus sign (U+2212), which sets at the width and height of `+`. */\nconst MINUS_SIGN = \"\\u2212\"\n\n/**\n * The colour of a change, by the tone its caller gave it. `good` and `bad`\n * write in `--nessa-market-gain` and `--nessa-market-loss`, which Nessa checks\n * at 4.5:1 as text on the background, card, and popover surfaces in both\n * modes; `neutral` is the muted foreground. The market pair is borrowed — it\n * is the only favourable/unfavourable text pair the token chain has — and\n * stands in until a status colour role exists, so a theme that retunes the\n * market pair retunes these tones too.\n */\nconst deltaToneVariants = cva(\"\", {\n  variants: {\n    tone: {\n      good: \"text-(--nessa-market-gain)\",\n      bad: \"text-(--nessa-market-loss)\",\n      neutral: \"text-muted-foreground\",\n    } satisfies Record<DeltaTone, string>,\n  },\n})\n\n/** Whether a change is good, bad, or neither. */\nexport type DeltaTone = \"good\" | \"bad\" | \"neutral\"\n\nexport interface DeltaProps\n  extends Omit<React.ComponentProps<\"span\">, \"children\"> {\n  /**\n   * The signed change, at the precision it is displayed. Delta signs what it\n   * receives, so pass the value already rounded the way `format` rounds it:\n   * `-0.04` shown to one decimal would otherwise read \"−0.0\", while the\n   * rounded `-0` reads as exactly zero. A value that is not a number gets no\n   * sign and is handed to `format` as `NaN`.\n   */\n  value: number\n  /**\n   * Writes the size of the change. It is always called with the absolute\n   * value — never a negative number, never `-0` — so it never produces a\n   * sign: Delta alone prefixes `+` or a true minus (U+2212). A change of\n   * exactly zero gets no sign, so `format` decides how zero reads — \"0\",\n   * \"±0.0\", or \"no change\".\n   */\n  format: (size: number) => string\n  /**\n   * Whether the change is good, bad, or neither. The caller decides: whether\n   * a rise is an improvement, and how large a change must be before it counts\n   * rather than being noise, belong to the model that owns the metric, not to\n   * the component drawing it. Defaults to `neutral`.\n   */\n  tone?: DeltaTone\n}\n\n/**\n * A signed change in the tone its caller judged it: `+1.8` in the favourable\n * ink, `−0.4` in the unfavourable one, a change too small to count muted.\n *\n * The sign always carries the direction, so the colour is never the only\n * signal. Every number is set in tabular figures, and the text size is\n * inherited, so a Delta sits inline beside the figure it qualifies. It is\n * laid out left to right and isolated from the text around it, so the sign\n * stays in front of the digits in a right-to-left paragraph; pass `dir` for a\n * locale that writes its sign differently. The tone is exposed as `data-tone`\n * for hosts that style around it.\n */\nfunction Delta({\n  className,\n  value,\n  format,\n  tone = \"neutral\",\n  ...props\n}: DeltaProps) {\n  const sign = value > 0 ? \"+\" : value < 0 ? MINUS_SIGN : \"\"\n\n  return (\n    <span\n      dir=\"ltr\"\n      data-slot=\"delta\"\n      data-tone={tone}\n      className={cn(\n        \"whitespace-nowrap tabular-nums\",\n        deltaToneVariants({ tone }),\n        className,\n      )}\n      {...props}\n    >\n      {sign}\n      {format(Math.abs(value))}\n    </span>\n  )\n}\n\nexport { Delta }\n",
+      "type": "registry:ui",
+      "target": "components/ui/delta.tsx"
+    }
+  ],
+  "type": "registry:ui"
+}

@@ -32,6 +32,14 @@ export {
   CardHeader,
   CardTitle,
 } from "./components/card"
+export { Delta, type DeltaProps, type DeltaTone } from "./components/delta"
+export { Meter, type MeterProps, type MeterTone } from "./components/meter"
+export { Stat, type StatProps, type StatSize } from "./components/stat"
+export {
+  StatusLabel,
+  type StatusLabelProps,
+  type StatusLabelTone,
+} from "./components/status-label"
 export {
   Checkbox,
   checkboxCheckPath,
