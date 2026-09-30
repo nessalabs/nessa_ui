@@ -422,3 +422,76 @@ export const GlassOverflow: Story = {
     finishStoryTransitions(canvasElement)
   },
 }
+
+function GlassDirectionDemo() {
+  const [dir, setDir] = React.useState<"ltr" | "rtl">("ltr")
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <SegmentedControl
+        debug
+        dir={dir}
+        variant="glass"
+        aria-label="Layout"
+        defaultValue="list"
+      >
+        <SegmentedControlOption value="list">List</SegmentedControlOption>
+        <SegmentedControlOption value="board">Board</SegmentedControlOption>
+        <SegmentedControlOption value="calendar">Calendar</SegmentedControlOption>
+      </SegmentedControl>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setDir((value) => (value === "ltr" ? "rtl" : "ltr"))}
+      >
+        {dir === "ltr" ? "Right to left" : "Left to right"}
+      </Button>
+    </div>
+  )
+}
+
+export const GlassDirection: Story = {
+  parameters: storyDocumentation(
+    "Flipping the control's `dir` mirrors its options without changing any size, so no resize is observed; the lens is re-measured when the direction changes and lands on the chosen option at once. The play test flips the direction both ways and asserts after each flip that the lens covers the chosen option, was moved exactly once (read from the `debug` trace), and did not glide there.",
+  ),
+  render: () => <GlassDirectionDemo />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const name = "Layout"
+    const lensOf = () =>
+      lensAndPressed(canvasElement, name).lens as HTMLElement
+    await expectLensOnPressed(canvasElement, name)
+    const before = lensOf().getBoundingClientRect().left
+    const trace = () =>
+      (
+        Object.values(
+          (
+            canvasElement.ownerDocument.defaultView as unknown as {
+              __nessaSegmentedControl: Record<
+                string,
+                { events: { ev: string; outcome?: string }[] }
+              >
+            }
+          ).__nessaSegmentedControl,
+        )[0]!.events
+      ).filter(
+        (event) =>
+          event.ev === "place" &&
+          (event.outcome === "placed" || event.outcome === "glide"),
+      ).length
+    for (const flip of ["Right to left", "Left to right"]) {
+      const moves = trace()
+      await userEvent.click(canvas.getByRole("button", { name: flip }))
+      await waitFor(async () => {
+        await expectLensOnPressed(canvasElement, name)
+      })
+      // One flip, one placement: the lens is not moved twice for it.
+      await expect(trace() - moves).toBe(1)
+      await expect(lensOf()).not.toHaveAttribute("data-animate")
+      await expect(lensOf().getAnimations()).toHaveLength(0)
+    }
+    await expect(
+      Math.abs(lensOf().getBoundingClientRect().left - before),
+    ).toBeLessThan(0.5)
+    finishStoryTransitions(canvasElement)
+  },
+}

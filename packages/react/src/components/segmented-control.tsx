@@ -208,7 +208,8 @@ export interface SegmentedControlProps
  * range tabs inside a chart's own control bar. `glass` sets the options on a
  * translucent track and carries the selection on a lens that slides between
  * them. The lens is measured from the pressed option before first paint and
- * again whenever the track or an option resizes or the options change, so
+ * again whenever the track or an option resizes, the options change, or
+ * their direction, class or style on the control changes, so
  * labels of any width land exactly; it glides only when the selection moves
  * and holds still under `prefers-reduced-motion`. A glass control is not
  * meant to be nested inside another one's track.
@@ -309,7 +310,20 @@ function SegmentedControl({
       for (const option of ownOptions(track)) resizeObserver.observe(option)
     }
     observeOptions()
-    const mutationObserver = new MutationObserver(() => {
+    // Options can also move without any box changing size — a `dir` flip
+    // mirrors them, a class or style change can reorder them — so the
+    // attributes that lay them out are watched too. The lens's own style is
+    // excluded: it changes on every placement and reacting to it would only
+    // measure again. One callback covers every record of a microtask, so a
+    // burst of changes places the lens once.
+    const mutationObserver = new MutationObserver((records) => {
+      const relevant = records.some(
+        (record) =>
+          record.type !== "attributes" ||
+          (record.target as Element).getAttribute("data-slot") !==
+            "segmented-control-lens",
+      )
+      if (!relevant) return
       observeOptions()
       placeLens("options")
     })
@@ -317,6 +331,8 @@ function SegmentedControl({
       childList: true,
       subtree: true,
       characterData: true,
+      attributes: true,
+      attributeFilter: ["dir", "class", "style"],
     })
     return () => {
       resizeObserver.disconnect()
