@@ -1,7 +1,7 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, userEvent, within } from "storybook/test"
-import { Breadcrumb, type BreadcrumbItem } from "@nessalabs/ui"
+import { Breadcrumb, type BreadcrumbStep } from "@nessalabs/ui"
 
 import { finishStoryTransitions } from "./finish-story-transitions"
 import { storyDocumentation } from "./story-documentation"
@@ -34,7 +34,7 @@ type Story = StoryObj<typeof meta>
 
 function TrailDemo() {
   const [returnedTo, setReturnedTo] = React.useState("nowhere yet")
-  const items: BreadcrumbItem[] = [
+  const items: BreadcrumbStep[] = [
     { label: "Experiments", onSelect: () => setReturnedTo("Experiments") },
     {
       label: "Checkout latency",
@@ -93,7 +93,7 @@ export const Trail: Story = {
   },
 }
 
-const longTrail: BreadcrumbItem[] = [
+const longTrail: BreadcrumbStep[] = [
   { label: "Every experiment across the workspace", onSelect: () => {} },
   {
     label: "Reduce checkout latency on the slowest regional storefronts",
@@ -106,20 +106,25 @@ const longTrail: BreadcrumbItem[] = [
 
 export const LongLabels: Story = {
   parameters: storyDocumentation(
-    "The overflow case: labels far longer than the pane they sit in. The trail stays on one line; every step truncates in proportion to its length, earlier steps capped so the current place keeps the most room, and each keeps its full label as its accessible name and hover text. The play test asserts the trail fits its pane on a single line, that the labels are visibly cut, and that each step is still found by its full name.",
+    "The overflow case: labels far longer than the pane they sit in. The trail stays on one line; every step truncates in proportion to its length, earlier steps capped so the current place keeps the most room, and each keeps its full label as its accessible name and hover text. The play test asserts the trail fits its pane on a single line, that squeezed steps stay at least 24px wide, that the labels are visibly cut, and that each step is still found by its full name.",
   ),
   render: () => (
-    <div className="w-80 rounded-lg border border-border p-2" data-testid="pane">
+    <div className="w-80 rounded-lg border border-border p-2">
       <Breadcrumb back items={longTrail} label="Run trail" />
     </div>
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    const pane = canvas.getByTestId("pane")
     const nav = canvas.getByRole("navigation", { name: "Run trail" })
-    await expect(nav.getBoundingClientRect().right).toBeLessThanOrEqual(
-      pane.getBoundingClientRect().right,
-    )
+    // The list itself fits: nothing spills past the box it is laid out in.
+    const list = within(nav).getByRole("list")
+    await expect(list.scrollWidth).toBeLessThanOrEqual(list.clientWidth)
+    // Squeezed steps stay targets: never narrower than 24px.
+    for (const button of within(nav).getAllByRole("button")) {
+      await expect(button.getBoundingClientRect().width).toBeGreaterThanOrEqual(
+        24,
+      )
+    }
     const centres = within(nav)
       .getAllByRole("listitem")
       .map((item) => {

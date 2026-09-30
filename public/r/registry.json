@@ -1981,7 +1981,8 @@
       "title": "Segmented control",
       "description": "A compact single-choice switcher: a bordered pill of pressed/unpressed buttons for view and scale toggles, with controlled or uncontrolled value state, and a glass variant whose selection rides a sliding lens.",
       "dependencies": [
-        "class-variance-authority"
+        "class-variance-authority",
+        "react-dom"
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/button",

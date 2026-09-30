@@ -1,5 +1,3 @@
-"use client"
-
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
@@ -29,7 +27,7 @@ export interface AvatarStackItem {
  * adds a hairline just outside that ring.
  */
 const avatarStackFaceVariants = cva(
-  "ring-2 ring-background data-[busy]:outline-1 data-[busy]:outline-offset-2 data-[busy]:outline-muted-foreground/60",
+  "ring-2 ring-background data-[busy]:outline-1 data-[busy]:outline-offset-2 data-[busy]:outline-muted-foreground",
   {
     variants: {
       size: {
@@ -104,7 +102,9 @@ function AvatarStack({
   className,
   ...props
 }: AvatarStackProps) {
-  const limit = Number.isFinite(max) ? Math.max(0, Math.floor(max)) : 3
+  // `Infinity` shows everyone; anything that is not a number falls back to
+  // the default rather than hiding the whole group.
+  const limit = Number.isNaN(max) ? 3 : Math.max(0, Math.floor(max))
   const shown = items.slice(0, limit)
   const hidden = items.length - shown.length
 

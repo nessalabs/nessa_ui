@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
+import { flushSync } from "react-dom"
 
 import { useComposedRefs } from "@/lib/compose"
 import { cn } from "@/lib/utils"
@@ -72,23 +73,36 @@ const segmentedShellVariants = cva(
  * The lens: the lifted fill, a hairline rim, and a one-pixel specular edge
  * along its top that only shows where the fill is dark enough to need it.
  * The transparent border draws nothing until forced colours replace it, which
- * is what keeps the selection visible when backgrounds are stripped.
+ * is what keeps the selection visible when backgrounds are stripped. Its box
+ * is the pressed option's, measured, so it follows whatever padding the track
+ * is given.
  */
 const glassLensClassName = cn(
-  "pointer-events-none absolute inset-y-0.5 left-0 z-0 box-border rounded-full border border-transparent bg-(--nessa-segmented-lens)",
+  "pointer-events-none absolute left-0 top-0 z-0 box-border rounded-full border border-transparent bg-(--nessa-segmented-lens)",
   "shadow-xs inset-ring inset-ring-foreground/[0.06] inset-shadow-[0_1px_0_light-dark(transparent,color-mix(in_oklab,var(--foreground)_12%,transparent))]",
   // It glides only between options. Placement on mount, on resize, and when
   // the options change lands at once: a lens that chased a resizing track
-  // would read as lag, not motion.
-  "transition-none motion-safe:data-[animate]:transition-[transform,width] [transition-duration:var(--nessa-motion-duration-slow)] [transition-timing-function:var(--nessa-motion-easing-standard)]",
+  // would read as lag, not motion. The duration and easing utilities feed the
+  // transition utility's own variables, so the tokens reach the glide however
+  // the variants around it resolve.
+  "transition-none duration-(--nessa-motion-duration-slow) ease-(--nessa-motion-easing-standard) motion-safe:data-[animate]:transition-[transform,width,height]",
 )
 
 /** Why the lens was placed: the development trace records it. */
 type LensCause = "mount" | "value" | "resize" | "options"
 
+/**
+ * What a placement did to the lens, for the development trace: `placed` and
+ * `glide` move it (at once, or animated), `kept` leaves it where it already
+ * is, and `cleared` and `none` mean no option is pressed.
+ */
+type LensOutcome = "placed" | "glide" | "kept" | "cleared" | "none"
+
 interface LensGeometry {
   x: number
+  y: number
   width: number
+  height: number
   animate: boolean
 }
 
@@ -113,9 +127,12 @@ function ownOptions(track: HTMLElement) {
 
 /**
  * Where the pressed option sits inside the track, in the track's own
- * untransformed pixels. Bounding rectangles keep the subpixel widths text
- * produces, which rounded `offset*` values would lose; dividing by the
- * track's rendered-to-layout ratio takes back any scale an ancestor applies.
+ * untransformed pixels, or `null` when no option is pressed. Bounding
+ * rectangles keep the subpixel widths text produces, which rounded `offset*`
+ * values would lose. An ancestor's scale shows as the rendered width parting
+ * from the layout width, and is divided back out — but only past a whole
+ * pixel, because `offsetWidth` is itself rounded and a sub-pixel difference is
+ * that rounding, not a transform.
  */
 function measurePressed(track: HTMLElement) {
   const pressed = ownOptions(track).find(
@@ -124,13 +141,28 @@ function measurePressed(track: HTMLElement) {
   if (!pressed) return null
   const trackBox = track.getBoundingClientRect()
   const box = pressed.getBoundingClientRect()
-  const scale =
-    track.offsetWidth > 0 ? trackBox.width / track.offsetWidth : 1
-  const ratio = scale > 0 ? scale : 1
+  const scaled =
+    track.offsetWidth > 0 && Math.abs(trackBox.width - track.offsetWidth) >= 1
+  const ratio = scaled ? trackBox.width / track.offsetWidth : 1
   return {
     x: (box.left - trackBox.left) / ratio - track.clientLeft,
+    y: (box.top - trackBox.top) / ratio - track.clientTop,
     width: box.width / ratio,
+    height: box.height / ratio,
   }
+}
+
+/** Whether two measurements put the lens in the same place. */
+function sameGeometry(
+  a: Omit<LensGeometry, "animate">,
+  b: Omit<LensGeometry, "animate">,
+) {
+  return (
+    Math.abs(a.x - b.x) < 0.01 &&
+    Math.abs(a.y - b.y) < 0.01 &&
+    Math.abs(a.width - b.width) < 0.01 &&
+    Math.abs(a.height - b.height) < 0.01
+  )
 }
 
 type SegmentedControlTraceHost = {
@@ -147,11 +179,13 @@ export interface SegmentedControlProps
   /** Fires with the newly selected option value. */
   onValueChange?: (value: string) => void
   /**
-   * Development tooling for the `glass` lens: records every placement (its
-   * cause — mount, value, resize, options — and the geometry it landed on)
-   * and every selection into a ring buffer published at
-   * `window.__nessaSegmentedControl[<instance id>]`, with a `snapshot()` of
-   * the live lens. No-op unless set.
+   * Development tooling for the `glass` lens: records every selection, every
+   * placement (its cause — mount, value, resize, options — what it did —
+   * placed, glide, kept, cleared — and the geometry), and the lens's own
+   * transitions running, ending, or being cancelled, into a ring buffer
+   * published at `window.__nessaSegmentedControl[<instance id>]` with a
+   * `snapshot()` of the live lens. So "did a resize cut the glide short?" is
+   * read from the trace rather than from a recording. No-op unless set.
    */
   debug?: boolean
 }
@@ -195,8 +229,10 @@ function SegmentedControl({
   const trackRef = React.useRef<HTMLDivElement>(null)
   const composedRef = useComposedRefs(trackRef, forwardedRef)
   const [lens, setLens] = React.useState<LensGeometry | null>(null)
-  const lensRef = React.useRef(lens)
-  lensRef.current = lens
+  // The placement logic's own record of the lens, written with every state
+  // update it makes: two placements in one batch (mount and value on the
+  // first layout pass) must see each other, which rendered state cannot.
+  const lensRef = React.useRef<LensGeometry | null>(null)
 
   /** Dev-only event ring buffer; null unless `debug`, so every call site is
    * a single optional chain. */
@@ -216,24 +252,36 @@ function SegmentedControl({
     const track = trackRef.current
     if (!track) return
     const measured = measurePressed(track)
-    traceRef.current?.({ ev: "measure", cause, ...(measured ?? { x: null }) })
-    setLens((previous) => {
-      if (!measured) return null
+    const previous = lensRef.current
+    let next: LensGeometry | null
+    let outcome: LensOutcome
+    if (!measured) {
+      next = null
+      outcome = previous ? "cleared" : "none"
+    } else if (previous && sameGeometry(previous, measured)) {
       // Unchanged geometry keeps the running glide: a resize observer's
       // first report arrives just after a selection starts moving the lens,
       // and treating it as a placement would cut the glide short.
-      if (
-        previous &&
-        Math.abs(previous.x - measured.x) < 0.01 &&
-        Math.abs(previous.width - measured.width) < 0.01
-      ) {
-        return previous
-      }
-      return {
-        ...measured,
-        animate: cause === "value" && previous !== null,
-      }
-    })
+      next = previous
+      outcome = "kept"
+    } else {
+      const animate = cause === "value" && previous !== null
+      next = { ...measured, animate }
+      outcome = animate ? "glide" : "placed"
+    }
+    traceRef.current?.({ ev: "place", cause, outcome, ...measured })
+    if (next === previous) return
+    lensRef.current = next
+    if (cause === "resize" || cause === "options") {
+      // An observer reports inside the frame it measured, so the lens has to
+      // move in that frame too. A default-priority update would render in a
+      // later task and let this frame paint the lens where it used to be —
+      // one frame behind for as long as the track keeps resizing.
+      flushSync(() => setLens(next))
+    } else {
+      // Called from a layout effect, which already commits before paint.
+      setLens(next)
+    }
   }, [])
 
   // The observers belong to the track, not to a selection: they follow the
@@ -241,6 +289,7 @@ function SegmentedControl({
   useIsomorphicLayoutEffect(() => {
     const track = trackRef.current
     if (!glass || !track) {
+      lensRef.current = null
       setLens(null)
       return
     }
@@ -287,7 +336,22 @@ function SegmentedControl({
         visibility: document.visibilityState,
       }),
     }
+    // The lens's own transitions, so a glide that was cut short reads as a
+    // `transitioncancel` rather than as a guess from a recording.
+    const track = trackRef.current
+    const onTransition = (event: TransitionEvent) => {
+      const target = event.target as Element | null
+      if (target?.getAttribute("data-slot") !== "segmented-control-lens") return
+      traceRef.current?.({
+        ev: event.type,
+        property: event.propertyName,
+        elapsed: Math.round(event.elapsedTime * 1000),
+      })
+    }
+    const kinds = ["transitionrun", "transitionend", "transitioncancel"] as const
+    for (const kind of kinds) track?.addEventListener(kind, onTransition)
     return () => {
+      for (const kind of kinds) track?.removeEventListener(kind, onTransition)
       delete host.__nessaSegmentedControl?.[instanceId]
     }
   }, [debug, instanceId])
@@ -329,7 +393,8 @@ function SegmentedControl({
             className={glassLensClassName}
             style={{
               width: lens.width,
-              transform: `translateX(${lens.x}px)`,
+              height: lens.height,
+              transform: `translate(${lens.x}px, ${lens.y}px)`,
             }}
           />
         ) : null}
@@ -343,14 +408,19 @@ function SegmentedControl({
  * A glass option paints no selection of its own once the lens is placed: it
  * sits above the lens, turns to the foreground when pressed, and takes a
  * quiet tint on hover only while it is not the chosen one.
+ *
+ * Its background does not transition, and the pending fill below is only a
+ * fill, with no shadow: it is removed in the same frame the lens is placed,
+ * and any fade there would lay a second, fading pill over the lens on every
+ * mount.
  */
 const glassOptionClassName = cn(
-  "relative z-10 rounded-full px-3 text-muted-foreground hover:bg-transparent hover:text-foreground aria-pressed:text-foreground not-aria-pressed:hover:bg-foreground/[0.05]",
-  "transition-[color,background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)]",
+  "relative z-10 rounded-full px-3 text-muted-foreground hover:bg-transparent hover:text-foreground aria-pressed:text-foreground not-aria-pressed:hover:bg-foreground/[0.04]",
+  "transition-[color,box-shadow,transform] duration-(--nessa-motion-duration-fast) ease-(--nessa-motion-easing-standard)",
   // Until the lens is placed — on a server render, before any script — the
   // pressed option wears the lens's paint itself, so selection never depends
   // on a measurement having happened.
-  "group-data-[lens=pending]/segmented-control:aria-pressed:bg-(--nessa-segmented-lens) group-data-[lens=pending]/segmented-control:aria-pressed:shadow-xs",
+  "group-data-[lens=pending]/segmented-control:aria-pressed:bg-(--nessa-segmented-lens)",
 )
 
 export interface SegmentedControlOptionProps

@@ -152,8 +152,11 @@ async function expectLensOnPressed(canvasElement: HTMLElement, name: string) {
   const pressedBox = pressed!.getBoundingClientRect()
   await expect(Math.abs(lensBox.left - pressedBox.left)).toBeLessThan(0.5)
   await expect(Math.abs(lensBox.width - pressedBox.width)).toBeLessThan(0.5)
+  await expect(Math.abs(lensBox.top - pressedBox.top)).toBeLessThan(0.5)
+  await expect(Math.abs(lensBox.height - pressedBox.height)).toBeLessThan(0.5)
 }
 
+/** Whether the story is running under the reduced-motion preference. */
 function prefersReducedMotion(canvasElement: HTMLElement) {
   return canvasElement.ownerDocument.defaultView!.matchMedia(
     "(prefers-reduced-motion: reduce)",
@@ -165,7 +168,7 @@ export const Glass: Story = {
   // project is where it must not.
   tags: ["cross-engine", "reduced-motion"],
   parameters: storyDocumentation(
-    "The `glass` variant: the options sit on a translucent track and the selection rides a lens that glides to whichever option is chosen — lifted from the track by the page's own background in light, by a brighter tint in dark, with a hairline rim and a faint specular top edge. Hovering an unchosen option gives it a quiet tint. The API and keyboard are the other variants': each option is a tab stop chosen with Enter or Space. The play test proves the lens covers the pressed option on first paint, glides on a click (and lands, with nothing left running), and follows keyboard selection; under reduced motion it proves the lens is already on the new option the moment it is chosen, with no transition at all.",
+    "The `glass` variant: the options sit on a translucent track and the selection rides a lens that glides to whichever option is chosen — lifted from the track by the page's own background in light, by a brighter tint in dark, with a hairline rim and a faint specular top edge. Hovering an unchosen option gives it a quiet tint. The API and keyboard are the other variants': each option is a tab stop chosen with Enter or Space. The play test proves the lens covers the pressed option on first paint with nothing animating, glides on a click over the slow motion token (and lands, with nothing left running), and follows keyboard selection; under reduced motion it proves the lens is already on the new option the moment it is chosen, with no transition at all.",
   ),
   args: { debug: true },
   render: (args) => (
@@ -187,8 +190,13 @@ export const Glass: Story = {
     const { group, lens } = lensAndPressed(canvasElement, name)
     await expect(group).toHaveAttribute("data-variant", "glass")
     await expect(group).toHaveAttribute("data-lens", "placed")
-    // First paint: placed, not glided into place.
+    // First paint: placed, not glided into place, and the pressed option's
+    // pending fill handed over without a fade laid over the lens.
     await expect(lens).not.toHaveAttribute("data-animate")
+    await expect(lens!.getAnimations()).toHaveLength(0)
+    await expect(
+      group.querySelector('[aria-pressed="true"]')!.getAnimations(),
+    ).toHaveLength(0)
     await expectLensOnPressed(canvasElement, name)
 
     const timeline = canvas.getByRole("button", { name: "Timeline" })
@@ -199,16 +207,18 @@ export const Glass: Story = {
       await expect(getComputedStyle(lens!).transitionProperty).toBe("none")
       await expectLensOnPressed(canvasElement, name)
     } else {
+      // The glide is configured on the lens for as long as it is animating
+      // between options, so this reads the same however far it has got: it
+      // transitions its transform, over the slow motion token.
       await expect(lens).toHaveAttribute("data-animate")
-      await expect(
-        lens!
-          .getAnimations()
-          .some(
-            (animation) =>
-              animation instanceof CSSTransition &&
-              animation.transitionProperty === "transform",
-          ),
-      ).toBe(true)
+      const style = getComputedStyle(lens!)
+      await expect(style.transitionProperty).toContain("transform")
+      const token = Number.parseFloat(
+        style.getPropertyValue("--nessa-motion-duration-slow"),
+      )
+      await expect(Number.parseFloat(style.transitionDuration) * 1000).toBe(
+        token,
+      )
       await waitFor(async () => {
         finishStoryTransitions(canvasElement)
         await expectLensOnPressed(canvasElement, name)
@@ -299,7 +309,7 @@ function GlassGeometryDemo() {
 
 export const GlassFollowsItsOptions: Story = {
   parameters: storyDocumentation(
-    "The lens is measured from the chosen option, not assumed from the option count, so it keeps its place when the geometry under it changes: the track resizing, the chosen label growing, or an option arriving ahead of it. Those moves land at once rather than gliding — a lens chasing a resizing track reads as lag. Stories enable the `debug` trace, so `window.__nessaSegmentedControl` records each placement and its cause. The play test widens the track, lengthens the chosen label, and adds an option before it, asserting after each that the lens still covers the chosen option exactly and did not animate there.",
+    "The lens is measured from the chosen option, not assumed from the option count, so it keeps its place when the geometry under it changes: the track resizing, the chosen label growing, or an option arriving ahead of it. Those moves land at once rather than gliding — a lens chasing a resizing track reads as lag — even straight after a glide. Stories enable the `debug` trace, so `window.__nessaSegmentedControl` records each placement, its cause and outcome, and the lens's transitions. The play test glides to another option first, then widens the track, lengthens the chosen label, and adds an option before it, asserting after each that the lens still covers the chosen option exactly, that it stopped being animated, and that no transition carried it there.",
   ),
   render: () => <GlassGeometryDemo />,
   play: async ({ canvasElement }) => {
@@ -307,28 +317,40 @@ export const GlassFollowsItsOptions: Story = {
     const name = "Range"
     const lensOf = () =>
       lensAndPressed(canvasElement, name).lens as HTMLElement
+    /** Lands the geometry change at once: no glide flag, no transition. */
+    const expectLanded = async () => {
+      await expectLensOnPressed(canvasElement, name)
+      await expect(lensOf()).not.toHaveAttribute("data-animate")
+      await expect(lensOf().getAnimations()).toHaveLength(0)
+    }
+    /** Chooses an option and lets its glide finish. */
+    const choose = async (option: string) => {
+      await userEvent.click(canvas.getByRole("button", { name: option }))
+      await waitFor(async () => {
+        finishStoryTransitions(canvasElement)
+        await expectLensOnPressed(canvasElement, name)
+      })
+    }
     await expectLensOnPressed(canvasElement, name)
-    const startWidth = lensOf().getBoundingClientRect().width
 
+    await choose("Month")
+    const startWidth = lensOf().getBoundingClientRect().width
     await userEvent.click(canvas.getByRole("button", { name: "Widen" }))
     await waitFor(async () => {
       await expect(lensOf().getBoundingClientRect().width).toBeGreaterThan(
         startWidth,
       )
     })
-    await expect(lensOf()).not.toHaveAttribute("data-animate")
-    await expectLensOnPressed(canvasElement, name)
+    await expectLanded()
 
+    await choose("Week")
     await userEvent.click(
       canvas.getByRole("button", { name: "Lengthen label" }),
     )
     await expect(
       canvas.getByRole("button", { name: "This working week" }),
     ).toHaveAttribute("aria-pressed", "true")
-    await waitFor(async () => {
-      await expectLensOnPressed(canvasElement, name)
-    })
-    await expect(lensOf()).not.toHaveAttribute("data-animate")
+    await waitFor(expectLanded)
 
     const before = lensOf().getBoundingClientRect().left
     await userEvent.click(canvas.getByRole("button", { name: "Add option" }))
@@ -338,9 +360,62 @@ export const GlassFollowsItsOptions: Story = {
         before,
         0,
       )
+    })
+    await expectLanded()
+    finishStoryTransitions(canvasElement)
+  },
+}
+
+const zones = [
+  "Pacific",
+  "Mountain",
+  "Central",
+  "Eastern",
+  "Atlantic",
+  "Greenwich",
+  "Central European",
+]
+
+export const GlassOverflow: Story = {
+  parameters: storyDocumentation(
+    "The overflow case: more options than the space they sit in. A glass track keeps its options on one line at their natural width — it never squeezes or wraps them — so the host gives it a scrolling container, as here. The lens belongs to the track and scrolls with it. The play test chooses the last option, scrolls it into view, and asserts the track overflowed its frame rather than wrapping and that the lens still covers the chosen option.",
+  ),
+  render: () => (
+    <div className="w-64 overflow-x-auto" data-testid="scroller">
+      <SegmentedControl
+        debug
+        variant="glass"
+        aria-label="Time zone"
+        defaultValue="Pacific"
+      >
+        {zones.map((zone) => (
+          <SegmentedControlOption key={zone} value={zone}>
+            {zone}
+          </SegmentedControlOption>
+        ))}
+      </SegmentedControl>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const name = "Time zone"
+    const scroller = canvas.getByTestId("scroller")
+    const { group } = lensAndPressed(canvasElement, name)
+    await expect(scroller.scrollWidth).toBeGreaterThan(scroller.clientWidth)
+    const tops = Array.from(
+      group.querySelectorAll('[data-slot="segmented-control-option"]'),
+      (option) => option.getBoundingClientRect().top,
+    )
+    for (const top of tops) await expect(Math.abs(top - tops[0])).toBeLessThan(1)
+
+    const last = canvas.getByRole("button", { name: "Central European" })
+    await userEvent.click(last)
+    last.scrollIntoView({ block: "nearest", inline: "nearest" })
+    await expect(scroller.scrollLeft).toBeGreaterThan(0)
+    await waitFor(async () => {
+      finishStoryTransitions(canvasElement)
       await expectLensOnPressed(canvasElement, name)
     })
-    await expect(lensOf()).not.toHaveAttribute("data-animate")
     finishStoryTransitions(canvasElement)
   },
 }

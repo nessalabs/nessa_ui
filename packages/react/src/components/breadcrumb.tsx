@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "./button"
 
 /** One step of a `Breadcrumb` trail. */
-export interface BreadcrumbItem {
+export interface BreadcrumbStep {
   /** The step's name. Shown truncated when space runs out; the full text stays its accessible name and hover text. */
   label: string
   /**
@@ -23,7 +23,7 @@ export interface BreadcrumbProps
    * The trail from its first step to the current place. The last item is
    * where the reader is now and is marked `aria-current="page"`.
    */
-  items: readonly BreadcrumbItem[]
+  items: readonly BreadcrumbStep[]
   /** Names the trail for assistive technology, such as "Where this was opened from". */
   label: string
   /**
@@ -61,7 +61,11 @@ function Breadcrumb({
       className={cn("flex min-w-0", className)}
       {...props}
     >
-      <ol className="m-0 flex min-w-0 list-none items-center gap-0.5 p-0 nessa-text-2">
+      {/* `list-none` removes list semantics in WebKit, so the role is restated. */}
+      <ol
+        role="list"
+        className="m-0 flex min-w-0 list-none items-center gap-0.5 p-0 nessa-text-2"
+      >
         {items.map((item, index) => {
           const current = index === lastIndex
           const chevron =
@@ -75,10 +79,11 @@ function Breadcrumb({
               data-slot="breadcrumb-item"
               // Every step gives up width in proportion to its length; an
               // earlier step is also capped, so a long ancestor cannot take
-              // the line from the place the reader is in.
+              // the line from the place the reader is in, and floored, so it
+              // stays a target of at least 32px beside its separator.
               className={cn(
-                "flex min-w-0 shrink items-center gap-0.5",
-                !current && "max-w-40",
+                "flex shrink items-center gap-0.5",
+                current ? "min-w-0" : "min-w-12 max-w-40",
               )}
             >
               {index > 0 ? (
@@ -106,7 +111,7 @@ function Breadcrumb({
                   data-slot="breadcrumb-link"
                   title={item.label}
                   onClick={item.onSelect}
-                  className="h-7 min-w-0 shrink gap-1 px-1.5 font-normal text-muted-foreground hover:text-foreground"
+                  className="h-7 min-w-8 shrink gap-1 px-1.5 font-normal text-muted-foreground hover:text-foreground"
                 >
                   {chevron}
                   <span className="truncate">{item.label}</span>

@@ -166,6 +166,12 @@ export const Working: Story = {
     await expect(canvas.getByRole("img", { name: "Ada, working" })).toBeVisible()
     await expect(ring(ada)).toBe("solid")
     await expect(ring(linus)).toBe("none")
+    // The ring is drawn in the muted foreground at full strength — the same
+    // ink as the count beside it, which holds text contrast on the surface.
+    const count = canvas.getByText("+3")
+    await expect(getComputedStyle(ada).outlineColor).toBe(
+      getComputedStyle(count).color,
+    )
 
     await userEvent.click(canvas.getByRole("button", { name: "Stop working" }))
     await waitFor(async () => {
