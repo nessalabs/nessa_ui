@@ -33,6 +33,14 @@ per-component decision:
   take the closing-ring trio's own tokens, and only the fourth ring onward
   reaches into this ramp, at its **strong** step. See the trio's section
   below.
+- **ProportionBar** — a segment is a band a few pixels tall, which reads as a
+  mark rather than a wash, so `proportionBarTones` takes the **strong** step;
+  the pale fill is too close to the surface at that size to separate a segment
+  from the track. Its two neutrals (`neutral`, `muted`) are foreground mixes
+  for parts that are context rather than a category, not ramp slots.
+- **Sparkline** — one series, so it names no slot: the line takes the current
+  text colour, and a host that wants a ramp hue sets a text utility to a
+  `-strong` step.
 
 Both steps are tokens, so each theme carries its own pair. **The ramp is pastel
 in both themes**: soft, low-chroma tints, stepped in lightness, on the light

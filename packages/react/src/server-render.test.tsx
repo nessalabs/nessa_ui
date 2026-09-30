@@ -15,11 +15,14 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { Badge } from "./components/badge"
 import { Button } from "./components/button"
 import { Card, CardContent } from "./components/card"
+import { ChartTooltip } from "./components/chart-tooltip"
 import { Checkbox } from "./components/checkbox"
 import { Input } from "./components/input"
 import { Message } from "./components/message"
+import { ProportionBar } from "./components/proportion-bar"
 import { SearchableListbox } from "./components/searchable-listbox"
 import { SectionedListbox } from "./components/sectioned-listbox"
+import { Sparkline } from "./components/sparkline"
 import {
   Tabs,
   TabsContent,
@@ -109,6 +112,30 @@ test("the listboxes render their rows on the server", () => {
   )
   assert.ok(sectioned.includes("Section"))
   assert.ok(sectioned.includes("Alpha"))
+})
+
+test("the chart primitives render on the server, measuring nothing until hydrated", () => {
+  const sparkline = server(
+    <Sparkline points={[{ x: 0, y: 1 }, { x: 1, y: 2 }]} aria-label="Trend" />,
+  )
+  assert.ok(sparkline.includes('aria-label="Trend"'))
+  assert.ok(!sparkline.includes("<svg"))
+  const bar = server(
+    <ProportionBar
+      legend
+      formatValue={String}
+      segments={[
+        { id: "a", label: "Alpha", value: 3 },
+        { id: "b", label: "Beta", value: 1 },
+      ]}
+    />,
+  )
+  assert.ok(bar.includes("Alpha") && bar.includes("Beta"))
+  assert.ok(
+    server(
+      <ChartTooltip anchor={{ x: 10, y: 20 }}>Reading</ChartTooltip>,
+    ).includes("Reading"),
+  )
 })
 
 test("a conversation surface renders its content on the server", () => {
