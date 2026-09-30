@@ -37,9 +37,11 @@ Git state.
 - Keep the issue you are working on current, not only its board Status: a
   **Status** section at the top of its description naming the remote branch(es)
   that hold the work, the pull request, a Mermaid sequence diagram of the flow
-  as implemented, and the **Blockers** (or none). Update it when work starts,
-  when the pull request opens, whenever the design moves, and when work stops or
-  is handed off.
+  as implemented, and the **Blockers** — each field saying "none yet" until it
+  exists. Update it when work starts, when a branch is pushed and the pull
+  request opens, whenever the design moves, and when work stops or is handed
+  off. These rules about how the work is done are held by review and the board,
+  not by a test.
 - Follow the design-system contract and run validation proportionate to risk.
 
 ## Merging and CI
