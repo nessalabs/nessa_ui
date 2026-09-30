@@ -512,6 +512,19 @@
       ]
     },
     {
+      "name": "chart-geometry",
+      "type": "registry:lib",
+      "title": "Chart geometry",
+      "description": "The pure geometry Nessa's small charts share and a host's own charts build on: round axis ticks over any range, a linear scale, a step line through a sequence as given or through the best so far it derives for a series where larger or smaller is better, a plain polyline, the linear or log weights a proportion bar sizes its segments by, and the flip-and-shift placement that keeps a floating card inside a boundary.",
+      "files": [
+        {
+          "path": "packages/react/src/lib/chart-geometry.ts",
+          "type": "registry:lib",
+          "target": "lib/chart-geometry.ts"
+        }
+      ]
+    },
+    {
       "name": "button",
       "type": "registry:ui",
       "title": "Button",
@@ -2526,6 +2539,63 @@
           "path": "packages/react/src/components/pie-chart/pie-chart-geometry.ts",
           "type": "registry:ui",
           "target": "components/ui/pie-chart/pie-chart-geometry.ts"
+        }
+      ]
+    },
+    {
+      "name": "sparkline",
+      "type": "registry:ui",
+      "title": "Sparkline",
+      "description": "A small step or line chart sized by its container: a step line through the points exactly as given, or, with a direction, the best value so far derived from them (the running maximum when larger is better, the running minimum when smaller is); or a plain line through every point. Optional dots at records or every point, a dashed reference line, an area wash, and an accessible name from the host. The line takes the current text colour.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/chart-geometry",
+        "nessalabs/nessa_ui/compose",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/sparkline.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/sparkline.tsx"
+        }
+      ]
+    },
+    {
+      "name": "chart-tooltip",
+      "type": "registry:ui",
+      "title": "Chart tooltip",
+      "description": "A hover card on the popover surface, anchored to a point in a chart and kept inside a boundary the host passes \u2014 an element, a ref or a rectangle, intersected with the viewport. It flips to the other side of the point and shifts along the edge wherever its preferred placement would cross the boundary, and re-places itself when its content resizes or anything scrolls.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/chart-geometry",
+        "nessalabs/nessa_ui/compose",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/popover-surface",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/chart-tooltip.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/chart-tooltip.tsx"
+        }
+      ]
+    },
+    {
+      "name": "proportion-bar",
+      "type": "registry:ui",
+      "title": "Proportion bar",
+      "description": "Parts of a whole as one bar of segments sized by share, linearly or log-weighted so a tiny part stays visible beside a huge one, coloured from the chart series ramp or named tones, optionally measured against a larger maximum, with an optional legend of labels and host-formatted values and an accessible summary.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/chart-geometry",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/proportion-bar.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/proportion-bar.tsx"
         }
       ]
     },
