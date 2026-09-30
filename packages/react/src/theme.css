@@ -138,7 +138,10 @@
      slots. The values start out near the diff pair — loss is the same red,
      gain a slightly different green — because both encode an up/down reading
      at the same contrast floor; they are separate tokens so a theme can move
-     a trading surface's colour without touching how a code review reads. */
+     a trading surface's colour without touching how a code review reads.
+     Delta, Meter, and StatusLabel borrow this pair for their good and bad
+     tones until a status colour role exists, so moving it moves them too —
+     see docs/architecture/chart-series-ramp.md. */
   --nessa-market-gain: oklch(0.5 0.135 148);
   --nessa-market-loss: oklch(0.55 0.19 27);
 }
