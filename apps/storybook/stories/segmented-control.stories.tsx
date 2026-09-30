@@ -200,7 +200,13 @@ export const Glass: Story = {
       getComputedStyle(group.querySelector('[aria-pressed="true"]')!)
         .transitionProperty,
     ).not.toContain("background")
-    await expectLensOnPressed(canvasElement, name)
+    // A web font landing after first paint widens the options, and the lens
+    // follows them on the resize that causes (placed, not glided). Wait for
+    // the fonts, then for the lens to cover the option — the end state — so a
+    // slow engine that has not yet delivered that resize is not a failure.
+    await canvasElement.ownerDocument.fonts.ready
+    await waitFor(() => expectLensOnPressed(canvasElement, name))
+    await expect(lens).not.toHaveAttribute("data-animate")
 
     const timeline = canvas.getByRole("button", { name: "Timeline" })
     await userEvent.click(timeline)
