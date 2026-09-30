@@ -1009,6 +1009,7 @@ export {
   niceTicks,
   placeChartTooltip,
   proportionWeights,
+  stepChanges,
   stepPath,
   type ChartBetter,
   type ChartPoint,

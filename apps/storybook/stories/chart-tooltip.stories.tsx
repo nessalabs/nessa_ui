@@ -180,7 +180,7 @@ function AttemptsChart() {
             </g>
           ))}
           <path
-            d={stepPath(ATTEMPTS, scale)}
+            d={stepPath(ATTEMPTS, scale, { better: "up" })}
             fill="none"
             strokeWidth={1.75}
             className="stroke-(--nessa-chart-series-1-strong)"
@@ -215,7 +215,7 @@ function AttemptsChart() {
 
 export const InAChart: Story = {
   parameters: storyDocumentation(
-    "A host's own chart built from the geometry helpers — `niceTicks` over the data's real range (40 to 65, not 0 to 100), `stepPath` for the best so far — with a ChartTooltip on every attempt, bounded by the card the chart sits in. The play test hovers the last attempt, whose preferred right-hand placement would leave the card, proves the tooltip flipped left and stays inside it, and proves it is gone once the pointer leaves.",
+    "A host's own chart built from the geometry helpers — `niceTicks` over the data's real range (40 to 65, not 0 to 100), `stepPath` deriving the best so far with `better: \"up\"` — with a ChartTooltip on every attempt, bounded by the card the chart sits in. The play test hovers the last attempt, whose preferred right-hand placement would leave the card, proves the tooltip flipped left and stays inside it, and proves it is gone once the pointer leaves.",
   ),
   args: { anchor: { x: 0, y: 0 } },
   render: () => <AttemptsChart />,

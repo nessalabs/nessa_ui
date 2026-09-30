@@ -8,6 +8,7 @@ import {
   bestSoFar,
   linePath,
   linearScale,
+  stepChanges,
   stepPath,
   type ChartBetter,
   type ChartPoint,
@@ -23,27 +24,34 @@ export type SparklineMarkers = "none" | "records" | "all"
 export interface SparklineProps
   extends Omit<React.ComponentProps<"div">, "children"> {
   /**
-   * The series, in data units. Order does not matter; points with a
-   * non-finite coordinate are skipped. A series whose points all share one x —
-   * a single reading — is drawn level across the whole box, with its dots at
-   * the right-hand end.
+   * The series, in data units, in ascending x. With `better` the order does
+   * not matter; without it the step line follows the points in the order
+   * given. Points with a non-finite coordinate are skipped. A series whose
+   * points all share one x — a single reading — is drawn level across the
+   * whole box, with its dots at the right-hand end.
    */
   points: readonly ChartPoint[]
   /**
-   * Which direction of the value axis is an improvement. The step variant
-   * keeps the running maximum for `up` and the running minimum for `down`,
-   * and in both variants a point that sets a new best is a *record*.
-   * Defaults to `up`.
+   * Which direction of the value axis is an improvement — given only when
+   * the sparkline should derive the best so far itself. With it, the step
+   * variant keeps the running maximum for `up` and the running minimum for
+   * `down`, and a point that sets a new best is a *record*. Without it
+   * (the default), nothing is derived: the step variant draws the points
+   * exactly as given, in order — the right choice when the host's series
+   * already is the best so far, owned elsewhere, and may fall back when a
+   * best is withdrawn — and a *record* is simply a point where the value
+   * changes.
    */
   better?: ChartBetter
   /**
-   * `step` (default) draws the best so far: flat until a record, then a step
-   * to it. `line` joins every point in order.
+   * `step` (default) holds each value flat until the next record, then steps
+   * to it — the best so far with `better`, the given values without. `line`
+   * joins every point in order.
    */
   variant?: "step" | "line"
   /**
    * `none` (default) draws only the line. `records` adds a dot at every
-   * record-setting point, `all` a dot at every point with the records drawn
+   * record (see `better`), `all` a dot at every point with the records drawn
    * stronger. Either also marks where the line ends.
    */
   markers?: SparklineMarkers
@@ -107,18 +115,19 @@ function useMeasuredBox(ref: React.RefObject<HTMLElement | null>) {
 
 /**
  * A small chart that fills whatever box the host gives it — set its height
- * with a class, or size its parent. The `step` variant draws the best value
- * so far, keeping the running maximum when `better` is `up` and the running
- * minimum when it is `down`, so the line only ever moves in the direction of
- * improvement; the `line` variant joins every point. Optional dots mark the
- * record-setting points (or every point), a dashed line marks a reference
- * value, and the line takes the current text colour, so a host tints it with a
- * text utility. A single reading is held level across the box. It is not
+ * with a class, or size its parent. The `step` variant holds each value
+ * until the next: given `better`, it derives the best value so far — the
+ * running maximum for `up`, the running minimum for `down`, so the line only
+ * moves in the direction of improvement — and without it, it steps through
+ * the points exactly as given, falls included. The `line` variant joins every
+ * point. Optional dots mark the records (or every point), a dashed line
+ * marks a reference value, and the line takes the current text colour, so a
+ * host tints it with a text utility. A single reading is held level across the box. It is not
  * interactive, and renders nothing until measured.
  */
 function Sparkline({
   points,
-  better = "up",
+  better,
   variant = "step",
   markers = "none",
   reference,
@@ -160,12 +169,16 @@ function Sparkline({
         : linearScale([firstX, lastX], [INSET, box.width - INSET]),
       y: linearScale([low, high], [box.height - INSET, INSET]),
     }
-    const records = bestSoFar(plotted, better)
+    // With `better` the best so far is derived here; without it the points
+    // are the sequence to draw, and a record is only where it changes.
+    const records = better ? bestSoFar(plotted, better) : stepChanges(plotted)
     const recordSet = new Set(records)
     const end =
-      variant === "step"
-        ? { x: lastX, y: records[records.length - 1]!.y }
-        : plotted.reduce((latest, point) => (point.x >= latest.x ? point : latest))
+      variant === "line"
+        ? plotted.reduce((latest, point) => (point.x >= latest.x ? point : latest))
+        : better
+          ? { x: lastX, y: records[records.length - 1]!.y }
+          : plotted[plotted.length - 1]!
     const line = flat
       ? `M${INSET},${scale.y(end.y)}H${box.width - INSET}`
       : variant === "step"

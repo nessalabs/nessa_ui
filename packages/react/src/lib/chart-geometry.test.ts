@@ -12,6 +12,7 @@ import {
   niceTicks,
   placeChartTooltip,
   proportionWeights,
+  stepChanges,
   stepPath,
   type ChartScale,
   type ChartTooltipPlacementInput,
@@ -164,8 +165,39 @@ describe("stepPath", () => {
         { x: 3, y: 12 },
       ],
       IDENTITY,
+      { better: "up" },
     )
     assert.equal(path, "M0,10H2V14H3")
+  })
+
+  it("steps through the points exactly as given without better", () => {
+    // A best-so-far owned by the caller that falls when a best is withdrawn:
+    // nothing is recomputed, so the fall is drawn.
+    const path = stepPath(
+      [
+        { x: 0, y: 10 },
+        { x: 1, y: 10 },
+        { x: 2, y: 14 },
+        { x: 3, y: 12 },
+        { x: 4, y: 12 },
+      ],
+      IDENTITY,
+    )
+    assert.equal(path, "M0,10H2V14H3V12H4")
+  })
+
+  it("keeps the given order without better", () => {
+    assert.equal(
+      stepPath(
+        [
+          { x: 0, y: 1 },
+          { x: 2, y: 3 },
+          { x: 1, y: 2 },
+        ],
+        IDENTITY,
+      ),
+      "M0,1H2V3H1V2",
+    )
   })
 
   it("steps down for better down", () => {
@@ -211,6 +243,27 @@ describe("stepPath", () => {
   it("is empty with nothing to plot", () => {
     assert.equal(stepPath([], IDENTITY), "")
     assert.equal(stepPath([{ x: Number.NaN, y: 1 }], IDENTITY), "")
+  })
+})
+
+describe("stepChanges", () => {
+  it("keeps the first point and every change of value, in the given order", () => {
+    assert.deepEqual(
+      stepChanges([
+        { x: 0, y: 5 },
+        { x: 1, y: 5 },
+        { x: 2, y: 7 },
+        { x: 3, y: 6 },
+        { x: 4, y: Number.NaN },
+        { x: 5, y: 6 },
+      ]),
+      [
+        { x: 0, y: 5 },
+        { x: 2, y: 7 },
+        { x: 3, y: 6 },
+      ],
+    )
+    assert.deepEqual(stepChanges([]), [])
   })
 })
 

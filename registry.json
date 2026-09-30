@@ -515,7 +515,7 @@
       "name": "chart-geometry",
       "type": "registry:lib",
       "title": "Chart geometry",
-      "description": "The pure geometry Nessa's small charts share and a host's own charts build on: round axis ticks over any range, a linear scale, the best-so-far step line for a series where larger or smaller is better, a plain polyline, the linear or log weights a proportion bar sizes its segments by, and the flip-and-shift placement that keeps a floating card inside a boundary.",
+      "description": "The pure geometry Nessa's small charts share and a host's own charts build on: round axis ticks over any range, a linear scale, a step line through a sequence as given or through the best so far it derives for a series where larger or smaller is better, a plain polyline, the linear or log weights a proportion bar sizes its segments by, and the flip-and-shift placement that keeps a floating card inside a boundary.",
       "files": [
         {
           "path": "packages/react/src/lib/chart-geometry.ts",
@@ -2465,7 +2465,7 @@
       "name": "sparkline",
       "type": "registry:ui",
       "title": "Sparkline",
-      "description": "A small step or line chart sized by its container: the best value so far as a step line (the running maximum when larger is better, the running minimum when smaller is), or a plain line through every point, with optional dots at record-setting points or every point, a dashed reference line, an area wash, and an accessible name from the host. The line takes the current text colour.",
+      "description": "A small step or line chart sized by its container: a step line through the points exactly as given, or, with a direction, the best value so far derived from them (the running maximum when larger is better, the running minimum when smaller is); or a plain line through every point. Optional dots at records or every point, a dashed reference line, an area wash, and an accessible name from the host. The line takes the current text colour.",
       "registryDependencies": [
         "nessalabs/nessa_ui/chart-geometry",
         "nessalabs/nessa_ui/compose",

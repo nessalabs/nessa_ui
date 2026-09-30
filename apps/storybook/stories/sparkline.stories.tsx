@@ -13,7 +13,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A small chart sized by its container — give it a height with a class, or size its parent. The **step** variant draws the best value so far: it keeps the running maximum when `better` is `up` and the running minimum when it is `down`, so the line only ever moves in the direction of improvement and steps exactly where a point set a new record. The **line** variant joins every point. Optional dots mark the record-setting points (`markers=\"records\"`) or every point with the records drawn stronger (`markers=\"all\"`), plus where the line ends; `reference` draws a dashed horizontal line at a value that is always kept in range, and `yDomain` pins the range so a column of sparklines shares one scale. The line takes the current text colour, so a text utility tints it. It is not interactive. The host names it with `aria-label`; without a name it is treated as decoration and hidden from assistive technology.",
+          "A small chart sized by its container — give it a height with a class, or size its parent. The **step** variant holds each value until the next. Given `better`, it derives the best value so far itself: it keeps the running maximum when `better` is `up` and the running minimum when it is `down`, so the line only ever moves in the direction of improvement and steps exactly where a point set a new record. Without `better` it derives nothing and steps through the points **exactly as given**, in order — for a host whose series already is the best so far, owned elsewhere, which may fall back when a best is withdrawn; a record is then simply a point where the value changes. The **line** variant joins every point. Optional dots mark the record-setting points (`markers=\"records\"`) or every point with the records drawn stronger (`markers=\"all\"`), plus where the line ends; `reference` draws a dashed horizontal line at a value that is always kept in range, and `yDomain` pins the range so a column of sparklines shares one scale. The line takes the current text colour, so a text utility tints it. It is not interactive. The host names it with `aria-label`; without a name it is treated as decoration and hidden from assistive technology.",
       },
     },
   },
@@ -58,6 +58,7 @@ export const BestSoFar: Story = {
   ),
   args: {
     points: CLIMB,
+    better: "up",
     markers: "all",
     reference: 75,
     "aria-label": "Best score by attempt: 61.2 at the start, 71.3 now, target 75",
@@ -188,6 +189,7 @@ export const SharedScale: Story = {
           <span className="w-16 nessa-text-2 text-muted-foreground">{row.name}</span>
           <Sparkline
             points={row.points}
+            better="up"
             yDomain={[40, 80]}
             reference={61.2}
             aria-label={`${row.name} best score by attempt`}
@@ -231,5 +233,60 @@ export const SingleReading: Story = {
     const end = canvasElement.querySelector('[data-slot="sparkline-end"]')!
     const y = Number(/^M[\d.]+,(-?[\d.]+)/.exec(line.getAttribute("d")!)![1])
     await expect(Number(end.getAttribute("cy"))).toBeCloseTo(y, 1)
+  },
+}
+
+/**
+ * A best-so-far sequence as another system reports it, already computed. The
+ * best rose to 71, then that result was withdrawn after reruns and the best
+ * fell back to 68 before climbing again — a sequence that is not monotone.
+ */
+const REPORTED_BEST: ChartPoint[] = [
+  { x: 1, y: 62 },
+  { x: 2, y: 62 },
+  { x: 3, y: 66 },
+  { x: 4, y: 71 },
+  { x: 5, y: 71 },
+  { x: 6, y: 68 },
+  { x: 7, y: 68 },
+  { x: 8, y: 73 },
+]
+
+export const AsGiven: Story = {
+  parameters: storyDocumentation(
+    "Without `better`, the sparkline derives nothing: the step line walks the points exactly as given, in order. This is the mode for a host whose series is already the best so far, computed by the system that owns it — recomputing a running maximum here would make the chart a second owner of \"best\", and would hide the moment the reported best fell from 71 back to 68 when a result was withdrawn. Records are the points where the value changes. The play test proves the path steps down at the withdrawal as well as up elsewhere, that only the first point and the four changes are marked as records, that the line ends on the last reported value, and that the chart claims no direction.",
+  ),
+  args: {
+    points: REPORTED_BEST,
+    markers: "all",
+    "aria-label": "Reported best by attempt: 62 at the start, 73 now, briefly withdrawn from 71 to 68",
+  },
+  render: (args) => (
+    <div className="w-72">
+      <Sparkline {...args} className="h-14 text-(--nessa-chart-series-1-strong)" />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const root = await canvas.findByRole("img", { name: /^Reported best by attempt/ })
+    await expect(root).not.toHaveAttribute("data-better")
+    const line = await drawnLine(canvasElement)
+    const d = line.getAttribute("d")!
+    // 62 -> 66 -> 71 -> 68 -> 73: four vertical moves, the third one down the
+    // screen (a larger pixel y) where the best was withdrawn.
+    const moves = verticalMoves(d)
+    await expect(moves).toHaveLength(4)
+    await expect(moves[1]!).toBeLessThan(moves[0]!)
+    await expect(moves[2]!).toBeGreaterThan(moves[1]!)
+    await expect(moves[3]!).toBeLessThan(moves[1]!)
+    const records = canvasElement.querySelectorAll(
+      '[data-slot="sparkline-marker"][data-record="true"]',
+    )
+    await expect(records).toHaveLength(5)
+    await expect(
+      canvasElement.querySelectorAll('[data-slot="sparkline-marker"]'),
+    ).toHaveLength(REPORTED_BEST.length)
+    const end = canvasElement.querySelector('[data-slot="sparkline-end"]')!
+    await expect(Number(end.getAttribute("cy"))).toBeCloseTo(moves[3]!, 1)
   },
 }

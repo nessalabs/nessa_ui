@@ -176,32 +176,62 @@ export function bestSoFar(
   return records
 }
 
+/**
+ * The points where a sequence taken exactly as given changes value, in the
+ * order given: the first point, then every later point whose y differs from
+ * the one before it. Nothing is sorted or recomputed, so a sequence that
+ * falls back — a best that was withdrawn — keeps its fall.
+ *
+ * Points with a non-finite coordinate are ignored.
+ *
+ * @param points - The sequence, in data units, in the order to draw it.
+ * @returns The points the sequence steps at, a subset of the input.
+ */
+export function stepChanges(points: readonly ChartPoint[]): ChartPoint[] {
+  const changes: ChartPoint[] = []
+  for (const point of points) {
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) continue
+    const previous = changes[changes.length - 1]
+    if (!previous || point.y !== previous.y) changes.push(point)
+  }
+  return changes
+}
+
 /** Options for {@link stepPath}. */
 export interface StepPathOptions {
-  /** Which direction of the value axis is an improvement. Defaults to `up`. */
+  /**
+   * Which direction of the value axis is an improvement. Given, the path
+   * derives the best so far itself — the running maximum for `up`, the
+   * running minimum for `down`. Omitted, the path steps through the points
+   * exactly as given, for a host whose sequence is already the one to draw
+   * (a best-so-far owned elsewhere, which may fall when a best is withdrawn).
+   */
   better?: ChartBetter
   /**
    * The x, in data units, the line is carried on to after its last step —
    * typically the newest observation, so the line reaches the present even
-   * when the latest points did not improve. Defaults to the largest x among
-   * the points.
+   * when the latest points did not change it. Defaults to the largest x among
+   * the points with `better`, and to the last point's x without it.
    */
   until?: number
 }
 
 /**
- * An SVG path for the best-so-far line: it holds the running best flat and
- * rises (or, for `down`, falls) only where a point sets a new record, then
- * runs on to `until`. The running maximum is kept when `better` is `up`, the
- * running minimum when it is `down`.
+ * An SVG step line, step-after: each value holds flat until the point that
+ * changes it, then the line steps to the new value, and finally runs on to
+ * `until`.
  *
- * The path is step-after — each record holds until the next one — which is
- * the honest reading of a best-so-far: the improvement is not there until the
- * point that made it.
+ * With `better`, the values are the best so far, derived here: the running
+ * maximum for `up`, the running minimum for `down`, stepping only where a
+ * point sets a new record, with the points taken in ascending x. Without
+ * `better`, the values are the points themselves, taken exactly as given and
+ * in the order given — nothing is recomputed, so a sequence that is not
+ * monotone draws its falls as well as its rises. Supply those points in
+ * ascending x.
  *
- * @param points - The observations, in data units, in any order.
+ * @param points - The observations, in data units.
  * @param scale - The data-to-pixel mapping.
- * @param options - Direction and where the line ends.
+ * @param options - Whether to derive the best so far, and where the line ends.
  * @returns Path data in pixels, or an empty string when no point is
  *   plottable.
  */
@@ -211,15 +241,20 @@ export function stepPath(
   options: StepPathOptions = {},
 ): string {
   const ordered = plottable(points)
-  const records = bestSoFar(ordered, options.better ?? "up")
-  if (records.length === 0) return ""
-  const [first, ...rest] = records
+  const steps = options.better
+    ? bestSoFar(ordered, options.better)
+    : stepChanges(points)
+  if (steps.length === 0) return ""
+  const [first, ...rest] = steps
   let path = `M${round(scale.x(first!.x))},${round(scale.y(first!.y))}`
-  for (const record of rest) {
-    path += `H${round(scale.x(record.x))}V${round(scale.y(record.y))}`
+  for (const step of rest) {
+    path += `H${round(scale.x(step.x))}V${round(scale.y(step.y))}`
   }
-  const end = options.until ?? ordered[ordered.length - 1]!.x
-  const last = records[records.length - 1]!
+  const given = options.better
+    ? ordered
+    : points.filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+  const end = options.until ?? given[given.length - 1]!.x
+  const last = steps[steps.length - 1]!
   if (Number.isFinite(end) && end > last.x) path += `H${round(scale.x(end))}`
   return path
 }
