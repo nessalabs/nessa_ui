@@ -44,10 +44,16 @@ export interface ObserveSizeOptions {
 }
 
 /**
- * Attributes that can lay an element out: its classes and inline style, its
- * direction, and whether it is hidden.
+ * Whether an attribute change can lay an element out. Nearly any attribute
+ * can — a `data-state` a variant styles on, `open`, `src`, `rows` — so all are
+ * watched except accessibility state, which only assistive technology reads.
+ * A report that changed nothing costs a measurement the caller bails on.
  */
-const LAYOUT_ATTRIBUTES = ["class", "style", "dir", "hidden"]
+function laysOut(record: MutationRecord) {
+  return !(
+    record.type === "attributes" && record.attributeName?.startsWith("aria-")
+  )
+}
 
 const noop = () => {}
 
@@ -58,8 +64,8 @@ const noop = () => {}
  * - A box resize is reported in the frame it is laid out, before paint, as
  *   `resize`. That includes the report a `ResizeObserver` makes when
  *   observation starts.
- * - A change to the element's subtree (children, text, or an attribute that
- *   lays it out) is reported as `content`, and a web font finishing its load,
+ * - A change to the element's subtree (children, text, or any attribute but
+ *   an `aria-*` one) is reported as `content`, and a web font finishing its load,
  *   or the document's fonts settling while a load is under way, as `fonts`.
  *   Any burst of these is reported once, on the next animation frame, with
  *   every cause it held.
@@ -101,7 +107,10 @@ export function observeSize(
     typeof view.MutationObserver === "function"
       ? new view.MutationObserver((records) => {
           const ignore = options.ignoreMutation
-          if (ignore && records.every((record) => ignore(record))) return
+          const relevant = records.some(
+            (record) => laysOut(record) && !(ignore && ignore(record)),
+          )
+          if (!relevant) return
           contentChanged = true
           schedule("content")
         })
@@ -167,7 +176,6 @@ export function observeSize(
     subtree: true,
     characterData: true,
     attributes: true,
-    attributeFilter: LAYOUT_ATTRIBUTES,
     attributeOldValue: true,
   })
 

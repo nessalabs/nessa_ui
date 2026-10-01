@@ -135,7 +135,8 @@ test("a content change is reported on the next frame", () => {
   assert.equal(mutations.init?.childList, true)
   assert.equal(mutations.init?.subtree, true)
   assert.equal(mutations.init?.characterData, true)
-  assert.deepEqual(mutations.init?.attributeFilter, ["class", "style", "dir", "hidden"])
+  assert.equal(mutations.init?.attributes, true)
+  assert.equal(mutations.init?.attributeFilter, undefined)
 
   mutations.trigger()
   assert.deepEqual(causes, [])
@@ -357,4 +358,17 @@ test("a style change is split into declarations the way CSS reads them", () => {
   // Standard names ignore case; custom properties do not.
   assert.equal(changesOnlyStyle(change("LEFT: 0px;", "left: 4px;"), ["left"]), true)
   assert.equal(changesOnlyStyle(change("--X: 0;", "--X: 1;"), ["--x"]), false)
+})
+
+test("accessibility state alone is not reported, any other attribute is", () => {
+  const env = fakeWindow()
+  const { causes, onChange } = record()
+  observeSize(env.element, onChange)
+
+  env.mutationObserver().trigger([{ type: "attributes", attributeName: "aria-expanded" }])
+  assert.equal(env.pendingFrames(), 0)
+
+  env.mutationObserver().trigger([{ type: "attributes", attributeName: "data-state" }])
+  env.runFrame()
+  assert.deepEqual(causes, ["content"])
 })

@@ -2032,3 +2032,38 @@ export const NodeWithoutResizeReports: Story = {
     })
   },
 }
+
+export const NodeMountedOverhangingBounds: Story = {
+  parameters: storyDocumentation(
+    "A node placed partly past the canvas bounds is moved inside as soon as it is measured, rather than on the first drag or arrow press.",
+  ),
+  render: () => (
+    <StoryFrame className="h-[24rem]">
+      <WorkflowCanvas
+        aria-label="Overhanging node canvas"
+        bounds={{ minX: 0, minY: 0, maxX: 480, maxY: 300 }}
+      >
+        <WorkflowCanvasSurface>
+          <WorkflowCanvasNode
+            nodeId="edge"
+            defaultPosition={{ x: 450, y: 40 }}
+            aria-label="edge job"
+          >
+            <div className="w-52 rounded-2xl border border-border bg-card p-4 nessa-text-2 text-card-foreground shadow-sm">
+              edge
+            </div>
+          </WorkflowCanvasNode>
+        </WorkflowCanvasSurface>
+      </WorkflowCanvas>
+    </StoryFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    const node = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="workflow-canvas-node"]',
+    )!
+    await waitFor(() => {
+      const x = readTransform(node.style.transform)?.x ?? 0
+      expect(x + node.offsetWidth).toBeLessThanOrEqual(480.5)
+    })
+  },
+}
