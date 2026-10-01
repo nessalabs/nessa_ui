@@ -15,6 +15,7 @@ import {
   type ChartScale,
 } from "@/lib/chart-geometry"
 import { useComposedRefs } from "@/lib/compose"
+import { useMeasuredSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 /** Which points a sparkline draws a dot for. */
@@ -87,33 +88,6 @@ const INSET = 4
 const DOT_RADIUS = { point: 1.5, record: 2.5, end: 3.5 } as const
 
 /**
- * The element's content-box size in whole pixels, tracked as it resizes, or
- * null until the first measurement — which never happens on a server.
- */
-function useMeasuredBox(ref: React.RefObject<HTMLElement | null>) {
-  const [box, setBox] = React.useState<{ width: number; height: number } | null>(
-    null,
-  )
-  React.useLayoutEffect(() => {
-    const element = ref.current
-    if (!element || typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver((entries) => {
-      const rect = entries[entries.length - 1]!.contentRect
-      const width = Math.round(rect.width)
-      const height = Math.round(rect.height)
-      setBox((previous) =>
-        previous && previous.width === width && previous.height === height
-          ? previous
-          : { width, height },
-      )
-    })
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [ref])
-  return box
-}
-
-/**
  * A small chart that fills whatever box the host gives it — set its height
  * with a class, or size its parent. The `step` variant holds each value
  * until the next: given `better`, it derives the best value so far — the
@@ -139,7 +113,7 @@ function Sparkline({
 }: SparklineProps) {
   const boxRef = React.useRef<HTMLDivElement>(null)
   const composedRef = useComposedRefs(boxRef, forwardedRef)
-  const box = useMeasuredBox(boxRef)
+  const box = useMeasuredSize(boxRef)
   const named =
     props["aria-label"] !== undefined || props["aria-labelledby"] !== undefined
 
