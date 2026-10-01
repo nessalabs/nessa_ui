@@ -1200,15 +1200,34 @@ function SelectionTooltipPanel({
   }, [open, pill])
   // Content height rather than a fixed one: the band follows a thread that
   // grows, an answer that streams in, a reply that wraps at a new width.
+  // WebKit does not always report the content's growth to a ResizeObserver —
+  // in CI the band stayed at its empty height (21px, its padding and rule)
+  // after a comment rendered into it (45px) — so what changes the content's
+  // height is watched directly as well: its DOM changing, and web fonts
+  // finishing their load.
   React.useLayoutEffect(() => {
     const node = contentRef.current
     if (node === null) return
     const measure = () => setHeight(node.getBoundingClientRect().height)
     measure()
-    if (typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver(measure)
-    observer.observe(node)
-    return () => observer.disconnect()
+    const mutations = new MutationObserver(measure)
+    mutations.observe(node, { childList: true, subtree: true, characterData: true })
+    const fonts = node.ownerDocument.fonts as FontFaceSet | undefined
+    let active = true
+    const onFonts = () => {
+      if (active) measure()
+    }
+    fonts?.addEventListener("loadingdone", onFonts)
+    void fonts?.ready.then(onFonts)
+    const resizes =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure)
+    resizes?.observe(node)
+    return () => {
+      active = false
+      mutations.disconnect()
+      fonts?.removeEventListener("loadingdone", onFonts)
+      resizes?.disconnect()
+    }
   }, [])
   return (
     <div
