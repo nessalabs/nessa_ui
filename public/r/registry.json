@@ -499,6 +499,19 @@
       ]
     },
     {
+      "name": "size-observer",
+      "type": "registry:lib",
+      "title": "Size observer",
+      "description": "The one place a component learns that an element's size may have changed: a box resize, a change to its content, or a web font finishing its load \u2014 the last two covering the resizes WebKit does not report \u2014 measured once per frame for a burst, and a hook that keeps an element's content-box size current through it.",
+      "files": [
+        {
+          "path": "packages/react/src/lib/size-observer.ts",
+          "type": "registry:lib",
+          "target": "lib/size-observer.ts"
+        }
+      ]
+    },
+    {
       "name": "portal-container",
       "type": "registry:lib",
       "title": "Portal container",
