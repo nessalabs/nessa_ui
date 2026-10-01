@@ -1618,3 +1618,58 @@ export const AutoHeightHonoursACappedContentRegion: Story = {
     await expect(heights[0]).toBeLessThanOrEqual(162)
   },
 }
+
+/** Two short windows in a deck of the given height mode. */
+function WheelDeck({ paneHeight }: { paneHeight?: string }) {
+  return (
+    <div className="h-[360px] w-full bg-background" data-testid={paneHeight ?? "fixed"}>
+      <WindowDeck paneHeight={paneHeight} defaultActivePane="first">
+        <WindowDeckPane id="first" label="First">
+          <p className="p-4 nessa-text-3">The first window.</p>
+        </WindowDeckPane>
+        <WindowDeckPane id="second" label="Second">
+          <p className="p-4 nessa-text-3">The second window.</p>
+        </WindowDeckPane>
+      </WindowDeck>
+    </div>
+  )
+}
+
+export const WheelNavigationByHeight: Story = {
+  parameters: storyDocumentation(
+    "A vertical wheel over a fixed-height deck moves the carousel to the next window. Over an auto-height deck it does not: that deck sits in the page's flow and its windows never scroll, so scrolling down means the page. Either default yields to an explicit `wheelNavigation`.",
+  ),
+  render: () => (
+    <div className="flex flex-col gap-6">
+      <WheelDeck />
+      <WheelDeck paneHeight="auto" />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const viewportOf = (testId: string) =>
+      canvas
+        .getByTestId(testId)
+        .querySelector<HTMLElement>('[data-slot="window-deck-viewport"]')!
+    const wheel = (testId: string) => {
+      const viewport = viewportOf(testId)
+      const pane = viewport.querySelector<HTMLElement>(
+        '[data-slot="window-deck-pane"]',
+      )!
+      pane.dispatchEvent(
+        new WheelEvent("wheel", { deltaY: 240, bubbles: true, cancelable: true }),
+      )
+    }
+
+    const fixed = viewportOf("fixed")
+    const fixedStart = fixed.scrollLeft
+    wheel("fixed")
+    await waitFor(() => expect(fixed.scrollLeft).toBeGreaterThan(fixedStart))
+
+    const auto = viewportOf("auto")
+    const autoStart = auto.scrollLeft
+    wheel("auto")
+    await frames(2)
+    await expect(auto.scrollLeft).toBe(autoStart)
+  },
+}

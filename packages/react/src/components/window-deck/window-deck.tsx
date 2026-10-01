@@ -127,8 +127,11 @@ interface WindowDeckProps extends React.ComponentProps<"div"> {
   overviewLayout?: WindowDeckOverviewOptions
   /**
    * Whether a vertical wheel gesture over the deck moves the carousel
-   * sideways. Content that scrolls on its own keeps its own gesture.
-   * @defaultValue true
+   * sideways. Content that scrolls on its own keeps its own gesture. Off by
+   * default for `paneHeight="auto"`: an auto-height deck sits in the page's
+   * flow, its windows never scroll, and a reader scrolling down means the
+   * page, not the next window.
+   * @defaultValue true, or false when `paneHeight` is "auto"
    */
   wheelNavigation?: boolean
   /** Overrides for the announcements the deck makes, for localization. */
@@ -344,7 +347,7 @@ function WindowDeck({
   contentMount = "active",
   overviewVisibleCount,
   overviewLayout,
-  wheelNavigation = true,
+  wheelNavigation: wheelNavigationProp,
   labels: labelsProp,
   className,
   style,
@@ -352,6 +355,7 @@ function WindowDeck({
   ref,
   ...props
 }: WindowDeckProps) {
+  const wheelNavigation = wheelNavigationProp ?? paneHeight !== "auto"
   const [panes, setPanes] = React.useState<RegisteredWindowDeckPane[]>([])
   const [uncontrolledActive, setUncontrolledActive] = React.useState<
     string | undefined
