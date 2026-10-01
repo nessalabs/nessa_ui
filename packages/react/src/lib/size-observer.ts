@@ -207,6 +207,10 @@ export function useMeasuredSize(
   return size
 }
 
+/**
+ * The element's content box from layout: its client size, which excludes
+ * borders and scrollbars and ignores transforms, less its padding.
+ */
 function contentBoxSize(element: HTMLElement): MeasuredSize {
   const css = element.ownerDocument.defaultView?.getComputedStyle(element)
   const pixels = (value: string | undefined) => Number.parseFloat(value ?? "") || 0
