@@ -25,6 +25,11 @@ import {
 } from "@nessalabs/ui"
 import { Plus, RotateCcw } from "lucide-react"
 
+import {
+  GrowingNote,
+  expectOverflowFollowsContent,
+  silenceResizeObserver,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 import { BashIcon } from "./icons/nucleo"
 
@@ -943,5 +948,27 @@ export const NotchDrop: Story = {
     // dismissed by hand.
     await userEvent.click(canvas.getByRole("button", { name: "Reset demo" }))
     await settledCard(canvasElement)
+  },
+}
+
+export const WithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "A command payload with a `ResizeObserver` that never reports, as WebKit sometimes does. Host content inside it grows on its own state — a commit the payload region never sees — and the region still becomes keyboard-reachable once it overflows, because it measures through the shared size observer, which also watches its content.",
+  ),
+  beforeEach: silenceResizeObserver,
+  render: () => (
+    <div className="w-96">
+      <ToolApprovalCommand label="Command input">
+        pnpm run deploy --env staging <GrowingNote />
+      </ToolApprovalCommand>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    await expectOverflowFollowsContent(canvasElement, () =>
+      canvasElement.querySelector<HTMLElement>(
+        '[data-slot="tool-approval-command"]',
+      ),
+    )
   },
 }
