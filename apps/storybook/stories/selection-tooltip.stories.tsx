@@ -331,6 +331,59 @@ function CommentDemo() {
   )
 }
 
+/**
+ * The band's height with a ResizeObserver that never reports: what WebKit did
+ * in CI, where a posted comment rendered into a band that stayed at its empty
+ * height. The band also measures when its content changes, so it opens to the
+ * comment all the same.
+ */
+export const PanelWithoutResizeReports: Story = {
+  parameters: storyDocumentation(
+    "The comment band opens to its content even where the engine never reports the content's resize: the band also measures when what it holds changes.",
+  ),
+  beforeEach: () => {
+    const real = window.ResizeObserver
+    window.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver
+    return () => {
+      window.ResizeObserver = real
+    }
+  },
+  render: () => <CommentDemo />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const panel = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="selection-tooltip-panel"]',
+    )
+    const panelContent = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="selection-tooltip-panel-content"]',
+    )
+    await expect(panel).not.toBeNull()
+    await expect(panelContent).not.toBeNull()
+    if (panel === null || panelContent === null) return
+    await userEvent.click(canvas.getByRole("button", { name: "Comment" }))
+    const input = canvas.getByRole("textbox", { name: "Write a comment" })
+    await waitFor(() => expect(input).toHaveFocus())
+    await userEvent.type(input, "Needs a citation")
+    const send = canvas.getByRole("button", { name: "Send" })
+    await waitFor(() => expect(send).toBeEnabled())
+    await userEvent.click(send)
+    await expect(await canvas.findByText("Needs a citation")).toBeVisible()
+    await waitFor(() => {
+      finishStoryTransitions(canvasElement)
+      expect(panel.getBoundingClientRect().height).toBeCloseTo(
+        panelContent.getBoundingClientRect().height,
+        1,
+      )
+    })
+    await expect(panel.getBoundingClientRect().height).toBeGreaterThan(30)
+    finishStoryTransitions(canvasElement)
+  },
+}
+
 export const CommentMode: Story = {
   // Cross-engine: Selection and Range APIs, which engines report differently.
   tags: ["cross-engine"],
