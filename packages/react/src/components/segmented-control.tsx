@@ -308,7 +308,15 @@ function SegmentedControl({
     // class or style change can reorder them — and a web font landing changes
     // their widths where WebKit reports no resize at all (seen in CI: a lens
     // 82px wide over a 77.6px option). The shared observer covers all of it.
-    return observeSize(track, placeLens, { boxes: ownOptions })
+    // The lens's own style changes with every placement and cannot move an
+    // option, so it is not watched.
+    return observeSize(track, placeLens, {
+      boxes: ownOptions,
+      ignoreMutation: (record) =>
+        record.type === "attributes" &&
+        (record.target as Element).getAttribute("data-slot") ===
+          "segmented-control-lens",
+    })
   }, [glass, placeLens])
 
   // The pressed state is committed to the options before this runs, so the

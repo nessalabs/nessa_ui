@@ -189,6 +189,10 @@ function ChartTooltip({
         (element as HTMLElement).offsetParent,
         boundaryElement,
       ],
+      // The card's own style is where it was placed, rewritten as the
+      // pointer moves; it cannot change the card's size.
+      ignoreMutation: (record) =>
+        record.target === card && record.attributeName === "style",
     })
     ownerDocument.addEventListener("scroll", replace, {
       capture: true,

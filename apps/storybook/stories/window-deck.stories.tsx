@@ -26,7 +26,10 @@ import {
   PanelsTopLeft,
 } from "lucide-react"
 
-import { silenceResizeObserver } from "./size-observer-harness"
+import {
+  settleMeasurements,
+  silenceResizeObserver,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -1290,6 +1293,7 @@ function livePane(canvasElement: HTMLElement) {
 async function playAutoHeight(canvasElement: HTMLElement) {
   const canvas = within(canvasElement)
   await waitFor(() => expect(deckPaneHeight(canvasElement)).toBeGreaterThan(0))
+  await settleMeasurements(canvasElement)
   const collapsed = deckPaneHeight(canvasElement)
 
   // Content that grows takes the window with it, rather than overflowing a

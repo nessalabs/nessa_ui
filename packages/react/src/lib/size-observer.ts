@@ -23,9 +23,17 @@ export interface ObserveSizeOptions {
    * Further elements whose own resize matters, such as the rows inside a
    * container that can grow while the container holds its size. Collected when
    * observation starts and again after every content change, so a row added
-   * later is followed too.
+   * later is followed too. A box `onChange` adds itself is picked up at the
+   * next content change.
    */
   boxes?: (element: Element) => Iterable<Element | null | undefined>
+  /**
+   * Content changes that cannot change the size being measured, such as the
+   * component's own positioning style or a region the measurement excludes.
+   * A batch of mutation records is reported only if one of them is not
+   * ignored. Changes `onChange` makes itself are already left out.
+   */
+  ignoreMutation?: (record: MutationRecord) => boolean
 }
 
 /**
@@ -81,7 +89,9 @@ export function observeSize(
       : null
   const mutations =
     typeof view.MutationObserver === "function"
-      ? new view.MutationObserver(() => {
+      ? new view.MutationObserver((records) => {
+          const ignore = options.ignoreMutation
+          if (ignore && records.every((record) => ignore(record))) return
           contentChanged = true
           schedule("content")
         })
@@ -153,9 +163,10 @@ export function observeSize(
   const fonts = (document as Document & { fonts?: FontFaceSet }).fonts
   const onFonts = () => schedule("fonts")
   fonts?.addEventListener?.("loadingdone", onFonts)
-  // Once, for a font that finished loading before this subscribed but after
-  // the caller measured.
-  void fonts?.ready?.then(onFonts, noop)
+  // Once more when a load already under way settles. A settled set has
+  // nothing left to land, and its resolved promise would only schedule a
+  // measurement for nothing on every subscription.
+  if (fonts?.status === "loading") void fonts.ready?.then(onFonts, noop)
 
   return () => {
     if (stopped) return

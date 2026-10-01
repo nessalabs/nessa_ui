@@ -218,12 +218,12 @@ function MessageApproval({
     if (!textarea) return
     // Width changes rewrap the text and change how tall it wants to be, and
     // so does a web font landing; the size observer covers both where React
-    // never sees them. A resize that kept the width — the height this sets —
-    // is not a reason to measure again.
+    // never sees them. Anything else — the height this sets, the draft's own
+    // layout effect writing it — is not a reason to measure again.
     let width = textarea.getBoundingClientRect().width
     return observeSize(textarea, (cause) => {
       const next = textarea.getBoundingClientRect().width
-      if (cause === "resize" && next === width) return
+      if (cause !== "fonts" && next === width) return
       width = next
       resize()
     })

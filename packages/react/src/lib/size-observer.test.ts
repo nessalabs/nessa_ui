@@ -38,8 +38,11 @@ function fakeWindow() {
     init: MutationObserverInit | null = null
     pending = 0
     disconnected = false
-    constructor(readonly callback: () => void) {
+    constructor(readonly callback: (records: MutationRecord[]) => void) {
       mutationObservers.push(this)
+    }
+    trigger(records: Partial<MutationRecord>[] = [{ type: "childList" }]) {
+      this.callback(records as MutationRecord[])
     }
     observe(target: unknown, init: MutationObserverInit) {
       this.target = target
@@ -57,6 +60,7 @@ function fakeWindow() {
 
   let resolveReady: () => void = () => {}
   const fonts = Object.assign(new EventTarget(), {
+    status: "loading" as FontFaceSetLoadStatus,
     ready: new Promise<void>((resolve) => {
       resolveReady = resolve
     }),
@@ -124,7 +128,7 @@ test("a content change is reported on the next frame", () => {
   assert.equal(mutations.init?.characterData, true)
   assert.deepEqual(mutations.init?.attributeFilter, ["class", "style", "dir", "hidden"])
 
-  mutations.callback()
+  mutations.trigger()
   assert.deepEqual(causes, [])
   env.runFrame()
   assert.deepEqual(causes, ["content"])
@@ -158,10 +162,10 @@ test("a burst of changes in one frame is measured once, with the cause that star
   const { causes, onChange } = record()
   observeSize(env.element, onChange)
 
-  env.mutationObserver().callback()
-  env.mutationObserver().callback()
+  env.mutationObserver().trigger()
+  env.mutationObserver().trigger()
   env.fonts.dispatchEvent(new Event("loadingdone"))
-  env.mutationObserver().callback()
+  env.mutationObserver().trigger()
   assert.equal(env.pendingFrames(), 1)
 
   env.runFrame()
@@ -185,7 +189,7 @@ test("what the measurement writes into the subtree is not reported back", () => 
   env.resizeObserver().callback()
   assert.equal(mutations().pending, 0)
 
-  mutations().callback()
+  mutations().trigger()
   env.runFrame()
   assert.equal(mutations().pending, 0)
   assert.deepEqual(causes, ["resize", "content"])
@@ -204,7 +208,7 @@ test("further boxes are followed, and collected again after content changes", ()
   assert.deepEqual([...observed()], [env.element, first])
 
   rows = [second]
-  env.mutationObserver().callback()
+  env.mutationObserver().trigger()
   env.runFrame()
   assert.deepEqual([...observed()], [env.element, second])
 })
@@ -214,7 +218,7 @@ test("stopping tears everything down and reports nothing after", async () => {
   const { causes, onChange } = record()
   const stop = observeSize(env.element, onChange)
 
-  env.mutationObserver().callback()
+  env.mutationObserver().trigger()
   assert.equal(env.pendingFrames(), 1)
   stop()
 
@@ -252,8 +256,39 @@ test("a window missing one API still uses the others", () => {
   const { causes, onChange } = record()
   const stop = observeSize(env.element, onChange)
 
-  env.mutationObserver().callback()
+  env.mutationObserver().trigger()
   env.runFrame()
   assert.deepEqual(causes, ["content"])
   stop()
+})
+
+test("a font set that has already settled schedules nothing on subscribing", async () => {
+  const env = fakeWindow()
+  env.fonts.status = "loaded"
+  env.resolveReady()
+  const { causes, onChange } = record()
+  observeSize(env.element, onChange)
+
+  await Promise.resolve()
+  await Promise.resolve()
+  assert.equal(env.pendingFrames(), 0)
+  assert.deepEqual(causes, [])
+})
+
+test("a batch of only ignored mutations is not reported", () => {
+  const env = fakeWindow()
+  const { causes, onChange } = record()
+  observeSize(env.element, onChange, {
+    ignoreMutation: (record) => record.attributeName === "style",
+  })
+
+  env.mutationObserver().trigger([{ type: "attributes", attributeName: "style" }])
+  assert.equal(env.pendingFrames(), 0)
+
+  env.mutationObserver().trigger([
+    { type: "attributes", attributeName: "style" },
+    { type: "childList" },
+  ])
+  env.runFrame()
+  assert.deepEqual(causes, ["content"])
 })

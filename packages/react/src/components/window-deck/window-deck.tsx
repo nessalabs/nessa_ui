@@ -1411,18 +1411,29 @@ function WindowDeck({
     // echoes the last measurement: growing content would overflow it and
     // shrinking content would leave it standing. Its natural height is read
     // with that size lifted for the read, and restored before anything paints.
+    // A height the host set on the pane itself is the pane's height, and is
+    // read as it stands.
     const measure = () => {
       const assigned = pane.style.height
+      if (assigned) {
+        commit(pane.offsetHeight)
+        return
+      }
       pane.style.height = "auto"
       const natural = pane.offsetHeight
-      pane.style.height = assigned
+      pane.style.height = ""
       commit(natural)
     }
 
     measure()
     // What sizes an auto-height pane is its content, so the content and web
-    // fonts are watched as well as the pane's box.
-    return observeSize(pane, measure)
+    // fonts are watched as well as the pane's box. The pane's own style is
+    // its translate, rewritten on every drag and pan frame, and cannot change
+    // its height.
+    return observeSize(pane, measure, {
+      ignoreMutation: (record) =>
+        record.target === pane && record.attributeName === "style",
+    })
   }, [liveContentId, paneElement, paneHeight, panes])
 
   const contextValue = React.useMemo(

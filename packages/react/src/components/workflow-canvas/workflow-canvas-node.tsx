@@ -309,10 +309,7 @@ function WorkflowCanvasNode({
       return
     }
 
-    // A node is sized by what it holds, so its content and web fonts are
-    // watched as well as its box: WebKit does not always report a resize
-    // they cause.
-    const stopObserving = observeSize(element, () => {
+    const remeasure = () => {
       canvas.geometry.setSize(nodeId, element.offsetWidth, element.offsetHeight)
 
       // A node that grew may now overhang the canvas bounds. Re-clamping
@@ -346,6 +343,15 @@ function WorkflowCanvasNode({
           }, 120)
         }
       }
+    }
+
+    // A node is sized by what it holds, so its content and web fonts are
+    // watched as well as its box: WebKit does not always report a resize
+    // they cause. The node's own style is its position, rewritten on every
+    // drag frame, and cannot change its size.
+    const stopObserving = observeSize(element, remeasure, {
+      ignoreMutation: (record) =>
+        record.target === element && record.attributeName === "style",
     })
 
     return () => {

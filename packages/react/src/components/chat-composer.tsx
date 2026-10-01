@@ -184,8 +184,14 @@ function ChatComposer({
     measure()
     // Each row is followed as well as the form: a row can grow (controls
     // wrapping, an attachment arriving) while the capped form holds its size.
+    // The input's own row is left out of the chrome, so what changes inside
+    // it — the draft, the height the textarea sets itself — is not watched.
     return observeSize(form, measure, {
       boxes: (element) => Array.from(element.children),
+      ignoreMutation: (record) =>
+        Array.from(form.children).some(
+          (row) => row.contains(input) && row.contains(record.target),
+        ),
     })
   }, [inputAdapter, effectiveMaxHeight])
 
@@ -439,8 +445,16 @@ function ChatComposerInput({
       textarea.scrollHeight > textarea.clientHeight ? "auto" : "hidden"
   }, [maxHeight])
 
+  React.useLayoutEffect(resize, [
+    composerMaxHeight,
+    props.value,
+    props.defaultValue,
+    resize,
+  ])
+
+  // Subscribed once, not per keystroke: the draft's own changes resize
+  // through the effect above, and the observer covers what React never sees.
   React.useLayoutEffect(() => {
-    resize()
     const textarea = localRef.current
     if (!textarea) return
     let previousWidth = textarea.getBoundingClientRect().width
@@ -460,7 +474,7 @@ function ChatComposerInput({
         textarea.style.overflowY = nextOverflow
       }
     })
-  }, [composerMaxHeight, props.value, props.defaultValue, resize])
+  }, [resize])
 
   return (
     <textarea

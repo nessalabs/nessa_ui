@@ -160,6 +160,10 @@ function MessageScrollerViewport({
     // Streamed content grows the transcript in place — text appended to a
     // message, not a new box — which WebKit does not always report as a
     // resize, so the shared size observer watches the content as well.
+    // The height a return was last aimed at: content reports arrive every
+    // frame a reply streams, and re-aiming a smooth scroll at an unchanged end
+    // restarts its curve without moving the target.
+    let returnTarget = -1
     return observeSize(viewport, () => {
       if (viewport.scrollTop < lastScrollTopRef.current - 1) {
         // The reader moved upward between scroll events; releasing here keeps
@@ -168,8 +172,12 @@ function MessageScrollerViewport({
         setPinned(false)
       } else if (autoScroll && pinnedRef.current) {
         viewport.scrollTop = viewport.scrollHeight
-      } else if (returningRef.current) {
+      } else if (
+        returningRef.current &&
+        viewport.scrollHeight !== returnTarget
+      ) {
         // Content grew mid-return: retarget the animation at the new end.
+        returnTarget = viewport.scrollHeight
         viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" })
       }
       updatePinned()
