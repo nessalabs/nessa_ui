@@ -20,6 +20,11 @@ import {
 import { Copy, SquareArrowOutUpRight, Undo2 } from "lucide-react"
 
 import { FileCopyIcon } from "./icons/nucleo"
+import {
+  GrowingNote,
+  expectOverflowFollowsContent,
+  silenceResizeObserver,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
 const editedFiles = [
@@ -276,5 +281,36 @@ export const VirtualizedFiles: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Collapse files" }))
     await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(3))
     await expect(list.scrollTop).toBe(0)
+  },
+}
+
+export const WithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "A changed-files list with a `ResizeObserver` that never reports, as WebKit sometimes does. Host content inside it grows on its own state — a commit the list never sees — and the region still becomes keyboard-reachable once it overflows, because it measures through the shared size observer, which also watches its content.",
+  ),
+  beforeEach: silenceResizeObserver,
+  render: () => (
+    <FileDiffCard defaultExpanded itemCount={2} className="w-full max-w-2xl">
+      <FileDiffCardHeader>
+        <FileDiffCardHeading>
+          <FileDiffCardTitle>Edited 2 files</FileDiffCardTitle>
+        </FileDiffCardHeading>
+      </FileDiffCardHeader>
+      <FileDiffList aria-label="Changed files">
+        <FileDiffListItem>
+          <FileDiffPath path="packages/react/src/lib/size-observer.ts" />
+        </FileDiffListItem>
+        <FileDiffListItem>
+          <FileDiffPath path="packages/react/src/components/table/table.tsx" />
+          <GrowingNote lines={24} />
+        </FileDiffListItem>
+      </FileDiffList>
+    </FileDiffCard>
+  ),
+  play: async ({ canvasElement }) => {
+    await expectOverflowFollowsContent(canvasElement, () =>
+      canvasElement.querySelector<HTMLElement>('[data-slot="file-diff-list"]'),
+    )
   },
 }

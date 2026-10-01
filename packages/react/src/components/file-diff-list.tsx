@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react"
 
 import { VirtualList } from "./virtual-list"
 import { useComposedRefs } from "@/lib/compose"
+import { observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 interface FileDiffCardContextValue {
@@ -283,17 +284,16 @@ function FileDiffList({ className, children, virtualize = false, rowHeight = 40,
 
   // Content can change height without changing the item count (a path
   // wrapping to two lines, async row content), so overflow is re-measured
-  // after every commit; the observer covers non-React resizes.
+  // after every commit; the size observer covers what changes it without
+  // one — a resize, content changed outside React, a web font landing.
   React.useEffect(() => {
     updateScrollable()
   })
 
   React.useEffect(() => {
     const element = listRef.current
-    if (!element || typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver(updateScrollable)
-    observer.observe(element)
-    return () => observer.disconnect()
+    if (!element) return
+    return observeSize(element, updateScrollable)
   }, [updateScrollable, virtualize])
 
   // The host's ref is composed rather than spread: `ref` is an ordinary
