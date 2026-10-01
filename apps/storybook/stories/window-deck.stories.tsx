@@ -1588,12 +1588,7 @@ export const AutoHeightHonoursACappedContentRegion: Story = {
   render: () => (
     <div className="h-[720px] w-full bg-background">
       <WindowDeck paneHeight="auto" defaultActivePane="notes">
-        <WindowDeckPane
-          id="notes"
-          label="Notes"
-          scrollable
-          contentClassName="max-h-40"
-        >
+        <WindowDeckPane id="notes" label="Notes" contentClassName="max-h-40">
           <ExpandableNotes />
         </WindowDeckPane>
         <WindowDeckPane id="later" label="Later">
@@ -1616,14 +1611,32 @@ export const AutoHeightHonoursACappedContentRegion: Story = {
     // Held at the cap, not climbing by the overflow frame after frame.
     await expect(new Set(heights).size).toBe(1)
     await expect(heights[0]).toBeLessThanOrEqual(162)
+    // And the notes past the cap scroll inside the region, by default.
+    const region = livePane(canvasElement).querySelector<HTMLElement>(
+      '[data-slot="window-deck-pane-content"]',
+    )!
+    await expect(getComputedStyle(region).overflowY).toBe("auto")
+    await expect(region.scrollHeight).toBeGreaterThan(region.clientHeight)
   },
 }
 
 /** Two short windows in a deck of the given height mode. */
-function WheelDeck({ paneHeight }: { paneHeight?: string }) {
+function WheelDeck({
+  paneHeight,
+  wheelNavigation,
+  testId,
+}: {
+  paneHeight?: string
+  wheelNavigation?: boolean
+  testId: string
+}) {
   return (
-    <div className="h-[360px] w-full bg-background" data-testid={paneHeight ?? "fixed"}>
-      <WindowDeck paneHeight={paneHeight} defaultActivePane="first">
+    <div className="h-[360px] w-full bg-background" data-testid={testId}>
+      <WindowDeck
+        paneHeight={paneHeight}
+        wheelNavigation={wheelNavigation}
+        defaultActivePane="first"
+      >
         <WindowDeckPane id="first" label="First">
           <p className="p-4 nessa-text-3">The first window.</p>
         </WindowDeckPane>
@@ -1637,12 +1650,13 @@ function WheelDeck({ paneHeight }: { paneHeight?: string }) {
 
 export const WheelNavigationByHeight: Story = {
   parameters: storyDocumentation(
-    "A vertical wheel over a fixed-height deck moves the carousel to the next window. Over an auto-height deck it does not, and it reaches the page: that deck sits in the page's flow and its windows grow rather than scroll, so their content is not a scroll region that could hold the wheel back. Either default yields to an explicit `wheelNavigation` or `scrollable`.",
+    "A vertical wheel over a fixed-height deck moves the carousel to the next window. Over an auto-height deck it does not, and it reaches the page: that deck sits in the page's flow and its windows grow rather than scroll, so their content regions do not contain the wheel. An auto-height deck that passes `wheelNavigation` takes the wheel as a fixed one does.",
   ),
   render: () => (
     <div className="flex flex-col gap-6">
-      <WheelDeck />
-      <WheelDeck paneHeight="auto" />
+      <WheelDeck testId="fixed" />
+      <WheelDeck testId="auto" paneHeight="auto" />
+      <WheelDeck testId="auto-opted-in" paneHeight="auto" wheelNavigation />
     </div>
   ),
   play: async ({ canvasElement }) => {
@@ -1661,30 +1675,55 @@ export const WheelNavigationByHeight: Story = {
       )
     }
 
-    const fixed = viewportOf("fixed")
-    const fixedStart = fixed.scrollLeft
-    wheel("fixed")
-    await waitFor(() => expect(fixed.scrollLeft).toBeGreaterThan(fixedStart))
+    const activeLabel = (testId: string) =>
+      canvas
+        .getByTestId(testId)
+        .querySelector<HTMLElement>('[data-slot="window-deck-pane"][data-active]')
+        ?.getAttribute("aria-label")
+    // Settled on the second window, not merely moved.
+    const expectSecond = async (testId: string) => {
+      await waitFor(() => expect(activeLabel(testId)).toMatch(/Second/))
+      const viewport = viewportOf(testId)
+      let last = -1
+      await waitFor(() => {
+        const now = viewport.scrollLeft
+        const settled = now === last
+        last = now
+        expect(settled).toBe(true)
+      })
+    }
 
+    // A fixed-height deck takes the wheel as "next window".
+    wheel("fixed")
+    await expectSecond("fixed")
+
+    // An auto-height deck leaves it alone...
     const auto = viewportOf("auto")
     const autoStart = auto.scrollLeft
     wheel("auto")
     await frames(2)
     await expect(auto.scrollLeft).toBe(autoStart)
+    await expect(activeLabel("auto")).toMatch(/First/)
 
-    // Nor does its window hold the wheel back from the page: it grows rather
-    // than scrolls, so its content region is not a scroll container — one
-    // with nothing to scroll and \`overscroll-behavior: contain\` keeps
-    // Chromium from passing the wheel on.
-    const autoContent = auto.querySelector<HTMLElement>(
-      '[data-slot="window-deck-pane-content"]',
-    )!
-    await expect(getComputedStyle(autoContent).overflowY).toBe("visible")
-    await expect(getComputedStyle(autoContent).overscrollBehaviorY).toBe("auto")
-    const fixedContent = fixed.querySelector<HTMLElement>(
-      '[data-slot="window-deck-pane-content"]',
-    )!
-    await expect(getComputedStyle(fixedContent).overflowY).toBe("auto")
+    // ...unless the host asks for it.
+    wheel("auto-opted-in")
+    await expectSecond("auto-opted-in")
+
+    // Nor does an auto-height window hold the wheel back from the page: its
+    // content region still scrolls when capped, but does not contain its
+    // scroll — Chromium keeps a wheel inside a containing region even with
+    // nothing to scroll. A fixed-height window still contains its own.
+    const contentOf = (testId: string) =>
+      viewportOf(testId).querySelector<HTMLElement>(
+        '[data-slot="window-deck-pane-content"]',
+      )!
+    await expect(getComputedStyle(contentOf("auto")).overflowY).toBe("auto")
+    await expect(getComputedStyle(contentOf("auto")).overscrollBehaviorY).toBe(
+      "auto",
+    )
+    await expect(getComputedStyle(contentOf("fixed")).overscrollBehaviorY).toBe(
+      "contain",
+    )
   },
 }
 
@@ -1723,5 +1762,38 @@ export const AutoHeightCollapsesWhenEmptied: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Empty the window" }))
     await waitFor(() => expect(deckPaneHeight(canvasElement)).toBe(0))
     await expect(livePane(canvasElement).offsetHeight).toBe(0)
+  },
+}
+
+export const AutoHeightHonoursAFixedContentRegion: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "An auto-height deck whose live window gives its content region a fixed height of its own, with no max-height. Notes that outgrow it scroll inside the region, and the window holds its height rather than growing by the overflow on every measurement.",
+  ),
+  render: () => (
+    <div className="h-[720px] w-full bg-background">
+      <WindowDeck paneHeight="auto" defaultActivePane="notes">
+        <WindowDeckPane id="notes" label="Notes" contentClassName="flex-none h-40">
+          <ExpandableNotes />
+        </WindowDeckPane>
+        <WindowDeckPane id="later" label="Later">
+          <p className="p-4 nessa-text-3">Nothing here yet.</p>
+        </WindowDeckPane>
+      </WindowDeck>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await waitFor(() => expect(deckPaneHeight(canvasElement)).toBeGreaterThan(0))
+    await settleMeasurements(canvasElement)
+    const before = deckPaneHeight(canvasElement)
+    await userEvent.click(canvas.getByRole("button", { name: "Show more" }))
+    // Sampled from the click on, so a single frame at a wrong height fails.
+    const heights: number[] = []
+    for (let index = 0; index < 12; index += 1) {
+      await frames(1)
+      heights.push(deckPaneHeight(canvasElement))
+    }
+    await expect(heights).toEqual(heights.map(() => before))
   },
 }

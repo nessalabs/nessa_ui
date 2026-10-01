@@ -246,6 +246,8 @@ test("stopping tears everything down and reports nothing after", async () => {
   await Promise.resolve()
   env.resizeObserver().callback()
   env.runFrame()
+  // Past the fallback timer too: nothing reports after stopping.
+  await new Promise((resolve) => setTimeout(resolve, 150))
   assert.deepEqual(causes, [])
   assert.doesNotThrow(stop)
 })
@@ -417,7 +419,8 @@ test("a report is flushed without a frame when none comes", async () => {
   // No frame is ever run here: the fallback timer flushes on its own.
   await new Promise((resolve) => setTimeout(resolve, 150))
   assert.deepEqual(causes, ["content"])
-  // And the frame it was also waiting on no longer flushes again.
+  // The frame it was also waiting on was cancelled, not left to run.
+  assert.equal(env.pendingFrames(), 0)
   env.runFrame()
   assert.deepEqual(causes, ["content"])
 })

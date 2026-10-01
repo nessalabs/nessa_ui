@@ -267,7 +267,8 @@ function emptyNaturalHeight(pane: HTMLElement): number | null {
  * cannot be read safely — the content fits (it may have shrunk inside a body
  * that fills the region, which only a fresh layout reveals), there is no
  * content region or loose text in it, a region the host caps or sizes so it
- * does not grow with the pane, or the overflow is not the in-flow content's
+ * does not grow with the pane (a max-height, or a size it does not flex
+ * from), or the overflow is not the in-flow content's
  * own (an absolutely positioned badge, a float, a body that fills the region
  * and overflows itself).
  */
@@ -290,7 +291,12 @@ function grownNaturalHeight(pane: HTMLElement): number | null {
   // lets it be. A region the host caps (`contentClassName="max-h-40"`) or
   // sizes itself would keep overflowing however tall the pane grew.
   const regionStyle = view.getComputedStyle(content)
-  if (regionStyle.maxHeight !== "none") return null
+  if (
+    regionStyle.maxHeight !== "none" ||
+    !(Number.parseFloat(regionStyle.flexGrow) > 0)
+  ) {
+    return null
+  }
   let rows = 0
   for (const row of pane.children) {
     if (!(row instanceof HTMLElement) || row.offsetParent === null) continue
@@ -1539,12 +1545,19 @@ function WindowDeck({
           .getPropertyValue("--nessa-window-deck-pane-height"),
       )
       const follows = Math.abs(pane.offsetHeight - applied) <= 1
-      const cheap = follows
-        ? (grownNaturalHeight(pane) ?? emptyNaturalHeight(pane))
-        : null
+      const grown = follows ? grownNaturalHeight(pane) : null
+      if (grown !== null) {
+        commit(grown)
+        return
+      }
+      const empty = follows ? emptyNaturalHeight(pane) : null
+      if (empty !== null) {
+        commit(empty)
+        return
+      }
       // Committed growth leaves the content fitting, so the next report
       // lifts and confirms it; the two reads cannot take turns.
-      commit(cheap ?? lift())
+      commit(lift())
     }
 
     measure()
