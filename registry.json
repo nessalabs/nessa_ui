@@ -924,8 +924,9 @@
         "lucide-react"
       ],
       "registryDependencies": [
-        "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
