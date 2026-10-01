@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { useComposedRefs } from "@/lib/compose"
+import { observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 const reducedMotionQuery = "(prefers-reduced-motion: reduce)"
@@ -380,7 +381,7 @@ function GeneratingSurface({
     // so an ordinary reveal is never cut short by its own layout.
     let baseHeight = content.offsetHeight
     let baseWidth = content.offsetWidth
-    const resizeObserver = new ResizeObserver(() => {
+    const stopObserving = observeSize(content, () => {
       const { offsetHeight, offsetWidth } = content
       if (offsetWidth !== baseWidth) {
         // The container reflowed around us rather than the content
@@ -397,10 +398,9 @@ function GeneratingSurface({
         setPhase("settled")
       }
     })
-    resizeObserver.observe(content)
     return () => {
       cancelled = true
-      resizeObserver.disconnect()
+      stopObserving()
       animations.forEach((animation) => animation.cancel())
     }
   }, [phase, reducedMotion])
