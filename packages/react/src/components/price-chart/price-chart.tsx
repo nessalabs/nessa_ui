@@ -4,6 +4,7 @@ import * as React from "react"
 import { cva } from "class-variance-authority"
 import { X } from "lucide-react"
 
+import { useMeasuredSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 import {
@@ -115,47 +116,6 @@ export interface PriceChartSelectionContext extends PriceChartSelection {
   changeAmount: number
   /** That same move as a percentage of the window's opening price. */
   changePercent: number
-}
-
-/**
- * The measured content box of an element, or `null` before the first
- * measurement. The same hook RadarChart and PieChart carry, plus one
- * synchronous first measurement — see the comment below for why this chart
- * needs it. Lifting the three into one shared module means adopting that
- * measurement everywhere, which is strictly safer than the observer-only
- * form; nothing else about them differs.
- */
-function useMeasuredBox(ref: React.RefObject<HTMLElement | null>) {
-  const [box, setBox] = React.useState<{ width: number; height: number } | null>(
-    null,
-  )
-  React.useLayoutEffect(() => {
-    const element = ref.current
-    if (!element) return
-    // Measured once before subscribing, unlike the observer-only copies in
-    // RadarChart and PieChart: this plot resolves pointer positions against
-    // its own width, so a press landing between first paint and the
-    // observer's first callback would resolve every position to bar zero.
-    const initial = element.getBoundingClientRect()
-    setBox((previous) =>
-      previous ??
-      { width: Math.round(initial.width), height: Math.round(initial.height) },
-    )
-    if (typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver((entries) => {
-      const rect = entries[entries.length - 1]!.contentRect
-      const width = Math.round(rect.width)
-      const height = Math.round(rect.height)
-      setBox((previous) =>
-        previous && previous.width === width && previous.height === height
-          ? previous
-          : { width, height },
-      )
-    })
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [ref])
-  return box
 }
 
 export interface PriceChartProps
@@ -342,7 +302,7 @@ function PriceChart({
   const offsetRef = React.useRef(0)
   const gradientId = React.useId()
   const hintId = React.useId()
-  const box = useMeasuredBox(plotRef) ?? { width: 0, height: 0 }
+  const box = useMeasuredSize(plotRef) ?? { width: 0, height: 0 }
 
   const [uncontrolledSelection, setUncontrolledSelection] =
     React.useState<PriceChartSelection | null>(defaultSelection)

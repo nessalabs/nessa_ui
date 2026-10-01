@@ -10,6 +10,11 @@ import {
 import { PriceChart } from "@nessalabs/ui"
 
 import { candleSeries, priceSeries, SESSION_START } from "./market-demo-data"
+import {
+  WidenableFrame,
+  expectFollowsFrame,
+  silenceResizeObserver,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -422,5 +427,28 @@ export const NoData: Story = {
       canvasElement.querySelector('[data-slot="price-chart-value-axis"]')
         ?.textContent,
     ).toBe("")
+  },
+}
+
+/**
+ * The chart's frame widened with a `ResizeObserver` that never reports, which
+ * is what WebKit does to some resizes. The plot still redraws at the new
+ * width once a web font lands, because the chart measures through the shared
+ * size observer.
+ */
+export const WithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "The chart measured with a `ResizeObserver` that never reports, as WebKit sometimes does. It still draws at its box's size, and when its frame widens it redraws at the new width once a web font finishes loading, because the chart measures through the shared size observer rather than a bare `ResizeObserver`.",
+  ),
+  args: Playground.args,
+  beforeEach: silenceResizeObserver,
+  render: (args) => (
+    <WidenableFrame className="h-64">
+      <PriceChart {...args} />
+    </WidenableFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    await expectFollowsFrame(canvasElement)
   },
 }
