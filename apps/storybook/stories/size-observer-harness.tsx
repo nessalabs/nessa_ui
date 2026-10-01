@@ -113,19 +113,68 @@ export async function expectFollowsFrame(
 }
 
 /**
+ * A switch that opens every {@link GrowingNote} given it, from outside the
+ * component the note sits in, without rendering anything but the note. For
+ * content inside a surface that takes no pointer input.
+ */
+export interface GrowthSwitch {
+  open: () => void
+  subscribe: (listener: () => void) => () => void
+  isOpen: () => boolean
+}
+
+/** A closed {@link GrowthSwitch}. */
+export function createGrowthSwitch(): GrowthSwitch {
+  let open = false
+  const listeners = new Set<() => void>()
+  return {
+    open() {
+      open = true
+      for (const listener of listeners) listener()
+    },
+    subscribe(listener) {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    isOpen: () => open,
+  }
+}
+
+const neverOpens: GrowthSwitch = {
+  open() {},
+  subscribe: () => () => {},
+  isOpen: () => false,
+}
+
+/**
  * Host content that grows on its own state: a disclosure that reveals more
  * lines. Opening it commits only this component, so the component it sits
  * inside sees no render of its own; with resize reports silenced, only the
  * size observer's content trigger can tell that its content grew. Phrasing
- * content, so it can sit in a paragraph, a `pre` or a list item.
+ * content, so it can sit in a paragraph, a `pre` or a list item. Given a
+ * `growth` switch it renders no button and opens when the switch does.
  */
-export function GrowingNote({ lines = 16 }: { lines?: number }) {
-  const [open, setOpen] = React.useState(false)
+export function GrowingNote({
+  lines = 16,
+  growth,
+}: {
+  lines?: number
+  growth?: GrowthSwitch
+}) {
+  const [clicked, setClicked] = React.useState(false)
+  const switched = React.useSyncExternalStore(
+    (growth ?? neverOpens).subscribe,
+    (growth ?? neverOpens).isOpen,
+    (growth ?? neverOpens).isOpen,
+  )
+  const open = clicked || switched
   return (
     <span className="block">
-      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
-        Show the full note
-      </Button>
+      {growth ? null : (
+        <Button variant="ghost" size="sm" onClick={() => setClicked(true)}>
+          Show the full note
+        </Button>
+      )}
       {open
         ? Array.from({ length: lines }, (_, index) => (
             <span key={index} className="block">
