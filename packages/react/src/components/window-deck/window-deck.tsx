@@ -1411,17 +1411,12 @@ function WindowDeck({
     // echoes the last measurement: growing content would overflow it and
     // shrinking content would leave it standing. Its natural height is read
     // with that size lifted for the read, and restored before anything paints.
-    // A height the host set on the pane itself is the pane's height, and is
-    // read as it stands.
+    // What is lifted is the deck's own size, so a height the host gives the
+    // pane — a class, an inline style, a stylesheet — still wins the read.
     const measure = () => {
-      const assigned = pane.style.height
-      if (assigned) {
-        commit(pane.offsetHeight)
-        return
-      }
-      pane.style.height = "auto"
+      pane.style.setProperty("--nessa-window-deck-pane-height", "auto")
       const natural = pane.offsetHeight
-      pane.style.height = ""
+      pane.style.removeProperty("--nessa-window-deck-pane-height")
       commit(natural)
     }
 

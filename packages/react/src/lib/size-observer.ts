@@ -18,6 +18,13 @@ import * as React from "react"
  */
 export type SizeChangeCause = "resize" | "content" | "fonts"
 
+/**
+ * Every cause behind one report. A frame can hold several — a content change
+ * and a web font landing together — and none is folded into another, so a
+ * caller that acts on one cause (a font rewrapping text) still sees it.
+ */
+export type SizeChanges = ReadonlySet<SizeChangeCause>
+
 export interface ObserveSizeOptions {
   /**
    * Further elements whose own resize matters, such as the rows inside a
@@ -53,13 +60,16 @@ const noop = () => {}
  *   observation starts.
  * - A change to the element's subtree (children, text, or an attribute that
  *   lays it out) is reported as `content`, and a web font finishing its load,
- *   or the document's fonts settling, as `fonts`. Any burst of these is
- *   reported once, on the next animation frame, with the cause that started
- *   it.
+ *   or the document's fonts settling while a load is under way, as `fonts`.
+ *   Any burst of these is reported once, on the next animation frame, with
+ *   every cause it held.
  *
- * `onChange` measures and acts; it is not called when observation starts, so
- * the caller takes its first measurement itself. Changes `onChange` makes to
- * the element's subtree while it runs are not reported back to it.
+ * A report says the size *may* have changed. `onChange` measures, compares
+ * with what it last acted on, and acts only on a real difference; that is
+ * what keeps a report it did not need cheap. It is not called when
+ * observation starts, so the caller takes its first measurement itself.
+ * Mutations queued while `onChange` runs are treated as its own and not
+ * reported back to it — including anything a `flushSync` inside it commits.
  *
  * Each API is used only where the element's window has it. Where it has none
  * — an element from a server render, a document without a view — nothing is
@@ -67,7 +77,7 @@ const noop = () => {}
  */
 export function observeSize(
   element: Element,
-  onChange: (cause: SizeChangeCause) => void,
+  onChange: (changes: SizeChanges) => void,
   options: ObserveSizeOptions = {},
 ): () => void {
   const document = element.ownerDocument as Document | undefined
@@ -77,14 +87,14 @@ export function observeSize(
   let stopped = false
   // Cancels the scheduled flush, or null when none is scheduled.
   let cancelFlush: (() => void) | null = null
-  let pendingCause: SizeChangeCause | null = null
+  let pending = new Set<SizeChangeCause>()
   let contentChanged = false
 
   const resizes =
     typeof view.ResizeObserver === "function"
       ? new view.ResizeObserver(() => {
           if (stopped) return
-          report("resize")
+          report(new Set(["resize"]))
         })
       : null
   const mutations =
@@ -117,8 +127,8 @@ export function observeSize(
     for (const box of next) observedBoxes.add(box)
   }
 
-  function report(cause: SizeChangeCause) {
-    onChange(cause)
+  function report(changes: SizeChanges) {
+    onChange(changes)
     // What the measurement wrote into the subtree itself — a lens moved, a
     // textarea's height set — is its own doing, not a change to measure for.
     mutations?.takeRecords()
@@ -126,19 +136,19 @@ export function observeSize(
 
   function flush() {
     cancelFlush = null
-    const cause = pendingCause
-    pendingCause = null
-    if (stopped || cause === null) return
+    const changes = pending
+    pending = new Set()
+    if (stopped || changes.size === 0) return
     if (contentChanged) {
       contentChanged = false
       followBoxes()
     }
-    report(cause)
+    report(changes)
   }
 
   function schedule(cause: SizeChangeCause) {
     if (stopped) return
-    pendingCause ??= cause
+    pending.add(cause)
     if (cancelFlush !== null) return
     const host = view!
     if (typeof host.requestAnimationFrame === "function") {
@@ -196,19 +206,55 @@ export function changesOnlyStyle(
   if (record.type !== "attributes" || record.attributeName !== "style") {
     return false
   }
+  const ignored = new Set(properties.map(propertyKey))
   const rest = (value: string | null) =>
-    (value ?? "")
-      .split(";")
-      .map((declaration) => declaration.trim())
+    declarations(value ?? "")
       .filter((declaration) => {
-        if (!declaration) return false
-        const name = declaration.slice(0, declaration.indexOf(":")).trim()
-        return !properties.includes(name.toLowerCase())
+        const colon = declaration.indexOf(":")
+        return colon === -1 || !ignored.has(propertyKey(declaration.slice(0, colon)))
       })
       .join(";")
   return (
     rest(record.oldValue) === rest((record.target as Element).getAttribute("style"))
   )
+}
+
+/**
+ * A property name as CSS compares it: standard names ignore case, custom
+ * properties (`--name`) do not.
+ */
+function propertyKey(name: string) {
+  const trimmed = name.trim()
+  return trimmed.startsWith("--") ? trimmed : trimmed.toLowerCase()
+}
+
+/**
+ * The declarations of an inline style string, split on the semicolons that
+ * end them — not on one inside a quoted string or a function such as `url()`.
+ */
+function declarations(style: string) {
+  const parts: string[] = []
+  let current = ""
+  let quote: string | null = null
+  let depth = 0
+  for (const character of style) {
+    if (quote) {
+      if (character === quote) quote = null
+    } else if (character === '"' || character === "'") {
+      quote = character
+    } else if (character === "(") {
+      depth += 1
+    } else if (character === ")") {
+      depth = Math.max(0, depth - 1)
+    } else if (character === ";" && depth === 0) {
+      if (current.trim()) parts.push(current.trim())
+      current = ""
+      continue
+    }
+    current += character
+  }
+  if (current.trim()) parts.push(current.trim())
+  return parts
 }
 
 /** An element's content-box size, in whole CSS pixels. */

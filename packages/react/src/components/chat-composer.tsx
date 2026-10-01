@@ -185,11 +185,13 @@ function ChatComposer({
     // Each row is followed as well as the form: a row can grow (controls
     // wrapping, an attachment arriving) while the capped form holds its size.
     // The input's own row is left out of the chrome, so what changes inside
-    // it — the draft, the height the textarea sets itself — is not watched.
-    // The row's own margins and position still count.
+    // it — the draft, the height the textarea sets itself — is not watched,
+    // nor is the input itself when it is a row of its own. Another row's own
+    // margins and position still count.
     return observeSize(form, measure, {
       boxes: (element) => Array.from(element.children),
       ignoreMutation: (record) =>
+        record.target === input ||
         Array.from(form.children).some(
           (row) =>
             row !== record.target &&
@@ -462,10 +464,10 @@ function ChatComposerInput({
     const textarea = localRef.current
     if (!textarea) return
     let previousWidth = textarea.getBoundingClientRect().width
-    return observeSize(textarea, (cause) => {
+    return observeSize(textarea, (changes) => {
       const nextWidth = textarea.getBoundingClientRect().width
       // A new width rewraps the text, and so does a web font landing.
-      if (nextWidth !== previousWidth || cause === "fonts") {
+      if (nextWidth !== previousWidth || changes.has("fonts")) {
         previousWidth = nextWidth
         resize()
         return

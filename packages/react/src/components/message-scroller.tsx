@@ -165,6 +165,8 @@ function MessageScrollerViewport({
     // restarts its curve without moving the target.
     let returnTarget = -1
     return observeSize(viewport, () => {
+      // A new return aims afresh, even at a height an earlier one reached.
+      if (!returningRef.current) returnTarget = -1
       if (viewport.scrollTop < lastScrollTopRef.current - 1) {
         // The reader moved upward between scroll events; releasing here keeps
         // a fast stream from yanking the gesture back to the bottom.

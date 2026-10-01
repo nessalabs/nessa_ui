@@ -192,7 +192,7 @@ function ChartTooltip({
       // Where the card was placed, rewritten as the pointer moves, cannot
       // change its size; the rest of its style can.
       ignoreMutation: (record) =>
-        record.target === card && changesOnlyStyle(record, ["left", "top"]),
+        record.target === card && changesOnlyStyle(record, ["left", "top", "inset"]),
     })
     ownerDocument.addEventListener("scroll", replace, {
       capture: true,

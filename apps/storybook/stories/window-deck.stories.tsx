@@ -1331,3 +1331,27 @@ export const AutoHeightWithoutResizeReports: Story = {
   render: () => <AutoHeightDeck />,
   play: async ({ canvasElement }) => playAutoHeight(canvasElement),
 }
+
+export const AutoHeightKeepsAHostHeight: Story = {
+  parameters: storyDocumentation(
+    "An auto-height deck whose live window the host sizes with a class. Measuring the window's natural height lifts only the deck's own size, so the host's height still wins and every window takes it.",
+  ),
+  render: () => (
+    <div className="h-[720px] w-full bg-background">
+      <WindowDeck paneHeight="auto" defaultActivePane="notes">
+        <WindowDeckPane id="notes" label="Notes" className="h-96">
+          <p className="p-4 nessa-text-3">A short note in a tall window.</p>
+        </WindowDeckPane>
+        <WindowDeckPane id="later" label="Later">
+          <p className="p-4 nessa-text-3">Nothing here yet.</p>
+        </WindowDeckPane>
+      </WindowDeck>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    await waitFor(() => expect(deckPaneHeight(canvasElement)).toBe(384))
+    await settleMeasurements(canvasElement)
+    await expect(deckPaneHeight(canvasElement)).toBe(384)
+    await expect(livePane(canvasElement).offsetHeight).toBe(384)
+  },
+}

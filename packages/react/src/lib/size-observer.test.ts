@@ -6,7 +6,7 @@ import test from "node:test"
 import {
   changesOnlyStyle,
   observeSize,
-  type SizeChangeCause,
+  type SizeChanges,
 } from "./size-observer"
 
 /**
@@ -103,9 +103,14 @@ function fakeWindow() {
   }
 }
 
+/** Each report's causes, sorted and joined: "content+fonts". */
+function label(changes: SizeChanges) {
+  return [...changes].sort().join("+")
+}
+
 function record() {
-  const causes: SizeChangeCause[] = []
-  return { causes, onChange: (cause: SizeChangeCause) => causes.push(cause) }
+  const causes: string[] = []
+  return { causes, onChange: (changes: SizeChanges) => causes.push(label(changes)) }
 }
 
 test("a box resize is reported at once, in the frame it is laid out", () => {
@@ -161,7 +166,7 @@ test("the document's fonts settling is reported once", async () => {
   assert.deepEqual(causes, ["fonts"])
 })
 
-test("a burst of changes in one frame is measured once, with the cause that started it", () => {
+test("a burst of changes in one frame is measured once, with every cause it held", () => {
   const env = fakeWindow()
   const { causes, onChange } = record()
   observeSize(env.element, onChange)
@@ -173,19 +178,21 @@ test("a burst of changes in one frame is measured once, with the cause that star
   assert.equal(env.pendingFrames(), 1)
 
   env.runFrame()
-  assert.deepEqual(causes, ["content"])
+  // A font landing beside a content change is not folded into it: a caller
+  // that rewraps text for fonts still sees it.
+  assert.deepEqual(causes, ["content+fonts"])
 
   env.fonts.dispatchEvent(new Event("loadingdone"))
   env.runFrame()
-  assert.deepEqual(causes, ["content", "fonts"])
+  assert.deepEqual(causes, ["content+fonts", "fonts"])
 })
 
 test("what the measurement writes into the subtree is not reported back", () => {
   const env = fakeWindow()
   const mutations = () => env.mutationObserver()
-  const causes: SizeChangeCause[] = []
-  observeSize(env.element, (cause) => {
-    causes.push(cause)
+  const causes: string[] = []
+  observeSize(env.element, (changes) => {
+    causes.push(label(changes))
     // The measurement moves something inside the element.
     mutations().pending += 1
   })
@@ -321,4 +328,33 @@ test("a style change counts as positioning only when nothing else changed", () =
   assert.equal(changesOnlyStyle(resized, ["transform"]), false)
 
   assert.equal(changesOnlyStyle(change("", "", "class"), ["transform"]), false)
+})
+
+test("a style change is split into declarations the way CSS reads them", () => {
+  const change = (oldValue: string, now: string) =>
+    ({
+      type: "attributes",
+      attributeName: "style",
+      oldValue,
+      target: { getAttribute: () => now },
+    }) as unknown as MutationRecord
+
+  // A semicolon inside a quoted value or a function does not end it.
+  assert.equal(
+    changesOnlyStyle(
+      change('content: "a;left: 1px"; left: 0px;', 'content: "b;left: 1px"; left: 4px;'),
+      ["left"],
+    ),
+    false,
+  )
+  assert.equal(
+    changesOnlyStyle(
+      change('background: url("x;y"); left: 0px;', 'background: url("x;y"); left: 4px;'),
+      ["left"],
+    ),
+    true,
+  )
+  // Standard names ignore case; custom properties do not.
+  assert.equal(changesOnlyStyle(change("LEFT: 0px;", "left: 4px;"), ["left"]), true)
+  assert.equal(changesOnlyStyle(change("--X: 0;", "--X: 1;"), ["--x"]), false)
 })

@@ -221,9 +221,9 @@ function MessageApproval({
     // never sees them. Anything else — the height this sets, the draft's own
     // layout effect writing it — is not a reason to measure again.
     let width = textarea.getBoundingClientRect().width
-    return observeSize(textarea, (cause) => {
+    return observeSize(textarea, (changes) => {
       const next = textarea.getBoundingClientRect().width
-      if (cause !== "fonts" && next === width) return
+      if (!changes.has("fonts") && next === width) return
       width = next
       resize()
     })

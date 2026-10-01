@@ -309,8 +309,16 @@ function WorkflowCanvasNode({
       return
     }
 
+    // The size last acted on. A report only says the size may have changed;
+    // re-clamping on one that changed nothing would report a "resize" move
+    // for a node that did not resize.
+    let measured = { width: element.offsetWidth, height: element.offsetHeight }
     const remeasure = () => {
-      canvas.geometry.setSize(nodeId, element.offsetWidth, element.offsetHeight)
+      const width = element.offsetWidth
+      const height = element.offsetHeight
+      if (width === measured.width && height === measured.height) return
+      measured = { width, height }
+      canvas.geometry.setSize(nodeId, width, height)
 
       // A node that grew may now overhang the canvas bounds. Re-clamping
       // here keeps it inside; without it the next drag or arrow press
@@ -321,7 +329,7 @@ function WorkflowCanvasNode({
         const current = resolvedPositionRef.current
         const clamped = clampPositionToBounds(
           current,
-          { width: element.offsetWidth, height: element.offsetHeight },
+          { width, height },
           bounds,
         )
 

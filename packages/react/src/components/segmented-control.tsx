@@ -5,7 +5,11 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { flushSync } from "react-dom"
 
 import { useComposedRefs } from "@/lib/compose"
-import { observeSize, type SizeChangeCause } from "@/lib/size-observer"
+import {
+  observeSize,
+  type SizeChangeCause,
+  type SizeChanges,
+} from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 import { Button } from "./button"
@@ -308,9 +312,19 @@ function SegmentedControl({
     // class or style change can reorder them — and a web font landing changes
     // their widths where WebKit reports no resize at all (seen in CI: a lens
     // 82px wide over a 77.6px option). The shared observer covers all of it.
+    // A report can hold several causes; the trace names a font landing over
+    // a content change, since that is the one WebKit leaves unreported.
+    const onSizeChange = (changes: SizeChanges) =>
+      placeLens(
+        changes.has("fonts")
+          ? "fonts"
+          : changes.has("content")
+            ? "content"
+            : "resize",
+      )
     // The lens's own style changes with every placement and cannot move an
     // option, so it is not watched.
-    return observeSize(track, placeLens, {
+    return observeSize(track, onSizeChange, {
       boxes: ownOptions,
       ignoreMutation: (record) =>
         record.type === "attributes" &&
