@@ -108,6 +108,12 @@ import {
 import { Archive, Bell, Braces, Check, ChevronLeft, ChevronRight, Copy, FileSearch, FileText, Folder, GitFork, History, Image as ImageIcon, Info, Paperclip, Pencil, Pin, Plus, RefreshCw, Share, SlidersHorizontal, Sparkles, Puzzle, Square, ThumbsUp, ThumbsDown, X } from "lucide-react"
 
 import { ChatAddIcon } from "./icons/nucleo"
+import {
+  WidenableFrame,
+  announceFontLoaded,
+  settleMeasurements,
+  silenceResizeObserver,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 import {
   filterSlashSections,
@@ -4889,5 +4895,36 @@ export const ResponseActions: Story = {
     await userEvent.click(canvas.getByRole("tab", { name: "Release notes" }))
     expect(canvas.getByLabelText("Reply to: Later question")).toBeInTheDocument()
     await waitFor(() => { for (const row of canvasElement.querySelectorAll('[data-slot="chat-message"]')) expect(getComputedStyle(row).opacity).toBe("1") })
+  },
+}
+
+export const WithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "The pill measured with a `ResizeObserver` that never reports, as WebKit sometimes does. When its frame narrows the draft wraps onto a second line, and once a web font lands the pill still takes its multi-line shape, because it counts the input's lines through the shared size observer.",
+  ),
+  beforeEach: silenceResizeObserver,
+  render: () => (
+    <WidenableFrame startWide wideClassName="w-[40rem]" narrowClassName="w-48">
+      <PillComposer onSubmit={(event) => event.preventDefault()}>
+        <PillComposerRow>
+          <ChatComposerInput
+            defaultValue="Summarise the release notes for the composer"
+            className="self-center"
+          />
+        </PillComposerRow>
+      </PillComposer>
+    </WidenableFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const pill = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="pill-composer"]',
+    )!
+    await settleMeasurements(canvasElement)
+    await expect(pill).not.toHaveAttribute("data-multiline")
+    await userEvent.click(canvas.getByRole("button", { name: "Narrow the frame" }))
+    announceFontLoaded(canvasElement)
+    await waitFor(() => expect(pill).toHaveAttribute("data-multiline", "true"))
   },
 }
