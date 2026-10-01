@@ -26,7 +26,23 @@ Git state.
   scope.
 - Do not run pre-commit hooks or `./verify.sh` unless the user explicitly asks.
 - For non-trivial changes, use an independent read-only review loop. Fix every
-  actionable finding and repeat review until zero actionable findings remain.
+  actionable finding and repeat review until zero actionable findings remain,
+  for at most three rounds. Findings still open after the third mean something
+  is structurally wrong: stop patching, write down what is mostly producing
+  them, make that structural change, and review again — at most two more
+  rounds. Still open after those, stop the work and hand it off — what is
+  done, what is not, the open findings with their evidence, the diagnosis, and
+  the suggested next step — pushed to a branch of its own, never `main`, in a
+  draft pull request and on its issue. This rule is the authorization for that
+  branch and push, when the work was not already on one.
+- Keep the issue you are working on current, not only its board Status: a
+  **Status** section at the top of its description naming the remote branch(es)
+  that hold the work, the pull request, a Mermaid sequence diagram of the flow
+  as implemented, and the **Blockers** — each field saying "none yet" until it
+  exists. Update it when work starts, when a branch is pushed and the pull
+  request opens, whenever the design moves, and when work stops or is handed
+  off. These rules about how the work is done are held by review and the board,
+  not by a test.
 - Follow the design-system contract and run validation proportionate to risk.
 
 ## Merging and CI
