@@ -43,17 +43,6 @@ export interface ObserveSizeOptions {
   ignoreMutation?: (record: MutationRecord) => boolean
 }
 
-/**
- * Whether an attribute change can lay an element out. Nearly any attribute
- * can — a `data-state` a variant styles on, `open`, `src`, `rows` — so all are
- * watched except accessibility state, which only assistive technology reads.
- * A report that changed nothing costs a measurement the caller bails on.
- */
-function laysOut(record: MutationRecord) {
-  return !(
-    record.type === "attributes" && record.attributeName?.startsWith("aria-")
-  )
-}
 
 /**
  * Events that mark a size change inside the element that no DOM mutation
@@ -99,8 +88,8 @@ const noop = () => {}
  * - A box resize is reported in the frame it is laid out, before paint, as
  *   `resize`. That includes the report a `ResizeObserver` makes when
  *   observation starts.
- * - A change to the element's subtree (children, text, or any attribute but
- *   an `aria-*` one), or content inside it settling without one (an image
+ * - A change to the element's subtree (children, text, or any attribute), or
+ *   content inside it settling without one (an image
  *   loading, a transition or animation ending), is reported as `content`, and a web font finishing its load,
  *   or the document's fonts settling while a load is under way, as `fonts`.
  *   Any burst of these is reported once, on the next animation frame, with
@@ -143,10 +132,10 @@ export function observeSize(
     typeof view.MutationObserver === "function"
       ? new view.MutationObserver((records) => {
           const ignore = options.ignoreMutation
-          const relevant = records.some(
-            (record) => laysOut(record) && !(ignore && ignore(record)),
-          )
-          if (!relevant) return
+          // Any attribute can lay an element out — a `data-state` or an
+          // `aria-pressed` a variant styles on, `open`, `src` — so only what
+          // the caller knows to be inert is left out.
+          if (ignore && records.every((record) => ignore(record))) return
           contentChanged = true
           schedule("content")
         })

@@ -234,9 +234,10 @@ function isDocumentFocus(owner: Document, active: Element | null): boolean {
  * the region shows, plus what the region's content needs. Null when that
  * cannot be read safely — the content fits (it may have shrunk inside a body
  * that fills the region, which only a fresh layout reveals), there is no
- * content region or loose text in it, or the overflow is not the in-flow
- * content's own (an absolutely positioned badge, a float, a body that fills
- * the region and overflows itself).
+ * content region or loose text in it, a region the host caps or sizes so it
+ * does not grow with the pane, or the overflow is not the in-flow content's
+ * own (an absolutely positioned badge, a float, a body that fills the region
+ * and overflows itself).
  */
 function grownNaturalHeight(pane: HTMLElement): number | null {
   const content = pane.querySelector<HTMLElement>(
@@ -253,6 +254,19 @@ function grownNaturalHeight(pane: HTMLElement): number | null {
   const view = pane.ownerDocument.defaultView
   if (!view) return null
   const pixels = (value: string) => Number.parseFloat(value) || 0
+  // The overflow sizes the pane only if the region is as tall as the pane
+  // lets it be. A region the host caps (`contentClassName="max-h-40"`) or
+  // sizes itself would keep overflowing however tall the pane grew.
+  const regionStyle = view.getComputedStyle(content)
+  if (regionStyle.maxHeight !== "none") return null
+  let rows = 0
+  for (const row of pane.children) {
+    if (!(row instanceof HTMLElement) || row.offsetParent === null) continue
+    const style = view.getComputedStyle(row)
+    if (style.position === "absolute" || style.position === "fixed") continue
+    rows += row.offsetHeight + pixels(style.marginTop) + pixels(style.marginBottom)
+  }
+  if (Math.abs(rows - pane.clientHeight) > 1) return null
   // In block flow the last in-flow child reaches furthest, so the walk stops
   // at it; whatever it skips is checked against the overflow below.
   let reach: number | null = null
@@ -280,7 +294,7 @@ function grownNaturalHeight(pane: HTMLElement): number | null {
     break
   }
   if (reach === null) return null
-  const needed = reach + pixels(view.getComputedStyle(content).paddingBottom)
+  const needed = reach + pixels(regionStyle.paddingBottom)
   // The in-flow content must account for the whole overflow; anything else
   // overflowing is not what sizes the pane.
   if (Math.abs(needed - content.scrollHeight) > 1) return null

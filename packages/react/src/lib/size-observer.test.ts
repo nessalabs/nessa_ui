@@ -362,17 +362,17 @@ test("a style change is split into declarations the way CSS reads them", () => {
   assert.equal(changesOnlyStyle(change("--X: 0;", "--X: 1;"), ["--x"]), false)
 })
 
-test("accessibility state alone is not reported, any other attribute is", () => {
+test("any attribute change is reported, accessibility state included", () => {
   const env = fakeWindow()
   const { causes, onChange } = record()
   observeSize(env.element, onChange)
 
-  env.mutationObserver().trigger([{ type: "attributes", attributeName: "aria-expanded" }])
-  assert.equal(env.pendingFrames(), 0)
-
+  // A variant can lay out on `aria-pressed` as readily as on `data-state`.
+  env.mutationObserver().trigger([{ type: "attributes", attributeName: "aria-pressed" }])
+  env.runFrame()
   env.mutationObserver().trigger([{ type: "attributes", attributeName: "data-state" }])
   env.runFrame()
-  assert.deepEqual(causes, ["content"])
+  assert.deepEqual(causes, ["content", "content"])
 })
 
 test("content settling with no DOM change is reported, until stopped", () => {

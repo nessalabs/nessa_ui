@@ -1294,29 +1294,42 @@ function livePane(canvasElement: HTMLElement) {
 
 /**
  * Counts the times the deck lifts its size on the live window to read the
- * window's natural height exactly — the expensive read, which a cheap read of
- * the content settles in the ordinary case. Returns a function that stops
- * counting and gives the total.
+ * window's natural height exactly — the expensive read — until the deck's
+ * height first changes. Returns a function that stops counting and gives
+ * the count at that change: the lifts it took to find the new height. A
+ * lift after it, confirming the height, is by design and not counted.
  */
-function countLifts(canvasElement: HTMLElement) {
-  // A lift sets the deck's size on the pane and removes it in the same task,
-  // so it is seen in the value the removal replaced.
+function countLiftsUntilHeightChanges(canvasElement: HTMLElement) {
+  const deck = canvasElement.querySelector<HTMLElement>(
+    '[data-slot="window-deck"]',
+  )!
+  const start = deckPaneHeight(canvasElement)
   let lifts = 0
-  const count = (records: MutationRecord[]) => {
+  let found: number | null = null
+  const panes = new MutationObserver((records) => {
     for (const record of records) {
       if (record.oldValue?.includes("--nessa-window-deck-pane-height")) lifts += 1
     }
-  }
-  const observer = new MutationObserver(count)
-  observer.observe(livePane(canvasElement), {
+  })
+  panes.observe(livePane(canvasElement), {
     attributes: true,
     attributeFilter: ["style"],
     attributeOldValue: true,
   })
+  const decks = new MutationObserver(() => {
+    if (found === null && deckPaneHeight(canvasElement) !== start) {
+      // Lifts queued with the change happened before it was committed.
+      for (const record of panes.takeRecords()) {
+        if (record.oldValue?.includes("--nessa-window-deck-pane-height")) lifts += 1
+      }
+      found = lifts
+    }
+  })
+  decks.observe(deck, { attributes: true, attributeFilter: ["style"] })
   return () => {
-    count(observer.takeRecords())
-    observer.disconnect()
-    return lifts
+    panes.disconnect()
+    decks.disconnect()
+    return found
   }
 }
 
@@ -1325,7 +1338,7 @@ async function playAutoHeight(canvasElement: HTMLElement) {
   await waitFor(() => expect(deckPaneHeight(canvasElement)).toBeGreaterThan(0))
   await settleMeasurements(canvasElement)
   const collapsed = deckPaneHeight(canvasElement)
-  const stopCounting = countLifts(canvasElement)
+  const stopCounting = countLiftsUntilHeightChanges(canvasElement)
 
   // Content that grows takes the window with it, rather than overflowing a
   // window pinned to the height it first measured.
@@ -1336,9 +1349,10 @@ async function playAutoHeight(canvasElement: HTMLElement) {
       deckPaneHeight(canvasElement),
     )
   })
-  // Growth was read from the content's overflow alone: the pane was never
-  // lifted and laid out again to find it. (A shrink is lifted: inside a body
-  // that fills the window, only a fresh layout can show it.)
+  // Growth was found from the content's overflow alone: the pane was not
+  // lifted and laid out again before the deck took the new height. (One lift
+  // may follow, confirming it; a shrink is lifted, since inside a body that
+  // fills the window only a fresh layout can show it.)
   await expect(stopCounting()).toBe(0)
 
   // And content that shrinks brings it back.
@@ -1561,5 +1575,44 @@ export const AutoHeightHoldsStillOverOverhangs: Story = {
       }
       await expect(new Set(heights).size).toBe(1)
     }
+  },
+}
+
+export const AutoHeightHonoursACappedContentRegion: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "An auto-height deck whose live window caps its content region with `contentClassName`. Notes that outgrow the cap scroll inside the region; the window takes the capped height and holds it, rather than growing by the overflow on every measurement.",
+  ),
+  render: () => (
+    <div className="h-[720px] w-full bg-background">
+      <WindowDeck paneHeight="auto" defaultActivePane="notes">
+        <WindowDeckPane
+          id="notes"
+          label="Notes"
+          scrollable
+          contentClassName="max-h-40"
+        >
+          <ExpandableNotes />
+        </WindowDeckPane>
+        <WindowDeckPane id="later" label="Later">
+          <p className="p-4 nessa-text-3">Nothing here yet.</p>
+        </WindowDeckPane>
+      </WindowDeck>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await waitFor(() => expect(deckPaneHeight(canvasElement)).toBeGreaterThan(0))
+    await settleMeasurements(canvasElement)
+    await userEvent.click(canvas.getByRole("button", { name: "Show more" }))
+    await frames(6)
+    const heights: number[] = []
+    for (let index = 0; index < 8; index += 1) {
+      await frames(1)
+      heights.push(deckPaneHeight(canvasElement))
+    }
+    // Held at the cap, not climbing by the overflow frame after frame.
+    await expect(new Set(heights).size).toBe(1)
+    await expect(heights[0]).toBeLessThanOrEqual(162)
   },
 }
