@@ -1355,3 +1355,45 @@ export const AutoHeightKeepsAHostHeight: Story = {
     await expect(livePane(canvasElement).offsetHeight).toBe(384)
   },
 }
+
+export const AutoHeightFollowsAnimatedContent: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "An auto-height deck whose live window holds a block that grows by animation, with no change to the DOM at all, as an image taking its natural size would. The window's own box is pinned by the deck's height, so the deck follows the boxes inside it that are not, and takes the new height; content that settles with an event — an image loading, a transition ending — is caught by that event as well.",
+  ),
+  render: () => (
+    <div className="h-[720px] w-full bg-background">
+      <WindowDeck paneHeight="auto" defaultActivePane="figure">
+        <WindowDeckPane id="figure" label="Figure">
+          <div data-testid="figure" className="h-10 bg-muted" />
+        </WindowDeckPane>
+        <WindowDeckPane id="later" label="Later">
+          <p className="p-4 nessa-text-3">Nothing here yet.</p>
+        </WindowDeckPane>
+      </WindowDeck>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await waitFor(() => expect(deckPaneHeight(canvasElement)).toBeGreaterThan(0))
+    await settleMeasurements(canvasElement)
+    const collapsed = deckPaneHeight(canvasElement)
+    const figure = canvas.getByTestId("figure")
+    // Grows the block without touching the DOM: no attribute, child or text
+    // changes, only its laid-out height.
+    const growth = figure.animate([{ height: "40px" }, { height: "240px" }], {
+      duration: 1,
+      fill: "forwards",
+    })
+    await growth.finished
+    await waitFor(() =>
+      expect(deckPaneHeight(canvasElement)).toBeGreaterThanOrEqual(
+        collapsed + 200,
+      ),
+    )
+    // Nothing is left running. Cancelling fires no DOM event, so whether the
+    // deck follows the block back down is up to the engine's ResizeObserver
+    // and is not asserted here.
+    growth.cancel()
+  },
+}

@@ -1425,7 +1425,17 @@ function WindowDeck({
     // fonts are watched as well as the pane's box. The translate and scale
     // the deck writes on every drag and pan frame cannot change its height;
     // anything else in the pane's style can.
+    // The pane's box is pinned by the height this measures, and so is the
+    // flexed content region inside it, so neither reports content that
+    // grows without a DOM change — an image taking its natural size, a
+    // height animating. The boxes that are not pinned are followed instead:
+    // the pane's own rows and what its content region holds.
     return observeSize(pane, measure, {
+      boxes: (element) => [
+        ...element.children,
+        ...(element.querySelector(':scope > [data-slot="window-deck-pane-content"]')
+          ?.children ?? []),
+      ],
       ignoreMutation: (record) =>
         record.target === pane &&
         changesOnlyStyle(record, ["translate", "scale"]),

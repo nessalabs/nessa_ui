@@ -55,6 +55,18 @@ function laysOut(record: MutationRecord) {
   )
 }
 
+/**
+ * Events that mark a size change inside the element that no DOM mutation
+ * announces.
+ */
+const SETTLE_EVENTS = [
+  "load",
+  "transitionend",
+  "transitioncancel",
+  "animationend",
+  "animationcancel",
+] as const
+
 const noop = () => {}
 
 /**
@@ -65,7 +77,8 @@ const noop = () => {}
  *   `resize`. That includes the report a `ResizeObserver` makes when
  *   observation starts.
  * - A change to the element's subtree (children, text, or any attribute but
- *   an `aria-*` one) is reported as `content`, and a web font finishing its load,
+ *   an `aria-*` one), or content inside it settling without one (an image
+ *   loading, a transition or animation ending), is reported as `content`, and a web font finishing its load,
  *   or the document's fonts settling while a load is under way, as `fonts`.
  *   Any burst of these is reported once, on the next animation frame, with
  *   every cause it held.
@@ -179,6 +192,14 @@ export function observeSize(
     attributeOldValue: true,
   })
 
+  // Content that changes size with no DOM change of its own: an image or
+  // frame finishing its load, a CSS transition or animation coming to rest.
+  // `load` does not bubble, so it is caught on the way down.
+  const onSettled = () => schedule("content")
+  for (const type of SETTLE_EVENTS) {
+    element.addEventListener(type, onSettled, true)
+  }
+
   const fonts = (document as Document & { fonts?: FontFaceSet }).fonts
   const onFonts = () => schedule("fonts")
   fonts?.addEventListener?.("loadingdone", onFonts)
@@ -193,6 +214,9 @@ export function observeSize(
     cancelFlush?.()
     cancelFlush = null
     fonts?.removeEventListener?.("loadingdone", onFonts)
+    for (const type of SETTLE_EVENTS) {
+      element.removeEventListener(type, onSettled, true)
+    }
     resizes?.disconnect()
     mutations?.disconnect()
     observedBoxes.clear()

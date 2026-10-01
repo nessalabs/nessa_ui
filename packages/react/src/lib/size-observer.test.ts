@@ -85,7 +85,9 @@ function fakeWindow() {
     clearTimeout,
   }
   const document = { defaultView: view, fonts }
-  const element = { ownerDocument: document } as unknown as Element
+  const element = Object.assign(new EventTarget(), {
+    ownerDocument: document,
+  }) as unknown as Element
 
   return {
     element,
@@ -371,4 +373,21 @@ test("accessibility state alone is not reported, any other attribute is", () => 
   env.mutationObserver().trigger([{ type: "attributes", attributeName: "data-state" }])
   env.runFrame()
   assert.deepEqual(causes, ["content"])
+})
+
+test("content settling with no DOM change is reported, until stopped", () => {
+  const env = fakeWindow()
+  const { causes, onChange } = record()
+  const stop = observeSize(env.element, onChange)
+
+  env.element.dispatchEvent(new Event("load"))
+  env.runFrame()
+  env.element.dispatchEvent(new Event("transitionend"))
+  env.element.dispatchEvent(new Event("animationend"))
+  env.runFrame()
+  assert.deepEqual(causes, ["content", "content"])
+
+  stop()
+  env.element.dispatchEvent(new Event("transitionend"))
+  assert.equal(env.pendingFrames(), 0)
 })
