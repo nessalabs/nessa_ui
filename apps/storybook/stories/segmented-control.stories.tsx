@@ -150,46 +150,6 @@ async function expectLensOnPressed(canvasElement: HTMLElement, name: string) {
   await expect(pressed).not.toBeNull()
   const lensBox = lens!.getBoundingClientRect()
   const pressedBox = pressed!.getBoundingClientRect()
-  // TEMPORARY diagnostic for a WebKit-on-Linux CI mismatch; removed once fixed.
-  if (
-    Math.abs(lensBox.width - pressedBox.width) >= 0.5 ||
-    Math.abs(lensBox.left - pressedBox.left) >= 0.5
-  ) {
-    const doc = canvasElement.ownerDocument
-    const style = (e: Element) => {
-      const c = getComputedStyle(e)
-      return {
-        font: `${c.fontWeight} ${c.fontSize} ${c.fontFamily}`,
-        padding: `${c.paddingLeft} ${c.paddingRight}`,
-        border: `${c.borderLeftWidth} ${c.borderRightWidth}`,
-        boxSizing: c.boxSizing,
-        transform: c.transform,
-        transition: c.transitionProperty,
-        width: c.width,
-      }
-    }
-    const track = pressed!.parentElement!
-    console.log(
-      "GLASS-DIAG",
-      JSON.stringify({
-        lensBox: lensBox.toJSON(),
-        pressedBox: pressedBox.toJSON(),
-        trackBox: track.getBoundingClientRect().toJSON(),
-        trackOffsetWidth: track.offsetWidth,
-        pressedOffsetWidth: pressed!.offsetWidth,
-        lensStyle: lens!.getAttribute("style"),
-        lensComputed: style(lens!),
-        pressedComputed: style(pressed!),
-        trackComputed: style(track),
-        fonts: [...doc.fonts].map((f) => `${f.family} ${f.weight} ${f.status}`),
-        fontsStatus: doc.fonts.status,
-        dpr: window.devicePixelRatio,
-        ua: navigator.userAgent,
-        trace: (window as unknown as { __nessaSegmentedControl?: unknown })
-          .__nessaSegmentedControl,
-      }),
-    )
-  }
   await expect(Math.abs(lensBox.left - pressedBox.left)).toBeLessThan(0.5)
   await expect(Math.abs(lensBox.width - pressedBox.width)).toBeLessThan(0.5)
   await expect(Math.abs(lensBox.top - pressedBox.top)).toBeLessThan(0.5)
@@ -295,6 +255,28 @@ export const Glass: Story = {
       finishStoryTransitions(canvasElement)
       await expectLensOnPressed(canvasElement, name)
     })
+    // A web font finishing its load re-measures the lens: WebKit does not
+    // report the options' new widths to a ResizeObserver, so the font set's
+    // own event is what catches it.
+    const traces = () =>
+      Object.values(
+        (
+          window as unknown as {
+            __nessaSegmentedControl?: Record<
+              string,
+              { events: { ev: string; cause?: string }[] }
+            >
+          }
+        ).__nessaSegmentedControl ?? {},
+      ).flatMap((trace) => trace.events)
+    const before = traces().filter((event) => event.cause === "fonts").length
+    canvasElement.ownerDocument.fonts.dispatchEvent(new Event("loadingdone"))
+    await waitFor(() =>
+      expect(
+        traces().filter((event) => event.cause === "fonts").length,
+      ).toBeGreaterThan(before),
+    )
+    await expectLensOnPressed(canvasElement, name)
     finishStoryTransitions(canvasElement)
   },
 }
