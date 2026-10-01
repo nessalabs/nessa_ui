@@ -8,6 +8,10 @@ import {
 } from "@nessalabs/ui"
 
 import { finishStoryTransitions } from "./finish-story-transitions"
+import {
+  announceFontLoaded,
+  settleMeasurements,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -269,8 +273,11 @@ export const Glass: Story = {
           }
         ).__nessaSegmentedControl ?? {},
       ).flatMap((trace) => trace.events)
+    // Measurements already scheduled run first, so the one counted here is
+    // the font event's own rather than one it was folded into.
+    await settleMeasurements(canvasElement)
     const before = traces().filter((event) => event.cause === "fonts").length
-    canvasElement.ownerDocument.fonts.dispatchEvent(new Event("loadingdone"))
+    announceFontLoaded(canvasElement)
     await waitFor(() =>
       expect(
         traces().filter((event) => event.cause === "fonts").length,
