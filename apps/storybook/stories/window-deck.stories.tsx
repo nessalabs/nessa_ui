@@ -28,6 +28,7 @@ import {
 } from "lucide-react"
 
 import {
+  frames,
   settleMeasurements,
   silenceResizeObserver,
 } from "./size-observer-harness"
@@ -1335,6 +1336,10 @@ async function playAutoHeight(canvasElement: HTMLElement) {
       deckPaneHeight(canvasElement),
     )
   })
+  // Growth was read from the content's overflow alone: the pane was never
+  // lifted and laid out again to find it. (A shrink is lifted: inside a body
+  // that fills the window, only a fresh layout can show it.)
+  await expect(stopCounting()).toBe(0)
 
   // And content that shrinks brings it back.
   await userEvent.click(canvas.getByRole("button", { name: "Show less" }))
@@ -1342,9 +1347,6 @@ async function playAutoHeight(canvasElement: HTMLElement) {
     expect(deckPaneHeight(canvasElement)).toBe(collapsed),
   )
 
-  // Both moves were read from the content region alone: the pane was never
-  // lifted and laid out again to find them.
-  await expect(stopCounting()).toBe(0)
 }
 
 export const AutoHeightFollowsContent: Story = {
@@ -1484,5 +1486,80 @@ export const AutoHeightAfterATransitionWithoutResizeReports: Story = {
     await waitFor(() =>
       expect(deckPaneHeight(canvasElement)).toBe(short + 200),
     )
+  },
+}
+
+/**
+ * A row that can show a badge hanging below it, positioned out of flow, and
+ * a fixed-height row whose text can spill past it: overflow that is not the
+ * window's content and must not size the deck.
+ */
+function OverhangingRows() {
+  const [badge, setBadge] = React.useState(false)
+  const [spill, setSpill] = React.useState(false)
+  return (
+    <div className="flex flex-col items-start gap-2 p-4 nessa-text-3">
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" onClick={() => setBadge(true)}>
+          Show the badge
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setSpill(true)}>
+          Spill the row
+        </Button>
+      </div>
+      <div className="relative h-5 w-full">
+        Last message
+        {badge ? (
+          <span className="absolute left-0 top-full h-10 rounded-md bg-muted px-2">
+            Reactions
+          </span>
+        ) : null}
+      </div>
+      <div className="h-5 w-full">
+        {spill
+          ? Array.from({ length: 4 }, (_, index) => (
+              <p key={index} className="m-0">
+                Spilled line {index + 1}
+              </p>
+            ))
+          : null}
+      </div>
+    </div>
+  )
+}
+
+export const AutoHeightHoldsStillOverOverhangs: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "Overflow that is not the window's content — a badge positioned below the last row, text spilling past a fixed-height row — does not size an auto-height deck, and does not set it alternating between two heights: the deck settles on one height and holds it.",
+  ),
+  render: () => (
+    <div className="h-[720px] w-full bg-background">
+      <WindowDeck paneHeight="auto" defaultActivePane="rows">
+        <WindowDeckPane id="rows" label="Rows">
+          <OverhangingRows />
+        </WindowDeckPane>
+        <WindowDeckPane id="later" label="Later">
+          <p className="p-4 nessa-text-3">Nothing here yet.</p>
+        </WindowDeckPane>
+      </WindowDeck>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await waitFor(() => expect(deckPaneHeight(canvasElement)).toBeGreaterThan(0))
+    await settleMeasurements(canvasElement)
+
+    for (const name of ["Show the badge", "Spill the row"]) {
+      await userEvent.click(canvas.getByRole("button", { name }))
+      await frames(4)
+      // Held still across frames, not taking turns between two readings.
+      const heights: number[] = []
+      for (let index = 0; index < 8; index += 1) {
+        await frames(1)
+        heights.push(deckPaneHeight(canvasElement))
+      }
+      await expect(new Set(heights).size).toBe(1)
+    }
   },
 }

@@ -229,6 +229,65 @@ function isDocumentFocus(owner: Document, active: Element | null): boolean {
 }
 
 /**
+ * The pane's natural height when its content has outgrown the content
+ * region, read without laying the pane out again: its height now, less what
+ * the region shows, plus what the region's content needs. Null when that
+ * cannot be read safely — the content fits (it may have shrunk inside a body
+ * that fills the region, which only a fresh layout reveals), there is no
+ * content region or loose text in it, or the overflow is not the in-flow
+ * content's own (an absolutely positioned badge, a float, a body that fills
+ * the region and overflows itself).
+ */
+function grownNaturalHeight(pane: HTMLElement): number | null {
+  const content = pane.querySelector<HTMLElement>(
+    ':scope > [data-slot="window-deck-pane-content"]',
+  )
+  if (!content) return null
+  const overflow = content.scrollHeight - content.clientHeight
+  if (overflow <= 1) return null
+  for (const node of content.childNodes) {
+    if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
+      return null
+    }
+  }
+  const view = pane.ownerDocument.defaultView
+  if (!view) return null
+  const pixels = (value: string) => Number.parseFloat(value) || 0
+  // In block flow the last in-flow child reaches furthest, so the walk stops
+  // at it; whatever it skips is checked against the overflow below.
+  let reach: number | null = null
+  for (let index = content.children.length - 1; index >= 0; index -= 1) {
+    const child = content.children[index]
+    if (!(child instanceof HTMLElement)) return null
+    if (child.offsetParent === null) continue
+    const style = view.getComputedStyle(child)
+    if (
+      style.position === "absolute" ||
+      style.position === "fixed" ||
+      style.float !== "none"
+    ) {
+      continue
+    }
+    let top: number
+    if (child.offsetParent === content) {
+      top = child.offsetTop
+    } else if (child.offsetParent === content.offsetParent) {
+      top = child.offsetTop - content.offsetTop - content.clientTop
+    } else {
+      return null
+    }
+    reach = top + child.offsetHeight + pixels(style.marginBottom)
+    break
+  }
+  if (reach === null) return null
+  const needed = reach + pixels(view.getComputedStyle(content).paddingBottom)
+  // The in-flow content must account for the whole overflow; anything else
+  // overflowing is not what sizes the pane.
+  if (Math.abs(needed - content.scrollHeight) > 1) return null
+  return pane.offsetHeight - content.clientHeight + Math.ceil(needed)
+}
+
+/**
  * A deck of windows the user moves between: a horizontal carousel that
  * centres one window at a time, and an overview that shrinks the live
  * window into a strip of preview tiles. The viewport shows a capped page
@@ -258,55 +317,6 @@ function isDocumentFocus(owner: Document, active: Element | null): boolean {
  * properties.
  * @returns The deck, its scroller, and the panes composed into it.
  */
-/**
- * The pane's natural height, read without laying it out again: its height
- * now, less what its content region shows, plus what that region's content
- * needs — its overflow when it has outgrown the region, or how far its
- * children reach when it has shrunk inside it. Null when that cannot be read
- * cheaply (no content region, loose text in it, an unrelated offset parent).
- */
-function contentNaturalHeight(pane: HTMLElement): number | null {
-  const content = pane.querySelector<HTMLElement>(
-    ':scope > [data-slot="window-deck-pane-content"]',
-  )
-  if (!content) return null
-  for (const node of content.childNodes) {
-    if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
-      return null
-    }
-  }
-  const overflow = content.scrollHeight - content.clientHeight
-  if (overflow > 1) return pane.offsetHeight + overflow
-  const view = pane.ownerDocument.defaultView
-  if (!view) return null
-  const pixels = (value: string) => Number.parseFloat(value) || 0
-  const css = view.getComputedStyle(content)
-  // How far below the region's padding edge its in-flow children reach.
-  let reach = 0
-  for (const child of content.children) {
-    if (!(child instanceof HTMLElement)) return null
-    const style = view.getComputedStyle(child)
-    if (style.position === "absolute" || style.position === "fixed") continue
-    let top: number
-    if (child.offsetParent === content) {
-      top = child.offsetTop
-    } else if (child.offsetParent === content.offsetParent) {
-      top = child.offsetTop - content.offsetTop - content.clientTop
-    } else {
-      return null
-    }
-    reach = Math.max(
-      reach,
-      top + child.offsetHeight + pixels(style.marginBottom),
-    )
-  }
-  const needed = Math.max(
-    reach + pixels(css.paddingBottom),
-    pixels(css.paddingTop) + pixels(css.paddingBottom),
-  )
-  return pane.offsetHeight - content.clientHeight + Math.ceil(needed)
-}
-
 function WindowDeck({
   activePane,
   defaultActivePane,
@@ -1462,37 +1472,29 @@ function WindowDeck({
     // exactly by lifting the deck's size for the read — not the pane's
     // height, so a height the host gives the pane (a class, an inline style,
     // a stylesheet) still wins. That lift restyles and lays out the whole
-    // pane, so it is the exception: a cheap read of the content region
-    // settles most reports.
+    // pane, so content that has plainly outgrown the pane — a reply
+    // streaming in — is read from its overflow instead.
     const lift = () => {
       pane.style.setProperty("--nessa-window-deck-pane-height", "auto")
       const natural = pane.offsetHeight
       pane.style.removeProperty("--nessa-window-deck-pane-height")
       return natural
     }
-    // Whether the cheap read agreed with the last lift. A pane the host holds
-    // to its own height never agrees, and is always lifted.
-    let constrained = true
     const measure = () => {
-      const cheap = contentNaturalHeight(pane)
       // The deck's height as the pane has it now, which may trail the last
       // commit by a render. A pane whose box is not that height is held by
-      // something else — the host — and only a lift can say what it needs.
+      // the host, and only a lift says what it needs.
       const applied = Number.parseFloat(
         (pane.ownerDocument.defaultView?.getComputedStyle(pane) ?? pane.style)
           .getPropertyValue("--nessa-window-deck-pane-height"),
       )
-      if (
-        !constrained &&
-        cheap !== null &&
+      const grown =
         Math.abs(pane.offsetHeight - applied) <= 1
-      ) {
-        commit(cheap)
-        return
-      }
-      const exact = lift()
-      constrained = cheap === null || Math.abs(cheap - exact) > 1
-      commit(exact)
+          ? grownNaturalHeight(pane)
+          : null
+      // Committed growth leaves the content fitting, so the next report
+      // lifts and confirms it; the two reads cannot take turns.
+      commit(grown ?? lift())
     }
 
     measure()

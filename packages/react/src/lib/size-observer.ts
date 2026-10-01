@@ -67,6 +67,29 @@ const SETTLE_EVENTS = [
   "animationcancel",
 ] as const
 
+/**
+ * Properties whose transition only repaints: a hover tint, a fade, a lift, a
+ * focus ring. Their transitions ending cannot have changed a size.
+ */
+const PAINT_ONLY_PROPERTIES = new Set([
+  "color",
+  "background-color",
+  "border-color",
+  "outline-color",
+  "text-decoration-color",
+  "fill",
+  "stroke",
+  "opacity",
+  "visibility",
+  "box-shadow",
+  "filter",
+  "backdrop-filter",
+  "transform",
+  "translate",
+  "scale",
+  "rotate",
+])
+
 const noop = () => {}
 
 /**
@@ -195,7 +218,11 @@ export function observeSize(
   // Content that changes size with no DOM change of its own: an image or
   // frame finishing its load, a CSS transition or animation coming to rest.
   // `load` does not bubble, so it is caught on the way down.
-  const onSettled = () => schedule("content")
+  const onSettled = (event: Event) => {
+    const property = (event as TransitionEvent).propertyName
+    if (property && PAINT_ONLY_PROPERTIES.has(property)) return
+    schedule("content")
+  }
   for (const type of SETTLE_EVENTS) {
     element.addEventListener(type, onSettled, true)
   }

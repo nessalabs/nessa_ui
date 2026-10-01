@@ -391,3 +391,19 @@ test("content settling with no DOM change is reported, until stopped", () => {
   env.element.dispatchEvent(new Event("transitionend"))
   assert.equal(env.pendingFrames(), 0)
 })
+
+test("a transition that only repaints is not reported", () => {
+  const env = fakeWindow()
+  const { causes, onChange } = record()
+  observeSize(env.element, onChange)
+  const ended = (propertyName: string) =>
+    Object.assign(new Event("transitionend"), { propertyName })
+
+  env.element.dispatchEvent(ended("background-color"))
+  env.element.dispatchEvent(ended("opacity"))
+  assert.equal(env.pendingFrames(), 0)
+
+  env.element.dispatchEvent(ended("height"))
+  env.runFrame()
+  assert.deepEqual(causes, ["content"])
+})
