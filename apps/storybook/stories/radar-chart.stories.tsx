@@ -11,6 +11,11 @@ import {
   type RadarChartSeries,
 } from "@nessalabs/ui"
 
+import {
+  WidenableFrame,
+  expectFollowsFrame,
+  silenceResizeObserver,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -539,5 +544,28 @@ export const Configured: Story = {
     expect(
       canvasElement.querySelectorAll('[data-slot="radar-chart-spoke"]').length,
     ).toBe(0)
+  },
+}
+
+/**
+ * The chart's frame widened with a `ResizeObserver` that never reports, which
+ * is what WebKit does to some resizes. The radar still redraws at the new
+ * width once a web font lands, because the chart measures through the shared
+ * size observer.
+ */
+export const WithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "The chart measured with a `ResizeObserver` that never reports, as WebKit sometimes does. It still draws at its box's size, and when its frame widens it redraws at the new width once a web font finishes loading, because the chart measures through the shared size observer rather than a bare `ResizeObserver`.",
+  ),
+  args: Scorecards.args,
+  beforeEach: silenceResizeObserver,
+  render: (args) => (
+    <WidenableFrame className="h-[460px]">
+      <RadarChart {...args} formatValue={outOfTen} renderAxisDetail={() => null} aria-label="Candidate scorecards" />
+    </WidenableFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    await expectFollowsFrame(canvasElement)
   },
 }

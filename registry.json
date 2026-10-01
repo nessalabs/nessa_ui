@@ -2554,6 +2554,7 @@
       "description": "A radar (spider) chart: values plotted along spokes radiating from one centre, one closed outline per series. Series take soft tints from a built-in palette (overridable per series, or disableable to a neutral wash) and the area wash derives from each outline's own colour. Polygon, circular, or no grid; a curve control that relaxes the polygon into a closed spline; and a scale switch between one shared maximum and per-axis normalisation, with an explicit per-axis maximum overriding both. It fills the host's box on both axes, tolerates and reports partial mid-stream data, floats host-supplied hover detail beside the pointer, makes every outline a keyboard-focusable button with hover isolation and multi-selectable series, and adds an axis probe that marks and ranks every series' reading on one spoke.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
