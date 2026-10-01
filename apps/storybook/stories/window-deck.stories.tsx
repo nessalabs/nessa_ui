@@ -14,6 +14,7 @@ import {
   TaskList,
   TaskListItem,
   WindowDeck,
+  cn,
   WindowDeckPane,
   PaneSplitDirection,
   createAppShellLayout,
@@ -1290,11 +1291,40 @@ function livePane(canvasElement: HTMLElement) {
   )!
 }
 
+/**
+ * Counts the times the deck lifts its size on the live window to read the
+ * window's natural height exactly — the expensive read, which a cheap read of
+ * the content settles in the ordinary case. Returns a function that stops
+ * counting and gives the total.
+ */
+function countLifts(canvasElement: HTMLElement) {
+  // A lift sets the deck's size on the pane and removes it in the same task,
+  // so it is seen in the value the removal replaced.
+  let lifts = 0
+  const count = (records: MutationRecord[]) => {
+    for (const record of records) {
+      if (record.oldValue?.includes("--nessa-window-deck-pane-height")) lifts += 1
+    }
+  }
+  const observer = new MutationObserver(count)
+  observer.observe(livePane(canvasElement), {
+    attributes: true,
+    attributeFilter: ["style"],
+    attributeOldValue: true,
+  })
+  return () => {
+    count(observer.takeRecords())
+    observer.disconnect()
+    return lifts
+  }
+}
+
 async function playAutoHeight(canvasElement: HTMLElement) {
   const canvas = within(canvasElement)
   await waitFor(() => expect(deckPaneHeight(canvasElement)).toBeGreaterThan(0))
   await settleMeasurements(canvasElement)
   const collapsed = deckPaneHeight(canvasElement)
+  const stopCounting = countLifts(canvasElement)
 
   // Content that grows takes the window with it, rather than overflowing a
   // window pinned to the height it first measured.
@@ -1311,6 +1341,10 @@ async function playAutoHeight(canvasElement: HTMLElement) {
   await waitFor(() =>
     expect(deckPaneHeight(canvasElement)).toBe(collapsed),
   )
+
+  // Both moves were read from the content region alone: the pane was never
+  // lifted and laid out again to find them.
+  await expect(stopCounting()).toBe(0)
 }
 
 export const AutoHeightFollowsContent: Story = {
@@ -1395,5 +1429,60 @@ export const AutoHeightFollowsAnimatedContent: Story = {
     // deck follows the block back down is up to the engine's ResizeObserver
     // and is not asserted here.
     growth.cancel()
+  },
+}
+
+/** A block in the live window that grows by a CSS height transition. */
+function TransitioningBlock() {
+  const [tall, setTall] = React.useState(false)
+  return (
+    <div className="flex flex-col items-start gap-2 p-4">
+      <Button variant="outline" size="sm" onClick={() => setTall(true)}>
+        Grow the block
+      </Button>
+      <div
+        data-testid="block"
+        className={cn(
+          "w-full bg-muted transition-[height] duration-300 ease-linear",
+          tall ? "h-60" : "h-10",
+        )}
+      />
+    </div>
+  )
+}
+
+export const AutoHeightAfterATransitionWithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "A block in an auto-height deck's live window grows by a CSS transition, with a `ResizeObserver` that never reports. The class change that starts the transition is measured at once, while the block is still short; nothing in the DOM changes as it grows. The deck takes the final height when the transition ends, because the shared size observer treats a transition coming to rest as a content change.",
+  ),
+  beforeEach: silenceResizeObserver,
+  render: () => (
+    <div className="h-[720px] w-full bg-background">
+      <WindowDeck paneHeight="auto" defaultActivePane="block">
+        <WindowDeckPane id="block" label="Block">
+          <TransitioningBlock />
+        </WindowDeckPane>
+        <WindowDeckPane id="later" label="Later">
+          <p className="p-4 nessa-text-3">Nothing here yet.</p>
+        </WindowDeckPane>
+      </WindowDeck>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await waitFor(() => expect(deckPaneHeight(canvasElement)).toBeGreaterThan(0))
+    await settleMeasurements(canvasElement)
+    const short = deckPaneHeight(canvasElement)
+    const block = canvas.getByTestId("block")
+    const ended = new Promise<void>((resolve) =>
+      block.addEventListener("transitionend", () => resolve(), { once: true }),
+    )
+    await userEvent.click(canvas.getByRole("button", { name: "Grow the block" }))
+    await ended
+    await expect(block.offsetHeight).toBe(240)
+    await waitFor(() =>
+      expect(deckPaneHeight(canvasElement)).toBe(short + 200),
+    )
   },
 }

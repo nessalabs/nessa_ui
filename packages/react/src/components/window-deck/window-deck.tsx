@@ -258,6 +258,55 @@ function isDocumentFocus(owner: Document, active: Element | null): boolean {
  * properties.
  * @returns The deck, its scroller, and the panes composed into it.
  */
+/**
+ * The pane's natural height, read without laying it out again: its height
+ * now, less what its content region shows, plus what that region's content
+ * needs — its overflow when it has outgrown the region, or how far its
+ * children reach when it has shrunk inside it. Null when that cannot be read
+ * cheaply (no content region, loose text in it, an unrelated offset parent).
+ */
+function contentNaturalHeight(pane: HTMLElement): number | null {
+  const content = pane.querySelector<HTMLElement>(
+    ':scope > [data-slot="window-deck-pane-content"]',
+  )
+  if (!content) return null
+  for (const node of content.childNodes) {
+    if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
+      return null
+    }
+  }
+  const overflow = content.scrollHeight - content.clientHeight
+  if (overflow > 1) return pane.offsetHeight + overflow
+  const view = pane.ownerDocument.defaultView
+  if (!view) return null
+  const pixels = (value: string) => Number.parseFloat(value) || 0
+  const css = view.getComputedStyle(content)
+  // How far below the region's padding edge its in-flow children reach.
+  let reach = 0
+  for (const child of content.children) {
+    if (!(child instanceof HTMLElement)) return null
+    const style = view.getComputedStyle(child)
+    if (style.position === "absolute" || style.position === "fixed") continue
+    let top: number
+    if (child.offsetParent === content) {
+      top = child.offsetTop
+    } else if (child.offsetParent === content.offsetParent) {
+      top = child.offsetTop - content.offsetTop - content.clientTop
+    } else {
+      return null
+    }
+    reach = Math.max(
+      reach,
+      top + child.offsetHeight + pixels(style.marginBottom),
+    )
+  }
+  const needed = Math.max(
+    reach + pixels(css.paddingBottom),
+    pixels(css.paddingTop) + pixels(css.paddingBottom),
+  )
+  return pane.offsetHeight - content.clientHeight + Math.ceil(needed)
+}
+
 function WindowDeck({
   activePane,
   defaultActivePane,
@@ -1410,14 +1459,40 @@ function WindowDeck({
     // The pane is sized by the height this measures, so its own box only
     // echoes the last measurement: growing content would overflow it and
     // shrinking content would leave it standing. Its natural height is read
-    // with that size lifted for the read, and restored before anything paints.
-    // What is lifted is the deck's own size, so a height the host gives the
-    // pane — a class, an inline style, a stylesheet — still wins the read.
-    const measure = () => {
+    // exactly by lifting the deck's size for the read — not the pane's
+    // height, so a height the host gives the pane (a class, an inline style,
+    // a stylesheet) still wins. That lift restyles and lays out the whole
+    // pane, so it is the exception: a cheap read of the content region
+    // settles most reports.
+    const lift = () => {
       pane.style.setProperty("--nessa-window-deck-pane-height", "auto")
       const natural = pane.offsetHeight
       pane.style.removeProperty("--nessa-window-deck-pane-height")
-      commit(natural)
+      return natural
+    }
+    // Whether the cheap read agreed with the last lift. A pane the host holds
+    // to its own height never agrees, and is always lifted.
+    let constrained = true
+    const measure = () => {
+      const cheap = contentNaturalHeight(pane)
+      // The deck's height as the pane has it now, which may trail the last
+      // commit by a render. A pane whose box is not that height is held by
+      // something else — the host — and only a lift can say what it needs.
+      const applied = Number.parseFloat(
+        (pane.ownerDocument.defaultView?.getComputedStyle(pane) ?? pane.style)
+          .getPropertyValue("--nessa-window-deck-pane-height"),
+      )
+      if (
+        !constrained &&
+        cheap !== null &&
+        Math.abs(pane.offsetHeight - applied) <= 1
+      ) {
+        commit(cheap)
+        return
+      }
+      const exact = lift()
+      constrained = cheap === null || Math.abs(cheap - exact) > 1
+      commit(exact)
     }
 
     measure()
