@@ -2326,6 +2326,7 @@
       "description": "An infinite (or bounded) pan-and-zoom workflow canvas with draggable nodes that render any content, side handles for drawing connections, and edges that follow their endpoint nodes \u2014 built to stay responsive with thousands of nodes.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [

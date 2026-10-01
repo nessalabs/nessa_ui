@@ -4,6 +4,7 @@
 
 import * as React from "react"
 
+import { observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 import {
@@ -304,11 +305,14 @@ function WorkflowCanvasNode({
   React.useEffect(() => {
     const element = elementRef.current
 
-    if (!element || typeof ResizeObserver === "undefined") {
+    if (!element) {
       return
     }
 
-    const observer = new ResizeObserver(() => {
+    // A node is sized by what it holds, so its content and web fonts are
+    // watched as well as its box: WebKit does not always report a resize
+    // they cause.
+    const stopObserving = observeSize(element, () => {
       canvas.geometry.setSize(nodeId, element.offsetWidth, element.offsetHeight)
 
       // A node that grew may now overhang the canvas bounds. Re-clamping
@@ -327,9 +331,9 @@ function WorkflowCanvasNode({
         if (clamped.x !== current.x || clamped.y !== current.y) {
           applyPosition(clamped, "resize")
 
-          // A ResizeObserver fires every frame a size changes, but a
-          // commit is promised once per settled gesture — so the trailing
-          // call is rescheduled until the resizing stops.
+          // A size change is reported every frame it lasts, but a commit
+          // is promised once per settled gesture — so the trailing call is
+          // rescheduled until the resizing stops.
           if (resizeCommitRef.current !== null) {
             clearTimeout(resizeCommitRef.current)
           }
@@ -344,10 +348,8 @@ function WorkflowCanvasNode({
       }
     })
 
-    observer.observe(element)
-
     return () => {
-      observer.disconnect()
+      stopObserving()
 
       if (resizeCommitRef.current !== null) {
         clearTimeout(resizeCommitRef.current)
