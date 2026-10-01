@@ -48,18 +48,25 @@ export async function settleMeasurements(canvasElement: HTMLElement) {
 }
 
 /**
- * A frame a story can widen with a button, around a component that sizes
- * itself to it. Widening changes nothing inside the component, so with
- * resize reports silenced only the size observer's font trigger can tell it.
+ * A frame a story can widen (or narrow, with `startWide`) with a button,
+ * around a component that sizes itself to it. Resizing it changes nothing
+ * inside the component, so with resize reports silenced only the size
+ * observer's font trigger can tell it.
  */
 export function WidenableFrame({
   className,
   children,
+  startWide = false,
+  narrowClassName = "w-80",
+  wideClassName = "w-[32rem]",
 }: {
   className?: string
   children: React.ReactNode
+  startWide?: boolean
+  narrowClassName?: string
+  wideClassName?: string
 }) {
-  const [wide, setWide] = React.useState(false)
+  const [wide, setWide] = React.useState(startWide)
   return (
     <div className="flex flex-col items-start gap-3">
       <Button variant="outline" onClick={() => setWide((value) => !value)}>
@@ -67,7 +74,7 @@ export function WidenableFrame({
       </Button>
       <div
         data-testid="frame"
-        className={cn(wide ? "w-[32rem]" : "w-80", className)}
+        className={cn(wide ? wideClassName : narrowClassName, className)}
       >
         {children}
       </div>
@@ -103,4 +110,79 @@ export async function expectFollowsFrame(
   )
   announceFontLoaded(canvasElement)
   await waitFor(() => expect(width()).toBeGreaterThan(before))
+}
+
+/**
+ * Host content that grows on its own state: a disclosure that reveals more
+ * lines. Opening it commits only this component, so the component it sits
+ * inside sees no render of its own; with resize reports silenced, only the
+ * size observer's content trigger can tell that its content grew. Phrasing
+ * content, so it can sit in a paragraph, a `pre` or a list item.
+ */
+export function GrowingNote({ lines = 16 }: { lines?: number }) {
+  const [open, setOpen] = React.useState(false)
+  return (
+    <span className="block">
+      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
+        Show the full note
+      </Button>
+      {open
+        ? Array.from({ length: lines }, (_, index) => (
+            <span key={index} className="block">
+              Note line {index + 1}
+            </span>
+          ))
+        : null}
+    </span>
+  )
+}
+
+/**
+ * The play test for a scroll region holding a {@link GrowingNote}, with
+ * resize reports silenced: the region fits and takes no tab stop, and once
+ * the note opens past the region's cap, it becomes keyboard-reachable.
+ */
+export async function expectOverflowFollowsContent(
+  canvasElement: HTMLElement,
+  region: () => HTMLElement | null,
+) {
+  await waitFor(() => expect(region()).not.toBeNull())
+  await settleMeasurements(canvasElement)
+  await expect(region()!.scrollHeight).toBeLessThanOrEqual(
+    region()!.clientHeight + 1,
+  )
+  await expect(region()).not.toHaveAttribute("tabindex", "0")
+  await userEvent.click(
+    within(canvasElement).getByRole("button", { name: "Show the full note" }),
+  )
+  await waitFor(() =>
+    expect(region()!.scrollHeight).toBeGreaterThan(region()!.clientHeight + 1),
+  )
+  await waitFor(() => expect(region()).toHaveAttribute("tabindex", "0"))
+}
+
+/**
+ * The play test for a scroll region inside a {@link WidenableFrame} that
+ * starts wide, with resize reports silenced: the region fits and takes no
+ * tab stop, and once the frame narrows, its text rewraps past the cap and a
+ * web font lands, it becomes keyboard-reachable.
+ */
+export async function expectOverflowFollowsFrame(
+  canvasElement: HTMLElement,
+  region: () => HTMLElement | null,
+) {
+  await waitFor(() => expect(region()).not.toBeNull())
+  await settleMeasurements(canvasElement)
+  await expect(region()!.scrollHeight).toBeLessThanOrEqual(
+    region()!.clientHeight + 1,
+  )
+  await expect(region()).not.toHaveAttribute("tabindex", "0")
+  await userEvent.click(
+    within(canvasElement).getByRole("button", { name: "Narrow the frame" }),
+  )
+  await waitFor(() =>
+    expect(region()!.scrollHeight).toBeGreaterThan(region()!.clientHeight + 1),
+  )
+  announceFontLoaded(canvasElement)
+  await waitFor(() => expect(region()).toHaveAttribute("tabindex", "0"))
 }

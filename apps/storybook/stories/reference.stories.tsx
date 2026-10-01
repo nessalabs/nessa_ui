@@ -11,6 +11,11 @@ import {
 } from "@nessalabs/ui"
 
 import { FileCopyIcon, GlobeIcon } from "./icons/nucleo"
+import {
+  GrowingNote,
+  expectOverflowFollowsContent,
+  silenceResizeObserver,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
 const investorLetter: ReferenceSource = {
@@ -396,5 +401,36 @@ export const CustomHoverContent: Story = {
     ).toBeVisible()
     // The bespoke body replaces ReferenceCard entirely — no pager, no footer.
     await expect(portal.queryByText("View source")).toBeNull()
+  },
+}
+
+export const WithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "A source excerpt with a `ResizeObserver` that never reports, as WebKit sometimes does. Host content inside it grows on its own state — a commit the card never sees — and the region still becomes keyboard-reachable once it overflows, because it measures through the shared size observer, which also watches its content.",
+  ),
+  beforeEach: silenceResizeObserver,
+  render: () => (
+    <ReferenceCard
+      className="w-80"
+      sources={[
+        {
+          title: "Field notes",
+          href: "https://example.com/field-notes",
+          excerpt: (
+            <p>
+              A short excerpt with more behind it. <GrowingNote />
+            </p>
+          ),
+        },
+      ]}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    await expectOverflowFollowsContent(canvasElement, () =>
+      canvasElement.querySelector<HTMLElement>(
+        '[data-slot="reference-card-excerpt"]',
+      ),
+    )
   },
 }
