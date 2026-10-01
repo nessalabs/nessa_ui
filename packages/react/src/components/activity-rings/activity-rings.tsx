@@ -4,6 +4,7 @@
 
 import * as React from "react"
 
+import { useMeasuredSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 import {
@@ -218,29 +219,6 @@ export interface ActivityRingsProps extends React.ComponentProps<"div"> {
   describeValues?: boolean
 }
 
-function useMeasuredBox(ref: React.RefObject<HTMLElement | null>) {
-  const [box, setBox] = React.useState<{ width: number; height: number } | null>(
-    null,
-  )
-  React.useLayoutEffect(() => {
-    const element = ref.current
-    if (!element || typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver((entries) => {
-      const rect = entries[entries.length - 1].contentRect
-      const width = Math.round(rect.width)
-      const height = Math.round(rect.height)
-      setBox((previous) =>
-        previous && previous.width === width && previous.height === height
-          ? previous
-          : { width, height },
-      )
-    })
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [ref])
-  return box
-}
-
 /**
  * True once the browser has painted at least one frame, so a value change
  * transitions instead of arriving finished. Two frames are needed, not one:
@@ -358,7 +336,7 @@ function ActivityRings({
   ...props
 }: ActivityRingsProps) {
   const plotRef = React.useRef<HTMLDivElement>(null)
-  const box = useMeasuredBox(plotRef)
+  const box = useMeasuredSize(plotRef)
   const painted = useAfterFirstPaint(animateOnMount)
   // Filter ids are document-global, so two ring sets on one page would share
   // one blur if the id were a constant.
