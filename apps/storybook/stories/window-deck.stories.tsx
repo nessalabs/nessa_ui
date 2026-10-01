@@ -1637,7 +1637,7 @@ function WheelDeck({ paneHeight }: { paneHeight?: string }) {
 
 export const WheelNavigationByHeight: Story = {
   parameters: storyDocumentation(
-    "A vertical wheel over a fixed-height deck moves the carousel to the next window. Over an auto-height deck it does not: that deck sits in the page's flow and its windows never scroll, so scrolling down means the page. Either default yields to an explicit `wheelNavigation`.",
+    "A vertical wheel over a fixed-height deck moves the carousel to the next window. Over an auto-height deck it does not, and it reaches the page: that deck sits in the page's flow and its windows grow rather than scroll, so their content is not a scroll region that could hold the wheel back. Either default yields to an explicit `wheelNavigation` or `scrollable`.",
   ),
   render: () => (
     <div className="flex flex-col gap-6">
@@ -1671,5 +1671,19 @@ export const WheelNavigationByHeight: Story = {
     wheel("auto")
     await frames(2)
     await expect(auto.scrollLeft).toBe(autoStart)
+
+    // Nor does its window hold the wheel back from the page: it grows rather
+    // than scrolls, so its content region is not a scroll container — one
+    // with nothing to scroll and \`overscroll-behavior: contain\` keeps
+    // Chromium from passing the wheel on.
+    const autoContent = auto.querySelector<HTMLElement>(
+      '[data-slot="window-deck-pane-content"]',
+    )!
+    await expect(getComputedStyle(autoContent).overflowY).toBe("visible")
+    await expect(getComputedStyle(autoContent).overscrollBehaviorY).toBe("auto")
+    const fixedContent = fixed.querySelector<HTMLElement>(
+      '[data-slot="window-deck-pane-content"]',
+    )!
+    await expect(getComputedStyle(fixedContent).overflowY).toBe("auto")
   },
 }

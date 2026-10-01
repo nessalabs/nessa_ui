@@ -1540,6 +1540,7 @@ function WindowDeck({
   const contextValue = React.useMemo(
     () => ({
       activePaneId,
+      autoHeight: paneHeight === "auto",
       dismissRequest,
       mode: resolvedMode,
       overviewPanning,
@@ -1556,6 +1557,7 @@ function WindowDeck({
     }),
     [
       activePaneId,
+      paneHeight,
       dismissRequest,
       overviewPanning,
       paneIds,

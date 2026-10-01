@@ -51,8 +51,12 @@ interface WindowDeckPaneProps
   /**
    * Whether the pane's content scrolls on its own. Turn it off when the
    * content fills the pane or manages its own scrolling, as a photograph, a
-   * message list, or a canvas does.
-   * @defaultValue true
+   * message list, or a canvas does. Off by default in a deck with
+   * `paneHeight="auto"`, whose windows grow to their content instead: a
+   * scroll region there would have nothing to scroll and would hold the
+   * wheel back from the page. Turn it on there for a content region the host
+   * caps with `contentClassName`.
+   * @defaultValue true, or false when the deck's `paneHeight` is "auto"
    */
   scrollable?: boolean
   /**
@@ -185,7 +189,7 @@ function WindowDeckPane({
   label,
   header,
   footer,
-  scrollable = true,
+  scrollable: scrollableProp,
   chrome = true,
   headerClassName,
   contentClassName,
@@ -202,6 +206,7 @@ function WindowDeckPane({
 }: WindowDeckPaneProps) {
   const {
     activePaneId,
+    autoHeight,
     dismissRequest,
     mode,
     overviewPanning,
@@ -215,6 +220,7 @@ function WindowDeckPane({
     shouldMountPreview,
     tileFor,
   } = useWindowDeck()
+  const scrollable = scrollableProp ?? !autoHeight
   const elementRef = React.useRef<HTMLDivElement>(null)
   // Memoized so React does not detach and re-attach refs on every render.
   const composedRef = React.useMemo(() => composeRefs(elementRef, ref), [ref])
