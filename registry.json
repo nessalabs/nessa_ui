@@ -1678,6 +1678,7 @@
         "nessalabs/nessa_ui/file-drop-zone",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/portal-container",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [

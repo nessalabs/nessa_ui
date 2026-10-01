@@ -20,6 +20,7 @@ import {
   useNessaLayerScope,
   usePortalContainer,
 } from "@/lib/portal-container"
+import { observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 import {
@@ -181,18 +182,11 @@ function ChatComposer({
       setChromeHeight(Math.ceil(shell + gaps + chrome))
     }
     measure()
-    if (typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver(measure)
-    const observeRows = () => {
-      observer.disconnect()
-      observer.observe(form)
-      Array.from(form.children).forEach((child) => observer.observe(child))
-      measure()
-    }
-    observeRows()
-    const mutations = new MutationObserver(observeRows)
-    mutations.observe(form, { childList: true })
-    return () => { observer.disconnect(); mutations.disconnect() }
+    // Each row is followed as well as the form: a row can grow (controls
+    // wrapping, an attachment arriving) while the capped form holds its size.
+    return observeSize(form, measure, {
+      boxes: (element) => Array.from(element.children),
+    })
   }, [inputAdapter, effectiveMaxHeight])
 
   const context = React.useMemo(
@@ -448,11 +442,12 @@ function ChatComposerInput({
   React.useLayoutEffect(() => {
     resize()
     const textarea = localRef.current
-    if (!textarea || typeof ResizeObserver === "undefined") return
+    if (!textarea) return
     let previousWidth = textarea.getBoundingClientRect().width
-    const observer = new ResizeObserver(() => {
+    return observeSize(textarea, (cause) => {
       const nextWidth = textarea.getBoundingClientRect().width
-      if (nextWidth !== previousWidth) {
+      // A new width rewraps the text, and so does a web font landing.
+      if (nextWidth !== previousWidth || cause === "fonts") {
         previousWidth = nextWidth
         resize()
         return
@@ -465,8 +460,6 @@ function ChatComposerInput({
         textarea.style.overflowY = nextOverflow
       }
     })
-    observer.observe(textarea)
-    return () => observer.disconnect()
   }, [composerMaxHeight, props.value, props.defaultValue, resize])
 
   return (

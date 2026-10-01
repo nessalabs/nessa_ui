@@ -21,6 +21,13 @@ import {
 } from "@nessalabs/ui"
 import { Mic, Plus, Shield } from "lucide-react"
 
+import {
+  GrowingNote,
+  WidenableFrame,
+  announceFontLoaded,
+  settleMeasurements,
+  silenceResizeObserver,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 import {
   filterSlashSections,
@@ -1029,5 +1036,73 @@ export const AttachmentsCappedHeight: Story = {
     await expect(footerRect.bottom).toBeLessThanOrEqual(composerRect.bottom)
     await expect(input.scrollHeight).toBeGreaterThan(input.clientHeight)
     await expect(getComputedStyle(input).overflowY).toBe("auto")
+  },
+}
+
+export const WithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "A capped composer measured with a `ResizeObserver` that never reports, as WebKit sometimes does. A row of host content grows on its own state, in a commit the composer never sees, and the composer's floor still rises to keep that row visible, because it measures its rows through the shared size observer, which also watches their content.",
+  ),
+  beforeEach: silenceResizeObserver,
+  render: () => (
+    <ChatComposer maxHeight={480} className="w-[32rem]">
+      <ChatComposerInput placeholder="Do anything" />
+      <div data-testid="host-row">
+        <GrowingNote lines={6} />
+      </div>
+      <ChatComposerFooter>
+        <ChatComposerSubmit />
+      </ChatComposerFooter>
+    </ChatComposer>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const composer = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="chat-composer"]',
+    )!
+    const floor = () => Number.parseFloat(composer.style.minHeight) || 0
+    await waitFor(() => expect(floor()).toBeGreaterThan(0))
+    await settleMeasurements(canvasElement)
+    const before = floor()
+    const row = canvas.getByTestId("host-row")
+    const rowBefore = row.offsetHeight
+    await userEvent.click(canvas.getByRole("button", { name: "Show the full note" }))
+    await waitFor(() => expect(row.offsetHeight).toBeGreaterThan(rowBefore))
+    await waitFor(() =>
+      expect(floor()).toBeGreaterThanOrEqual(
+        before + row.offsetHeight - rowBefore,
+      ),
+    )
+  },
+}
+
+export const InputWithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "The textarea measured with a `ResizeObserver` that never reports. When its frame narrows the draft rewraps, and once a web font lands the field grows to hold every line, because it measures through the shared size observer.",
+  ),
+  beforeEach: silenceResizeObserver,
+  render: () => (
+    <WidenableFrame startWide wideClassName="w-[40rem]" narrowClassName="w-72">
+      <ChatComposer>
+        <ChatComposerInput defaultValue="Summarise the release notes for the composer, then list every component whose measurement changed in this branch and why it moved." />
+        <ChatComposerFooter>
+          <ChatComposerSubmit />
+        </ChatComposerFooter>
+      </ChatComposer>
+    </WidenableFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const input = canvas.getByRole("textbox", { name: "Message" })
+    await settleMeasurements(canvasElement)
+    const before = input.getBoundingClientRect().height
+    await userEvent.click(canvas.getByRole("button", { name: "Narrow the frame" }))
+    announceFontLoaded(canvasElement)
+    await waitFor(() => {
+      expect(input.getBoundingClientRect().height).toBeGreaterThan(before)
+      expect(input.scrollHeight).toBeLessThanOrEqual(input.clientHeight + 1)
+    })
   },
 }
