@@ -3,7 +3,11 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { observeSize, type SizeChangeCause } from "./size-observer"
+import {
+  changesOnlyStyle,
+  observeSize,
+  type SizeChangeCause,
+} from "./size-observer"
 
 /**
  * A window with hand-driven observers, fonts and frames, so each trigger can
@@ -291,4 +295,30 @@ test("a batch of only ignored mutations is not reported", () => {
   ])
   env.runFrame()
   assert.deepEqual(causes, ["content"])
+})
+
+test("a style change counts as positioning only when nothing else changed", () => {
+  const styled = (style: string) =>
+    ({ getAttribute: (name: string) => (name === "style" ? style : null) }) as Element
+  const change = (oldValue: string, now: string, attributeName = "style") =>
+    ({
+      type: "attributes",
+      attributeName,
+      oldValue,
+      target: styled(now),
+    }) as unknown as MutationRecord
+
+  const moved = change(
+    "font-size: 14px; transform: translate(0px, 0px);",
+    "font-size: 14px; transform: translate(4px, 8px);",
+  )
+  assert.equal(changesOnlyStyle(moved, ["transform"]), true)
+
+  const resized = change(
+    "font-size: 14px; transform: translate(0px, 0px);",
+    "font-size: 18px; transform: translate(4px, 8px);",
+  )
+  assert.equal(changesOnlyStyle(resized, ["transform"]), false)
+
+  assert.equal(changesOnlyStyle(change("", "", "class"), ["transform"]), false)
 })

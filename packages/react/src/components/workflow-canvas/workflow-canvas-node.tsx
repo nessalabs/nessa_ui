@@ -4,7 +4,7 @@
 
 import * as React from "react"
 
-import { observeSize } from "@/lib/size-observer"
+import { changesOnlyStyle, observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 import {
@@ -347,11 +347,11 @@ function WorkflowCanvasNode({
 
     // A node is sized by what it holds, so its content and web fonts are
     // watched as well as its box: WebKit does not always report a resize
-    // they cause. The node's own style is its position, rewritten on every
-    // drag frame, and cannot change its size.
+    // they cause. The transform that places it, rewritten on every drag
+    // frame, cannot change its size; the rest of its style can.
     const stopObserving = observeSize(element, remeasure, {
       ignoreMutation: (record) =>
-        record.target === element && record.attributeName === "style",
+        record.target === element && changesOnlyStyle(record, ["transform"]),
     })
 
     return () => {

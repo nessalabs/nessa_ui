@@ -5,7 +5,7 @@
 import * as React from "react"
 
 import { composeRefs } from "@/lib/compose"
-import { observeSize } from "@/lib/size-observer"
+import { changesOnlyStyle, observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 import {
@@ -1427,12 +1427,13 @@ function WindowDeck({
 
     measure()
     // What sizes an auto-height pane is its content, so the content and web
-    // fonts are watched as well as the pane's box. The pane's own style is
-    // its translate, rewritten on every drag and pan frame, and cannot change
-    // its height.
+    // fonts are watched as well as the pane's box. The translate and scale
+    // the deck writes on every drag and pan frame cannot change its height;
+    // anything else in the pane's style can.
     return observeSize(pane, measure, {
       ignoreMutation: (record) =>
-        record.target === pane && record.attributeName === "style",
+        record.target === pane &&
+        changesOnlyStyle(record, ["translate", "scale"]),
     })
   }, [liveContentId, paneElement, paneHeight, panes])
 

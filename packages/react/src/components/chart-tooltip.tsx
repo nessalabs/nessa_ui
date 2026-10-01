@@ -11,7 +11,7 @@ import {
   type ChartTooltipSide,
 } from "@/lib/chart-geometry"
 import { useComposedRefs } from "@/lib/compose"
-import { observeSize } from "@/lib/size-observer"
+import { changesOnlyStyle, observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 import { PopoverSurface } from "./popover-surface"
@@ -189,10 +189,10 @@ function ChartTooltip({
         (element as HTMLElement).offsetParent,
         boundaryElement,
       ],
-      // The card's own style is where it was placed, rewritten as the
-      // pointer moves; it cannot change the card's size.
+      // Where the card was placed, rewritten as the pointer moves, cannot
+      // change its size; the rest of its style can.
       ignoreMutation: (record) =>
-        record.target === card && record.attributeName === "style",
+        record.target === card && changesOnlyStyle(record, ["left", "top"]),
     })
     ownerDocument.addEventListener("scroll", replace, {
       capture: true,

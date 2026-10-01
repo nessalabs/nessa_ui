@@ -158,6 +158,7 @@ export function observeSize(
     characterData: true,
     attributes: true,
     attributeFilter: LAYOUT_ATTRIBUTES,
+    attributeOldValue: true,
   })
 
   const fonts = (document as Document & { fonts?: FontFaceSet }).fonts
@@ -178,6 +179,36 @@ export function observeSize(
     mutations?.disconnect()
     observedBoxes.clear()
   }
+}
+
+/**
+ * Whether `record` is a change to an element's inline style that touched
+ * nothing but `properties` — positioning a component writes on every frame,
+ * such as `transform` or `left`, which cannot change the element's size.
+ * Every other inline style change, including one a host makes through the
+ * same `style` attribute, is not matched. For {@link ObserveSizeOptions}'
+ * `ignoreMutation`.
+ */
+export function changesOnlyStyle(
+  record: MutationRecord,
+  properties: readonly string[],
+): boolean {
+  if (record.type !== "attributes" || record.attributeName !== "style") {
+    return false
+  }
+  const rest = (value: string | null) =>
+    (value ?? "")
+      .split(";")
+      .map((declaration) => declaration.trim())
+      .filter((declaration) => {
+        if (!declaration) return false
+        const name = declaration.slice(0, declaration.indexOf(":")).trim()
+        return !properties.includes(name.toLowerCase())
+      })
+      .join(";")
+  return (
+    rest(record.oldValue) === rest((record.target as Element).getAttribute("style"))
+  )
 }
 
 /** An element's content-box size, in whole CSS pixels. */

@@ -186,11 +186,15 @@ function ChatComposer({
     // wrapping, an attachment arriving) while the capped form holds its size.
     // The input's own row is left out of the chrome, so what changes inside
     // it — the draft, the height the textarea sets itself — is not watched.
+    // The row's own margins and position still count.
     return observeSize(form, measure, {
       boxes: (element) => Array.from(element.children),
       ignoreMutation: (record) =>
         Array.from(form.children).some(
-          (row) => row.contains(input) && row.contains(record.target),
+          (row) =>
+            row !== record.target &&
+            row.contains(input) &&
+            row.contains(record.target),
         ),
     })
   }, [inputAdapter, effectiveMaxHeight])
