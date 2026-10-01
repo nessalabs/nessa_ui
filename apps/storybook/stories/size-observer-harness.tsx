@@ -22,6 +22,23 @@ export function silenceResizeObserver() {
 }
 
 /**
+ * A story \`beforeEach\` that withholds animation frames, as a loaded CI
+ * machine can for longer than a test waits: \`requestAnimationFrame\` queues
+ * the callback and never runs it. Restores the real one afterwards.
+ */
+export function withholdAnimationFrames() {
+  const request = window.requestAnimationFrame
+  const cancel = window.cancelAnimationFrame
+  let next = 1
+  window.requestAnimationFrame = () => next++
+  window.cancelAnimationFrame = () => {}
+  return () => {
+    window.requestAnimationFrame = request
+    window.cancelAnimationFrame = cancel
+  }
+}
+
+/**
  * Tells the document a web font finished loading, as `document.fonts` does
  * when one lands.
  */

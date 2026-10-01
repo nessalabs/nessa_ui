@@ -79,6 +79,12 @@ const PAINT_ONLY_PROPERTIES = new Set([
   "rotate",
 ])
 
+/**
+ * How long a batched report waits for an animation frame before it flushes
+ * without one.
+ */
+const FRAME_FALLBACK_MS = 100
+
 const noop = () => {}
 
 /**
@@ -92,8 +98,8 @@ const noop = () => {}
  *   content inside it settling without one (an image
  *   loading, a transition or animation ending), is reported as `content`, and a web font finishing its load,
  *   or the document's fonts settling while a load is under way, as `fonts`.
- *   Any burst of these is reported once, on the next animation frame, with
- *   every cause it held.
+ *   Any burst of these is reported once, on the next animation frame — or
+ *   after a short timer when no frame comes — with every cause it held.
  *
  * A report says the size *may* have changed. `onChange` measures, compares
  * with what it last acted on, and acts only on a real difference; that is
@@ -169,7 +175,11 @@ export function observeSize(
   }
 
   function flush() {
+    // Whichever of the frame and the fallback arrives first flushes; the
+    // other is cancelled.
+    const cancel = cancelFlush
     cancelFlush = null
+    cancel?.()
     const changes = pending
     pending = new Set()
     if (stopped || changes.size === 0) return
@@ -185,12 +195,17 @@ export function observeSize(
     pending.add(cause)
     if (cancelFlush !== null) return
     const host = view!
-    if (typeof host.requestAnimationFrame === "function") {
-      const id = host.requestAnimationFrame(flush)
-      cancelFlush = () => host.cancelAnimationFrame(id)
-    } else {
-      const id = host.setTimeout(flush, 0)
-      cancelFlush = () => host.clearTimeout(id)
+    // The next frame, before it paints — or, when no frame comes (a loaded
+    // machine withholding rendering, a background tab), a short timer, so a
+    // report is never held back for as long as frames are.
+    const timer = host.setTimeout(flush, FRAME_FALLBACK_MS)
+    const frame =
+      typeof host.requestAnimationFrame === "function"
+        ? host.requestAnimationFrame(flush)
+        : null
+    cancelFlush = () => {
+      host.clearTimeout(timer)
+      if (frame !== null) host.cancelAnimationFrame(frame)
     }
   }
 

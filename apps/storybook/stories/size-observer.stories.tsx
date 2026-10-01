@@ -10,6 +10,7 @@ import {
   frames,
   settleMeasurements,
   silenceResizeObserver,
+  withholdAnimationFrames,
 } from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
@@ -145,5 +146,33 @@ export const WithoutResizeReports: Story = {
     })
     await frames(4)
     await expect(count()).toBe(before + 1)
+  },
+}
+
+export const WithoutAnimationFrames: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "The box measured with resize reports silenced and animation frames withheld, as a loaded machine can withhold them. A content change is still measured: a batched report waits for the next frame only briefly, then flushes without one.",
+  ),
+  beforeEach: () => {
+    const restoreObserver = silenceResizeObserver()
+    const restoreFrames = withholdAnimationFrames()
+    return () => {
+      restoreFrames()
+      restoreObserver()
+    }
+  },
+  render: () => <SizeObserverDemo />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await waitFor(() =>
+      expect(printedSize(canvasElement)).toEqual(actualSize(canvasElement)),
+    )
+    const [, oneLine] = printedSize(canvasElement)!
+    await userEvent.click(canvas.getByRole("button", { name: "Add a line" }))
+    await waitFor(() => {
+      expect(printedSize(canvasElement)).toEqual(actualSize(canvasElement))
+      expect(printedSize(canvasElement)![1]).toBeGreaterThan(oneLine!)
+    })
   },
 }

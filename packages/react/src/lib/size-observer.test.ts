@@ -407,3 +407,17 @@ test("a transition that only repaints is not reported", () => {
   env.runFrame()
   assert.deepEqual(causes, ["content"])
 })
+
+test("a report is flushed without a frame when none comes", async () => {
+  const env = fakeWindow()
+  const { causes, onChange } = record()
+  observeSize(env.element, onChange)
+
+  env.mutationObserver().trigger()
+  // No frame is ever run here: the fallback timer flushes on its own.
+  await new Promise((resolve) => setTimeout(resolve, 150))
+  assert.deepEqual(causes, ["content"])
+  // And the frame it was also waiting on no longer flushes again.
+  env.runFrame()
+  assert.deepEqual(causes, ["content"])
+})
