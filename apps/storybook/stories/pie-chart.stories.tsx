@@ -10,6 +10,11 @@ import {
   type PieChartSlice,
 } from "@nessalabs/ui"
 
+import {
+  WidenableFrame,
+  expectFollowsFrame,
+  silenceResizeObserver,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -419,5 +424,28 @@ export const Configured: Story = {
     ])
     expect(wedges[1].dataset.tinted).toBe("false")
     expect(wedges[0].dataset.tinted).toBe("true")
+  },
+}
+
+/**
+ * The chart's frame widened with a `ResizeObserver` that never reports, which
+ * is what WebKit does to some resizes. The pie still redraws at the new
+ * width once a web font lands, because the chart measures through the shared
+ * size observer.
+ */
+export const WithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "The chart measured with a `ResizeObserver` that never reports, as WebKit sometimes does. It still draws at its box's size, and when its frame widens it redraws at the new width once a web font finishes loading, because the chart measures through the shared size observer rather than a bare `ResizeObserver`.",
+  ),
+  args: TicketMix.args,
+  beforeEach: silenceResizeObserver,
+  render: (args) => (
+    <WidenableFrame className="h-[420px]">
+      <PieChart {...args} formatValue={tickets} aria-label="Tickets by surface" />
+    </WidenableFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    await expectFollowsFrame(canvasElement)
   },
 }

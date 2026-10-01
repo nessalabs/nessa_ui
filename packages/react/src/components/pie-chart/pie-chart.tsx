@@ -4,6 +4,7 @@
 
 import * as React from "react"
 
+import { useMeasuredSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 import {
@@ -202,29 +203,6 @@ export interface PieChartProps
   ) => void
 }
 
-function useMeasuredBox(ref: React.RefObject<HTMLElement | null>) {
-  const [box, setBox] = React.useState<{ width: number; height: number } | null>(
-    null,
-  )
-  React.useLayoutEffect(() => {
-    const element = ref.current
-    if (!element || typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver((entries) => {
-      const rect = entries[entries.length - 1].contentRect
-      const width = Math.round(rect.width)
-      const height = Math.round(rect.height)
-      setBox((previous) =>
-        previous && previous.width === width && previous.height === height
-          ? previous
-          : { width, height },
-      )
-    })
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [ref])
-  return box
-}
-
 const WEDGE_CLASSES = cn(
   "cursor-pointer fill-[var(--nessa-pie-chart-color,var(--muted-foreground))] outline-none",
   // `d` and `transform` are transitionable presentation attributes, so
@@ -293,7 +271,7 @@ function PieChart({
   ...props
 }: PieChartProps) {
   const plotRef = React.useRef<HTMLDivElement>(null)
-  const box = useMeasuredBox(plotRef)
+  const box = useMeasuredSize(plotRef)
 
   const [hoveredId, setRawHoveredId] = React.useState<string | null>(null)
   // Keyboard focus isolates a wedge exactly like hover, so Tabbing through
