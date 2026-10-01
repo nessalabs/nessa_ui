@@ -89,7 +89,7 @@ const glassLensClassName = cn(
 )
 
 /** Why the lens was placed: the development trace records it. */
-type LensCause = "mount" | "value" | "resize" | "options"
+type LensCause = "mount" | "value" | "resize" | "options" | "fonts"
 
 /**
  * What a placement did to the lens, for the development trace: `placed` and
@@ -334,7 +334,21 @@ function SegmentedControl({
       attributes: true,
       attributeFilter: ["dir", "class", "style"],
     })
+    // A web font that lands after the lens is placed changes the options'
+    // widths, and WebKit does not report that to a ResizeObserver: the lens
+    // stayed at the fallback font's width (seen in CI, 82px over a 77.6px
+    // option). So the font set's own events re-measure too — each load that
+    // finishes, and the set settling once.
+    const fonts = track.ownerDocument.fonts as FontFaceSet | undefined
+    let active = true
+    const onFonts = () => {
+      if (active) placeLens("fonts")
+    }
+    fonts?.addEventListener("loadingdone", onFonts)
+    void fonts?.ready.then(onFonts)
     return () => {
+      active = false
+      fonts?.removeEventListener("loadingdone", onFonts)
       resizeObserver.disconnect()
       mutationObserver.disconnect()
     }
