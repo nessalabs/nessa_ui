@@ -3,6 +3,7 @@
 import * as React from "react"
 import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react"
 
+import { observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 /**
@@ -86,15 +87,14 @@ function Table({
         element.scrollWidth > element.clientWidth + 1 ||
           element.scrollHeight > element.clientHeight + 1,
       )
-    // Measure once regardless, so the initial layout is still handled where
-    // ResizeObserver is unavailable.
+    // Measured once first, so the initial layout is handled before any
+    // report arrives. Rows arriving, a cell's text wrapping and a web font
+    // landing all change the overflow, and the table can grow inside a
+    // container that holds its size, so the table's box is followed too.
     measure()
-    if (typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver(measure)
-    observer.observe(element)
-    const table = element.firstElementChild
-    if (table) observer.observe(table)
-    return () => observer.disconnect()
+    return observeSize(element, measure, {
+      boxes: (container) => [container.firstElementChild],
+    })
   }, [])
 
   return (
