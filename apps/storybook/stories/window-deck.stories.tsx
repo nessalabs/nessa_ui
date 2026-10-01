@@ -26,6 +26,7 @@ import {
   PanelsTopLeft,
 } from "lucide-react"
 
+import { silenceResizeObserver } from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -1230,4 +1231,99 @@ export const PreviewStrip: Story = {
     await waitFor(() => expect(deck).toHaveAttribute("data-mode", "carousel"))
     await waitFor(() => expect(deck.querySelector("[data-settling]")).toBeNull())
   },
+}
+
+/** Notes the reader expands and collapses inside the live window. */
+function ExpandableNotes() {
+  const [open, setOpen] = React.useState(false)
+  return (
+    <div className="flex flex-col items-start gap-2 p-4 nessa-text-3">
+      <Button variant="outline" size="sm" onClick={() => setOpen((value) => !value)}>
+        {open ? "Show less" : "Show more"}
+      </Button>
+      {open
+        ? Array.from({ length: 12 }, (_, index) => (
+            <p key={index} className="m-0">
+              Note line {index + 1}
+            </p>
+          ))
+        : null}
+    </div>
+  )
+}
+
+/** An auto-height deck whose live window holds {@link ExpandableNotes}. */
+function AutoHeightDeck() {
+  return (
+    <div className="h-[720px] w-full bg-background">
+      <WindowDeck paneHeight="auto" defaultActivePane="notes">
+        <WindowDeckPane id="notes" label="Notes">
+          <ExpandableNotes />
+        </WindowDeckPane>
+        <WindowDeckPane id="later" label="Later">
+          <p className="p-4 nessa-text-3">Nothing here yet.</p>
+        </WindowDeckPane>
+      </WindowDeck>
+    </div>
+  )
+}
+
+/** The deck's pane height, as the variable every frame is sized by. */
+function deckPaneHeight(canvasElement: HTMLElement) {
+  const deck = canvasElement.querySelector<HTMLElement>(
+    '[data-slot="window-deck"]',
+  )!
+  return (
+    Number.parseFloat(
+      deck.style.getPropertyValue("--nessa-window-deck-pane-height"),
+    ) || 0
+  )
+}
+
+/** The live window's own box. */
+function livePane(canvasElement: HTMLElement) {
+  return canvasElement.querySelector<HTMLElement>(
+    '[data-slot="window-deck-pane"]',
+  )!
+}
+
+async function playAutoHeight(canvasElement: HTMLElement) {
+  const canvas = within(canvasElement)
+  await waitFor(() => expect(deckPaneHeight(canvasElement)).toBeGreaterThan(0))
+  const collapsed = deckPaneHeight(canvasElement)
+
+  // Content that grows takes the window with it, rather than overflowing a
+  // window pinned to the height it first measured.
+  await userEvent.click(canvas.getByRole("button", { name: "Show more" }))
+  await waitFor(() => {
+    expect(deckPaneHeight(canvasElement)).toBeGreaterThan(collapsed + 100)
+    expect(livePane(canvasElement).offsetHeight).toBe(
+      deckPaneHeight(canvasElement),
+    )
+  })
+
+  // And content that shrinks brings it back.
+  await userEvent.click(canvas.getByRole("button", { name: "Show less" }))
+  await waitFor(() =>
+    expect(deckPaneHeight(canvasElement)).toBe(collapsed),
+  )
+}
+
+export const AutoHeightFollowsContent: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "With `paneHeight=\"auto\"` the windows take the live window's content height, and keep following it: notes expanded inside the window grow the deck, and collapsing them shrinks it back. The window's own box is sized by that height, so it is measured with the size lifted rather than read back as it stands.",
+  ),
+  render: () => <AutoHeightDeck />,
+  play: async ({ canvasElement }) => playAutoHeight(canvasElement),
+}
+
+export const AutoHeightWithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "The same auto-height deck with a `ResizeObserver` that never reports, as WebKit sometimes does. The deck still follows the live window's content as it grows and shrinks, because it measures the window through the shared size observer, which also watches its content.",
+  ),
+  beforeEach: silenceResizeObserver,
+  render: () => <AutoHeightDeck />,
+  play: async ({ canvasElement }) => playAutoHeight(canvasElement),
 }

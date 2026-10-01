@@ -5,6 +5,7 @@
 import * as React from "react"
 
 import { composeRefs } from "@/lib/compose"
+import { observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 import {
@@ -1406,10 +1407,22 @@ function WindowDeck({
       }
     }
 
-    commit(pane.offsetHeight)
-    const observer = new ResizeObserver(() => commit(pane.offsetHeight))
-    observer.observe(pane)
-    return () => observer.disconnect()
+    // The pane is sized by the height this measures, so its own box only
+    // echoes the last measurement: growing content would overflow it and
+    // shrinking content would leave it standing. Its natural height is read
+    // with that size lifted for the read, and restored before anything paints.
+    const measure = () => {
+      const assigned = pane.style.height
+      pane.style.height = "auto"
+      const natural = pane.offsetHeight
+      pane.style.height = assigned
+      commit(natural)
+    }
+
+    measure()
+    // What sizes an auto-height pane is its content, so the content and web
+    // fonts are watched as well as the pane's box.
+    return observeSize(pane, measure)
   }, [liveContentId, paneElement, paneHeight, panes])
 
   const contextValue = React.useMemo(
