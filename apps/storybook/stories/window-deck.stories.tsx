@@ -1728,7 +1728,7 @@ export const WheelNavigationByHeight: Story = {
 }
 
 /** A window whose host can empty it entirely, with no chrome to keep it open. */
-function EmptiableDeck() {
+function EmptiableDeck({ contentClassName }: { contentClassName?: string }) {
   const [empty, setEmpty] = React.useState(false)
   return (
     <div className="flex flex-col items-start gap-3">
@@ -1737,7 +1737,12 @@ function EmptiableDeck() {
       </Button>
       <div className="h-[360px] w-full bg-background">
         <WindowDeck paneHeight="auto" defaultActivePane="notes">
-          <WindowDeckPane id="notes" label="Notes" chrome={false}>
+          <WindowDeckPane
+            id="notes"
+            label="Notes"
+            chrome={false}
+            contentClassName={contentClassName}
+          >
             {empty ? null : <p className="m-0 p-4 nessa-text-3">A note.</p>}
           </WindowDeckPane>
           <WindowDeckPane id="later" label="Later">
@@ -1795,5 +1800,35 @@ export const AutoHeightHonoursAFixedContentRegion: Story = {
       heights.push(deckPaneHeight(canvasElement))
     }
     await expect(heights).toEqual(heights.map(() => before))
+  },
+}
+
+export const AutoHeightKeepsARegionSizeWhenEmptied: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "Emptied auto-height windows whose content regions the host sized — one with a minimum height, one with a fixed height it does not flex from. Each keeps the size the host gave it, rather than collapsing as a content-sized region would.",
+  ),
+  render: () => (
+    <div className="flex flex-col gap-6">
+      <div data-testid="minimum">
+        <EmptiableDeck contentClassName="min-h-40" />
+      </div>
+      <div data-testid="fixed">
+        <EmptiableDeck contentClassName="flex-none h-40" />
+      </div>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    for (const testId of ["minimum", "fixed"]) {
+      const host = within(canvasElement).getByTestId(testId)
+      await waitFor(() => expect(deckPaneHeight(host)).toBeGreaterThan(0))
+      await settleMeasurements(canvasElement)
+      await userEvent.click(
+        within(host).getByRole("button", { name: "Empty the window" }),
+      )
+      await frames(4)
+      await waitFor(() => expect(deckPaneHeight(host)).toBe(160))
+      await expect(livePane(host).offsetHeight).toBe(160)
+    }
   },
 }

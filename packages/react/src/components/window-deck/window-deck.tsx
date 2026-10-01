@@ -237,7 +237,7 @@ function isDocumentFocus(owner: Document, active: Element | null): boolean {
  * border, read without laying the pane out again. WebKit's lift goes stale
  * for a region whose last child was just removed, reporting the height the
  * child had, so this case is computed rather than measured. Null when the
- * region holds anything.
+ * region holds anything, or has a size of its own the host gave it.
  */
 function emptyNaturalHeight(pane: HTMLElement): number | null {
   const content = pane.querySelector<HTMLElement>(
@@ -252,6 +252,12 @@ function emptyNaturalHeight(pane: HTMLElement): number | null {
   if (!view) return null
   const css = view.getComputedStyle(content)
   const pixels = (value: string) => Number.parseFloat(value) || 0
+  // Only a region sized by its content collapses with it. One the host
+  // gives a size of its own — a fixed height it does not flex from, a
+  // minimum — keeps that size empty, and is left to the lift.
+  if (!(Number.parseFloat(css.flexGrow) > 0) || pixels(css.minHeight) > 0) {
+    return null
+  }
   const own =
     pixels(css.paddingTop) +
     pixels(css.paddingBottom) +
