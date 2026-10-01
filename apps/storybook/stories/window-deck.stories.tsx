@@ -1565,15 +1565,17 @@ export const AutoHeightHoldsStillOverOverhangs: Story = {
     await settleMeasurements(canvasElement)
 
     for (const name of ["Show the badge", "Spill the row"]) {
+      const before = deckPaneHeight(canvasElement)
       await userEvent.click(canvas.getByRole("button", { name }))
       await frames(4)
-      // Held still across frames, not taking turns between two readings.
+      // The overhang does not size the deck: every frame keeps the height
+      // it had, rather than jumping, or taking turns between two readings.
       const heights: number[] = []
       for (let index = 0; index < 8; index += 1) {
         await frames(1)
         heights.push(deckPaneHeight(canvasElement))
       }
-      await expect(new Set(heights).size).toBe(1)
+      await expect(heights).toEqual(heights.map(() => before))
     }
   },
 }
