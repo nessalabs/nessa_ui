@@ -4,6 +4,7 @@ import * as React from "react"
 import { ChevronDown } from "lucide-react"
 
 import { useComposedRefs } from "@/lib/compose"
+import { observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 interface MessageScrollerContextValue {
@@ -156,7 +157,10 @@ function MessageScrollerViewport({
     if (!viewport) return
     if (autoScroll) viewport.scrollTop = viewport.scrollHeight
     updatePinned()
-    const observer = new ResizeObserver(() => {
+    // Streamed content grows the transcript in place — text appended to a
+    // message, not a new box — which WebKit does not always report as a
+    // resize, so the shared size observer watches the content as well.
+    return observeSize(viewport, () => {
       if (viewport.scrollTop < lastScrollTopRef.current - 1) {
         // The reader moved upward between scroll events; releasing here keeps
         // a fast stream from yanking the gesture back to the bottom.
@@ -169,11 +173,7 @@ function MessageScrollerViewport({
         viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" })
       }
       updatePinned()
-    })
-    observer.observe(viewport)
-    const content = viewport.firstElementChild
-    if (content) observer.observe(content)
-    return () => observer.disconnect()
+    }, { boxes: (element) => [element.firstElementChild] })
   }, [autoScroll, pinnedRef, returningRef, setPinned, updatePinned, viewportRef])
 
   // The host's ref is composed rather than spread: `ref` is an ordinary
