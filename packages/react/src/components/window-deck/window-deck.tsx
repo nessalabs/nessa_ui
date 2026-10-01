@@ -232,6 +232,35 @@ function isDocumentFocus(owner: Document, active: Element | null): boolean {
 }
 
 /**
+ * The pane's natural height when its content region is empty — no element,
+ * no text — which is the rest of the pane plus the region's own padding and
+ * border, read without laying the pane out again. WebKit's lift goes stale
+ * for a region whose last child was just removed, reporting the height the
+ * child had, so this case is computed rather than measured. Null when the
+ * region holds anything.
+ */
+function emptyNaturalHeight(pane: HTMLElement): number | null {
+  const content = pane.querySelector<HTMLElement>(
+    ':scope > [data-slot="window-deck-pane-content"]',
+  )
+  if (!content) return null
+  for (const node of content.childNodes) {
+    if (node.nodeType === Node.ELEMENT_NODE) return null
+    if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) return null
+  }
+  const view = pane.ownerDocument.defaultView
+  if (!view) return null
+  const css = view.getComputedStyle(content)
+  const pixels = (value: string) => Number.parseFloat(value) || 0
+  const own =
+    pixels(css.paddingTop) +
+    pixels(css.paddingBottom) +
+    pixels(css.borderTopWidth) +
+    pixels(css.borderBottomWidth)
+  return Math.max(0, Math.round(pane.offsetHeight - content.offsetHeight + own))
+}
+
+/**
  * The pane's natural height when its content has outgrown the content
  * region, read without laying the pane out again: its height now, less what
  * the region shows, plus what the region's content needs. Null when that
@@ -1478,8 +1507,11 @@ function WindowDeck({
     const pane = paneElement(liveContentId)
     if (!pane) return
 
+    // A pane with no box — detached, or not displayed — measures 0 for want
+    // of a layout, not because it is empty, and is not read. A laid-out pane
+    // that measures 0 is empty, and the deck collapses to it.
     const commit = (height: number) => {
-      if (height > 0) {
+      if (height > 0 || (pane.isConnected && pane.getClientRects().length > 0)) {
         setMeasuredPaneHeight((current) => (current === height ? current : height))
       }
     }
@@ -1506,13 +1538,13 @@ function WindowDeck({
         (pane.ownerDocument.defaultView?.getComputedStyle(pane) ?? pane.style)
           .getPropertyValue("--nessa-window-deck-pane-height"),
       )
-      const grown =
-        Math.abs(pane.offsetHeight - applied) <= 1
-          ? grownNaturalHeight(pane)
-          : null
+      const follows = Math.abs(pane.offsetHeight - applied) <= 1
+      const cheap = follows
+        ? (grownNaturalHeight(pane) ?? emptyNaturalHeight(pane))
+        : null
       // Committed growth leaves the content fitting, so the next report
       // lifts and confirms it; the two reads cannot take turns.
-      commit(grown ?? lift())
+      commit(cheap ?? lift())
     }
 
     measure()

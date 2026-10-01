@@ -1687,3 +1687,41 @@ export const WheelNavigationByHeight: Story = {
     await expect(getComputedStyle(fixedContent).overflowY).toBe("auto")
   },
 }
+
+/** A window whose host can empty it entirely, with no chrome to keep it open. */
+function EmptiableDeck() {
+  const [empty, setEmpty] = React.useState(false)
+  return (
+    <div className="flex flex-col items-start gap-3">
+      <Button variant="outline" onClick={() => setEmpty(true)}>
+        Empty the window
+      </Button>
+      <div className="h-[360px] w-full bg-background">
+        <WindowDeck paneHeight="auto" defaultActivePane="notes">
+          <WindowDeckPane id="notes" label="Notes" chrome={false}>
+            {empty ? null : <p className="m-0 p-4 nessa-text-3">A note.</p>}
+          </WindowDeckPane>
+          <WindowDeckPane id="later" label="Later">
+            <p className="p-4 nessa-text-3">Nothing here yet.</p>
+          </WindowDeckPane>
+        </WindowDeck>
+      </div>
+    </div>
+  )
+}
+
+export const AutoHeightCollapsesWhenEmptied: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "An auto-height window without chrome whose host empties it: its natural height is zero, and the deck collapses to it rather than keeping the height the content had.",
+  ),
+  render: () => <EmptiableDeck />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await waitFor(() => expect(deckPaneHeight(canvasElement)).toBeGreaterThan(0))
+    await settleMeasurements(canvasElement)
+    await userEvent.click(canvas.getByRole("button", { name: "Empty the window" }))
+    await waitFor(() => expect(deckPaneHeight(canvasElement)).toBe(0))
+    await expect(livePane(canvasElement).offsetHeight).toBe(0)
+  },
+}
