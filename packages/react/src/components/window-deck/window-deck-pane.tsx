@@ -603,7 +603,9 @@ function WindowDeckPane({
       style={transform ? { ...style, ...transform } : style}
       className={cn(
         "relative flex w-(--nessa-window-deck-pane-width) flex-none snap-center flex-col overflow-hidden outline-none",
-        "h-(--nessa-window-deck-pane-height)",
+        // The deck's height, unless the deck is lifting it to read this
+        // pane's natural height.
+        "h-[var(--nessa-window-deck-pane-lift,var(--nessa-window-deck-pane-height))]",
         chrome &&
           "rounded-xl border border-border bg-card text-card-foreground shadow-lg",
         // Everything the deck moves is a transform, so a pane never reflows

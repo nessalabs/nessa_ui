@@ -1285,6 +1285,9 @@ function deckPaneHeight(canvasElement: HTMLElement) {
   )
 }
 
+/** The property the deck sets on the live window to read its natural height. */
+const PANE_LIFT = "--nessa-window-deck-pane-lift"
+
 /** The live window's own box. */
 function livePane(canvasElement: HTMLElement) {
   return canvasElement.querySelector<HTMLElement>(
@@ -1293,43 +1296,66 @@ function livePane(canvasElement: HTMLElement) {
 }
 
 /**
- * Counts the times the deck lifts its size on the live window to read the
- * window's natural height exactly — the expensive read — until the deck's
- * height first changes. Returns a function that stops counting and gives
- * the count at that change: the lifts it took to find the new height. A
- * lift after it, confirming the height, is by design and not counted.
+ * Records the times the deck lifts its size on the live window to read the
+ * window's natural height exactly — a layout of the window — from the moment
+ * content is added to or removed from the window until the deck's height
+ * first changes.
+ * Returns a function that stops recording and gives one line per lift: the
+ * lifts it took to find the new height. A lift after the change, confirming
+ * the height, is by design and not recorded.
+ *
+ * Recording starts at the content change rather than when this is called,
+ * so a report still pending from an earlier measurement — a resize the
+ * engine delivers late on a loaded machine — cannot be mistaken for a lift
+ * the change caused.
  */
-function countLiftsUntilHeightChanges(canvasElement: HTMLElement) {
+function recordLiftsUntilHeightChanges(canvasElement: HTMLElement) {
   const deck = canvasElement.querySelector<HTMLElement>(
     '[data-slot="window-deck"]',
   )!
+  const pane = livePane(canvasElement)
   const start = deckPaneHeight(canvasElement)
-  let lifts = 0
-  let found: number | null = null
-  const panes = new MutationObserver((records) => {
+  const lifts: string[] = []
+  let changedAt: number | null = null
+  let done = false
+  const read = (records: MutationRecord[]) => {
     for (const record of records) {
-      if (record.oldValue?.includes("--nessa-window-deck-pane-height")) lifts += 1
+      if (done) return
+      if (record.type === "childList") {
+        changedAt ??= performance.now()
+      } else if (
+        changedAt !== null &&
+        record.target === pane &&
+        record.oldValue?.includes(PANE_LIFT)
+      ) {
+        lifts.push(
+          `lift ${Math.round(performance.now() - changedAt)}ms after the content changed, ` +
+            `deck at ${deckPaneHeight(canvasElement)}px, window ${pane.offsetHeight}px`,
+        )
+      }
     }
-  })
-  panes.observe(livePane(canvasElement), {
+  }
+  const panes = new MutationObserver(read)
+  panes.observe(pane, {
     attributes: true,
     attributeFilter: ["style"],
     attributeOldValue: true,
+    childList: true,
+    subtree: true,
   })
   const decks = new MutationObserver(() => {
-    if (found === null && deckPaneHeight(canvasElement) !== start) {
-      // Lifts queued with the change happened before it was committed.
-      for (const record of panes.takeRecords()) {
-        if (record.oldValue?.includes("--nessa-window-deck-pane-height")) lifts += 1
-      }
-      found = lifts
+    if (!done && deckPaneHeight(canvasElement) !== start) {
+      // Records queued with the change happened before it was committed.
+      read(panes.takeRecords())
+      done = true
     }
   })
   decks.observe(deck, { attributes: true, attributeFilter: ["style"] })
   return () => {
+    read(panes.takeRecords())
     panes.disconnect()
     decks.disconnect()
-    return found
+    return lifts
   }
 }
 
@@ -1338,7 +1364,7 @@ async function playAutoHeight(canvasElement: HTMLElement) {
   await waitFor(() => expect(deckPaneHeight(canvasElement)).toBeGreaterThan(0))
   await settleMeasurements(canvasElement)
   const collapsed = deckPaneHeight(canvasElement)
-  const stopCounting = countLiftsUntilHeightChanges(canvasElement)
+  const stopRecording = recordLiftsUntilHeightChanges(canvasElement)
 
   // Content that grows takes the window with it, rather than overflowing a
   // window pinned to the height it first measured.
@@ -1351,15 +1377,32 @@ async function playAutoHeight(canvasElement: HTMLElement) {
   })
   // Growth was found from the content's overflow alone: the pane was not
   // lifted and laid out again before the deck took the new height. (One lift
-  // may follow, confirming it; a shrink is lifted, since inside a body that
-  // fills the window only a fresh layout can show it.)
-  await expect(stopCounting()).toBe(0)
+  // may follow, confirming it.) Each lift is listed with its timing, so a
+  // failure says when it happened.
+  await expect(stopRecording()).toEqual([])
 
-  // And content that shrinks brings it back.
+  // And content that shrinks brings it back. A shrink is lifted, since
+  // inside a body that fills the window only a fresh layout can show it —
+  // so the lift must restyle the window alone, not everything inside it.
+  const stopRecordingShrink = recordLiftsUntilHeightChanges(canvasElement)
   await userEvent.click(canvas.getByRole("button", { name: "Show less" }))
   await waitFor(() =>
     expect(deckPaneHeight(canvasElement)).toBe(collapsed),
   )
+  await expect(stopRecordingShrink().length).toBeGreaterThan(0)
+  // The lift does not inherit, so nothing inside the window is restyled by
+  // it; for a window of a few thousand rows an inherited one cost tens of
+  // milliseconds a read. Probed outside the deck, so the probe is not a
+  // change the deck measures for after the test ends.
+  const probe = document.createElement("div")
+  probe.append(document.createElement("span"))
+  probe.style.setProperty(PANE_LIFT, "auto")
+  canvasElement.append(probe)
+  const inherited = getComputedStyle(probe.firstElementChild!).getPropertyValue(
+    PANE_LIFT,
+  )
+  probe.remove()
+  await expect(inherited).toBe("")
 
 }
 
