@@ -232,6 +232,36 @@ function isDocumentFocus(owner: Document, active: Element | null): boolean {
 }
 
 /**
+ * The property the deck sets on the live pane to read its natural height,
+ * which the pane's height prefers over the deck's. It is registered not to
+ * inherit: an inherited custom property changing on the pane restyles every
+ * element inside it, which for a long pane cost far more than the layout the
+ * read needs — tens of milliseconds a read for a few thousand rows. Where
+ * registration is unsupported it inherits and costs that again, so every
+ * deck clears it on its own root: an outer deck's lift never reaches the
+ * panes of a deck nested inside it.
+ */
+const PANE_LIFT_PROPERTY = "--nessa-window-deck-pane-lift"
+
+/** The windows {@link PANE_LIFT_PROPERTY} has been registered in. */
+const paneLiftRegistered = new WeakSet<Window>()
+
+function registerPaneLift(view: Window & typeof globalThis) {
+  if (paneLiftRegistered.has(view)) return
+  paneLiftRegistered.add(view)
+  try {
+    view.CSS?.registerProperty?.({
+      name: PANE_LIFT_PROPERTY,
+      syntax: "*",
+      inherits: false,
+    })
+  } catch {
+    // Already registered — by another copy of this module, say. Not retried:
+    // the property then inherits, which every deck root already allows for.
+  }
+}
+
+/**
  * The pane's natural height when its content region is empty — no element,
  * no text — read without laying the pane out again. WebKit's lift goes stale
  * for a region whose last child was just removed, reporting the height the
@@ -1559,13 +1589,16 @@ function WindowDeck({
     // shrinking content would leave it standing. Its natural height is read
     // exactly by lifting the deck's size for the read — not the pane's
     // height, so a height the host gives the pane (a class, an inline style,
-    // a stylesheet) still wins. That lift restyles and lays out the whole
-    // pane, so content that has plainly outgrown the pane — a reply
-    // streaming in — is read from its overflow instead.
+    // a stylesheet) still wins. The lift is a property that does not
+    // inherit, so it restyles the pane alone and costs a layout of it.
+    // Content that has plainly outgrown the pane — a reply streaming in — is
+    // still read from its overflow, which needs no layout at all.
+    const view = pane.ownerDocument.defaultView
+    if (view) registerPaneLift(view)
     const lift = () => {
-      pane.style.setProperty("--nessa-window-deck-pane-height", "auto")
+      pane.style.setProperty(PANE_LIFT_PROPERTY, "auto")
       const natural = pane.offsetHeight
-      pane.style.removeProperty("--nessa-window-deck-pane-height")
+      pane.style.removeProperty(PANE_LIFT_PROPERTY)
       return natural
     }
     const measure = () => {
@@ -1666,6 +1699,7 @@ function WindowDeck({
           {
             ...style,
             "--nessa-window-deck-pane-width": paneWidth,
+            "--nessa-window-deck-pane-lift": "initial",
             "--nessa-window-deck-pane-height":
               paneHeight === "auto" && measuredPaneHeight !== undefined
                 ? `${measuredPaneHeight}px`

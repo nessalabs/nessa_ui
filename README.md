@@ -91,6 +91,13 @@ its Nessa base directly from the repository in one command:
 pnpm dlx shadcn@latest add nessalabs/nessa_ui/button
 ```
 
+`shadcn add` also installs the shared files a component imports. Copying a
+component's file by hand does not: bring along every item in its
+`registryDependencies` too. Components that measure themselves — the charts,
+WindowDeck, the composers, SegmentedControl, Table and others — import
+`@/lib/size-observer`, and without it the copied file fails to resolve that
+import.
+
 Generate static JSON artifacts for registry hosting or inspection:
 
 ```bash
