@@ -33,6 +33,12 @@ import {
   type WorkflowCanvasConnectionEnd,
 } from "@nessalabs/ui"
 
+import {
+  GrowingNote,
+  createGrowthSwitch,
+  settleMeasurements,
+  silenceResizeObserver,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -1968,6 +1974,96 @@ export const StressThousandNodes: Story = {
     })
     await waitFor(() => {
       expect(edge?.getAttribute("d")).not.toBe(pathBefore)
+    })
+  },
+}
+
+/** A bounded canvas with one node near its bottom edge, whose content grows on a switch outside the canvas. */
+function GrowingNodeDemo() {
+  const [growth] = React.useState(createGrowthSwitch)
+  return (
+    <div className="flex flex-col items-start gap-3">
+      <Button variant="outline" onClick={() => growth.open()}>
+        Grow the node
+      </Button>
+      <StoryFrame className="h-[24rem]">
+        <WorkflowCanvas
+          aria-label="Growing node canvas"
+          bounds={{ minX: 0, minY: 0, maxX: 480, maxY: 300 }}
+        >
+          <WorkflowCanvasSurface>
+            <WorkflowCanvasNode
+              nodeId="notes"
+              defaultPosition={{ x: 40, y: 180 }}
+              aria-label="notes job"
+            >
+              <div className="w-52 rounded-2xl border border-border bg-card p-4 nessa-text-2 text-card-foreground shadow-sm">
+                <span className="block font-medium">notes</span>
+                <GrowingNote lines={10} growth={growth} />
+              </div>
+            </WorkflowCanvasNode>
+          </WorkflowCanvasSurface>
+        </WorkflowCanvas>
+      </StoryFrame>
+    </div>
+  )
+}
+
+export const NodeWithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "A node near the bottom of a bounded canvas whose content grows in a commit the node never sees, measured with a `ResizeObserver` that never reports, as WebKit sometimes does. The node still re-clamps to stay inside the bounds, because it measures itself through the shared size observer, which also watches its content.",
+  ),
+  beforeEach: silenceResizeObserver,
+  render: () => <GrowingNodeDemo />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const node = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="workflow-canvas-node"]',
+    )!
+    await settleMeasurements(canvasElement)
+    const before = node.offsetHeight
+    await expect(readTransform(node.style.transform)?.y).toBe(180)
+    await userEvent.click(canvas.getByRole("button", { name: "Grow the node" }))
+    await waitFor(() => expect(node.offsetHeight).toBeGreaterThan(before))
+    await waitFor(() => {
+      const y = readTransform(node.style.transform)?.y ?? 0
+      expect(y + node.offsetHeight).toBeLessThanOrEqual(300.5)
+    })
+  },
+}
+
+export const NodeMountedOverhangingBounds: Story = {
+  parameters: storyDocumentation(
+    "A node placed partly past the canvas bounds is moved inside as soon as it is measured, rather than on the first drag or arrow press.",
+  ),
+  render: () => (
+    <StoryFrame className="h-[24rem]">
+      <WorkflowCanvas
+        aria-label="Overhanging node canvas"
+        bounds={{ minX: 0, minY: 0, maxX: 480, maxY: 300 }}
+      >
+        <WorkflowCanvasSurface>
+          <WorkflowCanvasNode
+            nodeId="edge"
+            defaultPosition={{ x: 450, y: 40 }}
+            aria-label="edge job"
+          >
+            <div className="w-52 rounded-2xl border border-border bg-card p-4 nessa-text-2 text-card-foreground shadow-sm">
+              edge
+            </div>
+          </WorkflowCanvasNode>
+        </WorkflowCanvasSurface>
+      </WorkflowCanvas>
+    </StoryFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    const node = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="workflow-canvas-node"]',
+    )!
+    await waitFor(() => {
+      const x = readTransform(node.style.transform)?.x ?? 0
+      expect(x + node.offsetWidth).toBeLessThanOrEqual(480.5)
     })
   },
 }

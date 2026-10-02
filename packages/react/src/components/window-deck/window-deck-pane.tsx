@@ -51,7 +51,10 @@ interface WindowDeckPaneProps
   /**
    * Whether the pane's content scrolls on its own. Turn it off when the
    * content fills the pane or manages its own scrolling, as a photograph, a
-   * message list, or a canvas does.
+   * message list, or a canvas does. In a deck with `paneHeight="auto"` the
+   * windows grow to their content, so the region only scrolls when the host
+   * caps it with `contentClassName`; there it does not contain its scroll,
+   * so a wheel over a window with nothing to scroll reaches the page.
    * @defaultValue true
    */
   scrollable?: boolean
@@ -202,6 +205,7 @@ function WindowDeckPane({
 }: WindowDeckPaneProps) {
   const {
     activePaneId,
+    autoHeight,
     dismissRequest,
     mode,
     overviewPanning,
@@ -664,7 +668,13 @@ function WindowDeckPane({
         inert={contentInert}
         className={cn(
           "min-h-0 flex-1",
-          scrollable && "overflow-y-auto overscroll-contain",
+          scrollable && "overflow-y-auto",
+          // Containing the scroll keeps a window's own scrolling from
+          // carrying on into the page. An auto-height window grows rather
+          // than scrolls, and Chromium holds a wheel inside a containing
+          // region even when it has nothing to scroll — so there the wheel
+          // is left to reach the page.
+          scrollable && !autoHeight && "overscroll-contain",
           contentClassName,
         )}
       >

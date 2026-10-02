@@ -4,6 +4,7 @@ import * as React from "react"
 import { ChevronDown } from "lucide-react"
 
 import { useComposedRefs } from "@/lib/compose"
+import { observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 interface MessageScrollerContextValue {
@@ -156,7 +157,16 @@ function MessageScrollerViewport({
     if (!viewport) return
     if (autoScroll) viewport.scrollTop = viewport.scrollHeight
     updatePinned()
-    const observer = new ResizeObserver(() => {
+    // Streamed content grows the transcript in place — text appended to a
+    // message, not a new box — which WebKit does not always report as a
+    // resize, so the shared size observer watches the content as well.
+    // The height a return was last aimed at: content reports arrive every
+    // frame a reply streams, and re-aiming a smooth scroll at an unchanged end
+    // restarts its curve without moving the target.
+    let returnTarget = -1
+    return observeSize(viewport, () => {
+      // A new return aims afresh, even at a height an earlier one reached.
+      if (!returningRef.current) returnTarget = -1
       if (viewport.scrollTop < lastScrollTopRef.current - 1) {
         // The reader moved upward between scroll events; releasing here keeps
         // a fast stream from yanking the gesture back to the bottom.
@@ -164,16 +174,16 @@ function MessageScrollerViewport({
         setPinned(false)
       } else if (autoScroll && pinnedRef.current) {
         viewport.scrollTop = viewport.scrollHeight
-      } else if (returningRef.current) {
+      } else if (
+        returningRef.current &&
+        viewport.scrollHeight !== returnTarget
+      ) {
         // Content grew mid-return: retarget the animation at the new end.
+        returnTarget = viewport.scrollHeight
         viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" })
       }
       updatePinned()
-    })
-    observer.observe(viewport)
-    const content = viewport.firstElementChild
-    if (content) observer.observe(content)
-    return () => observer.disconnect()
+    }, { boxes: (element) => [element.firstElementChild] })
   }, [autoScroll, pinnedRef, returningRef, setPinned, updatePinned, viewportRef])
 
   // The host's ref is composed rather than spread: `ref` is an ordinary

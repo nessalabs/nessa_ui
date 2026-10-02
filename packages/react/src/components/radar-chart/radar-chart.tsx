@@ -4,6 +4,7 @@
 
 import * as React from "react"
 
+import { useMeasuredSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 import {
@@ -207,29 +208,6 @@ export interface RadarChartProps
   ) => void
 }
 
-function useMeasuredBox(ref: React.RefObject<HTMLElement | null>) {
-  const [box, setBox] = React.useState<{ width: number; height: number } | null>(
-    null,
-  )
-  React.useLayoutEffect(() => {
-    const element = ref.current
-    if (!element || typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver((entries) => {
-      const rect = entries[entries.length - 1].contentRect
-      const width = Math.round(rect.width)
-      const height = Math.round(rect.height)
-      setBox((previous) =>
-        previous && previous.width === width && previous.height === height
-          ? previous
-          : { width, height },
-      )
-    })
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [ref])
-  return box
-}
-
 const OUTLINE_CLASSES = cn(
   // The outline takes the series colour as it comes: the ramp is a token per
   // theme, so it is already contrast-correct against whichever surface it
@@ -317,7 +295,7 @@ function RadarChart({
   ...props
 }: RadarChartProps) {
   const plotRef = React.useRef<HTMLDivElement>(null)
-  const box = useMeasuredBox(plotRef)
+  const box = useMeasuredSize(plotRef)
 
   const [hovered, setHovered] = React.useState<
     { kind: "series"; id: string } | { kind: "axis"; id: string } | null

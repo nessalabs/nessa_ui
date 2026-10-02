@@ -499,6 +499,19 @@
       ]
     },
     {
+      "name": "size-observer",
+      "type": "registry:lib",
+      "title": "Size observer",
+      "description": "The one place a component learns that an element's size may have changed: a box resize, a change to its content, or a web font finishing its load \u2014 the last two covering the resizes WebKit does not report \u2014 measured once per frame for a burst, and a hook that keeps an element's content-box size current through it.",
+      "files": [
+        {
+          "path": "packages/react/src/lib/size-observer.ts",
+          "type": "registry:lib",
+          "target": "lib/size-observer.ts"
+        }
+      ]
+    },
+    {
       "name": "portal-container",
       "type": "registry:lib",
       "title": "Portal container",
@@ -788,6 +801,7 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -911,8 +925,9 @@
         "lucide-react"
       ],
       "registryDependencies": [
-        "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -994,6 +1009,7 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1464,6 +1480,7 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/portal-container",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1663,6 +1680,7 @@
         "nessalabs/nessa_ui/file-drop-zone",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/portal-container",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1684,6 +1702,7 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/chat-composer",
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1798,6 +1817,7 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils",
         "nessalabs/nessa_ui/virtual-list"
       ],
@@ -1952,6 +1972,7 @@
         "nessalabs/nessa_ui/json-tree",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/portal-container",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1974,6 +1995,7 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/portal-container",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -2082,6 +2104,7 @@
         "nessalabs/nessa_ui/button",
         "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -2304,6 +2327,7 @@
       "description": "An infinite (or bounded) pan-and-zoom workflow canvas with draggable nodes that render any content, side handles for drawing connections, and edges that follow their endpoint nodes \u2014 built to stay responsive with thousands of nodes.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -2479,6 +2503,7 @@
         "nessalabs/nessa_ui/input",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/pagination",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -2511,6 +2536,7 @@
       "description": "A flow (Sankey) diagram: node bars in columns joined by ribbons whose thickness is proportional to the flow they carry. Bars take soft tints from a built-in palette (overridable per node or disableable to a neutral wash); ribbons color by source, target, or a source-to-target gradient. Four alignments (justify, left, right, center), optional d3-style barycenter iterations that reorder columns to untangle crossings, and horizontal or vertical orientation. It fills the host's box on both axes, lays out any number of stages via longest-path columns, tolerates and reports partial mid-stream data, floats host-supplied hover detail beside the pointer, and makes every ribbon a keyboard-focusable button with hover isolation and multi-selectable links.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -2538,6 +2564,7 @@
       "description": "A radar (spider) chart: values plotted along spokes radiating from one centre, one closed outline per series. Series take soft tints from a built-in palette (overridable per series, or disableable to a neutral wash) and the area wash derives from each outline's own colour. Polygon, circular, or no grid; a curve control that relaxes the polygon into a closed spline; and a scale switch between one shared maximum and per-axis normalisation, with an explicit per-axis maximum overriding both. It fills the host's box on both axes, tolerates and reports partial mid-stream data, floats host-supplied hover detail beside the pointer, makes every outline a keyboard-focusable button with hover isolation and multi-selectable series, and adds an axis probe that marks and ranks every series' reading on one spoke.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -2565,6 +2592,7 @@
       "description": "A pie or donut chart: one wedge per slice, sized to its share of the total. Slices take soft tints from a built-in palette (overridable per slice, or disableable to a neutral wash), labels sit outside on leader lines, inside the wedge, or nowhere, and a donut's centre reads the total at rest and the engaged slice while one is hovered, focused, or solely selected. A long tail can be rolled into one bucket that keeps its members reachable, the sweep can be narrowed into a gauge, and slices sort by input order or value. It fills the host's box on both axes, tolerates and reports partial mid-stream data, floats host-supplied hover detail beside the pointer, and makes every wedge a keyboard-focusable button with hover isolation and multi-selectable slices that ease out of the ring.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -2594,6 +2622,7 @@
         "nessalabs/nessa_ui/chart-geometry",
         "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -2614,6 +2643,7 @@
         "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/popover-surface",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -2795,6 +2825,7 @@
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -2845,6 +2876,7 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -2963,6 +2995,7 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/card",
         "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [

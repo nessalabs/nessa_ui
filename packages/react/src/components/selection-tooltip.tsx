@@ -8,6 +8,7 @@ import {
   useNessaLayerScope,
   usePortalContainer,
 } from "@/lib/portal-container"
+import { observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 export type SelectionTooltipSide = "top" | "bottom"
@@ -386,14 +387,11 @@ function SelectionTooltip({
   React.useLayoutEffect(() => {
     const node = rowRef.current
     if (morphing || node === null) return
-    if (typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver(() => {
+    return observeSize(node, () => {
       const width = node.getBoundingClientRect().width
       // A pill hidden via CSS resizes to 0; that must not poison the lock.
       if (width > 0) idleWidthRef.current = width
     })
-    observer.observe(node)
-    return () => observer.disconnect()
   }, [morphing])
   const composedRef = React.useCallback(
     (node: HTMLDivElement) => {
@@ -876,11 +874,9 @@ function SelectionTooltipComposeTrigger({
       )
     }
     measure()
-    if (typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver(measure)
-    observer.observe(node)
+    const stop = observeSize(node, measure)
     return () => {
-      observer.disconnect()
+      stop()
       row.style.removeProperty("--selection-tooltip-compose-start")
     }
   }, [composeTriggerRef])
@@ -1199,35 +1195,16 @@ function SelectionTooltipPanel({
     wasOpenRef.current = open
   }, [open, pill])
   // Content height rather than a fixed one: the band follows a thread that
-  // grows, an answer that streams in, a reply that wraps at a new width.
-  // WebKit does not always report the content's growth to a ResizeObserver —
-  // in CI the band stayed at its empty height (21px, its padding and rule)
-  // after a comment rendered into it (45px) — so what changes the content's
-  // height is watched directly as well: its DOM changing, and web fonts
-  // finishing their load.
+  // grows, an answer that streams in, a reply that wraps at a new width. The
+  // shared observer also catches the growth WebKit does not report as a
+  // resize — in CI the band stayed at its empty height (21px, its padding and
+  // rule) after a comment rendered into it (45px).
   React.useLayoutEffect(() => {
     const node = contentRef.current
     if (node === null) return
     const measure = () => setHeight(node.getBoundingClientRect().height)
     measure()
-    const mutations = new MutationObserver(measure)
-    mutations.observe(node, { childList: true, subtree: true, characterData: true })
-    const fonts = node.ownerDocument.fonts as FontFaceSet | undefined
-    let active = true
-    const onFonts = () => {
-      if (active) measure()
-    }
-    fonts?.addEventListener("loadingdone", onFonts)
-    void fonts?.ready.then(onFonts)
-    const resizes =
-      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure)
-    resizes?.observe(node)
-    return () => {
-      active = false
-      mutations.disconnect()
-      fonts?.removeEventListener("loadingdone", onFonts)
-      resizes?.disconnect()
-    }
+    return observeSize(node, measure)
   }, [])
   return (
     <div

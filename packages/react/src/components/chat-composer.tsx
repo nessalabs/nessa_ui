@@ -20,6 +20,7 @@ import {
   useNessaLayerScope,
   usePortalContainer,
 } from "@/lib/portal-container"
+import { observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 import {
@@ -181,18 +182,23 @@ function ChatComposer({
       setChromeHeight(Math.ceil(shell + gaps + chrome))
     }
     measure()
-    if (typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver(measure)
-    const observeRows = () => {
-      observer.disconnect()
-      observer.observe(form)
-      Array.from(form.children).forEach((child) => observer.observe(child))
-      measure()
-    }
-    observeRows()
-    const mutations = new MutationObserver(observeRows)
-    mutations.observe(form, { childList: true })
-    return () => { observer.disconnect(); mutations.disconnect() }
+    // Each row is followed as well as the form: a row can grow (controls
+    // wrapping, an attachment arriving) while the capped form holds its size.
+    // The input's own row is left out of the chrome, so what changes inside
+    // it — the draft, the height the textarea sets itself — is not watched,
+    // nor is the input itself when it is a row of its own. Another row's own
+    // margins and position still count.
+    return observeSize(form, measure, {
+      boxes: (element) => Array.from(element.children),
+      ignoreMutation: (record) =>
+        record.target === input ||
+        Array.from(form.children).some(
+          (row) =>
+            row !== record.target &&
+            row.contains(input) &&
+            row.contains(record.target),
+        ),
+    })
   }, [inputAdapter, effectiveMaxHeight])
 
   const context = React.useMemo(
@@ -445,14 +451,23 @@ function ChatComposerInput({
       textarea.scrollHeight > textarea.clientHeight ? "auto" : "hidden"
   }, [maxHeight])
 
+  React.useLayoutEffect(resize, [
+    composerMaxHeight,
+    props.value,
+    props.defaultValue,
+    resize,
+  ])
+
+  // Subscribed once, not per keystroke: the draft's own changes resize
+  // through the effect above, and the observer covers what React never sees.
   React.useLayoutEffect(() => {
-    resize()
     const textarea = localRef.current
-    if (!textarea || typeof ResizeObserver === "undefined") return
+    if (!textarea) return
     let previousWidth = textarea.getBoundingClientRect().width
-    const observer = new ResizeObserver(() => {
+    return observeSize(textarea, (changes) => {
       const nextWidth = textarea.getBoundingClientRect().width
-      if (nextWidth !== previousWidth) {
+      // A new width rewraps the text, and so does a web font landing.
+      if (nextWidth !== previousWidth || changes.has("fonts")) {
         previousWidth = nextWidth
         resize()
         return
@@ -465,9 +480,7 @@ function ChatComposerInput({
         textarea.style.overflowY = nextOverflow
       }
     })
-    observer.observe(textarea)
-    return () => observer.disconnect()
-  }, [composerMaxHeight, props.value, props.defaultValue, resize])
+  }, [resize])
 
   return (
     <textarea

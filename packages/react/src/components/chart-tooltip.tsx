@@ -11,6 +11,7 @@ import {
   type ChartTooltipSide,
 } from "@/lib/chart-geometry"
 import { useComposedRefs } from "@/lib/compose"
+import { changesOnlyStyle, observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 import { PopoverSurface } from "./popover-surface"
@@ -176,22 +177,30 @@ function ChartTooltip({
     const ownerDocument = card.ownerDocument
     const view = ownerDocument.defaultView
     const replace = () => placeRef.current()
-    const observer =
-      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(replace)
-    observer?.observe(card)
-    if (card.offsetParent) observer?.observe(card.offsetParent)
     const boundaryElement =
       observedBoundary && isRefObject(observedBoundary)
         ? observedBoundary.current
         : observedBoundary
-    if (boundaryElement) observer?.observe(boundaryElement)
+    // The card's own size follows its content and fonts as well as its box,
+    // so the shared size observer watches it, with the wrapper and the
+    // boundary followed for their resizes.
+    const stopObserving = observeSize(card, replace, {
+      boxes: (element) => [
+        (element as HTMLElement).offsetParent,
+        boundaryElement,
+      ],
+      // Where the card was placed, rewritten as the pointer moves, cannot
+      // change its size; the rest of its style can.
+      ignoreMutation: (record) =>
+        record.target === card && changesOnlyStyle(record, ["left", "top", "inset"]),
+    })
     ownerDocument.addEventListener("scroll", replace, {
       capture: true,
       passive: true,
     })
     view?.addEventListener("resize", replace)
     return () => {
-      observer?.disconnect()
+      stopObserving()
       ownerDocument.removeEventListener("scroll", replace, { capture: true })
       view?.removeEventListener("resize", replace)
     }

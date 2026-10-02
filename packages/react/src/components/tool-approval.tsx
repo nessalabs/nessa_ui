@@ -9,6 +9,7 @@ import {
   useNessaLayerScope,
   usePortalContainer,
 } from "@/lib/portal-container"
+import { observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 import { Button, type ButtonProps } from "./button"
 import { JsonTree } from "./json-tree"
@@ -551,16 +552,15 @@ function ToolApprovalCommand({
     setScrollable(element.scrollHeight - element.clientHeight > 1)
   }, [])
   // Hosts swap payloads without remounting, so overflow is re-measured after
-  // every commit; the observer covers non-React resizes.
+  // every commit; the size observer covers what changes it without one — a
+  // resize, content changed outside React, a web font landing.
   React.useEffect(() => {
     updateScrollable()
   })
   React.useEffect(() => {
     const element = ref.current
-    if (!element || typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver(updateScrollable)
-    observer.observe(element)
-    return () => observer.disconnect()
+    if (!element) return
+    return observeSize(element, updateScrollable)
   }, [updateScrollable])
   const structured = React.useMemo(
     () => (json === undefined ? undefined : parseJsonPayload(json)),

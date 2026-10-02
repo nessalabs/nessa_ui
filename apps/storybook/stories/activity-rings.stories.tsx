@@ -9,6 +9,11 @@ import {
   type ActivityRing,
 } from "@nessalabs/ui"
 
+import {
+  WidenableFrame,
+  expectFollowsFrame,
+  silenceResizeObserver,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -458,5 +463,28 @@ export const AnyFigure: Story = {
       '[data-slot="activity-rings-card-legend"]',
     )
     await expect(legend?.textContent).toContain("19/30 MIN")
+  },
+}
+
+/**
+ * The chart's frame widened with a `ResizeObserver` that never reports, which
+ * is what WebKit does to some resizes. The rings still redraws at the new
+ * width once a web font lands, because the chart measures through the shared
+ * size observer.
+ */
+export const WithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "The chart measured with a `ResizeObserver` that never reports, as WebKit sometimes does. It still draws at its box's size, and when its frame widens it redraws at the new width once a web font finishes loading, because the chart measures through the shared size observer rather than a bare `ResizeObserver`.",
+  ),
+  args: ClosingRings.args,
+  beforeEach: silenceResizeObserver,
+  render: (args) => (
+    <WidenableFrame className="h-[280px]">
+      <ActivityRings {...args} aria-label="Today's activity" />
+    </WidenableFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    await expectFollowsFrame(canvasElement)
   },
 }

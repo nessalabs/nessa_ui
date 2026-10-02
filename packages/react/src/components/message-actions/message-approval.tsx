@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Check, LoaderCircle, TriangleAlert, X } from "lucide-react"
 
+import { observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 import { Button } from "../button"
 import { builtInChannelMark } from "./channel-marks"
@@ -64,10 +65,8 @@ function useOverflowing(ref: React.RefObject<HTMLElement | null>) {
   React.useEffect(measure)
   React.useEffect(() => {
     const element = ref.current
-    if (!element || typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver(measure)
-    observer.observe(element)
-    return () => observer.disconnect()
+    if (!element) return
+    return observeSize(element, measure)
   }, [measure, ref])
   return overflowing
 }
@@ -216,18 +215,18 @@ function MessageApproval({
   React.useLayoutEffect(resize, [resize, draft, editable])
   React.useEffect(() => {
     const textarea = textareaRef.current
-    if (!textarea || typeof ResizeObserver === "undefined") return
-    // Width changes rewrap the text and change how tall it wants to be; the
-    // observer covers container resizes React never sees.
+    if (!textarea) return
+    // Width changes rewrap the text and change how tall it wants to be, and
+    // so does a web font landing; the size observer covers both where React
+    // never sees them. Anything else — the height this sets, the draft's own
+    // layout effect writing it — is not a reason to measure again.
     let width = textarea.getBoundingClientRect().width
-    const observer = new ResizeObserver(() => {
+    return observeSize(textarea, (changes) => {
       const next = textarea.getBoundingClientRect().width
-      if (next === width) return
+      if (!changes.has("fonts") && next === width) return
       width = next
       resize()
     })
-    observer.observe(textarea)
-    return () => observer.disconnect()
   }, [resize, editable])
 
   const resolved = resolvedStatuses.has(status)

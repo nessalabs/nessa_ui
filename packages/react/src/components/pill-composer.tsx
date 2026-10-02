@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Maximize2, Minimize2 } from "lucide-react"
 
+import { observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 import {
@@ -386,10 +387,7 @@ function PillComposer({
       setCanExpand(lines > 2.5)
     }
     measure()
-    if (typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver(measure)
-    observer.observe(input)
-    return () => observer.disconnect()
+    return observeSize(input, measure)
   }, [inputAdapter])
 
   // The pill reads as `constrained` so ChatComposerInput drops its min-height

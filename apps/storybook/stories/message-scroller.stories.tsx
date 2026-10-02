@@ -2,6 +2,7 @@ import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, userEvent, waitFor, within } from "storybook/test"
 import {
+  Button,
   Message,
   MessageAvatar,
   MessageBubble,
@@ -14,6 +15,12 @@ import {
   MessageStreamText,
 } from "@nessalabs/ui"
 
+import {
+  GrowingNote,
+  createGrowthSwitch,
+  settleMeasurements,
+  silenceResizeObserver,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
 interface Turn {
@@ -123,7 +130,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A stick-to-bottom transcript scroller for streamed conversations. MessageScroller owns the live-edge state and exposes it as data-pinned; MessageScrollerViewport opens scrolled to the end and follows content growth with a ResizeObserver while the reader stays within a few pixels of the bottom — any scroll away releases the follow so the transcript never moves underneath someone rereading, and returning to the bottom re-pins it. MessageScrollerContent is a polite log live region (hosts supply the accessible name), and MessageScrollerButton floats over the bottom edge, appearing only while unpinned, to smooth-scroll the reader back to the newest content. Hosts can read the same state through useMessageScroller, and autoScroll={false} turns the viewport into a plain scroll region.",
+          "A stick-to-bottom transcript scroller for streamed conversations. MessageScroller owns the live-edge state and exposes it as data-pinned; MessageScrollerViewport opens scrolled to the end and follows content growth through the shared size observer while the reader stays within a few pixels of the bottom — any scroll away releases the follow so the transcript never moves underneath someone rereading, and returning to the bottom re-pins it. MessageScrollerContent is a polite log live region (hosts supply the accessible name), and MessageScrollerButton floats over the bottom edge, appearing only while unpinned, to smooth-scroll the reader back to the newest content. Hosts can read the same state through useMessageScroller, and autoScroll={false} turns the viewport into a plain scroll region.",
       },
     },
   },
@@ -246,5 +253,63 @@ export const ManualBrowse: Story = {
       { timeout: 3000 },
     )
     await expect(hiddenButton).toHaveAttribute("data-visible", "false")
+  },
+}
+
+/**
+ * A pinned transcript whose last message grows on a switch outside the
+ * scroller, so the scroller sees no render of its own and no pointer moves
+ * its viewport.
+ */
+function GrowingTranscript() {
+  const [growth] = React.useState(createGrowthSwitch)
+  return (
+    <div className="grid gap-3">
+      <div>
+        <Button variant="outline" onClick={() => growth.open()}>
+          Grow the last message
+        </Button>
+      </div>
+      <ScrollerFrame>
+        <MessageScroller className="h-80">
+          <MessageScrollerViewport className="px-1">
+            <MessageScrollerContent aria-label="Conversation">
+              {seededTurns.map((turn) => (
+                <TranscriptTurn key={turn.id} turn={turn} />
+              ))}
+              <Message from="assistant">
+                <MessageContent className="max-w-full">
+                  <MessageBubble variant="plain">
+                    Still writing. <GrowingNote lines={16} growth={growth} />
+                  </MessageBubble>
+                </MessageContent>
+              </Message>
+            </MessageScrollerContent>
+          </MessageScrollerViewport>
+          <MessageScrollerButton />
+        </MessageScroller>
+      </ScrollerFrame>
+    </div>
+  )
+}
+
+export const WithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "A pinned transcript whose last message grows in a commit the scroller never sees, measured with a `ResizeObserver` that never reports, as WebKit sometimes does. The viewport still follows the growth to the live edge, because it watches its content through the shared size observer.",
+  ),
+  beforeEach: silenceResizeObserver,
+  render: () => <GrowingTranscript />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const viewport = viewportOf(canvasElement)
+    await waitFor(() => expect(distanceFromEnd(viewport)).toBeLessThanOrEqual(2))
+    await settleMeasurements(canvasElement)
+    const before = viewport.scrollHeight
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Grow the last message" }),
+    )
+    await waitFor(() => expect(viewport.scrollHeight).toBeGreaterThan(before))
+    await waitFor(() => expect(distanceFromEnd(viewport)).toBeLessThanOrEqual(2))
   },
 }

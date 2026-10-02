@@ -4,6 +4,7 @@
 
 import * as React from "react"
 
+import { useMeasuredSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 import {
@@ -178,29 +179,6 @@ function linkIdOf(link: FlowChartLink): string {
   return link.id ?? `${link.source}→${link.target}`
 }
 
-function useMeasuredBox(ref: React.RefObject<HTMLElement | null>) {
-  const [box, setBox] = React.useState<{ width: number; height: number } | null>(
-    null,
-  )
-  React.useLayoutEffect(() => {
-    const element = ref.current
-    if (!element || typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver((entries) => {
-      const rect = entries[entries.length - 1].contentRect
-      const width = Math.round(rect.width)
-      const height = Math.round(rect.height)
-      setBox((previous) =>
-        previous && previous.width === width && previous.height === height
-          ? previous
-          : { width, height },
-      )
-    })
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [ref])
-  return box
-}
-
 const RIBBON_CLASSES = cn(
   "cursor-pointer fill-[var(--nessa-flow-chart-color,var(--muted-foreground))] opacity-15 outline-none",
   // `d` is a transitionable presentation attribute, so streamed data
@@ -271,7 +249,7 @@ function FlowChart({
   ...props
 }: FlowChartProps) {
   const plotRef = React.useRef<HTMLDivElement>(null)
-  const box = useMeasuredBox(plotRef)
+  const box = useMeasuredSize(plotRef)
 
   const [hovered, setHovered] = React.useState<
     { kind: "link"; id: string } | { kind: "node"; id: string } | null

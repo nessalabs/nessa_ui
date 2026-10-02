@@ -14,6 +14,7 @@ import {
   TaskList,
   TaskListItem,
   WindowDeck,
+  cn,
   WindowDeckPane,
   PaneSplitDirection,
   createAppShellLayout,
@@ -26,6 +27,11 @@ import {
   PanelsTopLeft,
 } from "lucide-react"
 
+import {
+  frames,
+  settleMeasurements,
+  silenceResizeObserver,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -1229,5 +1235,623 @@ export const PreviewStrip: Story = {
     await userEvent.keyboard("{Escape}")
     await waitFor(() => expect(deck).toHaveAttribute("data-mode", "carousel"))
     await waitFor(() => expect(deck.querySelector("[data-settling]")).toBeNull())
+  },
+}
+
+/** Notes the reader expands and collapses inside the live window. */
+function ExpandableNotes() {
+  const [open, setOpen] = React.useState(false)
+  return (
+    <div className="flex flex-col items-start gap-2 p-4 nessa-text-3">
+      <Button variant="outline" size="sm" onClick={() => setOpen((value) => !value)}>
+        {open ? "Show less" : "Show more"}
+      </Button>
+      {open
+        ? Array.from({ length: 12 }, (_, index) => (
+            <p key={index} className="m-0">
+              Note line {index + 1}
+            </p>
+          ))
+        : null}
+    </div>
+  )
+}
+
+/** An auto-height deck whose live window holds {@link ExpandableNotes}. */
+function AutoHeightDeck() {
+  return (
+    <div className="h-[720px] w-full bg-background">
+      <WindowDeck paneHeight="auto" defaultActivePane="notes">
+        <WindowDeckPane id="notes" label="Notes">
+          <ExpandableNotes />
+        </WindowDeckPane>
+        <WindowDeckPane id="later" label="Later">
+          <p className="p-4 nessa-text-3">Nothing here yet.</p>
+        </WindowDeckPane>
+      </WindowDeck>
+    </div>
+  )
+}
+
+/** The deck's pane height, as the variable every frame is sized by. */
+function deckPaneHeight(canvasElement: HTMLElement) {
+  const deck = canvasElement.querySelector<HTMLElement>(
+    '[data-slot="window-deck"]',
+  )!
+  return (
+    Number.parseFloat(
+      deck.style.getPropertyValue("--nessa-window-deck-pane-height"),
+    ) || 0
+  )
+}
+
+/** The live window's own box. */
+function livePane(canvasElement: HTMLElement) {
+  return canvasElement.querySelector<HTMLElement>(
+    '[data-slot="window-deck-pane"]',
+  )!
+}
+
+/**
+ * Counts the times the deck lifts its size on the live window to read the
+ * window's natural height exactly — the expensive read — until the deck's
+ * height first changes. Returns a function that stops counting and gives
+ * the count at that change: the lifts it took to find the new height. A
+ * lift after it, confirming the height, is by design and not counted.
+ */
+function countLiftsUntilHeightChanges(canvasElement: HTMLElement) {
+  const deck = canvasElement.querySelector<HTMLElement>(
+    '[data-slot="window-deck"]',
+  )!
+  const start = deckPaneHeight(canvasElement)
+  let lifts = 0
+  let found: number | null = null
+  const panes = new MutationObserver((records) => {
+    for (const record of records) {
+      if (record.oldValue?.includes("--nessa-window-deck-pane-height")) lifts += 1
+    }
+  })
+  panes.observe(livePane(canvasElement), {
+    attributes: true,
+    attributeFilter: ["style"],
+    attributeOldValue: true,
+  })
+  const decks = new MutationObserver(() => {
+    if (found === null && deckPaneHeight(canvasElement) !== start) {
+      // Lifts queued with the change happened before it was committed.
+      for (const record of panes.takeRecords()) {
+        if (record.oldValue?.includes("--nessa-window-deck-pane-height")) lifts += 1
+      }
+      found = lifts
+    }
+  })
+  decks.observe(deck, { attributes: true, attributeFilter: ["style"] })
+  return () => {
+    panes.disconnect()
+    decks.disconnect()
+    return found
+  }
+}
+
+async function playAutoHeight(canvasElement: HTMLElement) {
+  const canvas = within(canvasElement)
+  await waitFor(() => expect(deckPaneHeight(canvasElement)).toBeGreaterThan(0))
+  await settleMeasurements(canvasElement)
+  const collapsed = deckPaneHeight(canvasElement)
+  const stopCounting = countLiftsUntilHeightChanges(canvasElement)
+
+  // Content that grows takes the window with it, rather than overflowing a
+  // window pinned to the height it first measured.
+  await userEvent.click(canvas.getByRole("button", { name: "Show more" }))
+  await waitFor(() => {
+    expect(deckPaneHeight(canvasElement)).toBeGreaterThan(collapsed + 100)
+    expect(livePane(canvasElement).offsetHeight).toBe(
+      deckPaneHeight(canvasElement),
+    )
+  })
+  // Growth was found from the content's overflow alone: the pane was not
+  // lifted and laid out again before the deck took the new height. (One lift
+  // may follow, confirming it; a shrink is lifted, since inside a body that
+  // fills the window only a fresh layout can show it.)
+  await expect(stopCounting()).toBe(0)
+
+  // And content that shrinks brings it back.
+  await userEvent.click(canvas.getByRole("button", { name: "Show less" }))
+  await waitFor(() =>
+    expect(deckPaneHeight(canvasElement)).toBe(collapsed),
+  )
+
+}
+
+export const AutoHeightFollowsContent: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "With `paneHeight=\"auto\"` the windows take the live window's content height, and keep following it: notes expanded inside the window grow the deck, and collapsing them shrinks it back. The window's own box is sized by that height, so it is measured with the size lifted rather than read back as it stands.",
+  ),
+  render: () => <AutoHeightDeck />,
+  play: async ({ canvasElement }) => playAutoHeight(canvasElement),
+}
+
+export const AutoHeightWithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "The same auto-height deck with a `ResizeObserver` that never reports, as WebKit sometimes does. The deck still follows the live window's content as it grows and shrinks, because it measures the window through the shared size observer, which also watches its content.",
+  ),
+  beforeEach: silenceResizeObserver,
+  render: () => <AutoHeightDeck />,
+  play: async ({ canvasElement }) => playAutoHeight(canvasElement),
+}
+
+export const AutoHeightKeepsAHostHeight: Story = {
+  parameters: storyDocumentation(
+    "An auto-height deck whose live window the host sizes with a class. Measuring the window's natural height lifts only the deck's own size, so the host's height still wins and every window takes it.",
+  ),
+  render: () => (
+    <div className="h-[720px] w-full bg-background">
+      <WindowDeck paneHeight="auto" defaultActivePane="notes">
+        <WindowDeckPane id="notes" label="Notes" className="h-96">
+          <p className="p-4 nessa-text-3">A short note in a tall window.</p>
+        </WindowDeckPane>
+        <WindowDeckPane id="later" label="Later">
+          <p className="p-4 nessa-text-3">Nothing here yet.</p>
+        </WindowDeckPane>
+      </WindowDeck>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    await waitFor(() => expect(deckPaneHeight(canvasElement)).toBe(384))
+    await settleMeasurements(canvasElement)
+    await expect(deckPaneHeight(canvasElement)).toBe(384)
+    await expect(livePane(canvasElement).offsetHeight).toBe(384)
+  },
+}
+
+export const AutoHeightFollowsAnimatedContent: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "An auto-height deck whose live window holds a block that grows by animation, with no change to the DOM at all, as an image taking its natural size would. The window's own box is pinned by the deck's height, so the deck follows the boxes inside it that are not, and takes the new height; content that settles with an event — an image loading, a transition ending — is caught by that event as well.",
+  ),
+  render: () => (
+    <div className="h-[720px] w-full bg-background">
+      <WindowDeck paneHeight="auto" defaultActivePane="figure">
+        <WindowDeckPane id="figure" label="Figure">
+          <div data-testid="figure" className="h-10 bg-muted" />
+        </WindowDeckPane>
+        <WindowDeckPane id="later" label="Later">
+          <p className="p-4 nessa-text-3">Nothing here yet.</p>
+        </WindowDeckPane>
+      </WindowDeck>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await waitFor(() => expect(deckPaneHeight(canvasElement)).toBeGreaterThan(0))
+    await settleMeasurements(canvasElement)
+    const collapsed = deckPaneHeight(canvasElement)
+    const figure = canvas.getByTestId("figure")
+    // Grows the block without touching the DOM: no attribute, child or text
+    // changes, only its laid-out height.
+    const growth = figure.animate([{ height: "40px" }, { height: "240px" }], {
+      duration: 1,
+      fill: "forwards",
+    })
+    await growth.finished
+    await waitFor(() =>
+      expect(deckPaneHeight(canvasElement)).toBeGreaterThanOrEqual(
+        collapsed + 200,
+      ),
+    )
+    // Nothing is left running. Cancelling fires no DOM event, so whether the
+    // deck follows the block back down is up to the engine's ResizeObserver
+    // and is not asserted here.
+    growth.cancel()
+  },
+}
+
+/** A block in the live window that grows by a CSS height transition. */
+function TransitioningBlock() {
+  const [tall, setTall] = React.useState(false)
+  return (
+    <div className="flex flex-col items-start gap-2 p-4">
+      <Button variant="outline" size="sm" onClick={() => setTall(true)}>
+        Grow the block
+      </Button>
+      <div
+        data-testid="block"
+        className={cn(
+          "w-full bg-muted transition-[height] duration-300 ease-linear",
+          tall ? "h-60" : "h-10",
+        )}
+      />
+    </div>
+  )
+}
+
+export const AutoHeightAfterATransitionWithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "A block in an auto-height deck's live window grows by a CSS transition, with a `ResizeObserver` that never reports. The class change that starts the transition is measured at once, while the block is still short; nothing in the DOM changes as it grows. The deck takes the final height when the transition ends, because the shared size observer treats a transition coming to rest as a content change.",
+  ),
+  beforeEach: silenceResizeObserver,
+  render: () => (
+    <div className="h-[720px] w-full bg-background">
+      <WindowDeck paneHeight="auto" defaultActivePane="block">
+        <WindowDeckPane id="block" label="Block">
+          <TransitioningBlock />
+        </WindowDeckPane>
+        <WindowDeckPane id="later" label="Later">
+          <p className="p-4 nessa-text-3">Nothing here yet.</p>
+        </WindowDeckPane>
+      </WindowDeck>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await waitFor(() => expect(deckPaneHeight(canvasElement)).toBeGreaterThan(0))
+    await settleMeasurements(canvasElement)
+    const short = deckPaneHeight(canvasElement)
+    const block = canvas.getByTestId("block")
+    const ended = new Promise<void>((resolve) =>
+      block.addEventListener("transitionend", () => resolve(), { once: true }),
+    )
+    await userEvent.click(canvas.getByRole("button", { name: "Grow the block" }))
+    await ended
+    await expect(block.offsetHeight).toBe(240)
+    await waitFor(() =>
+      expect(deckPaneHeight(canvasElement)).toBe(short + 200),
+    )
+  },
+}
+
+/**
+ * A row that can show a badge hanging below it, positioned out of flow, and
+ * a fixed-height row whose text can spill past it: overflow that is not the
+ * window's content and must not size the deck.
+ */
+function OverhangingRows() {
+  const [badge, setBadge] = React.useState(false)
+  const [spill, setSpill] = React.useState(false)
+  return (
+    <div className="flex flex-col items-start gap-2 p-4 nessa-text-3">
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" onClick={() => setBadge(true)}>
+          Show the badge
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setSpill(true)}>
+          Spill the row
+        </Button>
+      </div>
+      <div className="relative h-5 w-full">
+        Last message
+        {badge ? (
+          <span className="absolute left-0 top-full h-10 rounded-md bg-muted px-2">
+            Reactions
+          </span>
+        ) : null}
+      </div>
+      <div className="h-5 w-full">
+        {spill
+          ? Array.from({ length: 4 }, (_, index) => (
+              <p key={index} className="m-0">
+                Spilled line {index + 1}
+              </p>
+            ))
+          : null}
+      </div>
+    </div>
+  )
+}
+
+export const AutoHeightHoldsStillOverOverhangs: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "Overflow that is not the window's content — a badge positioned below the last row, text spilling past a fixed-height row — does not size an auto-height deck, and does not set it alternating between two heights: the deck settles on one height and holds it.",
+  ),
+  render: () => (
+    <div className="h-[720px] w-full bg-background">
+      <WindowDeck paneHeight="auto" defaultActivePane="rows">
+        <WindowDeckPane id="rows" label="Rows">
+          <OverhangingRows />
+        </WindowDeckPane>
+        <WindowDeckPane id="later" label="Later">
+          <p className="p-4 nessa-text-3">Nothing here yet.</p>
+        </WindowDeckPane>
+      </WindowDeck>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await waitFor(() => expect(deckPaneHeight(canvasElement)).toBeGreaterThan(0))
+    await settleMeasurements(canvasElement)
+
+    for (const name of ["Show the badge", "Spill the row"]) {
+      const before = deckPaneHeight(canvasElement)
+      await userEvent.click(canvas.getByRole("button", { name }))
+      await frames(4)
+      // The overhang does not size the deck: every frame keeps the height
+      // it had, rather than jumping, or taking turns between two readings.
+      const heights: number[] = []
+      for (let index = 0; index < 8; index += 1) {
+        await frames(1)
+        heights.push(deckPaneHeight(canvasElement))
+      }
+      await expect(heights).toEqual(heights.map(() => before))
+    }
+  },
+}
+
+export const AutoHeightHonoursACappedContentRegion: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "An auto-height deck whose live window caps its content region with `contentClassName`. Notes that outgrow the cap scroll inside the region; the window takes the capped height and holds it, rather than growing by the overflow on every measurement.",
+  ),
+  render: () => (
+    <div className="h-[720px] w-full bg-background">
+      <WindowDeck paneHeight="auto" defaultActivePane="notes">
+        <WindowDeckPane id="notes" label="Notes" contentClassName="max-h-40">
+          <ExpandableNotes />
+        </WindowDeckPane>
+        <WindowDeckPane id="later" label="Later">
+          <p className="p-4 nessa-text-3">Nothing here yet.</p>
+        </WindowDeckPane>
+      </WindowDeck>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await waitFor(() => expect(deckPaneHeight(canvasElement)).toBeGreaterThan(0))
+    await settleMeasurements(canvasElement)
+    await userEvent.click(canvas.getByRole("button", { name: "Show more" }))
+    await frames(6)
+    const heights: number[] = []
+    for (let index = 0; index < 8; index += 1) {
+      await frames(1)
+      heights.push(deckPaneHeight(canvasElement))
+    }
+    // Held at the cap, not climbing by the overflow frame after frame.
+    await expect(new Set(heights).size).toBe(1)
+    await expect(heights[0]).toBeLessThanOrEqual(162)
+    // And the notes past the cap scroll inside the region, by default.
+    const region = livePane(canvasElement).querySelector<HTMLElement>(
+      '[data-slot="window-deck-pane-content"]',
+    )!
+    await expect(getComputedStyle(region).overflowY).toBe("auto")
+    await expect(region.scrollHeight).toBeGreaterThan(region.clientHeight)
+  },
+}
+
+/** Two short windows in a deck of the given height mode. */
+function WheelDeck({
+  paneHeight,
+  wheelNavigation,
+  testId,
+}: {
+  paneHeight?: string
+  wheelNavigation?: boolean
+  testId: string
+}) {
+  return (
+    <div className="h-[360px] w-full bg-background" data-testid={testId}>
+      <WindowDeck
+        paneHeight={paneHeight}
+        wheelNavigation={wheelNavigation}
+        defaultActivePane="first"
+      >
+        <WindowDeckPane id="first" label="First">
+          <p className="p-4 nessa-text-3">The first window.</p>
+        </WindowDeckPane>
+        <WindowDeckPane id="second" label="Second">
+          <p className="p-4 nessa-text-3">The second window.</p>
+        </WindowDeckPane>
+      </WindowDeck>
+    </div>
+  )
+}
+
+export const WheelNavigationByHeight: Story = {
+  parameters: storyDocumentation(
+    "A vertical wheel over a fixed-height deck moves the carousel to the next window. Over an auto-height deck it does not, and it reaches the page: that deck sits in the page's flow and its windows grow rather than scroll, so their content regions do not contain the wheel. An auto-height deck that passes `wheelNavigation` takes the wheel as a fixed one does.",
+  ),
+  render: () => (
+    <div className="flex flex-col gap-6">
+      <WheelDeck testId="fixed" />
+      <WheelDeck testId="auto" paneHeight="auto" />
+      <WheelDeck testId="auto-opted-in" paneHeight="auto" wheelNavigation />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const viewportOf = (testId: string) =>
+      canvas
+        .getByTestId(testId)
+        .querySelector<HTMLElement>('[data-slot="window-deck-viewport"]')!
+    const wheel = (testId: string) => {
+      const viewport = viewportOf(testId)
+      const pane = viewport.querySelector<HTMLElement>(
+        '[data-slot="window-deck-pane"]',
+      )!
+      pane.dispatchEvent(
+        new WheelEvent("wheel", { deltaY: 240, bubbles: true, cancelable: true }),
+      )
+    }
+
+    const activeLabel = (testId: string) =>
+      canvas
+        .getByTestId(testId)
+        .querySelector<HTMLElement>('[data-slot="window-deck-pane"][data-active]')
+        ?.getAttribute("aria-label")
+    // Settled on the second window, not merely moved.
+    const expectSecond = async (testId: string) => {
+      await waitFor(() => expect(activeLabel(testId)).toMatch(/Second/))
+      const viewport = viewportOf(testId)
+      let last = -1
+      await waitFor(() => {
+        const now = viewport.scrollLeft
+        const settled = now === last
+        last = now
+        expect(settled).toBe(true)
+      })
+    }
+
+    // A fixed-height deck takes the wheel as "next window".
+    wheel("fixed")
+    await expectSecond("fixed")
+
+    // An auto-height deck leaves it alone...
+    const auto = viewportOf("auto")
+    const autoStart = auto.scrollLeft
+    wheel("auto")
+    await frames(2)
+    await expect(auto.scrollLeft).toBe(autoStart)
+    await expect(activeLabel("auto")).toMatch(/First/)
+
+    // ...unless the host asks for it.
+    wheel("auto-opted-in")
+    await expectSecond("auto-opted-in")
+
+    // Nor does an auto-height window hold the wheel back from the page: its
+    // content region still scrolls when capped, but does not contain its
+    // scroll — Chromium keeps a wheel inside a containing region even with
+    // nothing to scroll. A fixed-height window still contains its own.
+    const contentOf = (testId: string) =>
+      viewportOf(testId).querySelector<HTMLElement>(
+        '[data-slot="window-deck-pane-content"]',
+      )!
+    await expect(getComputedStyle(contentOf("auto")).overflowY).toBe("auto")
+    await expect(getComputedStyle(contentOf("auto")).overscrollBehaviorY).toBe(
+      "auto",
+    )
+    await expect(getComputedStyle(contentOf("fixed")).overscrollBehaviorY).toBe(
+      "contain",
+    )
+  },
+}
+
+/** A window whose host can empty it entirely, with no chrome to keep it open. */
+function EmptiableDeck({
+  contentClassName,
+  tall = false,
+}: {
+  contentClassName?: string
+  /** Fill the window with a 300px note rather than a line of text. */
+  tall?: boolean
+}) {
+  const [empty, setEmpty] = React.useState(false)
+  return (
+    <div className="flex flex-col items-start gap-3">
+      <Button variant="outline" onClick={() => setEmpty(true)}>
+        Empty the window
+      </Button>
+      <div className="h-[360px] w-full bg-background">
+        <WindowDeck paneHeight="auto" defaultActivePane="notes">
+          <WindowDeckPane
+            id="notes"
+            label="Notes"
+            chrome={false}
+            contentClassName={contentClassName}
+          >
+            {empty ? null : tall ? (
+              <div className="h-[300px] bg-muted" />
+            ) : (
+              <p className="m-0 p-4 nessa-text-3">A note.</p>
+            )}
+          </WindowDeckPane>
+          <WindowDeckPane id="later" label="Later">
+            <p className="p-4 nessa-text-3">Nothing here yet.</p>
+          </WindowDeckPane>
+        </WindowDeck>
+      </div>
+    </div>
+  )
+}
+
+export const AutoHeightCollapsesWhenEmptied: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "An auto-height window without chrome whose host empties it: its natural height is zero, and the deck collapses to it rather than keeping the height the content had.",
+  ),
+  render: () => <EmptiableDeck />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await waitFor(() => expect(deckPaneHeight(canvasElement)).toBeGreaterThan(0))
+    await settleMeasurements(canvasElement)
+    await userEvent.click(canvas.getByRole("button", { name: "Empty the window" }))
+    await waitFor(() => expect(deckPaneHeight(canvasElement)).toBe(0))
+    await expect(livePane(canvasElement).offsetHeight).toBe(0)
+  },
+}
+
+export const AutoHeightHonoursAFixedContentRegion: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "An auto-height deck whose live window gives its content region a fixed height of its own, with no max-height. Notes that outgrow it scroll inside the region, and the window holds its height rather than growing by the overflow on every measurement.",
+  ),
+  render: () => (
+    <div className="h-[720px] w-full bg-background">
+      <WindowDeck paneHeight="auto" defaultActivePane="notes">
+        <WindowDeckPane id="notes" label="Notes" contentClassName="flex-none h-40">
+          <ExpandableNotes />
+        </WindowDeckPane>
+        <WindowDeckPane id="later" label="Later">
+          <p className="p-4 nessa-text-3">Nothing here yet.</p>
+        </WindowDeckPane>
+      </WindowDeck>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await waitFor(() => expect(deckPaneHeight(canvasElement)).toBeGreaterThan(0))
+    await settleMeasurements(canvasElement)
+    const before = deckPaneHeight(canvasElement)
+    await userEvent.click(canvas.getByRole("button", { name: "Show more" }))
+    // Sampled from the click on, so a single frame at a wrong height fails.
+    const heights: number[] = []
+    for (let index = 0; index < 12; index += 1) {
+      await frames(1)
+      heights.push(deckPaneHeight(canvasElement))
+    }
+    await expect(heights).toEqual(heights.map(() => before))
+  },
+}
+
+export const AutoHeightKeepsARegionSizeWhenEmptied: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "Emptied auto-height windows. A region the host gave a minimum height keeps that minimum, whether its content was shorter or taller than it. A region with a fixed height it does not flex from keeps that height. A region that merely does not flex, with no size of its own, is sized by its content and collapses with it.",
+  ),
+  render: () => (
+    <div className="flex flex-col gap-6">
+      <div data-testid="minimum">
+        <EmptiableDeck contentClassName="min-h-40" />
+      </div>
+      <div data-testid="minimum-outgrown">
+        <EmptiableDeck contentClassName="min-h-40" tall />
+      </div>
+      <div data-testid="fixed">
+        <EmptiableDeck contentClassName="flex-none h-40" />
+      </div>
+      <div data-testid="unflexed">
+        <EmptiableDeck contentClassName="flex-none" tall />
+      </div>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const cases = [
+      { testId: "minimum", before: 160, after: 160 },
+      { testId: "minimum-outgrown", before: 300, after: 160 },
+      { testId: "fixed", before: 160, after: 160 },
+      { testId: "unflexed", before: 300, after: 0 },
+    ]
+    for (const { testId, before, after } of cases) {
+      const host = within(canvasElement).getByTestId(testId)
+      await waitFor(() => expect(deckPaneHeight(host)).toBe(before))
+      await settleMeasurements(canvasElement)
+      await userEvent.click(
+        within(host).getByRole("button", { name: "Empty the window" }),
+      )
+      await frames(4)
+      await waitFor(() => expect(deckPaneHeight(host)).toBe(after))
+      await expect(livePane(host).offsetHeight).toBe(after)
+    }
   },
 }

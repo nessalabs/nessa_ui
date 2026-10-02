@@ -28,6 +28,7 @@ import {
 import { ChevronRight, FilterX } from "lucide-react"
 
 import { SearchIcon } from "./icons/nucleo"
+import { silenceResizeObserver } from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -1151,5 +1152,71 @@ export const PageOutOfRange: Story = {
       scoped.getByRole("button", { name: "Go to previous page" }),
     ).not.toHaveAttribute("aria-disabled")
     await expect(scoped.queryByRole("button", { name: "Page 99" })).toBeNull()
+  },
+}
+
+/** A height-capped table the host fills one trace at a time. */
+function GrowingTable() {
+  const [count, setCount] = React.useState(1)
+  return (
+    <div className="flex flex-col items-start gap-3">
+      <Button
+        variant="outline"
+        onClick={() => setCount((value) => Math.min(traces.length, value + 2))}
+      >
+        Add traces
+      </Button>
+      <TableShell className="w-lg max-w-full">
+        <Table containerClassName="max-h-44" containerLabel="Growing traces">
+          <TableHeader sticky>
+            <TableRow>
+              <TableHead>Trace</TableHead>
+              <TableHead>Agent</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {traces.slice(0, count).map((trace) => (
+              <TableRow key={trace.id}>
+                <TableCell className="font-semibold text-foreground">
+                  {trace.title}
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {trace.agent}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableShell>
+    </div>
+  )
+}
+
+export const WithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "Rows added to a height-capped table with a `ResizeObserver` that never reports, as WebKit sometimes does. The container still becomes a focusable region once the rows overflow it, because the table measures its overflow through the shared size observer, which also watches its content.",
+  ),
+  beforeEach: silenceResizeObserver,
+  render: () => <GrowingTable />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const region = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="table-container"]',
+    ) as HTMLElement
+    await expect(region).toHaveAttribute("tabindex", "-1")
+    const add = canvas.getByRole("button", { name: "Add traces" })
+    for (
+      let presses = 0;
+      presses < 10 && region.scrollHeight <= region.clientHeight + 1;
+      presses += 1
+    ) {
+      await userEvent.click(add)
+    }
+    await expect(region.scrollHeight).toBeGreaterThan(region.clientHeight + 1)
+    await waitFor(() => expect(region).toHaveAttribute("tabindex", "0"))
+    await expect(
+      canvas.getByRole("region", { name: "Growing traces" }),
+    ).toBeInTheDocument()
   },
 }

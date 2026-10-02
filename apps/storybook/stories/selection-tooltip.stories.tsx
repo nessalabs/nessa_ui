@@ -27,6 +27,10 @@ import {
 
 import { finishStoryTransitions } from "./finish-story-transitions"
 import { ChatAddIcon, CommentIcon } from "./icons/nucleo"
+import {
+  settleMeasurements,
+  silenceResizeObserver,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -338,20 +342,11 @@ function CommentDemo() {
  * comment all the same.
  */
 export const PanelWithoutResizeReports: Story = {
+  tags: ["cross-engine"],
   parameters: storyDocumentation(
     "The comment band opens to its content even where the engine never reports the content's resize: the band also measures when what it holds changes.",
   ),
-  beforeEach: () => {
-    const real = window.ResizeObserver
-    window.ResizeObserver = class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    } as unknown as typeof ResizeObserver
-    return () => {
-      window.ResizeObserver = real
-    }
-  },
+  beforeEach: silenceResizeObserver,
   render: () => <CommentDemo />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
@@ -370,6 +365,9 @@ export const PanelWithoutResizeReports: Story = {
     await userEvent.type(input, "Needs a citation")
     const send = canvas.getByRole("button", { name: "Send" })
     await waitFor(() => expect(send).toBeEnabled())
+    // Fonts settle first: one landing after the post would measure the band
+    // for its own reason and hide whether the content change did.
+    await settleMeasurements(canvasElement)
     await userEvent.click(send)
     await expect(await canvas.findByText("Needs a citation")).toBeVisible()
     await waitFor(() => {

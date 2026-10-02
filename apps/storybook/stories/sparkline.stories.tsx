@@ -2,6 +2,11 @@ import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, waitFor, within } from "storybook/test"
 import { Sparkline, type ChartPoint } from "@nessalabs/ui"
 
+import {
+  WidenableFrame,
+  expectFollowsFrame,
+  silenceResizeObserver,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -288,5 +293,28 @@ export const AsGiven: Story = {
     ).toHaveLength(REPORTED_BEST.length)
     const end = canvasElement.querySelector('[data-slot="sparkline-end"]')!
     await expect(Number(end.getAttribute("cy"))).toBeCloseTo(moves[3]!, 1)
+  },
+}
+
+/**
+ * The chart's frame widened with a `ResizeObserver` that never reports, which
+ * is what WebKit does to some resizes. The line still redraws at the new
+ * width once a web font lands, because the chart measures through the shared
+ * size observer.
+ */
+export const WithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "The chart measured with a `ResizeObserver` that never reports, as WebKit sometimes does. It still draws at its box's size, and when its frame widens it redraws at the new width once a web font finishes loading, because the chart measures through the shared size observer rather than a bare `ResizeObserver`.",
+  ),
+  args: BestSoFar.args,
+  beforeEach: silenceResizeObserver,
+  render: (args) => (
+    <WidenableFrame>
+      <Sparkline {...args} className="h-14 text-(--nessa-chart-series-1-strong)" />
+    </WidenableFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    await expectFollowsFrame(canvasElement)
   },
 }

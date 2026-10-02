@@ -47,6 +47,11 @@ export interface RegisteredWindowDeckPane {
 export interface WindowDeckContextValue {
   /** How the deck currently presents its panes. */
   mode: WindowDeckMode
+  /**
+   * Whether the panes take their content's height (`paneHeight="auto"`), so
+   * their content grows rather than scrolls.
+   */
+  autoHeight: boolean
   /** The pane the carousel is centred on. */
   activePaneId: string | undefined
   /** The pane leaving the overview returns to, when nothing else is chosen. */

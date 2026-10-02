@@ -4,6 +4,7 @@
 
 import * as React from "react"
 
+import { changesOnlyStyle, observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 import {
@@ -304,12 +305,22 @@ function WorkflowCanvasNode({
   React.useEffect(() => {
     const element = elementRef.current
 
-    if (!element || typeof ResizeObserver === "undefined") {
+    if (!element) {
       return
     }
 
-    const observer = new ResizeObserver(() => {
-      canvas.geometry.setSize(nodeId, element.offsetWidth, element.offsetHeight)
+    // The size last acted on, null until the first report — which still
+    // clamps, so a node mounted or re-bounded overhanging the canvas moves
+    // inside. A later report only says the size may have changed; re-clamping
+    // on one that changed nothing would report a "resize" move for a node
+    // that did not resize.
+    let measured: { width: number; height: number } | null = null
+    const remeasure = () => {
+      const width = element.offsetWidth
+      const height = element.offsetHeight
+      if (measured?.width === width && measured.height === height) return
+      measured = { width, height }
+      canvas.geometry.setSize(nodeId, width, height)
 
       // A node that grew may now overhang the canvas bounds. Re-clamping
       // here keeps it inside; without it the next drag or arrow press
@@ -320,16 +331,16 @@ function WorkflowCanvasNode({
         const current = resolvedPositionRef.current
         const clamped = clampPositionToBounds(
           current,
-          { width: element.offsetWidth, height: element.offsetHeight },
+          { width, height },
           bounds,
         )
 
         if (clamped.x !== current.x || clamped.y !== current.y) {
           applyPosition(clamped, "resize")
 
-          // A ResizeObserver fires every frame a size changes, but a
-          // commit is promised once per settled gesture — so the trailing
-          // call is rescheduled until the resizing stops.
+          // A size change is reported every frame it lasts, but a commit
+          // is promised once per settled gesture — so the trailing call is
+          // rescheduled until the resizing stops.
           if (resizeCommitRef.current !== null) {
             clearTimeout(resizeCommitRef.current)
           }
@@ -342,12 +353,19 @@ function WorkflowCanvasNode({
           }, 120)
         }
       }
+    }
+
+    // A node is sized by what it holds, so its content and web fonts are
+    // watched as well as its box: WebKit does not always report a resize
+    // they cause. The transform that places it, rewritten on every drag
+    // frame, cannot change its size; the rest of its style can.
+    const stopObserving = observeSize(element, remeasure, {
+      ignoreMutation: (record) =>
+        record.target === element && changesOnlyStyle(record, ["transform"]),
     })
 
-    observer.observe(element)
-
     return () => {
-      observer.disconnect()
+      stopObserving()
 
       if (resizeCommitRef.current !== null) {
         clearTimeout(resizeCommitRef.current)

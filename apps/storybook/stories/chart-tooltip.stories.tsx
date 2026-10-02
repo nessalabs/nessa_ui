@@ -2,6 +2,7 @@ import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, userEvent, waitFor, within } from "storybook/test"
 import {
+  Button,
   ChartTooltip,
   linearScale,
   niceTicks,
@@ -10,6 +11,12 @@ import {
   type ChartTooltipSide,
 } from "@nessalabs/ui"
 
+import {
+  GrowingNote,
+  createGrowthSwitch,
+  settleMeasurements,
+  silenceResizeObserver,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -231,5 +238,59 @@ export const InAChart: Story = {
 
     await userEvent.unhover(last)
     await waitFor(() => expect(canvas.queryByRole("tooltip")).toBeNull())
+  },
+}
+
+/**
+ * A card above a point near the bottom of its boundary, whose content grows
+ * on a switch outside the chart, so the card sees no render of its own.
+ */
+function GrowingCardBox() {
+  const boundaryRef = React.useRef<HTMLDivElement>(null)
+  const [growth] = React.useState(createGrowthSwitch)
+  const width = 256
+  const height = 320
+  const anchor = { x: width / 2, y: height * 0.9 }
+  return (
+    <div className="flex flex-col items-start gap-3">
+      <Button variant="outline" onClick={() => growth.open()}>
+        Grow the card
+      </Button>
+      <div
+        ref={boundaryRef}
+        data-testid="boundary"
+        className="relative rounded-lg border border-border bg-card"
+        style={{ width, height }}
+      >
+        <ChartTooltip anchor={anchor} boundary={boundaryRef} side="top">
+          <p className="m-0 font-medium">Attempt 8</p>
+          <GrowingNote lines={8} growth={growth} />
+        </ChartTooltip>
+      </div>
+    </div>
+  )
+}
+
+export const WithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "A card whose content grows in a commit the card never sees, measured with a `ResizeObserver` that never reports, as WebKit sometimes does. The card still re-places itself to stay inside its boundary, because it follows its size through the shared size observer, which also watches its content.",
+  ),
+  args: { anchor: { x: 0, y: 0 } },
+  beforeEach: silenceResizeObserver,
+  render: () => <GrowingCardBox />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const box = canvas.getByTestId("boundary")
+    const card = within(box).getByRole("tooltip")
+    await waitFor(() => expect(card).toHaveAttribute("data-placed", "true"))
+    await settleMeasurements(canvasElement)
+    await expectInside(card, box)
+    const before = card.getBoundingClientRect().height
+    await userEvent.click(canvas.getByRole("button", { name: "Grow the card" }))
+    await waitFor(() =>
+      expect(card.getBoundingClientRect().height).toBeGreaterThan(before),
+    )
+    await waitFor(() => expectInside(card, box))
   },
 }

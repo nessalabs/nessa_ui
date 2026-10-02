@@ -5,6 +5,11 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { flushSync } from "react-dom"
 
 import { useComposedRefs } from "@/lib/compose"
+import {
+  observeSize,
+  type SizeChangeCause,
+  type SizeChanges,
+} from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 import { Button } from "./button"
@@ -89,7 +94,7 @@ const glassLensClassName = cn(
 )
 
 /** Why the lens was placed: the development trace records it. */
-type LensCause = "mount" | "value" | "resize" | "options" | "fonts"
+type LensCause = "mount" | "value" | SizeChangeCause
 
 /**
  * What a placement did to the lens, for the development trace: `placed` and
@@ -117,7 +122,7 @@ const useIsomorphicLayoutEffect =
 const optionSelector = '[data-slot="segmented-control-option"]'
 
 /** The options that belong to this track, not to a control nested inside it. */
-function ownOptions(track: HTMLElement) {
+function ownOptions(track: Element) {
   return Array.from(
     track.querySelectorAll<HTMLElement>(optionSelector),
   ).filter(
@@ -279,7 +284,7 @@ function SegmentedControl({
     traceRef.current?.({ ev: "place", cause, outcome, ...measured })
     if (next === previous) return
     lensRef.current = next
-    if (cause === "resize" || cause === "options") {
+    if (cause !== "mount" && cause !== "value") {
       // An observer reports inside the frame it measured, so the lens has to
       // move in that frame too. A default-priority update would render in a
       // later task and let this frame paint the lens where it used to be —
@@ -302,56 +307,30 @@ function SegmentedControl({
     }
     placeLens("mount")
     // A track can hold its size while one option grows and its neighbour
-    // shifts, so the options are observed as well as the track.
-    const resizeObserver = new ResizeObserver(() => placeLens("resize"))
-    const observeOptions = () => {
-      resizeObserver.disconnect()
-      resizeObserver.observe(track)
-      for (const option of ownOptions(track)) resizeObserver.observe(option)
-    }
-    observeOptions()
-    // Options can also move without any box changing size — a `dir` flip
-    // mirrors them, a class or style change can reorder them — so the
-    // attributes that lay them out are watched too. The lens's own style is
-    // excluded: it changes on every placement and reacting to it would only
-    // measure again. One callback covers every record of a microtask, so a
-    // burst of changes places the lens once.
-    const mutationObserver = new MutationObserver((records) => {
-      const relevant = records.some(
-        (record) =>
-          record.type !== "attributes" ||
-          (record.target as Element).getAttribute("data-slot") !==
-            "segmented-control-lens",
+    // shifts, so the options are followed as well as the track. Options can
+    // also move without any box changing size — a `dir` flip mirrors them, a
+    // class or style change can reorder them — and a web font landing changes
+    // their widths where WebKit reports no resize at all (seen in CI: a lens
+    // 82px wide over a 77.6px option). The shared observer covers all of it.
+    // A report can hold several causes; the trace names a font landing over
+    // a content change, since that is the one WebKit leaves unreported.
+    const onSizeChange = (changes: SizeChanges) =>
+      placeLens(
+        changes.has("fonts")
+          ? "fonts"
+          : changes.has("content")
+            ? "content"
+            : "resize",
       )
-      if (!relevant) return
-      observeOptions()
-      placeLens("options")
+    // The lens's own style changes with every placement and cannot move an
+    // option, so it is not watched.
+    return observeSize(track, onSizeChange, {
+      boxes: ownOptions,
+      ignoreMutation: (record) =>
+        record.type === "attributes" &&
+        (record.target as Element).getAttribute("data-slot") ===
+          "segmented-control-lens",
     })
-    mutationObserver.observe(track, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-      attributes: true,
-      attributeFilter: ["dir", "class", "style"],
-    })
-    // A web font that lands after the lens is placed changes the options'
-    // widths, and WebKit does not report that to a ResizeObserver: the lens
-    // stayed at the fallback font's width (seen in CI, 82px over a 77.6px
-    // option). So the font set's own events re-measure too — each load that
-    // finishes, and the set settling once.
-    const fonts = track.ownerDocument.fonts as FontFaceSet | undefined
-    let active = true
-    const onFonts = () => {
-      if (active) placeLens("fonts")
-    }
-    fonts?.addEventListener("loadingdone", onFonts)
-    void fonts?.ready.then(onFonts)
-    return () => {
-      active = false
-      fonts?.removeEventListener("loadingdone", onFonts)
-      resizeObserver.disconnect()
-      mutationObserver.disconnect()
-    }
   }, [glass, placeLens])
 
   // The pressed state is committed to the options before this runs, so the

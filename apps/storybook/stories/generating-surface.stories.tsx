@@ -1,8 +1,13 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { expect, waitFor } from "storybook/test"
+import { expect, userEvent, waitFor, within } from "storybook/test"
 import { Button, CodeBlock, GeneratingSurface } from "@nessalabs/ui"
 
+import {
+  GrowingNote,
+  createGrowthSwitch,
+  silenceResizeObserver,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
 function SurfaceFrame({ children }: { children: React.ReactNode }) {
@@ -178,6 +183,58 @@ export const RevealMorph: Story = {
     await expect(content.hasAttribute("inert")).toBe(false)
     // No lingering players on the surface once settled, so the story rests
     // on plain DOM (and the a11y sweep measures the final frame).
+    await waitFor(() =>
+      expect(surface.getAnimations({ subtree: true }).length).toBe(0),
+    )
+  },
+}
+
+/**
+ * A reveal slowed to twenty seconds, whose content grows mid-morph on a
+ * switch outside the surface, so the surface sees no render of its own.
+ */
+function MidMorphGrowthDemo() {
+  const [generating, setGenerating] = React.useState(true)
+  const [growth] = React.useState(createGrowthSwitch)
+  return (
+    <div
+      className="grid w-[min(40rem,calc(100vw-2rem))] gap-3"
+      style={{ "--nessa-motion-duration-slow": "20s" } as React.CSSProperties}
+    >
+      <div className="flex gap-2">
+        <Button variant="outline" onClick={() => setGenerating(false)}>
+          Finish generating
+        </Button>
+        <Button variant="outline" onClick={() => growth.open()}>
+          Grow the content
+        </Button>
+      </div>
+      <GeneratingSurface generating={generating} label="Generating notes">
+        <p className="m-0 p-4">
+          Release notes. <GrowingNote lines={12} growth={growth} />
+        </p>
+      </GeneratingSurface>
+    </div>
+  )
+}
+
+export const GrowthWithoutResizeReports: Story = {
+  tags: ["cross-engine"],
+  args: { generating: true },
+  parameters: storyDocumentation(
+    "Content that grows mid-reveal, in a commit the surface never sees, measured with a `ResizeObserver` that never reports, as WebKit sometimes does. The surface still finishes the reveal early rather than animating toward a height that no longer fits, because it watches its content through the shared size observer.",
+  ),
+  beforeEach: silenceResizeObserver,
+  render: () => <MidMorphGrowthDemo />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const surface = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="generating-surface"]',
+    )!
+    await userEvent.click(canvas.getByRole("button", { name: "Finish generating" }))
+    await waitFor(() => expect(surface).toHaveAttribute("data-phase", "revealing"))
+    await userEvent.click(canvas.getByRole("button", { name: "Grow the content" }))
+    await waitFor(() => expect(surface).toHaveAttribute("data-phase", "settled"))
     await waitFor(() =>
       expect(surface.getAnimations({ subtree: true }).length).toBe(0),
     )

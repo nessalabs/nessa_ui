@@ -10,6 +10,13 @@ import {
 
 import { Mail, MessageSquare } from "lucide-react"
 
+import {
+  WidenableFrame,
+  announceFontLoaded,
+  expectOverflowFollowsFrame,
+  settleMeasurements,
+  silenceResizeObserver,
+} from "./size-observer-harness"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -683,5 +690,64 @@ export const NothingFound: DigestStory = {
     const canvas = within(canvasElement)
     await expect(canvas.getByText("No messages")).toBeVisible()
     await expect(canvas.queryByRole("list")).toBeNull()
+  },
+}
+
+const WRAPPING_DRAFT =
+  "Running about ten minutes late — the train sat outside the station for a while. Grab us a table by the window if you can, and order the usual for me. I will explain the rest when I get there, it is a long story involving a lost umbrella and a very persistent pigeon on the platform."
+
+export const WithoutResizeReports: ApprovalStory = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "A read-only draft measured with a `ResizeObserver` that never reports, as WebKit sometimes does. When the card's frame narrows, the draft rewraps past its cap with no commit the card sees, and once a web font lands the region becomes keyboard-reachable, because it measures through the shared size observer.",
+  ),
+  beforeEach: silenceResizeObserver,
+  args: {
+    recipient: "Peter Parker",
+    channel: "Messages",
+    editable: false,
+    message: WRAPPING_DRAFT,
+  },
+  render: (args) => (
+    <WidenableFrame startWide wideClassName="w-[40rem]" narrowClassName="w-48">
+      <MessageApproval {...args} />
+    </WidenableFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    await expectOverflowFollowsFrame(canvasElement, () =>
+      canvasElement.querySelector<HTMLElement>(
+        '[data-slot="message-approval-message"]',
+      ),
+    )
+  },
+}
+
+export const EditableWithoutResizeReports: ApprovalStory = {
+  tags: ["cross-engine"],
+  parameters: storyDocumentation(
+    "An editable draft measured with a `ResizeObserver` that never reports. When the card's frame narrows the draft rewraps, and once a web font lands the field grows to hold every line rather than scrolling them away, because it measures through the shared size observer.",
+  ),
+  beforeEach: silenceResizeObserver,
+  args: {
+    recipient: "Peter Parker",
+    channel: "Messages",
+    message: WRAPPING_DRAFT,
+  },
+  render: (args) => (
+    <WidenableFrame startWide wideClassName="w-[40rem]" narrowClassName="w-96">
+      <MessageApproval {...args} />
+    </WidenableFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const field = canvas.getByRole("textbox", { name: "Message to Peter Parker" })
+    await settleMeasurements(canvasElement)
+    const before = field.getBoundingClientRect().height
+    await userEvent.click(canvas.getByRole("button", { name: "Narrow the frame" }))
+    announceFontLoaded(canvasElement)
+    await waitFor(() => {
+      expect(field.getBoundingClientRect().height).toBeGreaterThan(before)
+      expect(field.scrollHeight).toBeLessThanOrEqual(field.clientHeight + 1)
+    })
   },
 }

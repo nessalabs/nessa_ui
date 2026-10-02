@@ -5,6 +5,7 @@
 import * as React from "react"
 
 import { composeRefs } from "@/lib/compose"
+import { changesOnlyStyle, observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 import {
@@ -126,8 +127,11 @@ interface WindowDeckProps extends React.ComponentProps<"div"> {
   overviewLayout?: WindowDeckOverviewOptions
   /**
    * Whether a vertical wheel gesture over the deck moves the carousel
-   * sideways. Content that scrolls on its own keeps its own gesture.
-   * @defaultValue true
+   * sideways. Content that scrolls on its own keeps its own gesture. Off by
+   * default for `paneHeight="auto"`: an auto-height deck sits in the page's
+   * flow, its windows never scroll, and a reader scrolling down means the
+   * page, not the next window.
+   * @defaultValue true, or false when `paneHeight` is "auto"
    */
   wheelNavigation?: boolean
   /** Overrides for the announcements the deck makes, for localization. */
@@ -228,6 +232,146 @@ function isDocumentFocus(owner: Document, active: Element | null): boolean {
 }
 
 /**
+ * The pane's natural height when its content region is empty — no element,
+ * no text — read without laying the pane out again. WebKit's lift goes stale
+ * for a region whose last child was just removed, reporting the height the
+ * child had, so the empty size is worked out instead:
+ *
+ * - a region that flexes with the pane is as small as its own padding,
+ *   border and minimum height allow;
+ * - one that does not flex is not stretched by the pane, so its own box
+ *   already is its natural size — a fixed height the host gave it, or just
+ *   its padding and border.
+ *
+ * Null when the region holds anything.
+ */
+function emptyNaturalHeight(pane: HTMLElement): number | null {
+  const content = pane.querySelector<HTMLElement>(
+    ':scope > [data-slot="window-deck-pane-content"]',
+  )
+  if (!content) return null
+  for (const node of content.childNodes) {
+    if (node.nodeType === Node.ELEMENT_NODE) return null
+    if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) return null
+  }
+  const view = pane.ownerDocument.defaultView
+  if (!view) return null
+  const css = view.getComputedStyle(content)
+  const pixels = (value: string) => Number.parseFloat(value) || 0
+  const region =
+    Number.parseFloat(css.flexGrow) > 0
+      ? Math.max(
+          pixels(css.paddingTop) +
+            pixels(css.paddingBottom) +
+            pixels(css.borderTopWidth) +
+            pixels(css.borderBottomWidth),
+          pixels(css.minHeight),
+        )
+      : content.offsetHeight
+  // Built from the pane's rows rather than from its current height: a region
+  // that does not flex leaves the pinned pane with space it does not need.
+  const paneCss = view.getComputedStyle(pane)
+  let rows = 0
+  let count = 0
+  for (const row of pane.children) {
+    if (!(row instanceof HTMLElement) || row.offsetParent === null) continue
+    const style = view.getComputedStyle(row)
+    if (style.position === "absolute" || style.position === "fixed") continue
+    rows +=
+      (row === content ? region : row.offsetHeight) +
+      pixels(style.marginTop) +
+      pixels(style.marginBottom)
+    count += 1
+  }
+  const frame =
+    pane.offsetHeight -
+    pane.clientHeight +
+    pixels(paneCss.paddingTop) +
+    pixels(paneCss.paddingBottom)
+  const gaps = Math.max(0, count - 1) * pixels(paneCss.rowGap)
+  return Math.max(0, Math.round(frame + gaps + rows))
+}
+
+/**
+ * The pane's natural height when its content has outgrown the content
+ * region, read without laying the pane out again: its height now, less what
+ * the region shows, plus what the region's content needs. Null when that
+ * cannot be read safely — the content fits (it may have shrunk inside a body
+ * that fills the region, which only a fresh layout reveals), there is no
+ * content region or loose text in it, a region the host caps or sizes so it
+ * does not grow with the pane (a max-height, or a size it does not flex
+ * from), or the overflow is not the in-flow content's
+ * own (an absolutely positioned badge, a float, a body that fills the region
+ * and overflows itself).
+ */
+function grownNaturalHeight(pane: HTMLElement): number | null {
+  const content = pane.querySelector<HTMLElement>(
+    ':scope > [data-slot="window-deck-pane-content"]',
+  )
+  if (!content) return null
+  const overflow = content.scrollHeight - content.clientHeight
+  if (overflow <= 1) return null
+  for (const node of content.childNodes) {
+    if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
+      return null
+    }
+  }
+  const view = pane.ownerDocument.defaultView
+  if (!view) return null
+  const pixels = (value: string) => Number.parseFloat(value) || 0
+  // The overflow sizes the pane only if the region is as tall as the pane
+  // lets it be. A region the host caps (`contentClassName="max-h-40"`) or
+  // sizes itself would keep overflowing however tall the pane grew.
+  const regionStyle = view.getComputedStyle(content)
+  if (
+    regionStyle.maxHeight !== "none" ||
+    !(Number.parseFloat(regionStyle.flexGrow) > 0)
+  ) {
+    return null
+  }
+  let rows = 0
+  for (const row of pane.children) {
+    if (!(row instanceof HTMLElement) || row.offsetParent === null) continue
+    const style = view.getComputedStyle(row)
+    if (style.position === "absolute" || style.position === "fixed") continue
+    rows += row.offsetHeight + pixels(style.marginTop) + pixels(style.marginBottom)
+  }
+  if (Math.abs(rows - pane.clientHeight) > 1) return null
+  // In block flow the last in-flow child reaches furthest, so the walk stops
+  // at it; whatever it skips is checked against the overflow below.
+  let reach: number | null = null
+  for (let index = content.children.length - 1; index >= 0; index -= 1) {
+    const child = content.children[index]
+    if (!(child instanceof HTMLElement)) return null
+    if (child.offsetParent === null) continue
+    const style = view.getComputedStyle(child)
+    if (
+      style.position === "absolute" ||
+      style.position === "fixed" ||
+      style.float !== "none"
+    ) {
+      continue
+    }
+    let top: number
+    if (child.offsetParent === content) {
+      top = child.offsetTop
+    } else if (child.offsetParent === content.offsetParent) {
+      top = child.offsetTop - content.offsetTop - content.clientTop
+    } else {
+      return null
+    }
+    reach = top + child.offsetHeight + pixels(style.marginBottom)
+    break
+  }
+  if (reach === null) return null
+  const needed = reach + pixels(regionStyle.paddingBottom)
+  // The in-flow content must account for the whole overflow; anything else
+  // overflowing is not what sizes the pane.
+  if (Math.abs(needed - content.scrollHeight) > 1) return null
+  return pane.offsetHeight - content.clientHeight + Math.ceil(needed)
+}
+
+/**
  * A deck of windows the user moves between: a horizontal carousel that
  * centres one window at a time, and an overview that shrinks the live
  * window into a strip of preview tiles. The viewport shows a capped page
@@ -270,7 +414,7 @@ function WindowDeck({
   contentMount = "active",
   overviewVisibleCount,
   overviewLayout,
-  wheelNavigation = true,
+  wheelNavigation: wheelNavigationProp,
   labels: labelsProp,
   className,
   style,
@@ -278,6 +422,7 @@ function WindowDeck({
   ref,
   ...props
 }: WindowDeckProps) {
+  const wheelNavigation = wheelNavigationProp ?? paneHeight !== "auto"
   const [panes, setPanes] = React.useState<RegisteredWindowDeckPane[]>([])
   const [uncontrolledActive, setUncontrolledActive] = React.useState<
     string | undefined
@@ -1400,21 +1545,79 @@ function WindowDeck({
     const pane = paneElement(liveContentId)
     if (!pane) return
 
+    // A pane with no box — detached, or not displayed — measures 0 for want
+    // of a layout, not because it is empty, and is not read. A laid-out pane
+    // that measures 0 is empty, and the deck collapses to it.
     const commit = (height: number) => {
-      if (height > 0) {
+      if (height > 0 || (pane.isConnected && pane.getClientRects().length > 0)) {
         setMeasuredPaneHeight((current) => (current === height ? current : height))
       }
     }
 
-    commit(pane.offsetHeight)
-    const observer = new ResizeObserver(() => commit(pane.offsetHeight))
-    observer.observe(pane)
-    return () => observer.disconnect()
+    // The pane is sized by the height this measures, so its own box only
+    // echoes the last measurement: growing content would overflow it and
+    // shrinking content would leave it standing. Its natural height is read
+    // exactly by lifting the deck's size for the read — not the pane's
+    // height, so a height the host gives the pane (a class, an inline style,
+    // a stylesheet) still wins. That lift restyles and lays out the whole
+    // pane, so content that has plainly outgrown the pane — a reply
+    // streaming in — is read from its overflow instead.
+    const lift = () => {
+      pane.style.setProperty("--nessa-window-deck-pane-height", "auto")
+      const natural = pane.offsetHeight
+      pane.style.removeProperty("--nessa-window-deck-pane-height")
+      return natural
+    }
+    const measure = () => {
+      // The deck's height as the pane has it now, which may trail the last
+      // commit by a render. A pane whose box is not that height is held by
+      // the host, and only a lift says what it needs.
+      const applied = Number.parseFloat(
+        (pane.ownerDocument.defaultView?.getComputedStyle(pane) ?? pane.style)
+          .getPropertyValue("--nessa-window-deck-pane-height"),
+      )
+      const follows = Math.abs(pane.offsetHeight - applied) <= 1
+      const grown = follows ? grownNaturalHeight(pane) : null
+      if (grown !== null) {
+        commit(grown)
+        return
+      }
+      const empty = follows ? emptyNaturalHeight(pane) : null
+      if (empty !== null) {
+        commit(empty)
+        return
+      }
+      // Committed growth leaves the content fitting, so the next report
+      // lifts and confirms it; the two reads cannot take turns.
+      commit(lift())
+    }
+
+    measure()
+    // What sizes an auto-height pane is its content, so the content and web
+    // fonts are watched as well as the pane's box. The translate and scale
+    // the deck writes on every drag and pan frame cannot change its height;
+    // anything else in the pane's style can.
+    // The pane's box is pinned by the height this measures, and so is the
+    // flexed content region inside it, so neither reports content that
+    // grows without a DOM change — an image taking its natural size, a
+    // height animating. The boxes that are not pinned are followed instead:
+    // the pane's own rows and what its content region holds.
+    return observeSize(pane, measure, {
+      boxes: (element) => [
+        ...element.children,
+        ...(element.querySelector(':scope > [data-slot="window-deck-pane-content"]')
+          ?.children ?? []),
+      ],
+      ignoreMutation: (record) =>
+        record.target === pane &&
+        changesOnlyStyle(record, ["translate", "scale"]),
+    })
   }, [liveContentId, paneElement, paneHeight, panes])
 
   const contextValue = React.useMemo(
     () => ({
       activePaneId,
+      autoHeight: paneHeight === "auto",
       dismissRequest,
       mode: resolvedMode,
       overviewPanning,
@@ -1431,6 +1634,7 @@ function WindowDeck({
     }),
     [
       activePaneId,
+      paneHeight,
       dismissRequest,
       overviewPanning,
       paneIds,

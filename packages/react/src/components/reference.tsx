@@ -8,6 +8,7 @@ import {
   useNessaLayerScope,
   usePortalContainer,
 } from "@/lib/portal-container"
+import { observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
 /**
@@ -529,17 +530,16 @@ function ReferenceCard({
   }, [])
 
   // Paging swaps the excerpt without remounting the region, so overflow is
-  // re-measured after every commit; the observer covers non-React resizes.
+  // re-measured after every commit; the size observer covers what changes it
+  // without one — a resize, content changed outside React, a web font landing.
   React.useEffect(() => {
     updateExcerptScrollable()
   })
 
   React.useEffect(() => {
     const element = excerptRef.current
-    if (!element || typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver(updateExcerptScrollable)
-    observer.observe(element)
-    return () => observer.disconnect()
+    if (!element) return
+    return observeSize(element, updateExcerptScrollable)
   }, [updateExcerptScrollable])
 
   if (!source) return null
