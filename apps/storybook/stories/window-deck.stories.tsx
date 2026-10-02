@@ -1728,7 +1728,14 @@ export const WheelNavigationByHeight: Story = {
 }
 
 /** A window whose host can empty it entirely, with no chrome to keep it open. */
-function EmptiableDeck({ contentClassName }: { contentClassName?: string }) {
+function EmptiableDeck({
+  contentClassName,
+  tall = false,
+}: {
+  contentClassName?: string
+  /** Fill the window with a 300px note rather than a line of text. */
+  tall?: boolean
+}) {
   const [empty, setEmpty] = React.useState(false)
   return (
     <div className="flex flex-col items-start gap-3">
@@ -1743,7 +1750,11 @@ function EmptiableDeck({ contentClassName }: { contentClassName?: string }) {
             chrome={false}
             contentClassName={contentClassName}
           >
-            {empty ? null : <p className="m-0 p-4 nessa-text-3">A note.</p>}
+            {empty ? null : tall ? (
+              <div className="h-[300px] bg-muted" />
+            ) : (
+              <p className="m-0 p-4 nessa-text-3">A note.</p>
+            )}
           </WindowDeckPane>
           <WindowDeckPane id="later" label="Later">
             <p className="p-4 nessa-text-3">Nothing here yet.</p>
@@ -1806,29 +1817,41 @@ export const AutoHeightHonoursAFixedContentRegion: Story = {
 export const AutoHeightKeepsARegionSizeWhenEmptied: Story = {
   tags: ["cross-engine"],
   parameters: storyDocumentation(
-    "Emptied auto-height windows whose content regions the host sized — one with a minimum height, one with a fixed height it does not flex from. Each keeps the size the host gave it, rather than collapsing as a content-sized region would.",
+    "Emptied auto-height windows. A region the host gave a minimum height keeps that minimum, whether its content was shorter or taller than it. A region with a fixed height it does not flex from keeps that height. A region that merely does not flex, with no size of its own, is sized by its content and collapses with it.",
   ),
   render: () => (
     <div className="flex flex-col gap-6">
       <div data-testid="minimum">
         <EmptiableDeck contentClassName="min-h-40" />
       </div>
+      <div data-testid="minimum-outgrown">
+        <EmptiableDeck contentClassName="min-h-40" tall />
+      </div>
       <div data-testid="fixed">
         <EmptiableDeck contentClassName="flex-none h-40" />
+      </div>
+      <div data-testid="unflexed">
+        <EmptiableDeck contentClassName="flex-none" tall />
       </div>
     </div>
   ),
   play: async ({ canvasElement }) => {
-    for (const testId of ["minimum", "fixed"]) {
+    const cases = [
+      { testId: "minimum", before: 160, after: 160 },
+      { testId: "minimum-outgrown", before: 300, after: 160 },
+      { testId: "fixed", before: 160, after: 160 },
+      { testId: "unflexed", before: 300, after: 0 },
+    ]
+    for (const { testId, before, after } of cases) {
       const host = within(canvasElement).getByTestId(testId)
-      await waitFor(() => expect(deckPaneHeight(host)).toBeGreaterThan(0))
+      await waitFor(() => expect(deckPaneHeight(host)).toBe(before))
       await settleMeasurements(canvasElement)
       await userEvent.click(
         within(host).getByRole("button", { name: "Empty the window" }),
       )
       await frames(4)
-      await waitFor(() => expect(deckPaneHeight(host)).toBe(160))
-      await expect(livePane(host).offsetHeight).toBe(160)
+      await waitFor(() => expect(deckPaneHeight(host)).toBe(after))
+      await expect(livePane(host).offsetHeight).toBe(after)
     }
   },
 }

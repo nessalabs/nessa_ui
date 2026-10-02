@@ -233,11 +233,17 @@ function isDocumentFocus(owner: Document, active: Element | null): boolean {
 
 /**
  * The pane's natural height when its content region is empty — no element,
- * no text — which is the rest of the pane plus the region's own padding and
- * border, read without laying the pane out again. WebKit's lift goes stale
+ * no text — read without laying the pane out again. WebKit's lift goes stale
  * for a region whose last child was just removed, reporting the height the
- * child had, so this case is computed rather than measured. Null when the
- * region holds anything, or has a size of its own the host gave it.
+ * child had, so the empty size is worked out instead:
+ *
+ * - a region that flexes with the pane is as small as its own padding,
+ *   border and minimum height allow;
+ * - one that does not flex is not stretched by the pane, so its own box
+ *   already is its natural size — a fixed height the host gave it, or just
+ *   its padding and border.
+ *
+ * Null when the region holds anything.
  */
 function emptyNaturalHeight(pane: HTMLElement): number | null {
   const content = pane.querySelector<HTMLElement>(
@@ -252,18 +258,38 @@ function emptyNaturalHeight(pane: HTMLElement): number | null {
   if (!view) return null
   const css = view.getComputedStyle(content)
   const pixels = (value: string) => Number.parseFloat(value) || 0
-  // Only a region sized by its content collapses with it. One the host
-  // gives a size of its own — a fixed height it does not flex from, a
-  // minimum — keeps that size empty, and is left to the lift.
-  if (!(Number.parseFloat(css.flexGrow) > 0) || pixels(css.minHeight) > 0) {
-    return null
+  const region =
+    Number.parseFloat(css.flexGrow) > 0
+      ? Math.max(
+          pixels(css.paddingTop) +
+            pixels(css.paddingBottom) +
+            pixels(css.borderTopWidth) +
+            pixels(css.borderBottomWidth),
+          pixels(css.minHeight),
+        )
+      : content.offsetHeight
+  // Built from the pane's rows rather than from its current height: a region
+  // that does not flex leaves the pinned pane with space it does not need.
+  const paneCss = view.getComputedStyle(pane)
+  let rows = 0
+  let count = 0
+  for (const row of pane.children) {
+    if (!(row instanceof HTMLElement) || row.offsetParent === null) continue
+    const style = view.getComputedStyle(row)
+    if (style.position === "absolute" || style.position === "fixed") continue
+    rows +=
+      (row === content ? region : row.offsetHeight) +
+      pixels(style.marginTop) +
+      pixels(style.marginBottom)
+    count += 1
   }
-  const own =
-    pixels(css.paddingTop) +
-    pixels(css.paddingBottom) +
-    pixels(css.borderTopWidth) +
-    pixels(css.borderBottomWidth)
-  return Math.max(0, Math.round(pane.offsetHeight - content.offsetHeight + own))
+  const frame =
+    pane.offsetHeight -
+    pane.clientHeight +
+    pixels(paneCss.paddingTop) +
+    pixels(paneCss.paddingBottom)
+  const gaps = Math.max(0, count - 1) * pixels(paneCss.rowGap)
+  return Math.max(0, Math.round(frame + gaps + rows))
 }
 
 /**
