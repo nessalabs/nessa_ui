@@ -3166,6 +3166,26 @@
           "target": "components/ui/pairing-code.tsx"
         }
       ]
+    },
+    {
+      "name": "qr-orb",
+      "type": "registry:ui",
+      "title": "QR orb",
+      "description": "A QR code drawn as an orb of sand: a real, scannable code at its centre with crisp finder corners and a clean quiet zone, decoration fading to the rim, and grains that spiral in and settle still.",
+      "dependencies": [
+        "qrcode-generator"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/qr-orb.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/qr-orb.tsx"
+        }
+      ]
     }
   ]
 }

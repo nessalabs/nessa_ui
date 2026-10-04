@@ -74,6 +74,7 @@ export {
   type PairingCodeProps,
   type PairingCodeState,
 } from "./components/pairing-code"
+export { QrOrb, type QrOrbProps } from "./components/qr-orb"
 export {
   ConversationRail,
   ConversationRailItem,
