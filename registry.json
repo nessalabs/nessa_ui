@@ -3186,6 +3186,37 @@
           "target": "components/ui/qr-orb.tsx"
         }
       ]
+    },
+    {
+      "name": "orb-code",
+      "type": "registry:lib",
+      "title": "Orb code",
+      "description": "The signal orb's code: a pairing code as dense and sparse regions of an orb with Reed-Solomon error correction, and the reader that recovers it from a camera frame at any rotation, on a light or dark screen, through blur and glare.",
+      "files": [
+        {
+          "path": "packages/react/src/lib/orb-code.ts",
+          "type": "registry:lib",
+          "target": "lib/orb-code.ts"
+        }
+      ]
+    },
+    {
+      "name": "signal-orb",
+      "type": "registry:ui",
+      "title": "Signal orb",
+      "description": "A pairing code carried by an orb of fine blue dots, like a phone's setup screen: the code hides in where the dots gather densely or thin out, readable by the matching orb-code reader but not a stock camera app. The dots ripple in place.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/orb-code",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/signal-orb.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/signal-orb.tsx"
+        }
+      ]
     }
   ]
 }

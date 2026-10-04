@@ -75,6 +75,17 @@ export {
   type PairingCodeState,
 } from "./components/pairing-code"
 export { QrOrb, type QrOrbProps } from "./components/qr-orb"
+export { SignalOrb, type SignalOrbProps } from "./components/signal-orb"
+export {
+  ORB_CODE_ALPHABET,
+  ORB_CODE_LENGTH,
+  encodeOrbCode,
+  decodeOrbRegions,
+  formatOrbCode,
+  parseOrbCode,
+  readOrbFrame,
+  type OrbFrame,
+} from "./lib/orb-code"
 export {
   ConversationRail,
   ConversationRailItem,
