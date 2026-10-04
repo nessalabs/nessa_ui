@@ -56,6 +56,24 @@ export {
   type CheckboxProps,
 } from "./components/checkbox"
 export { EmptyState, type EmptyStateProps } from "./components/empty-state"
+export { Switch, type SwitchProps } from "./components/switch"
+export {
+  SettingsGroup,
+  SettingsRow,
+  type SettingsGroupProps,
+  type SettingsRowProps,
+} from "./components/settings-group"
+export {
+  KeyFingerprint,
+  fingerprintGroups,
+  type KeyFingerprintProps,
+} from "./components/key-fingerprint"
+export {
+  PairingCode,
+  formatRemaining,
+  type PairingCodeProps,
+  type PairingCodeState,
+} from "./components/pairing-code"
 export {
   ConversationRail,
   ConversationRailItem,
