@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import qrcode from "qrcode-generator"
 
 import { cn } from "@/lib/utils"
 
@@ -38,7 +37,25 @@ type Grain = {
 }
 
 /** The grains of an orb for `value`: the code's dark modules, then decoration out to the rim. */
-function orbGrains(value: string) {
+type QrFactory = typeof import("qrcode-generator")
+
+let qrFactory: QrFactory | null = null
+let qrLoading: Promise<QrFactory> | null = null
+
+/**
+ * The QR encoder, loaded on first use. It runs work when its module loads,
+ * so a static import would put it in every app that imports anything from
+ * the package barrel, QR or not; loading it here keeps it out of theirs.
+ */
+function loadQrFactory(): Promise<QrFactory> {
+  qrLoading ??= import("qrcode-generator").then((module) => {
+    qrFactory = ((module as { default?: QrFactory }).default ?? module) as QrFactory
+    return qrFactory
+  })
+  return qrLoading
+}
+
+function orbGrains(qrcode: QrFactory, value: string) {
   const qr = qrcode(0, "M")
   qr.addData(value)
   qr.make()
@@ -115,17 +132,31 @@ export interface QrOrbProps extends Omit<React.ComponentProps<"div">, "children"
  * On mount the grains spiral in and settle, then hold still: nothing moves
  * once the code is readable, and with reduced motion it is drawn settled.
  * The disc stays light with dark ink in both themes, because scanners need
- * dark on light.
+ * dark on light. The QR encoder loads on first use, so `data-state` reads
+ * `loading` for a moment before the grains appear.
  */
 function QrOrb({ value, size = 320, onSettled, className, style, "aria-label": ariaLabel, ...props }: QrOrbProps) {
-  // A value too long for any QR code cannot be drawn; the orb is left empty.
+  const [factory, setFactory] = React.useState<QrFactory | null>(() => qrFactory)
+  React.useEffect(() => {
+    if (factory) return
+    let live = true
+    void loadQrFactory().then((loaded) => {
+      if (live) setFactory(() => loaded)
+    })
+    return () => {
+      live = false
+    }
+  }, [factory])
+  // Undefined while the encoder loads. A value too long for any QR code
+  // cannot be drawn; the orb is left empty.
   const orb = React.useMemo(() => {
+    if (!factory) return undefined
     try {
-      return orbGrains(value)
+      return orbGrains(factory, value)
     } catch {
       return null
     }
-  }, [value])
+  }, [factory, value])
   const { count, centre, radius, grains } = orb ?? { count: 21, centre: 14.5, radius: 20, grains: [] }
   const svgRef = React.useRef<SVGSVGElement>(null)
   const [settled, setSettled] = React.useState(false)
@@ -198,7 +229,7 @@ function QrOrb({ value, size = 320, onSettled, className, style, "aria-label": a
       role="img"
       aria-label={ariaLabel ?? "QR code"}
       data-slot="qr-orb"
-      data-state={orb === null ? "invalid" : settled ? "settled" : "settling"}
+      data-state={orb === undefined ? "loading" : orb === null ? "invalid" : settled ? "settled" : "settling"}
       className={cn("relative inline-grid shrink-0 place-items-center", className)}
       {...props}
       style={{ width: size, height: size, ...style }}
@@ -223,7 +254,7 @@ function QrOrb({ value, size = 320, onSettled, className, style, "aria-label": a
         </defs>
         <circle cx={centre} cy={centre} r={radius} className="fill-background dark:fill-foreground" />
         <circle cx={centre} cy={centre} r={radius} fill={`url(#${shadeId})`} />
-        {orb && <Finders count={count} />}
+        {orb ? <Finders count={count} /> : null}
         {grains.map((grain) => (
           <circle
             key={grain.index}

@@ -39,18 +39,22 @@ const SYNC_VALUES: readonly (readonly [0 | 1, 0 | 1])[] = [
 
 // ——— GF(32) and Reed–Solomon ———
 
-const EXP = new Array<number>(62)
-const LOG = new Array<number>(32).fill(0)
-{
+// Every table here is built in a function call marked pure, so a bundle
+// that never uses the orb can drop it: work at module scope is a side effect
+// no bundler may remove, and the package barrel reaches every module.
+const [EXP, LOG] = /* @__PURE__ */ (() => {
+  const exp = new Array<number>(62)
+  const log = new Array<number>(32).fill(0)
   let x = 1
   for (let i = 0; i < 31; i++) {
-    EXP[i] = x
-    LOG[x] = i
+    exp[i] = x
+    log[x] = i
     x <<= 1
     if (x & 32) x ^= 0b100101 // x^5 + x^2 + 1
   }
-  for (let i = 31; i < 62; i++) EXP[i] = EXP[i - 31]!
-}
+  for (let i = 31; i < 62; i++) exp[i] = exp[i - 31]!
+  return [exp, log] as const
+})()
 
 function mul(a: number, b: number): number {
   return a === 0 || b === 0 ? 0 : EXP[LOG[a]! + LOG[b]!]!
@@ -80,7 +84,7 @@ function polyEval(p: readonly number[], x: number): number {
   return y
 }
 
-const GENERATOR = (() => {
+const GENERATOR = /* @__PURE__ */ (() => {
   let g = [1]
   for (let i = 0; i < PARITY; i++) g = polyMul(g, [1, power(i)])
   return g
@@ -196,7 +200,7 @@ export function formatOrbCode(symbols: readonly number[]): string {
 }
 
 /** A fixed mask over the payload, so every code — even all-A — mixes bright and dim. */
-const WHITEN = Array.from({ length: SYMBOLS * BITS }, (_, i) => ((i * 2654435761) >>> 13) & 1)
+const WHITEN = /* @__PURE__ */ Array.from({ length: SYMBOLS * BITS }, (_, i) => ((i * 2654435761) >>> 13) & 1)
 
 /** Region index for ring and sector, ring-major. */
 export function orbRegion(ring: number, sector: number): number {
@@ -204,7 +208,7 @@ export function orbRegion(ring: number, sector: number): number {
 }
 
 /** Payload sectors in reading order: each ring's sectors, skipping its sync sectors. */
-const PAYLOAD_REGIONS = (() => {
+const PAYLOAD_REGIONS = /* @__PURE__ */ (() => {
   const regions: number[] = []
   for (let ring = 0; ring < ORB_RINGS; ring++) {
     for (let sector = 0; sector < ORB_SECTORS; sector++) {

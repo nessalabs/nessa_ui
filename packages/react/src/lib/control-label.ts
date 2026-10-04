@@ -8,7 +8,7 @@ import * as React from "react"
  * one, so a row reads as "Allow linking, switch, on" rather than as an
  * unnamed switch beside some text.
  */
-const ControlLabelContext = React.createContext<string | undefined>(undefined)
+const ControlLabelContext = /* @__PURE__ */ React.createContext<string | undefined>(undefined)
 
 /**
  * The naming props for a control: its own `aria-label` or
