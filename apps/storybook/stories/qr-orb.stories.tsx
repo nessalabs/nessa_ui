@@ -94,3 +94,15 @@ export const Dark: Story = {
     await expect(await decode(canvasElement)).toBe(link)
   },
 }
+
+export const TooLong: Story = {
+  args: { value: "x".repeat(4000) },
+  parameters: storyDocumentation(
+    "A value too long for any QR code draws an empty orb and says so through `data-state`, instead of throwing during render.",
+  ),
+  play: async ({ canvasElement, args }) => {
+    await expect(canvasElement.querySelector("[data-slot=qr-orb]")).toHaveAttribute("data-state", "invalid")
+    await expect(args.onSettled).not.toHaveBeenCalled()
+    await expect(canvasElement.querySelector("[data-slot=qr-orb-finder]")).toBeNull()
+  },
+}

@@ -66,8 +66,14 @@ type Dot = {
   size: number
   alpha: number
   color: string
-  index: number
+  /** When, through the gathering, this dot arrives: 0 first, 0.35 last. */
+  lag: number
+  /** Which batch it is drawn in once gathered: its colour and opacity, rounded. */
+  batch: number
 }
+
+/** Opacity levels dots are rounded to once gathered, so each colour draws in a few batches. */
+const ALPHA_STEPS = 6
 
 /** Dots per unit of the orb's area, before each band thins them. */
 const DENSITY = 26000
@@ -95,13 +101,15 @@ function orbDots(regions: readonly (0 | 1)[]): Dot[] {
       const a = noise(at, 2) * Math.PI * 2
       const alpha = keep(r, a, at)
       if (alpha === null) continue
+      const colour = Math.floor(noise(at, 5) * blues.length) % blues.length
       dots.push({
         r,
         a,
         size: (0.3 + noise(at, 3) * 0.45) * grow(r, a),
         alpha,
-        color: blues[Math.floor(noise(at, 5) * blues.length) % blues.length]!,
-        index: at,
+        color: blues[colour]!,
+        lag: noise(at, 7) * 0.35,
+        batch: colour * ALPHA_STEPS + Math.min(ALPHA_STEPS - 1, Math.floor(alpha * ALPHA_STEPS)),
       })
     }
   }
@@ -144,7 +152,8 @@ function easeOut(t: number): number {
 export interface SignalOrbProps extends Omit<React.ComponentProps<"div">, "children"> {
   /**
    * The pairing code the orb carries, as the gateway shows it ("ABCD-2345").
-   * A reader recovers it with `readOrbFrame`. It is not exposed as text.
+   * A reader recovers it with `readOrbFrame`. It is not exposed as text. A
+   * value that is not a code draws nothing and sets `data-state="invalid"`.
    */
   code: string
   /** The orb's diameter in CSS pixels. Defaults to 320. */
@@ -176,13 +185,16 @@ function SignalOrb({
   still = false,
   onReady,
   className,
+  style,
   "aria-label": ariaLabel,
   ...props
 }: SignalOrbProps) {
   const regions = React.useMemo(() => encodeOrbCode(code), [code])
   const dots = React.useMemo(() => (regions ? orbDots(regions) : []), [regions])
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
-  const [state, setState] = React.useState<"gathering" | "live" | "still">("gathering")
+  const [state, setState] = React.useState<"gathering" | "live" | "still" | "invalid">(
+    regions ? "gathering" : "invalid",
+  )
   const onReadyRef = React.useRef(onReady)
   React.useEffect(() => {
     onReadyRef.current = onReady
@@ -191,7 +203,13 @@ function SignalOrb({
   React.useEffect(() => {
     const canvas = canvasRef.current
     const context = canvas?.getContext("2d")
-    if (!canvas || !context || dots.length === 0) return
+    if (!regions) {
+      // Nothing of a previous code may stay on screen to be scanned.
+      context?.clearRect(0, 0, canvas?.width ?? 0, canvas?.height ?? 0)
+      setState("invalid")
+      return
+    }
+    if (!canvas || !context) return
     const ratio = Math.min(2, window.devicePixelRatio || 1)
     const pixels = Math.round(size * ratio)
     canvas.width = pixels
@@ -202,21 +220,51 @@ function SignalOrb({
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
     const animate = !still && !reduced
 
+    // Once gathered, dots are drawn in batches of one colour and rounded
+    // opacity: one path and one fill per batch rather than one per dot.
+    const batches = new Map<number, Dot[]>()
+    for (const dot of dots) {
+      const batch = batches.get(dot.batch)
+      if (batch) batch.push(dot)
+      else batches.set(dot.batch, [dot])
+    }
+
+    /** Where `dot` is at this moment, given how far it has gathered. */
+    const place = (dot: Dot, t: number, seconds: number) => {
+      // The wave: each dot breathes in and out along its radius, in a
+      // ripple that travels outward and around the ring.
+      const wave = animate ? Math.sin(seconds * 1.7 - dot.r * 13 + dot.a * 3) * 0.014 : 0
+      const r = (dot.r + wave) * (1.25 - 0.25 * t)
+      return [centre + Math.sin(dot.a) * r * unit, centre - Math.cos(dot.a) * r * unit] as const
+    }
+
     const draw = (elapsed: number) => {
       const gather = animate ? Math.min(1, elapsed / GATHER_MS) : 1
       const seconds = elapsed / 1000
       context.clearRect(0, 0, pixels, pixels)
-      for (const dot of dots) {
-        const t = easeOut(Math.min(1, Math.max(0, gather * 1.35 - noise(dot.index, 7) * 0.35)))
-        // The wave: each dot breathes in and out along its radius, in a
-        // ripple that travels outward and around the ring.
-        const wave = animate ? Math.sin(seconds * 1.7 - dot.r * 13 + dot.a * 3) * 0.014 : 0
-        const r = (dot.r + wave) * (1.25 - 0.25 * t)
-        context.globalAlpha = dot.alpha * t
-        context.fillStyle = dot.color
-        context.beginPath()
-        context.arc(centre + Math.sin(dot.a) * r * unit, centre - Math.cos(dot.a) * r * unit, dot.size * ratio, 0, Math.PI * 2)
-        context.fill()
+      if (gather < 1) {
+        for (const dot of dots) {
+          const t = easeOut(Math.min(1, Math.max(0, gather * 1.35 - dot.lag)))
+          const [x, y] = place(dot, t, seconds)
+          context.globalAlpha = dot.alpha * t
+          context.fillStyle = dot.color
+          context.beginPath()
+          context.arc(x, y, dot.size * ratio, 0, Math.PI * 2)
+          context.fill()
+        }
+      } else {
+        for (const [key, batch] of batches) {
+          context.globalAlpha = ((key % ALPHA_STEPS) + 0.5) / ALPHA_STEPS
+          context.fillStyle = blues[Math.floor(key / ALPHA_STEPS)]!
+          context.beginPath()
+          for (const dot of batch) {
+            const [x, y] = place(dot, 1, seconds)
+            const radius = dot.size * ratio
+            context.moveTo(x + radius, y)
+            context.arc(x, y, radius, 0, Math.PI * 2)
+          }
+          context.fill()
+        }
       }
       context.globalAlpha = 1
     }
@@ -261,7 +309,7 @@ function SignalOrb({
       observer?.disconnect()
       document.removeEventListener("visibilitychange", resume)
     }
-  }, [dots, size, still])
+  }, [dots, regions, size, still])
 
   return (
     <div
@@ -270,8 +318,8 @@ function SignalOrb({
       data-slot="signal-orb"
       data-state={state}
       className={cn("relative inline-grid shrink-0 place-items-center", className)}
-      style={{ width: size, height: size }}
       {...props}
+      style={{ width: size, height: size, ...style }}
     >
       <canvas ref={canvasRef} aria-hidden="true" data-slot="signal-orb-canvas" className="size-full" />
     </div>

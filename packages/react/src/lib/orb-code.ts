@@ -266,11 +266,15 @@ function correctOrbRegions(
 
 /**
  * Corrections the frame reader accepts. It tries hundreds of rotations and
- * scales per frame, and correcting up to four symbols on each would, now and
- * then, turn a garbage reading into some other valid code. Two leaves the
- * rest of the parity to refuse it.
+ * scales per frame, and a scanner reads many frames, so every correction
+ * allowed widens the odds of turning a garbage reading into some other valid
+ * code. One is accepted freely; two only when at most one sync sector
+ * missed, which a garbage reading manages about once in thirty. That keeps
+ * a single frame's wrong read to a few in a million; `createOrbScanner`,
+ * which a scanning device should use, requires two frames to agree on top.
  */
 const READ_LIMIT = 2
+const READ_LIMIT_UNSYNCED = 1
 
 // ——— Geometry ———
 
@@ -449,66 +453,102 @@ function readRegions(
   orb: { cx: number; cy: number; radius: number },
   rotation: number,
 ): (0 | 1)[] {
-  const values = Array.from({ length: ORB_RINGS }, (_, ring) =>
-    Array.from({ length: ORB_SECTORS }, (_, sector) => sampleRegion(frame, orb, ring, sector, rotation)),
+  return classify(
+    Array.from({ length: ORB_RINGS }, (_, ring) =>
+      Array.from({ length: ORB_SECTORS }, (_, sector) => sampleRegion(frame, orb, ring, sector, rotation)),
+    ),
   )
-  // Each region is judged against its neighbourhood rather than one
-  // global level, so glare or a vignette that lifts part of the orb lifts
-  // the threshold with it. The payload is whitened, so a neighbourhood
-  // nearly always holds both levels; where one shows no real contrast, the
-  // whole orb's split is used instead.
+}
+
+/**
+ * Dense (1) or sparse (0) for every region, from each region's level. Each
+ * is judged against its neighbourhood rather than one global level, so
+ * glare or a vignette that lifts part of the orb lifts the threshold with
+ * it. The payload is whitened, so a neighbourhood nearly always holds both
+ * levels; where one shows no real contrast, the whole orb's split is used.
+ */
+function classify(values: readonly (readonly number[])[]): (0 | 1)[] {
   const whole = split(values.flat())
   const regions: (0 | 1)[] = []
   for (let ring = 0; ring < ORB_RINGS; ring++) {
+    // Only its own ring: an orb may grow denser from centre to edge, and
+    // that must not move the threshold.
+    const row = values[ring]!
     for (let sector = 0; sector < ORB_SECTORS; sector++) {
       const around: number[] = []
-      // Only its own ring: an orb may grow denser or brighter from centre
-      // to edge, and that must not move the threshold.
-      const row = values[ring]!
       for (let ds = -5; ds <= 5; ds++) around.push(row[(sector + ds + ORB_SECTORS) % ORB_SECTORS]!)
       const local = split(around)
       const threshold = local.contrast >= whole.contrast * 0.45 ? local.threshold : whole.threshold
-      regions.push(values[ring]![sector]! > threshold ? 1 : 0)
+      regions.push(row[sector]! > threshold ? 1 : 0)
     }
   }
   return regions
 }
 
 /**
- * Reads the code from a camera frame or a rendered orb, or null when no orb
+ * Reads the code from one camera frame or a rendered orb, or null when no orb
  * is found or its code cannot be recovered. The orb may sit anywhere in the
  * frame, at any rotation; perspective is not yet corrected, so hold the
- * camera square to the screen.
+ * camera square to the screen. A scanning device should read frames through
+ * `createOrbScanner`, which only reports a code two frames agree on.
  */
 export function readOrbFrame(frame: OrbFrame): string | null {
-  const ink = inkOf(frame)
+  const ink = shrink(inkOf(frame), MAX_SIDE)
   const found = locate(ink)
   if (!found) return null
-  const span = (Math.PI * 2) / ORB_SECTORS
-  const steps = ORB_SECTORS * 8
   // Blur and exposure move where the rim's edge appears to be by a few
   // percent, so nearby scales are tried too, nearest first.
   let best: { code: string; corrected: number } | null = null
   for (const scale of [1, 1.03, 0.97, 1.06, 0.94]) {
-    const orb = { ...found, radius: found.radius * scale }
-    const read = readAt(ink, orb, span, steps)
+    const read = readAt(polarGrid(ink, { ...found, radius: found.radius * scale }))
     if (read && (!best || read.corrected < best.corrected)) best = read
     if (best?.corrected === 0) break
   }
   return best?.code ?? null
 }
 
-/** The code read at one scale of a located orb, searching every rotation. */
-function readAt(
-  frame: OrbFrame,
-  orb: { cx: number; cy: number; radius: number },
-  span: number,
-  steps: number,
-): { code: string; corrected: number } | null {
+/** Angular bins per sector: the step the rotation search moves in. */
+const BINS = 8
+/** The bins of a sector a reader samples, clear of its edges. */
+const INNER_BINS = [2, 3, 4, 5] as const
+/** Frames are read at no more than this many pixels on their longer side. */
+const MAX_SIDE = 640
+
+/**
+ * The orb sampled once onto a polar grid: for every ring, the mean level in
+ * each of ORB_SECTORS × BINS angular bins. Every rotation is then a shift
+ * along the grid rather than a fresh pass over the frame.
+ */
+function polarGrid(frame: OrbFrame, orb: { cx: number; cy: number; radius: number }): number[][] {
+  const bins = ORB_SECTORS * BINS
+  const half = Math.max(1, Math.round(orb.radius / 90))
+  return Array.from({ length: ORB_RINGS }, (_, ring) => {
+    const [r0, r1] = orbRingBounds(ring)
+    return Array.from({ length: bins }, (_, bin) => {
+      const a = ((bin + 0.5) / bins) * Math.PI * 2
+      let total = 0
+      for (let i = 1; i <= 4; i++) {
+        const r = (r0 + ((r1 - r0) * (i + 0.5)) / 6) * orb.radius
+        total += patch(frame, orb.cx + Math.sin(a) * r, orb.cy - Math.cos(a) * r, half)
+      }
+      return total / 4
+    })
+  })
+}
+
+/** The code read from a polar grid at the best rotation, if any. */
+function readAt(grid: readonly (readonly number[])[]): { code: string; corrected: number } | null {
+  const bins = ORB_SECTORS * BINS
   let best: { code: string; corrected: number } | null = null
-  for (let k = 0; k < steps; k++) {
-    const rotation = (k / steps) * Math.PI * 2 - span / 2
-    const regions = readRegions(frame, orb, rotation)
+  for (let shift = 0; shift < bins; shift++) {
+    const values = grid.map((row) =>
+      Array.from({ length: ORB_SECTORS }, (_, sector) => {
+        let total = 0
+        for (const inner of INNER_BINS) total += row[(sector * BINS + inner + shift) % bins]!
+        return total / INNER_BINS.length
+      }),
+    )
+    const regions = classify(values)
     // The sync sectors confirm the rotation, allowing a couple to be lost
     // to glare; Reed–Solomon is the final judge of the payload.
     let misses = 0
@@ -521,11 +561,54 @@ function readAt(
       })
     }
     if (misses > 2) continue
-    const read = correctOrbRegions(regions, READ_LIMIT)
+    const read = correctOrbRegions(regions, misses <= 1 ? READ_LIMIT : READ_LIMIT_UNSYNCED)
     if (read && (!best || read.corrected < best.corrected)) best = read
     if (best?.corrected === 0) return best
   }
   return best
+}
+
+/** A frame box-averaged down so its longer side is at most `side` pixels. */
+function shrink(frame: OrbFrame, side: number): OrbFrame {
+  const factor = Math.ceil(Math.max(frame.width, frame.height) / side)
+  if (factor <= 1) return frame
+  const width = Math.floor(frame.width / factor)
+  const height = Math.floor(frame.height / factor)
+  const out = new Uint8ClampedArray(width * height * 4)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let total = 0
+      for (let dy = 0; dy < factor; dy++) {
+        for (let dx = 0; dx < factor; dx++) total += frame.data[((y * factor + dy) * frame.width + x * factor + dx) * 4]!
+      }
+      const at = (y * width + x) * 4
+      out[at] = out[at + 1] = out[at + 2] = total / (factor * factor)
+      out[at + 3] = 255
+    }
+  }
+  return { data: out, width, height }
+}
+
+/**
+ * A scanner for a stream of camera frames: it reports a code only once two
+ * consecutive readable frames agree on it, so a single misread frame can
+ * never become a pairing attempt. Frames with no readable orb in between do
+ * not break the agreement.
+ */
+export function createOrbScanner(): { read: (frame: OrbFrame) => string | null; reset: () => void } {
+  let last: string | null = null
+  return {
+    read(frame) {
+      const code = readOrbFrame(frame)
+      if (code === null) return null
+      const confirmed = code === last
+      last = code
+      return confirmed ? code : null
+    },
+    reset() {
+      last = null
+    },
+  }
 }
 
 export const orbCodeInternals = { rsEncode, rsDecode, locate, readRegions, inkOf }

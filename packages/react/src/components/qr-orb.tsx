@@ -96,7 +96,8 @@ function Finders({ count }: { count: number }) {
 export interface QrOrbProps extends Omit<React.ComponentProps<"div">, "children"> {
   /**
    * What a camera reads. It is not exposed as text, since it may be a
-   * secret such as a pairing link.
+   * secret such as a pairing link. A value too long for a QR code (about
+   * 2,300 characters) draws an empty orb and sets `data-state="invalid"`.
    */
   value: string
   /** The orb's diameter in CSS pixels. Defaults to 320. */
@@ -116,8 +117,16 @@ export interface QrOrbProps extends Omit<React.ComponentProps<"div">, "children"
  * The disc stays light with dark ink in both themes, because scanners need
  * dark on light.
  */
-function QrOrb({ value, size = 320, onSettled, className, "aria-label": ariaLabel, ...props }: QrOrbProps) {
-  const { count, centre, radius, grains } = React.useMemo(() => orbGrains(value), [value])
+function QrOrb({ value, size = 320, onSettled, className, style, "aria-label": ariaLabel, ...props }: QrOrbProps) {
+  // A value too long for any QR code cannot be drawn; the orb is left empty.
+  const orb = React.useMemo(() => {
+    try {
+      return orbGrains(value)
+    } catch {
+      return null
+    }
+  }, [value])
+  const { count, centre, radius, grains } = orb ?? { count: 21, centre: 14.5, radius: 20, grains: [] }
   const svgRef = React.useRef<SVGSVGElement>(null)
   const [settled, setSettled] = React.useState(false)
   const onSettledRef = React.useRef(onSettled)
@@ -128,7 +137,7 @@ function QrOrb({ value, size = 320, onSettled, className, "aria-label": ariaLabe
   useIsomorphicLayoutEffect(() => {
     const svg = svgRef.current
     setSettled(false)
-    if (!svg) return
+    if (!svg || !orb) return
     const done = () => {
       setSettled(true)
       onSettledRef.current?.()
@@ -179,7 +188,7 @@ function QrOrb({ value, size = 320, onSettled, className, "aria-label": ariaLabe
       live = false
       for (const animation of animations) animation.cancel()
     }
-  }, [grains, centre, radius])
+  }, [orb, grains, centre, radius])
 
   const shadeId = `qr-orb-shade-${React.useId().replace(/[^\w-]/g, "")}`
   const view = radius * 2
@@ -189,10 +198,10 @@ function QrOrb({ value, size = 320, onSettled, className, "aria-label": ariaLabe
       role="img"
       aria-label={ariaLabel ?? "QR code"}
       data-slot="qr-orb"
-      data-state={settled ? "settled" : "settling"}
+      data-state={orb === null ? "invalid" : settled ? "settled" : "settling"}
       className={cn("relative inline-grid shrink-0 place-items-center", className)}
-      style={{ width: size, height: size }}
       {...props}
+      style={{ width: size, height: size, ...style }}
     >
       {/* The halo the orb sits in. Behind the disc, so it never touches the code's contrast. */}
       <span
@@ -214,7 +223,7 @@ function QrOrb({ value, size = 320, onSettled, className, "aria-label": ariaLabe
         </defs>
         <circle cx={centre} cy={centre} r={radius} className="fill-background dark:fill-foreground" />
         <circle cx={centre} cy={centre} r={radius} fill={`url(#${shadeId})`} />
-        <Finders count={count} />
+        {orb && <Finders count={count} />}
         {grains.map((grain) => (
           <circle
             key={grain.index}

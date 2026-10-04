@@ -8,7 +8,9 @@ import {
   encodeOrbCode,
   formatOrbCode,
   orbCodeInternals,
+  createOrbScanner,
   parseOrbCode,
+  readOrbFrame,
 } from "./orb-code"
 
 const { rsEncode, rsDecode } = orbCodeInternals
@@ -98,4 +100,36 @@ test("every code mixes bright and dim regions, even a uniform one", () => {
     const bright = regions.filter((value) => value === 1).length
     assert.ok(bright > 25 && bright < 63, `${code}: ${bright} bright of 88`)
   }
+})
+
+/** A frame of coloured noise, with an optional saturated disc in it: no orb code anywhere. */
+function noiseFrame(seed: number, width = 640, height = 520, blob = true) {
+  const random = seeded(seed)
+  const data = new Uint8ClampedArray(width * height * 4)
+  for (let i = 0; i < width * height; i++) {
+    const x = i % width
+    const y = Math.floor(i / width)
+    const inside = blob && (x - 320) ** 2 + (y - 260) ** 2 < 150 ** 2
+    const grain = random()
+    data[i * 4] = inside ? 40 + grain * 60 : 200 + grain * 40
+    data[i * 4 + 1] = inside ? 100 + grain * 80 : 200 + grain * 40
+    data[i * 4 + 2] = inside ? 230 + grain * 25 : 200 + grain * 40
+    data[i * 4 + 3] = 255
+  }
+  return { data, width, height }
+}
+
+test("a frame with no code in it reads as nothing, quickly", () => {
+  for (let seed = 1; seed <= 12; seed++) {
+    const started = performance.now()
+    assert.equal(readOrbFrame(noiseFrame(seed)), null, `seed ${seed}`)
+    assert.ok(performance.now() - started < 1500, `seed ${seed} took too long`)
+  }
+})
+
+test("the scanner never confirms frames it cannot read", () => {
+  const scanner = createOrbScanner()
+  const blank = noiseFrame(1, 64, 64, false)
+  assert.equal(scanner.read(blank), null)
+  assert.equal(scanner.read(blank), null)
 })

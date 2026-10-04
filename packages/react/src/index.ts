@@ -84,6 +84,7 @@ export {
   formatOrbCode,
   parseOrbCode,
   readOrbFrame,
+  createOrbScanner,
   type OrbFrame,
 } from "./lib/orb-code"
 export {

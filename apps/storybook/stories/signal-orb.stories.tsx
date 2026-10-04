@@ -1,7 +1,7 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, fn, userEvent, waitFor, within } from "storybook/test"
-import { Button, SignalOrb, readOrbFrame } from "@nessalabs/ui"
+import { Button, SignalOrb, createOrbScanner, readOrbFrame } from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 
@@ -72,12 +72,16 @@ async function settledStill(canvasElement: HTMLElement) {
 export const Still: Story = {
   args: { still: true },
   parameters: storyDocumentation(
-    "Drawn settled. The play test reads the code back from the drawn pixels with `readOrbFrame`.",
+    "Drawn settled. The play test reads the code back from the drawn pixels with `readOrbFrame`, and proves `createOrbScanner` holds back the first frame and reports the code once a second frame agrees.",
   ),
   play: async ({ canvasElement, args }) => {
     await settledStill(canvasElement)
     await expect(args.onReady).toHaveBeenCalledTimes(1)
-    await expect(readOrbFrame(frameOf(orbCanvas(canvasElement)))).toBe(code)
+    const frame = frameOf(orbCanvas(canvasElement))
+    await expect(readOrbFrame(frame)).toBe(code)
+    const scanner = createOrbScanner()
+    await expect(scanner.read(frame)).toBeNull()
+    await expect(scanner.read(frame)).toBe(code)
   },
 }
 
@@ -128,5 +132,32 @@ export const Live: Story = {
     await expect(readOrbFrame(frameOf(orbCanvas(canvasElement)))).toBe(code)
     await userEvent.click(within(canvasElement).getByRole("button", { name: "Pause" }))
     await waitFor(() => expect(orb).toHaveAttribute("data-state", "still"))
+  },
+}
+
+function SwapExample(props: React.ComponentProps<typeof SignalOrb>) {
+  const [current, setCurrent] = React.useState(props.code)
+  return (
+    <div className="flex flex-col items-center gap-6">
+      <SignalOrb {...props} code={current} still />
+      <Button size="sm" variant="outline" onClick={() => setCurrent("expired")}>
+        Expire code
+      </Button>
+    </div>
+  )
+}
+
+export const Invalid: Story = {
+  parameters: storyDocumentation(
+    "A value that is not a pairing code draws nothing and says so through `data-state`. The play test draws a real code, swaps it for an invalid one — as when a code expires — and proves nothing of the old code is left to scan.",
+  ),
+  render: (args) => <SwapExample {...args} />,
+  play: async ({ canvasElement }) => {
+    await settledStill(canvasElement)
+    await expect(readOrbFrame(frameOf(orbCanvas(canvasElement)))).toBe(code)
+    await userEvent.click(within(canvasElement).getByRole("button", { name: "Expire code" }))
+    await waitFor(() => expect(orbOf(canvasElement)).toHaveAttribute("data-state", "invalid"))
+    const pixels = frameOf(orbCanvas(canvasElement)).data
+    await expect(pixels.some((value, at) => at % 4 === 3 && value !== 0)).toBe(false)
   },
 }
