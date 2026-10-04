@@ -371,9 +371,10 @@ export const CustomRowsAndAnimation: Story = {
       trigger.getAttribute("aria-describedby")!,
     )!
     trigger.focus()
-    await waitFor(() =>
-      expect(getComputedStyle(preview).opacity).toBe("1"),
-    )
+    await waitFor(() => {
+      finishStoryTransitions(preview)
+      expect(getComputedStyle(preview).opacity).toBe("1")
+    })
     await userEvent.click(trigger)
     await expect(trigger).toHaveAttribute("aria-current", "true")
     await expect(canvas.getByText("Viewing: Queue delivered")).toBeVisible()
