@@ -56,7 +56,7 @@ export const CountsDownAndExpires: Story = {
     await waitFor(() =>
       expect(status(canvasElement)).toHaveTextContent(/^Expires in 0:0[12]$/),
     )
-    await expect(within(canvasElement).getByRole("group")).toHaveAccessibleName(
+    await expect(within(canvasElement).getByRole("img")).toHaveAccessibleName(
       "Pairing code K 7 P X 4 Q M 2",
     )
     await waitFor(() => expect(root).toHaveAttribute("data-state", "expired"), { timeout: 4000 })

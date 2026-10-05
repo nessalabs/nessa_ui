@@ -163,7 +163,11 @@ export interface SignalOrbProps extends Omit<React.ComponentProps<"div">, "child
    * motion always draws it still.
    */
   still?: boolean
-  /** Called once the dots have gathered and the orb can be read. */
+  /**
+   * Called once the dots have gathered and this code can be read. Pausing a
+   * live orb, or drawing the same code still after it has already gathered,
+   * does not call it again. A different code does.
+   */
   onReady?: () => void
 }
 
@@ -199,15 +203,24 @@ function SignalOrb({
   React.useEffect(() => {
     onReadyRef.current = onReady
   })
+  // The code already reported as readable. The effect redraws when `still`
+  // flips, and that redraw is not a new reading of the code.
+  const readyCodeRef = React.useRef<string | null>(null)
 
   React.useEffect(() => {
     const canvas = canvasRef.current
     const context = canvas?.getContext("2d")
     if (!regions) {
       // Nothing of a previous code may stay on screen to be scanned.
+      readyCodeRef.current = null
       context?.clearRect(0, 0, canvas?.width ?? 0, canvas?.height ?? 0)
       setState("invalid")
       return
+    }
+    const reportReady = () => {
+      if (readyCodeRef.current === code) return
+      readyCodeRef.current = code
+      onReadyRef.current?.()
     }
     if (!canvas || !context) return
     const ratio = Math.min(2, window.devicePixelRatio || 1)
@@ -272,7 +285,7 @@ function SignalOrb({
     if (!animate) {
       draw(0)
       setState("still")
-      onReadyRef.current?.()
+      reportReady()
       return
     }
 
@@ -287,7 +300,7 @@ function SignalOrb({
       if (!ready && now - start >= GATHER_MS) {
         ready = true
         setState("live")
-        onReadyRef.current?.()
+        reportReady()
       }
       frame = visible && !document.hidden ? requestAnimationFrame(tick) : 0
     }
@@ -309,7 +322,7 @@ function SignalOrb({
       observer?.disconnect()
       document.removeEventListener("visibilitychange", resume)
     }
-  }, [dots, regions, size, still])
+  }, [code, dots, regions, size, still])
 
   return (
     <div

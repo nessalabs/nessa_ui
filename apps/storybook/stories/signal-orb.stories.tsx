@@ -132,6 +132,7 @@ export const Live: Story = {
     await expect(readOrbFrame(frameOf(orbCanvas(canvasElement)))).toBe(code)
     await userEvent.click(within(canvasElement).getByRole("button", { name: "Pause" }))
     await waitFor(() => expect(orb).toHaveAttribute("data-state", "still"))
+    await expect(args.onReady).toHaveBeenCalledTimes(1)
   },
 }
 

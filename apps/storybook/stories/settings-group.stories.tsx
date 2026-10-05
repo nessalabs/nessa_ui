@@ -4,6 +4,7 @@ import { expect, userEvent, within } from "storybook/test"
 import { Laptop, Smartphone } from "lucide-react"
 import {
   Button,
+  Checkbox,
   EmptyState,
   KeyFingerprint,
   SettingsGroup,
@@ -154,6 +155,56 @@ function LinkedDevicesExample() {
       </SettingsGroup>
     </div>
   )
+}
+
+export const NamedControls: Story = {
+  parameters: storyDocumentation(
+    "The row's label names whatever control sits at the end, not only a switch. The play test asks for a checkbox and a native select by the row label.",
+  ),
+  render: () => (
+    <div className="max-w-xl">
+      <SettingsGroup title="Notifications">
+        <SettingsRow label="Email digests" control={<Checkbox defaultChecked />} />
+        <SettingsRow
+          label="Frequency"
+          control={
+            <select
+              defaultValue="daily"
+              className="rounded-md border border-border bg-background px-2 py-1 text-foreground"
+            >
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+            </select>
+          }
+        />
+      </SettingsGroup>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByRole("checkbox", { name: "Email digests" })).toBeChecked()
+    await expect(canvas.getByRole("combobox", { name: "Frequency" })).toHaveValue("daily")
+  },
+}
+
+export const DisabledContent: Story = {
+  parameters: storyDocumentation(
+    "A disabled row disables controls under the label as well as the one at the end. The play test proves the retry button is unavailable.",
+  ),
+  render: () => (
+    <div className="max-w-xl">
+      <SettingsGroup title="Recovery">
+        <SettingsRow label="Send again" disabled control={<Button>Send</Button>}>
+          <Button>Retry</Button>
+        </SettingsRow>
+      </SettingsGroup>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByRole("button", { name: "Send" })).toBeDisabled()
+    await expect(canvas.getByRole("button", { name: "Retry" })).toBeDisabled()
+  },
 }
 
 export const LinkedDevices: Story = {

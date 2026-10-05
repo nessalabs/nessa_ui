@@ -74,12 +74,14 @@ export interface SettingsRowProps
   control?: React.ReactNode
   /**
    * Content under the row's label line, full width — a fingerprint to
-   * compare, an inline error. It stays inside the row.
+   * compare, an inline error, a button beside that error. It stays inside
+   * the row, and a disabled row disables the controls in it.
    */
   children?: React.ReactNode
   /**
-   * Disables every control in the row: they are dimmed, skipped by Tab, and
-   * read as unavailable, as a disabled fieldset makes them.
+   * Disables every control in the row, the one at the end and any passed as
+   * children: they are dimmed, skipped by Tab, and read as unavailable, as
+   * a disabled fieldset makes them.
    */
   disabled?: boolean
 }
@@ -133,15 +135,79 @@ function SettingsRow({
               disabled && "opacity-50",
             )}
           >
-            <ControlLabelContext.Provider value={labelId}>{control}</ControlLabelContext.Provider>
+            <ControlLabelContext.Provider value={labelId}>
+              {withRowLabel(control, labelId)}
+            </ControlLabelContext.Provider>
           </fieldset>
         ) : null}
       </div>
       {children !== undefined ? (
-        <div data-slot="settings-row-content">{children}</div>
+        disabled ? (
+          <fieldset
+            disabled
+            data-slot="settings-row-content"
+            className="m-0 min-w-0 border-0 p-0 opacity-50"
+          >
+            {children}
+          </fieldset>
+        ) : (
+          <div data-slot="settings-row-content">{children}</div>
+        )
       ) : null}
     </div>
   )
+}
+
+type LabelableProps = {
+  children?: React.ReactNode
+  "aria-label"?: string
+  "aria-labelledby"?: string
+}
+
+/** Host elements whose accessible name is their own text. */
+const NAMED_BY_TEXT = new Set(["a", "button", "summary"])
+
+function hasOwnName(props: LabelableProps): boolean {
+  return props["aria-label"] !== undefined || props["aria-labelledby"] !== undefined
+}
+
+function hasTextContent(node: React.ReactNode): boolean {
+  if (typeof node === "string") return node.trim() !== ""
+  if (typeof node === "number") return true
+  if (Array.isArray(node)) return node.some(hasTextContent)
+  if (React.isValidElement<LabelableProps>(node)) return hasTextContent(node.props.children)
+  return false
+}
+
+/**
+ * Points a control that carries no name of its own at the row's label.
+ * A button or link that already says something keeps that name. A checkbox,
+ * switch, input, or native select does not, so it takes the row's — at the
+ * row, where the label is known, rather than only inside controls that
+ * happen to read the label context.
+ */
+function withRowLabel(node: React.ReactNode, labelId: string): React.ReactNode {
+  if (Array.isArray(node)) return node.map((child) => withRowLabel(child, labelId))
+  if (!React.isValidElement<LabelableProps>(node)) return node
+  if (node.type === React.Fragment) {
+    return React.cloneElement(node, {}, withRowLabel(node.props.children, labelId))
+  }
+
+  const props = node.props
+  if (hasOwnName(props)) return node
+
+  if (typeof node.type === "string") {
+    const tag = node.type
+    if (NAMED_BY_TEXT.has(tag) && hasTextContent(props.children)) return node
+    if (tag === "input" || tag === "select" || tag === "textarea" || tag === "button") {
+      return React.cloneElement(node, { "aria-labelledby": labelId })
+    }
+    return React.cloneElement(node, {}, withRowLabel(props.children, labelId))
+  }
+
+  // A component that renders its children, such as Button, already has a name.
+  if (hasTextContent(props.children)) return node
+  return React.cloneElement(node, { "aria-labelledby": labelId })
 }
 
 export { SettingsGroup, SettingsRow }

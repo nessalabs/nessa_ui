@@ -46,12 +46,21 @@ let qrLoading: Promise<QrFactory> | null = null
  * The QR encoder, loaded on first use. It runs work when its module loads,
  * so a static import would put it in every app that imports anything from
  * the package barrel, QR or not; loading it here keeps it out of theirs.
+ *
+ * A failed chunk load drops the cached promise. The next mount tries again
+ * instead of replaying the same rejection forever.
  */
 function loadQrFactory(): Promise<QrFactory> {
-  qrLoading ??= import("qrcode-generator").then((module) => {
-    qrFactory = ((module as { default?: QrFactory }).default ?? module) as QrFactory
-    return qrFactory
-  })
+  qrLoading ??= import("qrcode-generator").then(
+    (module) => {
+      qrFactory = ((module as { default?: QrFactory }).default ?? module) as QrFactory
+      return qrFactory
+    },
+    (error: unknown) => {
+      qrLoading = null
+      throw error
+    },
+  )
   return qrLoading
 }
 
@@ -133,16 +142,23 @@ export interface QrOrbProps extends Omit<React.ComponentProps<"div">, "children"
  * once the code is readable, and with reduced motion it is drawn settled.
  * The disc stays light with dark ink in both themes, because scanners need
  * dark on light. The QR encoder loads on first use, so `data-state` reads
- * `loading` for a moment before the grains appear.
+ * `loading` for a moment before the grains appear. If that chunk never
+ * arrives, `data-state` becomes `invalid` and a later mount can try again.
  */
 function QrOrb({ value, size = 320, onSettled, className, style, "aria-label": ariaLabel, ...props }: QrOrbProps) {
   const [factory, setFactory] = React.useState<QrFactory | null>(() => qrFactory)
+  const [loadFailed, setLoadFailed] = React.useState(false)
   React.useEffect(() => {
     if (factory) return
     let live = true
-    void loadQrFactory().then((loaded) => {
-      if (live) setFactory(() => loaded)
-    })
+    void loadQrFactory().then(
+      (loaded) => {
+        if (live) setFactory(() => loaded)
+      },
+      () => {
+        if (live) setLoadFailed(true)
+      },
+    )
     return () => {
       live = false
     }
@@ -229,7 +245,9 @@ function QrOrb({ value, size = 320, onSettled, className, style, "aria-label": a
       role="img"
       aria-label={ariaLabel ?? "QR code"}
       data-slot="qr-orb"
-      data-state={orb === undefined ? "loading" : orb === null ? "invalid" : settled ? "settled" : "settling"}
+      data-state={
+        loadFailed || orb === null ? "invalid" : orb === undefined ? "loading" : settled ? "settled" : "settling"
+      }
       className={cn("relative inline-grid shrink-0 place-items-center", className)}
       {...props}
       style={{ width: size, height: size, ...style }}
@@ -244,7 +262,7 @@ function QrOrb({ value, size = 320, onSettled, className, style, "aria-label": a
         ref={svgRef}
         aria-hidden="true"
         viewBox={`${origin} ${origin} ${view} ${view}`}
-        className="relative size-full overflow-visible text-foreground dark:text-background"
+        className="relative size-full overflow-visible text-foreground dark:text-background [[data-nessa-mode=dark]_&]:text-background"
       >
         <defs>
           <radialGradient id={shadeId} cx="38%" cy="32%" r="75%">
@@ -252,7 +270,15 @@ function QrOrb({ value, size = 320, onSettled, className, style, "aria-label": a
             <stop offset="100%" stopColor="currentColor" stopOpacity={0.08} />
           </radialGradient>
         </defs>
-        <circle cx={centre} cy={centre} r={radius} className="fill-background dark:fill-foreground" />
+        {/* Dark ink on a light disc in both schemes. `dark:` follows a `.dark`
+            ancestor. The attribute selector follows `data-nessa-mode`, which
+            is what NessaProvider and NessaThemeScope actually publish. */}
+        <circle
+          cx={centre}
+          cy={centre}
+          r={radius}
+          className="fill-background dark:fill-foreground [[data-nessa-mode=dark]_&]:fill-foreground"
+        />
         <circle cx={centre} cy={centre} r={radius} fill={`url(#${shadeId})`} />
         {orb ? <Finders count={count} /> : null}
         {grains.map((grain) => (

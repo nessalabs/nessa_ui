@@ -131,7 +131,7 @@ function PairingCode({
       {...props}
     >
       <div
-        role="group"
+        role="img"
         data-slot="pairing-code-value"
         aria-label={`Pairing code ${code.split("").join(" ")}`}
         className={cn(

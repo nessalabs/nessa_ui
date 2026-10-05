@@ -95,6 +95,21 @@ export const Dark: Story = {
   },
 }
 
+export const ScopedDark: Story = {
+  parameters: storyDocumentation(
+    "Dark chosen with `data-nessa-mode`, and no `.dark` ancestor. The disc stays light and the ink dark, so it still scans. The play test decodes it.",
+  ),
+  render: (args) => (
+    <div data-nessa-mode="dark" className="rounded-lg bg-background p-8">
+      <QrOrb {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    await settled(canvasElement)
+    await expect(await decode(canvasElement)).toBe(link)
+  },
+}
+
 export const TooLong: Story = {
   args: { value: "x".repeat(4000) },
   parameters: storyDocumentation(
