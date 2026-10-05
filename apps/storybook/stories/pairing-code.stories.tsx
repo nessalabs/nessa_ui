@@ -1,6 +1,6 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { expect, fn, waitFor, within } from "storybook/test"
+import { expect, fn, userEvent, waitFor, within } from "storybook/test"
 import { Button, PairingCode, type PairingCodeProps } from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
@@ -64,6 +64,35 @@ export const CountsDownAndExpires: Story = {
     await expect(
       canvasElement.querySelector("[data-slot=pairing-code-announcement]"),
     ).toHaveTextContent("This code has expired")
+    await expect(args.onExpire).toHaveBeenCalledTimes(1)
+  },
+}
+
+function MoveDeadline(props: Omit<PairingCodeProps, "expiresAt">) {
+  const [expiresAt, setExpiresAt] = React.useState(() => Date.now() + 60_000)
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <PairingCode expiresAt={expiresAt} {...props} />
+      <Button size="sm" variant="outline" onClick={() => setExpiresAt(Date.now() - 1000)}>
+        Expire now
+      </Button>
+    </div>
+  )
+}
+
+export const DeadlineMovesPast: Story = {
+  parameters: storyDocumentation(
+    "The host brings the deadline forward into the past while the code is on screen. The play test proves that still counts as the code expiring: it is struck through and `onExpire` is called once. A code first shown already expired does not call it.",
+  ),
+  render: (args) => <MoveDeadline code={args.code} onExpire={args.onExpire} />,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement)
+    const root = canvasElement.querySelector<HTMLElement>("[data-slot=pairing-code]")!
+    await waitFor(() => expect(root).toHaveAttribute("data-state", "open"))
+    await expect(args.onExpire).not.toHaveBeenCalled()
+    await userEvent.click(canvas.getByRole("button", { name: "Expire now" }))
+    await waitFor(() => expect(root).toHaveAttribute("data-state", "expired"))
+    await expect(status(canvasElement)).toHaveTextContent("This code has expired")
     await expect(args.onExpire).toHaveBeenCalledTimes(1)
   },
 }

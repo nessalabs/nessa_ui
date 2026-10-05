@@ -24,8 +24,9 @@ export interface PairingCodeProps
    */
   state?: Exclude<PairingCodeState, "expired">
   /**
-   * Called once when an open code expires while shown. A code first shown
-   * already past its expiry does not call it.
+   * Called once when an open code expires while shown. That includes the
+   * deadline moving into the past after the code was shown still open. A
+   * code first shown already past its expiry does not call it.
    */
   onExpire?: () => void
   /** Characters per group when the code is drawn. Defaults to 4. */
@@ -97,21 +98,40 @@ function PairingCode({
   React.useEffect(() => {
     onExpireRef.current = onExpire
   })
+  // Set once this code has been shown while it could still be used. A
+  // deadline that then moves into the past is that code expiring, so the
+  // host is told. A code first shown already past its deadline never sets
+  // this. The notice remembers which code already reported that expiry, so
+  // the timer and a deadline change cannot both call.
+  const openCodeRef = React.useRef<string | null>(null)
+  const notifiedCodeRef = React.useRef<string | null>(null)
 
   React.useEffect(() => {
     // Decided from a real reading, not from the clockless first render.
     const at = Date.now()
     setNow(at)
-    const first: PairingCodeState = state === "open" && at >= deadline ? "expired" : state
+    const past = state === "open" && at >= deadline
+    const first: PairingCodeState = past ? "expired" : state
     setSeen((prev) => (prev !== null && prev.code === code ? prev : { code, state: first }))
-    if (state !== "open" || at >= deadline) return
+    const notifyExpire = () => {
+      if (notifiedCodeRef.current === code) return
+      notifiedCodeRef.current = code
+      openCodeRef.current = null
+      onExpireRef.current?.()
+    }
+    if (state !== "open" || past) {
+      if (past && openCodeRef.current === code) notifyExpire()
+      return
+    }
+    openCodeRef.current = code
+    notifiedCodeRef.current = null
     // The interval only redraws the countdown; the timeout lands exactly on
     // the deadline, so expiry is never up to a tick late.
     const tick = window.setInterval(() => setNow(Date.now()), 1000)
     const end = window.setTimeout(() => {
       window.clearInterval(tick)
       setNow(Math.max(Date.now(), deadline))
-      onExpireRef.current?.()
+      notifyExpire()
     }, deadline - at)
     return () => {
       window.clearInterval(tick)
