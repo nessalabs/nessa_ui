@@ -1,0 +1,15 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "control-label",
+  "title": "Control label",
+  "description": "How a control with no name of its own takes the name of the row it sits in, so a switch in a settings row is read by that row's label.",
+  "files": [
+    {
+      "path": "packages/react/src/lib/control-label.ts",
+      "content": "\"use client\"\n\nimport * as React from \"react\"\n\n/**\n * The id of the visible text that names the control inside it — a settings\n * row's label, for instance. A control with no name of its own takes this\n * one, so a row reads as \"Allow linking, switch, on\" rather than as an\n * unnamed switch beside some text.\n */\nconst ControlLabelContext = /* @__PURE__ */ React.createContext<string | undefined>(undefined)\n\n/**\n * The naming props for a control: its own `aria-label` or\n * `aria-labelledby` when it has one, otherwise the enclosing label's id.\n */\nfunction useControlLabel(own: {\n  \"aria-label\"?: string\n  \"aria-labelledby\"?: string\n}): { \"aria-label\"?: string; \"aria-labelledby\"?: string } {\n  const enclosing = React.useContext(ControlLabelContext)\n  if (own[\"aria-label\"] !== undefined || own[\"aria-labelledby\"] !== undefined) {\n    return own\n  }\n  return enclosing === undefined ? {} : { \"aria-labelledby\": enclosing }\n}\n\nexport { ControlLabelContext, useControlLabel }\n",
+      "type": "registry:lib",
+      "target": "lib/control-label.ts"
+    }
+  ],
+  "type": "registry:lib"
+}

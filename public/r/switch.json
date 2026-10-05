@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "switch",
+  "title": "Switch",
+  "description": "An on/off setting that takes effect at once: a role=switch button, controlled or uncontrolled, named by the settings row it sits in.",
+  "registryDependencies": [
+    "nessalabs/nessa_ui/control-label",
+    "nessalabs/nessa_ui/nessa-base",
+    "nessalabs/nessa_ui/utils"
+  ],
+  "files": [
+    {
+      "path": "packages/react/src/components/switch.tsx",
+      "content": "\"use client\"\n\nimport * as React from \"react\"\n\nimport { useControlLabel } from \"@/lib/control-label\"\nimport { cn } from \"@/lib/utils\"\n\nexport interface SwitchProps\n  extends Omit<\n    React.ComponentProps<\"button\">,\n    \"type\" | \"role\" | \"aria-checked\" | \"onChange\" | \"value\" | \"defaultValue\"\n  > {\n  /** Whether the switch is on. Pass it to control the switch. */\n  checked?: boolean\n  /** Whether the switch starts on, when it is not controlled. */\n  defaultChecked?: boolean\n  /** Called with the new state each time the switch is turned. */\n  onCheckedChange?: (checked: boolean) => void\n}\n\n/**\n * An on/off setting that takes effect at once: a `role=\"switch\"` button, so\n * Space and Enter turn it and assistive technology reads it as on or off.\n *\n * Use `Checkbox` for a choice that is submitted with a form; use Switch when\n * turning it is itself the action. Inside a `SettingsRow` it takes the row's\n * label as its name; elsewhere give it an `aria-label`.\n */\nfunction Switch({\n  checked,\n  defaultChecked = false,\n  onCheckedChange,\n  onClick,\n  className,\n  \"aria-label\": ariaLabel,\n  \"aria-labelledby\": ariaLabelledby,\n  ...props\n}: SwitchProps) {\n  const [own, setOwn] = React.useState(defaultChecked)\n  const on = checked ?? own\n  const name = useControlLabel({\n    \"aria-label\": ariaLabel,\n    \"aria-labelledby\": ariaLabelledby,\n  })\n\n  return (\n    <button\n      type=\"button\"\n      role=\"switch\"\n      aria-checked={on}\n      data-slot=\"switch\"\n      data-state={on ? \"on\" : \"off\"}\n      {...name}\n      {...props}\n      onClick={(event) => {\n        onClick?.(event)\n        if (event.defaultPrevented) return\n        if (checked === undefined) setOwn(!on)\n        onCheckedChange?.(!on)\n      }}\n      className={cn(\n        \"relative inline-flex h-5 w-8.5 shrink-0 cursor-pointer appearance-none items-center rounded-full border-0 p-0.5 outline-none\",\n        \"bg-foreground/15 data-[state=on]:bg-primary\",\n        \"transition-[background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none\",\n        \"focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring\",\n        \"disabled:cursor-not-allowed disabled:opacity-50\",\n        className,\n      )}\n    >\n      <span\n        aria-hidden=\"true\"\n        data-slot=\"switch-thumb\"\n        className={cn(\n          \"pointer-events-none block size-4 rounded-full bg-background shadow-xs\",\n          \"translate-x-0 data-[state=on]:translate-x-3.5\",\n          \"transition-transform [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none\",\n        )}\n        data-state={on ? \"on\" : \"off\"}\n      />\n    </button>\n  )\n}\n\nexport { Switch }\n",
+      "type": "registry:ui",
+      "target": "components/ui/switch.tsx"
+    }
+  ],
+  "type": "registry:ui"
+}

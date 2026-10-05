@@ -242,4 +242,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-017",
+    kind: "transition",
+    contractId: "SRC-002",
+    baseRevision: "8aaeb437037c1c53de6276314b26d5fa0420da86",
+    targets: ["validation/exceptions.ts"],
+    beforeFingerprint: "1478cfcbe36c7482ca688a93fb840ee58c94d9b28f54f3b151a994501a049752",
+    afterFingerprint: "7d59b7c0e7937612bbc2cfbba2ca7327a90fa2f369dd22187f7c062b53284d5c",
+    rationale: "QrOrb draws a QR code, and a QR code is only read when its ink is dark on a light ground. Every semantic surface token swaps ends in Dark, so the orb cannot stay readable through tokens alone: in Dark it takes the other end of the same foreground/background pair. That is two exact `dark:` occurrences in one file, each ledgered at one, instead of a fixed colour.",
+    compatibility: "Additive. No existing component, token or exception changes; the two occurrences are confined to the new qr-orb file and capped at one each.",
+    migration: "None for consumers. The entries are removed when a scheme-fixed light ground and ink token pair exists and QrOrb moves onto it.",
+    supersedes: null,
+    pullRequest: null,
+  },
 ])

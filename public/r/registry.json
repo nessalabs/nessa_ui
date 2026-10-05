@@ -3083,6 +3083,140 @@
           "target": "components/ui/code-editor-syntax.ts"
         }
       ]
+    },
+    {
+      "name": "control-label",
+      "type": "registry:lib",
+      "title": "Control label",
+      "description": "How a control with no name of its own takes the name of the row it sits in, so a switch in a settings row is read by that row's label.",
+      "files": [
+        {
+          "path": "packages/react/src/lib/control-label.ts",
+          "type": "registry:lib",
+          "target": "lib/control-label.ts"
+        }
+      ]
+    },
+    {
+      "name": "switch",
+      "type": "registry:ui",
+      "title": "Switch",
+      "description": "An on/off setting that takes effect at once: a role=switch button, controlled or uncontrolled, named by the settings row it sits in.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/control-label",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/switch.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/switch.tsx"
+        }
+      ]
+    },
+    {
+      "name": "settings-group",
+      "type": "registry:ui",
+      "title": "Settings group",
+      "description": "A titled card of settings rows with hairlines between them and an optional footnote, and the row itself: label, detail, leading mark, control, and content under the label.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/control-label",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/settings-group.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/settings-group.tsx"
+        }
+      ]
+    },
+    {
+      "name": "key-fingerprint",
+      "type": "registry:ui",
+      "title": "Key fingerprint",
+      "description": "A key fingerprint drawn for comparing by eye across devices: monospaced, upper-cased, in even groups that wrap between groups, read group by group by assistive technology.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/key-fingerprint.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/key-fingerprint.tsx"
+        }
+      ]
+    },
+    {
+      "name": "pairing-code",
+      "type": "registry:ui",
+      "title": "Pairing code",
+      "description": "A one-use pairing code shown large, with a countdown to expiry that stops when it expires, and used, cancelled, and expired states that strike the code through.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/pairing-code.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/pairing-code.tsx"
+        }
+      ]
+    },
+    {
+      "name": "qr-orb",
+      "type": "registry:ui",
+      "title": "QR orb",
+      "description": "A QR code drawn as an orb of sand: a real, scannable code at its centre with crisp finder corners and a clean quiet zone, decoration fading to the rim, and grains that spiral in and settle still.",
+      "dependencies": [
+        "qrcode-generator"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/qr-orb.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/qr-orb.tsx"
+        }
+      ]
+    },
+    {
+      "name": "orb-code",
+      "type": "registry:lib",
+      "title": "Orb code",
+      "description": "The signal orb's code: a pairing code as dense and sparse regions of an orb with Reed-Solomon error correction, and the reader that recovers it from a camera frame at any rotation, on a light or dark screen, through blur and glare.",
+      "files": [
+        {
+          "path": "packages/react/src/lib/orb-code.ts",
+          "type": "registry:lib",
+          "target": "lib/orb-code.ts"
+        }
+      ]
+    },
+    {
+      "name": "signal-orb",
+      "type": "registry:ui",
+      "title": "Signal orb",
+      "description": "A pairing code carried by an orb of fine blue dots, like a phone's setup screen: the code hides in where the dots gather densely or thin out, readable by the matching orb-code reader but not a stock camera app. The dots ripple in place.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/orb-code",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/signal-orb.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/signal-orb.tsx"
+        }
+      ]
     }
   ]
 }
