@@ -107,6 +107,21 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
       if (value === undefined) setOwn(next)
       onValueChange?.(next)
     }
+
+    // An uncontrolled field returns to `defaultValue` when its form resets.
+    // The input is always rendered with a value, so the browser's own reset
+    // cannot reach it; the field listens for the form's reset instead.
+    const resetRef = React.useRef<() => void>(() => {})
+    resetRef.current = () => {
+      if (value === undefined && own !== defaultValue) change(defaultValue)
+    }
+    React.useEffect(() => {
+      const form = inputRef.current?.form
+      if (!form) return
+      const onReset = () => resetRef.current()
+      form.addEventListener("reset", onReset)
+      return () => form.removeEventListener("reset", onReset)
+    }, [])
     // A field that cannot change — read-only, or controlled with nobody
     // listening — has nothing to clear, so it shows no clear button and
     // leaves Escape to the host.

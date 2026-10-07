@@ -69,11 +69,31 @@ function Choices({
       ? { "aria-labelledby": rowLabel }
       : ownLabel
   const idPrefix = React.useId()
+  const groupRef = React.useRef<HTMLDivElement | null>(null)
+
+  // An uncontrolled group returns to `defaultValue` when its form resets. A
+  // native reset fires no change event on the radios, so the group listens
+  // for the form's reset instead.
+  const resetRef = React.useRef<() => void>(() => {})
+  resetRef.current = () => {
+    if (value === undefined && own !== defaultValue) {
+      setOwn(defaultValue)
+      if (defaultValue !== undefined) onValueChange?.(defaultValue)
+    }
+  }
+  React.useEffect(() => {
+    const form = groupRef.current?.closest("form")
+    if (!form) return
+    const onReset = () => resetRef.current()
+    form.addEventListener("reset", onReset)
+    return () => form.removeEventListener("reset", onReset)
+  }, [])
 
   return (
     <div
       {...props}
       {...label}
+      ref={groupRef}
       role="radiogroup"
       data-slot="choices"
       aria-disabled={disabled || undefined}

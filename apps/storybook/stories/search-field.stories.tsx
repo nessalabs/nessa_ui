@@ -211,6 +211,7 @@ export const HostCancelsEscape: Story = {
     </div>
   ),
   play: async ({ canvasElement }) => {
+    onHostKeyDown.mockClear()
     const field = within(canvasElement).getByRole("searchbox", { name: "Kept search" })
     await userEvent.click(field)
     await userEvent.keyboard("{Escape}")
@@ -254,6 +255,34 @@ function FixedFieldsExample() {
       <SearchField aria-label="Fixed search" value="pinned" shortcut="/" />
     </div>
   )
+}
+
+const onFormQuery = fn()
+
+export const FormReset: Story = {
+  parameters: storyDocumentation(
+    "An uncontrolled field in a form returns to its `defaultValue` when the form resets, and tells the host. The play test edits the query, resets the form, and proves the field and the host both see the default again.",
+  ),
+  render: () => (
+    <form className="flex max-w-xs flex-col gap-2">
+      <SearchField aria-label="Saved search" defaultValue="open" onValueChange={onFormQuery} />
+      <button type="reset">Reset</button>
+    </form>
+  ),
+  play: async ({ canvasElement }) => {
+    onFormQuery.mockClear()
+    const canvas = within(canvasElement)
+    const field = canvas.getByRole("searchbox", { name: "Saved search" })
+    await userEvent.clear(field)
+    await userEvent.type(field, "closed")
+    await expect(field).toHaveValue("closed")
+    await userEvent.click(canvas.getByRole("button", { name: "Reset" }))
+    await expect(field).toHaveValue("open")
+    await expect(onFormQuery).toHaveBeenLastCalledWith("open")
+    // It stays reset through the next render rather than snapping back.
+    await userEvent.type(field, "!")
+    await expect(field).toHaveValue("open!")
+  },
 }
 
 export const Disabled: Story = {

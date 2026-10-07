@@ -101,3 +101,28 @@ export const Controlled: Story = {
     await expect(canvas.getByTestId("density")).toHaveTextContent("density: compact")
   },
 }
+
+export const FormReset: Story = {
+  parameters: storyDocumentation(
+    "An uncontrolled group in a form returns to its `defaultValue` when the form resets — the radio and the card's chosen look both. The play test chooses another card, resets the form, and proves the default is chosen again.",
+  ),
+  render: (args) => (
+    <form className="flex max-w-md flex-col gap-2">
+      <Choices {...args} />
+      <button type="reset">Reset</button>
+    </form>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await userEvent.click(canvas.getByRole("radio", { name: "Dark" }))
+    await expect(canvas.getByRole("radio", { name: "Dark" })).toBeChecked()
+    await userEvent.click(canvas.getByRole("button", { name: "Reset" }))
+    const system = canvas.getByRole("radio", { name: "System" })
+    await expect(system).toBeChecked()
+    await expect(system.closest("label")).toHaveAttribute("data-state", "checked")
+    await expect(canvas.getByRole("radio", { name: "Dark" }).closest("label")).toHaveAttribute(
+      "data-state",
+      "unchecked",
+    )
+  },
+}

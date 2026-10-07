@@ -57,17 +57,23 @@ export const Tones: Story = {
   },
 }
 
-const rows = ["Plan the release", "Fix flaky story", "Review tokens"]
+const initialRows = ["Plan the release", "Fix flaky story", "Review tokens"]
+
+// A disclosure always comes with its handler: `open` alone is a type error,
+// so a header can never draw a disclosure button that does nothing.
+// @ts-expect-error `open` requires `onOpenChange`.
+const _openWithoutHandler = <GroupHeader label="Projects" open />
+void _openWithoutHandler
 
 function CollapsibleExample() {
   const [open, setOpen] = React.useState(true)
-  const [added, setAdded] = React.useState(0)
+  const [rows, setRows] = React.useState(initialRows)
   const contentId = React.useId()
   return (
     <div className="max-w-xs">
       <GroupHeader
         label="Projects"
-        count={rows.length + added}
+        count={rows.length}
         open={open}
         onOpenChange={setOpen}
         controls={contentId}
@@ -78,7 +84,7 @@ function CollapsibleExample() {
             variant="plain"
             shape="pill"
             aria-label="New project"
-            onClick={() => setAdded((count) => count + 1)}
+            onClick={() => setRows((all) => [...all, `Untitled ${all.length + 1}`])}
           >
             <Plus />
           </Button>
@@ -120,5 +126,8 @@ export const Collapsible: Story = {
     await waitFor(() => expect(getComputedStyle(add.parentElement!).opacity).toBe("1"))
     await userEvent.keyboard("{Enter}")
     await expect(canvas.getByRole("button", { name: "Projects 4" })).toBe(toggle)
+    // The count is the rows drawn under it.
+    await expect(within(region).getAllByRole("listitem")).toHaveLength(4)
+    await expect(within(region).getByRole("button", { name: "Untitled 4" })).toBeInTheDocument()
   },
 }

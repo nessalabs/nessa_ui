@@ -16,7 +16,7 @@ type HeadingLevel = 2 | 3 | 4 | 5 | 6
 const revealOnHoverClassName =
   "[@media(hover:hover)_and_(pointer:fine)]:opacity-0 [@media(hover:hover)_and_(pointer:fine)]:group-hover/group-header:opacity-100 [@media(hover:hover)_and_(pointer:fine)]:group-has-[:focus-visible]/group-header:opacity-100"
 
-export interface GroupHeaderProps
+interface GroupHeaderBaseProps
   extends Omit<React.ComponentProps<"div">, "children"> {
   /** The group's name. */
   label: React.ReactNode
@@ -28,15 +28,6 @@ export interface GroupHeaderProps
    * @defaultValue "quiet"
    */
   tone?: "quiet" | "strong"
-  /**
-   * Whether the group is open. Passing it makes the label a disclosure
-   * button with a chevron; the host shows or hides the group's content.
-   */
-  open?: boolean
-  /** Called with the next open state when the disclosure is operated. */
-  onOpenChange?: (open: boolean) => void
-  /** The id of the content the disclosure shows and hides. */
-  controls?: string
   /** A control at the end of the header — add, filter, more. */
   action?: React.ReactNode
   /**
@@ -51,6 +42,33 @@ export interface GroupHeaderProps
    */
   level?: HeadingLevel
 }
+
+/** A header whose label is a disclosure: `open` comes with its handler. */
+interface GroupHeaderDisclosureProps {
+  /**
+   * Whether the group is open. Passing it makes the label a disclosure
+   * button with a chevron; the host shows or hides the group's content.
+   */
+  open: boolean
+  /**
+   * Called with the next open state when the disclosure is operated.
+   * Required with `open`, so a disclosure is never a button that does
+   * nothing.
+   */
+  onOpenChange: (open: boolean) => void
+  /** The id of the content the disclosure shows and hides. */
+  controls?: string
+}
+
+/** A plain header: no disclosure. */
+interface GroupHeaderStaticProps {
+  open?: undefined
+  onOpenChange?: undefined
+  controls?: undefined
+}
+
+export type GroupHeaderProps = GroupHeaderBaseProps &
+  (GroupHeaderDisclosureProps | GroupHeaderStaticProps)
 
 /**
  * The label above a group of rows: a heading with an optional count, an
@@ -76,7 +94,8 @@ function GroupHeader({
   ...props
 }: GroupHeaderProps) {
   const Heading = `h${level}` as const
-  const collapsible = open !== undefined
+  // A disclosure needs both halves; a plain JS caller passing `open` alone gets a plain heading.
+  const collapsible = open !== undefined && onOpenChange !== undefined
   const text = (
     <>
       <span data-slot="group-header-label" className="min-w-0 truncate">
