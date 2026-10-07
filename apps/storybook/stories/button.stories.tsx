@@ -2,7 +2,7 @@ import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, userEvent, within } from "storybook/test"
 import { Button } from "@nessalabs/ui"
-import { ArrowRight, Plus } from "lucide-react"
+import { ArrowRight, ChevronDown, Plus } from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"
 
@@ -21,13 +21,29 @@ const meta = {
   argTypes: {
     variant: {
       control: "select",
-      options: ["default", "secondary", "outline", "ghost", "link", "destructive"],
+      options: [
+        "default",
+        "secondary",
+        "outline",
+        "ghost",
+        "link",
+        "destructive",
+        "tinted",
+        "plain",
+        "inverse",
+        "danger",
+      ],
       description: "Controls the action's semantic emphasis.",
     },
     size: {
       control: "select",
-      options: ["sm", "default", "lg", "icon", "icon-sm"],
+      options: ["sm", "default", "lg", "icon", "icon-sm", "30", "28", "26", "24", "22"],
       description: "Controls the button's height and horizontal padding.",
+    },
+    shape: {
+      control: "inline-radio",
+      options: ["default", "pill"],
+      description: "Keeps the theme's control radius, or rounds the ends fully.",
     },
     asChild: {
       description:
@@ -110,6 +126,73 @@ export const AllVariants: Story = {
       <Button variant="link">Link</Button>
     </div>
   ),
+}
+
+const compactSizes = ["30", "28", "26", "24", "22"] as const
+
+export const Compact: Story = {
+  parameters: storyDocumentation(
+    "The compact family for toolbars, rows and headers: `tinted`, `plain`, `inverse` and `danger` at 22–30px with `shape=\"pill\"`. A selected chip says so with `aria-pressed`. The play test measures each height, proves `plain` has no fill at rest while `tinted` does, that a pressed chip holds the hover fill, and that keyboard focus draws a 1.5px solid outline rather than the 3px ring.",
+  ),
+  render: () => (
+    <div className="flex flex-col gap-3">
+      {compactSizes.map((size) => (
+        <div key={size} className="flex flex-wrap items-center gap-2">
+          <Button shape="pill" size={size} variant="tinted" data-testid={`tinted-${size}`}>
+            Open
+          </Button>
+          <Button shape="pill" size={size} variant="plain">
+            Filter
+            <ChevronDown />
+          </Button>
+          <Button shape="pill" size={size} variant="inverse">
+            Approve
+          </Button>
+          <Button shape="pill" size={size} variant="danger">
+            Revoke
+          </Button>
+          <Button shape="pill" size={size} variant="link">
+            Details
+          </Button>
+        </div>
+      ))}
+      <div className="flex items-center gap-1">
+        <Button shape="pill" size="22" variant="plain" aria-pressed="true">
+          Running 3
+        </Button>
+        <Button shape="pill" size="22" variant="plain" aria-pressed="false">
+          Waiting 1
+        </Button>
+      </div>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    for (const size of compactSizes) {
+      const height = canvas.getByTestId(`tinted-${size}`).getBoundingClientRect().height
+      await expect(height).toBe(Number(size))
+    }
+    const [plain] = canvas.getAllByRole("button", { name: "Filter" })
+    const [tinted] = canvas.getAllByRole("button", { name: "Open" })
+    await expect(getComputedStyle(plain!).backgroundColor).toBe("rgba(0, 0, 0, 0)")
+    await expect(getComputedStyle(tinted!).backgroundColor).not.toBe("rgba(0, 0, 0, 0)")
+    const pressed = canvas.getByRole("button", { name: "Running 3", pressed: true })
+    const resting = canvas.getByRole("button", { name: "Waiting 1", pressed: false })
+    await expect(getComputedStyle(pressed).backgroundColor).not.toBe(
+      getComputedStyle(resting).backgroundColor,
+    )
+    pressed.blur()
+    resting.focus()
+    await userEvent.tab({ shift: true })
+    await expect(pressed).toHaveFocus()
+    const focused = getComputedStyle(pressed)
+    await expect(focused.outlineStyle).toBe("solid")
+    // Chromium snaps outline widths down to whole device pixels, so the
+    // 1.5px token draws 1px at 1x and 1.5px at 2x.
+    const dpr = window.devicePixelRatio
+    await expect(focused.outlineWidth).toBe(`${Math.max(1, Math.floor(1.5 * dpr)) / dpr}px`)
+    await expect(focused.boxShadow).not.toContain("3px")
+  },
 }
 
 function FormComposition() {

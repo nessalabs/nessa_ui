@@ -169,6 +169,18 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
+  // The compact variants (tinted, plain, inverse, danger) share one solid
+  // outline in place of the translucent ring, so it is counted once per
+  // variant that composes it.
+  {
+    component: "button",
+    layer: "outline",
+    state: "focus-visible:compact",
+    className: "focus-visible:outline-ring",
+    count: 4,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
   { component: "button", layer: "border", state: "focus-visible:border", className: "focus-visible:border-ring", light: { token: "--ring", opacity: 1 }, dark: { token: "--ring", opacity: 1 } },
   { component: "badge", layer: "border", state: "focus-visible:border", className: "focus-visible:border-ring", light: { token: "--ring", opacity: 1 }, dark: { token: "--ring", opacity: 1 } },
   { component: "input", layer: "border", state: "focus-visible:border", className: "focus-visible:border-ring", light: { token: "--ring", opacity: 1 }, dark: { token: "--ring", opacity: 1 } },
@@ -614,6 +626,12 @@ export const focusSurfaces = Object.freeze(["--background", "--card", "--popover
 // review-owned by A11Y-003 while ring/border colors are measured by A11Y-002.
 export const focusGeometryClasses = Object.freeze([
   { component: "button", className: "focus-visible:ring-[3px]" },
+  // The compact variants trade the 3px ring for a 1.5px solid outline,
+  // outset by 1px so it clears the pill's fill.
+  { component: "button", className: "focus-visible:ring-0", count: 4 },
+  { component: "button", className: "focus-visible:outline-solid", count: 4 },
+  { component: "button", className: "focus-visible:outline-(length:--nessa-focus-outline-width)", count: 4 },
+  { component: "button", className: "focus-visible:outline-offset-1", count: 4 },
   { component: "badge", className: "focus-visible:ring-[3px]" },
   { component: "input", className: "focus-visible:ring-[3px]" },
   { component: "questionnaire", className: "focus-visible:outline-2", count: 1 },
