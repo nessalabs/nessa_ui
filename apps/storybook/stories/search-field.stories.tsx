@@ -101,7 +101,10 @@ export const ClearAndEscape: Story = {
     await expect(field).toHaveFocus()
     await expect(onClear).toHaveBeenCalledTimes(1)
 
+    // Escape during IME composition belongs to the composition.
     await userEvent.type(field, "plan")
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", isComposing: true, bubbles: true }))
+    await expect(field).toHaveValue("plan")
     onHostEscape.mockClear()
     await userEvent.keyboard("{Escape}")
     await expect(field).toHaveValue("")
