@@ -21,7 +21,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A search box: a magnifier, the query, and at the end either the key that focuses it (while empty and unfocused) or a button that clears it (once there is text). Escape clears a non-empty query and keeps focus; on an empty field Escape is left to the host. A Radix overlay around the field (Drawer, DropdownMenu, Popover) hears Escape first, so guard its `onEscapeKeyDown`: prevent it when the target has `data-clearable`, which the input carries exactly while Escape will clear it. Three heights: `sm` 28px, `md` 32px, `lg` 36px. Name it with `aria-label` when no visible label does.",
+          "A search box: a magnifier, the query, and at the end either the key that focuses it (while empty and unfocused) or a button that clears it (once there is text). Escape clears a non-empty query and keeps focus; on an empty field Escape is left to the host. A Radix overlay around the field (Drawer, DropdownMenu, Popover) hears Escape first, so guard its `onEscapeKeyDown`: prevent it when the target has `data-clearable`, which the input carries while it holds text it can clear. Three heights: `sm` 28px, `md` 32px, `lg` 36px. Name it with `aria-label` when no visible label does.",
       },
     },
   },
@@ -221,7 +221,7 @@ export const HostCancelsEscape: Story = {
 
 export const InADrawer: Story = {
   parameters: storyDocumentation(
-    "A search field inside a Drawer. The drawer hears Escape first, so the host guards it: `onEscapeKeyDown` prevents the close while the event's target carries `data-clearable`. The play test proves the first Escape clears the query and the drawer stays open, and the next one closes the drawer — and that a read-only field holding text does not hold the drawer open.",
+    "A search field inside a Drawer. The drawer hears Escape first, so the host guards it: `onEscapeKeyDown` prevents the close while the event's target carries `data-clearable`. The play test proves the first Escape clears the query and the drawer stays open, and the next one closes the drawer.",
   ),
   render: () => <DrawerExample readOnly={false} />,
   play: async ({ canvasElement }) => {
@@ -257,7 +257,7 @@ function FixedFieldsExample() {
 }
 
 export const Disabled: Story = {
-  parameters: storyDocumentation("A disabled field is dimmed and cannot be typed in."),
+  parameters: storyDocumentation("A disabled field is dimmed, cannot be typed in, and has nothing to clear."),
   render: () => (
     <div className="max-w-xs">
       <SearchField aria-label="Search" placeholder="Search" disabled defaultValue="locked" />
@@ -265,7 +265,10 @@ export const Disabled: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await expect(canvas.getByRole("searchbox", { name: "Search" })).toBeDisabled()
-    await expect(canvas.getByRole("button", { name: "Clear search", hidden: true })).toBeDisabled()
+    const field = canvas.getByRole("searchbox", { name: "Search" })
+    await expect(field).toBeDisabled()
+    // A disabled field cannot be cleared, so it gives an overlay guard nothing to hold.
+    await expect(field).not.toHaveAttribute("data-clearable")
+    await expect(canvas.queryByRole("button", { name: "Clear search", hidden: true })).toBeNull()
   },
 }

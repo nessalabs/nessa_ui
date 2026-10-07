@@ -61,9 +61,12 @@ export interface SearchFieldProps
  * field — Drawer, DropdownMenu, Popover — listens for Escape on the document
  * before the field sees it, so it closes on that same key unless the host
  * guards it: in the overlay's `onEscapeKeyDown`, call `preventDefault()` when
- * the event's target carries `data-clearable` — the input has it exactly
- * while Escape will clear it, so a read-only field holding text still lets
- * the overlay close. The field still clears, because only a
+ * the event's target carries `data-clearable` — the input has it while it
+ * holds text it can clear (not read-only, disabled, or controlled with no
+ * `onValueChange`), so a read-only field holding text still lets the overlay
+ * close. Two cases it does not cover: during IME composition Escape cancels
+ * the composition, and a host whose own `onKeyDown` cancels Escape should
+ * not also guard the overlay, or the key does nothing. The field still clears, because only a
  * `preventDefault()` called by its own `onKeyDown` prop cancels the clear.
  *
  * The clear button is skipped by Tab, since Escape does the same from the
@@ -108,7 +111,10 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
     // listening — has nothing to clear, so it shows no clear button and
     // leaves Escape to the host.
     const clearable =
-      query !== "" && !props.readOnly && (value === undefined || onValueChange !== undefined)
+      query !== "" &&
+      !disabled &&
+      !props.readOnly &&
+      (value === undefined || onValueChange !== undefined)
     const clear = () => {
       change("")
       onClear?.()
