@@ -3120,6 +3120,45 @@
       ]
     },
     {
+      "name": "kbd",
+      "type": "registry:ui",
+      "title": "Kbd",
+      "description": "A key or a chord written as one key cap, on the kbd element, as menus, fields and tooltips show a shortcut.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/kbd.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/kbd.tsx"
+        }
+      ]
+    },
+    {
+      "name": "search-field",
+      "type": "registry:ui",
+      "title": "Search field",
+      "description": "A search box in three heights with a magnifier, the shortcut that focuses it while empty, and a clear button once there is text; Escape clears.",
+      "dependencies": [
+        "class-variance-authority",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/kbd",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/search-field.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/search-field.tsx"
+        }
+      ]
+    },
+    {
       "name": "settings-group",
       "type": "registry:ui",
       "title": "Settings group",

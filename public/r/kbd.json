@@ -1,0 +1,19 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "kbd",
+  "title": "Kbd",
+  "description": "A key or a chord written as one key cap, on the kbd element, as menus, fields and tooltips show a shortcut.",
+  "registryDependencies": [
+    "nessalabs/nessa_ui/nessa-base",
+    "nessalabs/nessa_ui/utils"
+  ],
+  "files": [
+    {
+      "path": "packages/react/src/components/kbd.tsx",
+      "content": "import * as React from \"react\"\n\nimport { cn } from \"@/lib/utils\"\n\n/**\n * A key, or a chord written as one cap — `⌘K`, `Esc`, `⇧⌘P` — as a menu, a\n * field or a tooltip shows it. It is the `<kbd>` element, so assistive\n * technology reads it as keyboard input; it does not bind the key, which\n * stays the host's job.\n */\nfunction Kbd({ className, ...props }: React.ComponentProps<\"kbd\">) {\n  return (\n    <kbd\n      data-slot=\"kbd\"\n      className={cn(\n        \"inline-flex h-4.5 min-w-4.5 shrink-0 items-center justify-center gap-0.5 rounded-sm bg-muted px-1 font-sans nessa-text-1 font-medium text-muted-foreground tabular-nums\",\n        className,\n      )}\n      {...props}\n    />\n  )\n}\n\nexport { Kbd }\n",
+      "type": "registry:ui",
+      "target": "components/ui/kbd.tsx"
+    }
+  ],
+  "type": "registry:ui"
+}
