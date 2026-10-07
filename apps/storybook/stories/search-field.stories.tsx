@@ -190,7 +190,10 @@ export const InADrawer: Story = {
     await userEvent.type(field, "plan")
     await userEvent.keyboard("{Escape}")
     await expect(field).toHaveValue("")
-    await expect(body.getByRole("dialog", { name: "Sessions" })).toBeInTheDocument()
+    // A closing drawer stays in the DOM while it slides out, so presence
+    // proves nothing; its open state is what the guard keeps.
+    await expect(dialog).toHaveAttribute("data-state", "open")
+    await expect(field).toHaveFocus()
     await userEvent.keyboard("{Escape}")
     await waitFor(() => expect(body.queryByRole("dialog", { name: "Sessions" })).toBeNull())
   },
