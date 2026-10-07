@@ -25,6 +25,17 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.556 0 0);
+  /* The surface family. --background is the canvas, --card the raised layer
+     and --popover the overlay; these fill the two tones between them and the
+     elevation that tells layers apart where a tone step alone cannot.
+     Panel is docked chrome — toolbars, pane headers, status bars — one step
+     off the canvas; sunken is an inset well (code, table heads, summaries)
+     inside whatever surface holds it. Text on either uses the canvas
+     foregrounds. */
+  --nessa-surface-panel: oklch(0.985 0 0);
+  --nessa-surface-sunken: oklch(0.97 0 0);
+  --nessa-shadow-raised: 0 1px 2px 0 oklch(0 0 0 / 0.05), 0 1px 1px -0.5px oklch(0 0 0 / 0.04);
+  --nessa-shadow-overlay: 0 2px 6px -1px oklch(0 0 0 / 0.06), 0 12px 32px -8px oklch(0 0 0 / 0.16);
   --radius: 0.625rem;
   --nessa-font-sans: "Geist Variable", "Geist", ui-sans-serif, system-ui, sans-serif;
   --nessa-font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, monospace;
@@ -180,7 +191,8 @@
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  /* One step above --card, so a menu opened over a card still lifts off it. */
+  --popover: oklch(0.235 0 0);
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
@@ -210,6 +222,13 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.274 0.006 286.033);
   --sidebar-ring: oklch(0.708 0 0);
+  /* Dark elevation is lightness: canvas 0.145 → panel → card → popover, and a
+     well goes below the canvas. Shadows barely read on a dark ground, so each
+     also carries a hairline top highlight that catches the edge. */
+  --nessa-surface-panel: oklch(0.175 0 0);
+  --nessa-surface-sunken: oklch(0.115 0 0);
+  --nessa-shadow-raised: inset 0 1px 0 0 oklch(1 0 0 / 0.04), 0 1px 2px 0 oklch(0 0 0 / 0.4);
+  --nessa-shadow-overlay: inset 0 1px 0 0 oklch(1 0 0 / 0.06), 0 2px 8px -1px oklch(0 0 0 / 0.35), 0 16px 40px -8px oklch(0 0 0 / 0.6);
   --nessa-thinking-fill-base: oklch(0.54 0.19 264);
   --nessa-thinking-fill-current: oklch(0.67 0.2 306);
   --nessa-thinking-fill-highlight: oklch(0.82 0.12 210);
@@ -441,6 +460,10 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-surface-panel: var(--nessa-surface-panel);
+  --color-surface-sunken: var(--nessa-surface-sunken);
+  --shadow-raised: var(--nessa-shadow-raised);
+  --shadow-overlay: var(--nessa-shadow-overlay);
   --radius-xs: calc(var(--radius) * 0.5);
   --radius-sm: calc(var(--radius) * 0.75);
   --radius-md: calc(var(--radius) * 0.875);

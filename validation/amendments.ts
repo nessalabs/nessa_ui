@@ -256,4 +256,18 @@ export const amendments: readonly Amendment[] = Object.freeze([
     supersedes: null,
     pullRequest: null,
   },
+  {
+    id: "AMEND-018",
+    kind: "transition",
+    contractId: "A11Y-002",
+    baseRevision: "ab06053c4271a5831697a0a53292eab80836507a",
+    targets: ["validation/exceptions.ts"],
+    beforeFingerprint: "7d59b7c0e7937612bbc2cfbba2ca7327a90fa2f369dd22187f7c062b53284d5c",
+    afterFingerprint: "dfba9cf1c3ee078600e062be2b3af3e914a661b81a3db5a245481f4c1d6b097c",
+    rationale: "The surface family gives Dark a real elevation ladder — canvas, panel, card, popover — and that means --popover can no longer share --card's lightness: a menu opened over a card has to lift off it. Dark --popover moves from oklch(0.205 0 0) to oklch(0.235 0 0). The destructive Button's focus ring on --popover is an existing exact exception pinned to the old surface value, so its fingerprint is re-pinned to the new one. The ring still measures below 3:1 on the lighter popover, as it did on the old one, so the exception remains needed rather than retired.",
+    compatibility: "No requirement is weakened and no exception is added: one existing tuple's expected surface value follows the token it names. Every other focus exception is unchanged.",
+    migration: "None for consumers. The entry is removed under the same condition as its siblings, when the destructive focus treatment clears 3:1 on every surface.",
+    supersedes: null,
+    pullRequest: null,
+  },
 ])
