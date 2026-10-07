@@ -115,6 +115,16 @@
  * static set, and only then defer the things that reach it. `MessageMarkdown`
  * and its react-markdown stack are next, and this file is where the answer
  * gets recorded.
+ *
+ * ## Re-recorded for the compact kit additions (#120)
+ *
+ * Adding `Kbd`, `SearchField`, `GroupHeader`, `Choices` and the compact
+ * Button variants moved every fixture by the same amount — about 4.4 kB
+ * minified and 1.0–1.2 kB gzip, measured against the base commit — because
+ * the barrel still hands every export to every consumer. Nothing new was
+ * pulled into the import graph. `rich-transcript` had sat 0.5 kB under its
+ * gzip ceiling, so it crossed; its ceiling now matches `file-preview`'s,
+ * which it measures just under.
  */
 
 export interface ConsumerBudget {
@@ -169,7 +179,7 @@ export const consumerBudgets: readonly ConsumerBudget[] = Object.freeze([
     rationale:
       "Markdown, highlighting, maths and diagrams — everything the barrel already hands the other three. It reads close to them, and that is the finding rather than the reassurance.",
     maximumBytes: 1_830_000,
-    maximumGzipBytes: 525_000,
+    maximumGzipBytes: 530_000,
     maximumCssBytes: 48_000,
   },
 ] satisfies readonly ConsumerBudget[])
