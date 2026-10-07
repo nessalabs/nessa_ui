@@ -53,8 +53,16 @@ export interface SearchFieldProps
 /**
  * A search box: a magnifier, the query, and at the end either the key that
  * focuses it (while empty) or a button that clears it (once there is text).
- * Escape clears a non-empty query and keeps focus in the field; on an empty
- * field Escape is left to the host, to close whatever the field sits in.
+ *
+ * Escape, exactly: on a non-empty field that can change, Escape clears the
+ * query, keeps focus in the field, and stops the key from reaching React
+ * ancestors. On an empty field (or one that cannot change, or during IME
+ * composition) the field leaves the key alone. A Radix overlay around the
+ * field — Drawer, DropdownMenu, Popover — listens for Escape on the document
+ * before the field sees it, so it closes on that same key unless the host
+ * guards it: in the overlay's `onEscapeKeyDown`, call `preventDefault()` when
+ * the event's target is a search field with a value. The field still clears,
+ * because only its own `onKeyDown` prop can cancel the clear.
  *
  * The clear button is skipped by Tab, since Escape does the same from the
  * field; a pointer or a screen reader's cursor reaches it. Name the field
@@ -126,8 +134,11 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
           value={query}
           onChange={(event) => change(event.target.value)}
           onKeyDown={(event) => {
+            // Only this field's own handler cancels the clear: an overlay
+            // that prevented the key to stay open has already marked it.
+            const preventedBefore = event.defaultPrevented
             onKeyDown?.(event)
-            if (event.defaultPrevented) return
+            if (event.defaultPrevented && !preventedBefore) return
             // Escape while an IME is composing cancels the composition, not the query.
             if (event.key === "Escape" && clearable && !event.nativeEvent.isComposing) {
               event.preventDefault()
@@ -154,7 +165,7 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
           >
             <X aria-hidden="true" className="size-3.5" />
           </button>
-        ) : shortcut !== undefined ? (
+        ) : shortcut !== undefined && query === "" ? (
           <span
             aria-hidden="true"
             data-slot="search-field-shortcut"

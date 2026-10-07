@@ -147,6 +147,9 @@ export interface SettingsRowProps
  * inline message or a `Choices` control without leaving the card. A
  * `Choices` there is named by the row's label; anything else keeps its own
  * name.
+ *
+ * `data-found`, `data-pending` and `aria-busy` are written after the props
+ * passed through, so they always reflect `found` and `pending`.
  */
 function SettingsRow({
   label,

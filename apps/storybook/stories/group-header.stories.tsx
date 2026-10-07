@@ -34,7 +34,10 @@ export const Playground: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await expect(canvas.getByRole("heading", { level: 2, name: "Sessions 12" })).toBeInTheDocument()
+    const heading = canvas.getByRole("heading", { level: 2, name: "Sessions 12" })
+    // The space is in the text itself, not left to how an engine joins
+    // the label and the count when it computes the name.
+    await expect(heading.textContent).toBe("Sessions 12")
   },
 }
 

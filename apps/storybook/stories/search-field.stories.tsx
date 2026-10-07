@@ -1,7 +1,14 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { expect, fn, userEvent, within } from "storybook/test"
-import { SearchField } from "@nessalabs/ui"
+import { expect, fn, userEvent, waitFor, within } from "storybook/test"
+import {
+  Drawer,
+  DrawerBody,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  SearchField,
+} from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 
@@ -138,6 +145,54 @@ export const ReadOnlyAndUncontrolledValue: Story = {
       await expect(onHostEscape).toHaveBeenCalledTimes(1)
     }
     await expect(canvas.queryByRole("button", { name: "Clear search" })).toBeNull()
+    // The shortcut cap is for an empty field; a field holding text shows none.
+    await expect(canvasElement.querySelector("[data-slot=search-field-shortcut]")).toBeNull()
+  },
+}
+
+/**
+ * The guard a Radix overlay needs around a search field: its Escape listener
+ * runs before the field's, so it stays open only if it lets a search field
+ * holding text have the key.
+ */
+function keepOpenWhileSearchHasText(event: KeyboardEvent) {
+  const target = event.target
+  if (
+    target instanceof HTMLInputElement &&
+    target.closest("[data-slot=search-field]") !== null &&
+    target.value !== ""
+  ) {
+    event.preventDefault()
+  }
+}
+
+export const InADrawer: Story = {
+  parameters: storyDocumentation(
+    "A search field inside a Drawer. The drawer hears Escape first, so the host guards it: `onEscapeKeyDown` prevents the close while the event's target is a search field with text. The play test proves the first Escape clears the query and the drawer stays open, and the next one closes the drawer.",
+  ),
+  render: () => (
+    <Drawer defaultOpen>
+      <DrawerContent onEscapeKeyDown={keepOpenWhileSearchHasText}>
+        <DrawerHeader>
+          <DrawerTitle>Sessions</DrawerTitle>
+        </DrawerHeader>
+        <DrawerBody>
+          <SearchField aria-label="Search sessions" placeholder="Search" />
+        </DrawerBody>
+      </DrawerContent>
+    </Drawer>
+  ),
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body)
+    const dialog = await body.findByRole("dialog", { name: "Sessions" })
+    const field = within(dialog).getByRole("searchbox", { name: "Search sessions" })
+    await userEvent.click(field)
+    await userEvent.type(field, "plan")
+    await userEvent.keyboard("{Escape}")
+    await expect(field).toHaveValue("")
+    await expect(body.getByRole("dialog", { name: "Sessions" })).toBeInTheDocument()
+    await userEvent.keyboard("{Escape}")
+    await waitFor(() => expect(body.queryByRole("dialog", { name: "Sessions" })).toBeNull())
   },
 }
 
@@ -149,8 +204,8 @@ function FixedFieldsExample() {
         if (event.key === "Escape") onHostEscape()
       }}
     >
-      <SearchField aria-label="Read-only search" readOnly defaultValue="pinned" />
-      <SearchField aria-label="Fixed search" value="pinned" />
+      <SearchField aria-label="Read-only search" readOnly defaultValue="pinned" shortcut="⌘K" />
+      <SearchField aria-label="Fixed search" value="pinned" shortcut="/" />
     </div>
   )
 }

@@ -85,7 +85,7 @@ function GroupHeader({
       {count !== undefined ? (
         // A space the name reads but the layout already draws as the gap,
         // so the heading is "Projects 4", not "Projects4".
-        <span className="sr-only"> </span>
+        <span data-slot="group-header-separator" className="sr-only"> </span>
       ) : null}
       {count !== undefined ? (
         <span
