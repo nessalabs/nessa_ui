@@ -145,7 +145,7 @@ const sidebarMenuBadgeClassName =
  * @returns The composed class-name string for a Sidebar menu-item control.
  */
 const sidebarMenuItemVariants = cva(
-  "group/menu-button relative flex w-full min-w-0 appearance-none items-center gap-2.5 overflow-hidden rounded-lg border-0 bg-transparent text-left font-sans nessa-text-4 font-normal text-sidebar-foreground no-underline outline-none transition-[color,background-color,box-shadow,padding] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground group-data-[has-trailing=true]/menu-item:pe-16 group-data-[nested=true]/menu:min-h-8 group-data-[nested=true]/menu:ps-10 group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0",
+  "group/menu-button relative flex w-full min-w-0 appearance-none items-center gap-2.5 overflow-hidden rounded-lg border-0 bg-transparent text-left font-sans nessa-text-4 font-normal text-sidebar-foreground no-underline outline-none transition-[color,background-color,box-shadow,padding] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[selected=true]:bg-sidebar-accent data-[selected=true]:text-sidebar-accent-foreground data-[unread=true]:font-medium data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground group-data-[has-trailing=true]/menu-item:pe-16 group-data-[nested=true]/menu:min-h-8 group-data-[nested=true]/menu:ps-10 group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0",
   {
     variants: {
       variant: {
@@ -153,6 +153,8 @@ const sidebarMenuItemVariants = cva(
         outline: "border border-sidebar-border bg-sidebar shadow-xs",
       },
       size: {
+        // A dense list row: 28px, nested or not.
+        xs: "min-h-7 gap-2 px-2 nessa-text-3 group-data-[nested=true]/menu:min-h-7",
         sm: "min-h-8 px-2 nessa-text-2",
         default: "min-h-9 px-2.5",
         lg: "min-h-12 px-2.5",
@@ -192,11 +194,28 @@ interface SidebarMenuItemProps
   /** Decorative leading content displayed before the label. */
   icon?: React.ReactNode
   /**
-   * Applies active visual styling without adding an ARIA state. Consumers must
-   * supply the appropriate native or ARIA state for the row's interaction.
+   * Marks the row as the current one — the open page or conversation — with
+   * the active fill and a medium weight. Applies styling only: pair it with
+   * `aria-current` (or the native state the row's interaction calls for).
    * @defaultValue false
    */
   isActive?: boolean
+  /**
+   * Marks the row as picked — one of a multi-selection, or the row a
+   * keyboard cursor rests on in a list the host drives — with the active
+   * fill but the resting weight, so it reads as chosen without reading as
+   * current. Styling only, as `isActive` is.
+   * @defaultValue false
+   */
+  selected?: boolean
+  /**
+   * Marks the row as holding something not yet seen: the label takes the
+   * medium weight the current row has, so moving between unread and current
+   * never reflows the label. Pair it with words a screen reader hears — a
+   * badge, or the row's `description`.
+   * @defaultValue false
+   */
+  unread?: boolean
   /**
    * Reveals trailing content on hover or keyboard focus when a fine pointer
    * is available. With a `badge` also present the two share one cell and
@@ -246,7 +265,9 @@ interface SidebarMenuItemProps
    */
   variant?: VariantProps<typeof sidebarMenuItemVariants>["variant"]
   /**
-   * Minimum height and typography scale applied to the row control.
+   * Minimum height and typography scale applied to the row control: the
+   * row's density. `xs` is 28px (a dense app list), `sm` 32px, `default`
+   * 36px, and `lg` 48px (room for a description line).
    * @defaultValue "default"
    */
   size?: VariantProps<typeof sidebarMenuItemVariants>["size"]
@@ -306,6 +327,8 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
   description,
   icon,
   isActive = false,
+  selected = false,
+  unread = false,
   showTrailingOnHover = false,
   submenu,
   tooltip,
@@ -354,7 +377,13 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
   // same `size` prop rather than from `:has()`, which would match a nested
   // submenu's rows and let a child row's size move its parent's trailing.
   const trailingBandClassName =
-    size === "sm" ? "h-8" : size === "lg" ? "h-12" : "h-9"
+    size === "xs"
+      ? "h-7 group-data-[nested=true]/menu:h-7"
+      : size === "sm"
+        ? "h-8"
+        : size === "lg"
+          ? "h-12"
+          : "h-9"
   const content = (
     <>
       {isCollapsible && collapsible === "row" ? (
@@ -418,6 +447,8 @@ const SidebarMenuItem = React.memo(function SidebarMenuItem({
       type={asChild ? undefined : "button"}
       data-slot="sidebar-menu-item-control"
       data-active={isActive}
+      data-selected={selected || undefined}
+      data-unread={unread || undefined}
       data-size={size ?? "default"}
       aria-label={tooltip}
       title={tooltip}

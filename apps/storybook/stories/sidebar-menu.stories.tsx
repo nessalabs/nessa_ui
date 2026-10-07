@@ -42,6 +42,10 @@ const menuDescriptions = {
     "The guides variant of a nested SidebarMenu draws decorative branch lines from the parent row to each child, terminating in an elbow on the last row. Guides are presentation only: hierarchy stays in the nested list structure, and the logical-start offset retunes through --nessa-sidebar-guide-inset.",
   TrailingAction:
     "SidebarAction is the trailing icon control on a row — settings, a kebab menu, a dismiss. Paired with a badge and showTrailingOnHover the two share one cell and swap, so revealing the action costs the reader neither width nor the row's resting count. The reveal answers hover and keyboard focus only: :focus-within would keep the row you last clicked revealed while you hover another, showing two rows' actions at once.",
+  Densities:
+    "A row's size is its density: xs is a 28px dense list row, sm 32px, default 36px, and lg 48px with room for a description. The trailing slot centres on the row's first line at every density.",
+  RowStates:
+    "Three row states. isActive is the current row: the active fill and a medium weight. selected is a picked row — one of a multi-selection, or where a keyboard cursor rests — with the same fill at the resting weight. unread gives the label the medium weight without the fill, so moving between unread and current never reflows the label. All three are styling only; the host supplies aria-current or the state its interaction calls for.",
   CollapsibleSubmenu:
     "A submenu becomes a disclosure through the collapsible prop. In row mode the parent row is the disclosure button; in chevron mode a separate control at the logical start toggles it so the row itself stays free to navigate. Open state is uncontrolled through defaultOpen or host-controlled through open and onOpenChange.",
 } as const
@@ -134,7 +138,7 @@ export const Menu: StoryObj<MenuStoryArgs> = {
   ),
 }
 
-type ItemSize = "sm" | "default" | "lg"
+type ItemSize = "xs" | "sm" | "default" | "lg"
 type ItemVariant = "default" | "outline"
 
 interface MenuItemStoryArgs {
@@ -182,7 +186,7 @@ export const MenuItem: StoryObj<MenuItemStoryArgs> = {
     isActive: { control: "boolean" },
     inset: { control: "boolean" },
     variant: { control: "inline-radio", options: ["default", "outline"] },
-    size: { control: "inline-radio", options: ["sm", "default", "lg"] },
+    size: { control: "inline-radio", options: ["xs", "sm", "default", "lg"] },
   },
   parameters: storyDocumentation(menuDescriptions.MenuItem),
   render: ({
@@ -588,6 +592,76 @@ function CollapsibleSubmenuExample() {
       </SidebarMenuItem>
     </SidebarMenu>
   )
+}
+
+export const Densities: StoryObj = {
+  parameters: storyDocumentation(menuDescriptions.Densities),
+  render: () => (
+    <MenuPrimitiveFrame description={menuDescriptions.Densities}>
+      <SidebarMenu>
+        {(["xs", "sm", "default", "lg"] as const).map((size) => (
+          <SidebarMenuItem
+            key={size}
+            size={size}
+            icon={<Folder />}
+            description={size === "lg" ? "Two lines fit here" : undefined}
+            badge={<span>4</span>}
+          >
+            {`Density ${size}`}
+          </SidebarMenuItem>
+        ))}
+      </SidebarMenu>
+    </MenuPrimitiveFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const heights = { xs: 28, sm: 32, default: 36, lg: 48 } as const
+    for (const [size, height] of Object.entries(heights)) {
+      const control = canvas.getByRole("button", { name: new RegExp(`^Density ${size}`) })
+      await expect(control).toHaveAttribute("data-size", size)
+      await expect(control.getBoundingClientRect().height).toBe(height)
+      const row = control.closest<HTMLElement>("[data-slot=sidebar-menu-item-row]")!
+      const trailing = row.querySelector<HTMLElement>("[data-slot=sidebar-menu-item-trailing]")!
+      await expect(trailing.getBoundingClientRect().height).toBe(size === "lg" ? 48 : height)
+    }
+  },
+}
+
+export const RowStates: StoryObj = {
+  parameters: storyDocumentation(menuDescriptions.RowStates),
+  render: () => (
+    <MenuPrimitiveFrame description={menuDescriptions.RowStates}>
+      <SidebarMenu>
+        <SidebarMenuItem size="xs" icon={<Folder />}>
+          Resting
+        </SidebarMenuItem>
+        <SidebarMenuItem size="xs" icon={<Folder />} isActive aria-current="page">
+          Current
+        </SidebarMenuItem>
+        <SidebarMenuItem size="xs" icon={<Folder />} selected>
+          Selected
+        </SidebarMenuItem>
+        <SidebarMenuItem size="xs" icon={<Folder />} unread badge={<span>2 new</span>}>
+          Unread
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </MenuPrimitiveFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const style = (name: string) => getComputedStyle(canvas.getByRole("button", { name: new RegExp(`^${name}`) }))
+    const resting = style("Resting")
+    const current = style("Current")
+    const selected = style("Selected")
+    const unread = style("Unread")
+    await expect(current.fontWeight).toBe("500")
+    await expect(selected.fontWeight).toBe(resting.fontWeight)
+    await expect(selected.backgroundColor).toBe(current.backgroundColor)
+    await expect(selected.backgroundColor).not.toBe(resting.backgroundColor)
+    await expect(unread.fontWeight).toBe(current.fontWeight)
+    await expect(unread.backgroundColor).toBe(resting.backgroundColor)
+    await expect(canvas.getByRole("button", { name: /^Current/ })).toHaveAttribute("aria-current", "page")
+  },
 }
 
 export const CollapsibleSubmenu: StoryObj = {
