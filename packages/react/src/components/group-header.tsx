@@ -83,6 +83,11 @@ function GroupHeader({
         {label}
       </span>
       {count !== undefined ? (
+        // A space the name reads but the layout already draws as the gap,
+        // so the heading is "Projects 4", not "Projects4".
+        <span className="sr-only"> </span>
+      ) : null}
+      {count !== undefined ? (
         <span
           data-slot="group-header-count"
           className="shrink-0 font-normal text-muted-foreground tabular-nums"
@@ -95,11 +100,11 @@ function GroupHeader({
 
   return (
     <div
+      {...props}
       data-slot="group-header"
       data-tone={tone}
       data-state={collapsible ? (open ? "open" : "closed") : undefined}
       className={cn("group/group-header flex min-h-7 min-w-0 items-center gap-1 ps-2 pe-1 font-sans", className)}
-      {...props}
     >
       <Heading
         className={cn(

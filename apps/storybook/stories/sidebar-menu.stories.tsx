@@ -610,6 +610,19 @@ export const Densities: StoryObj = {
             {`Density ${size}`}
           </SidebarMenuItem>
         ))}
+        <SidebarMenuItem
+          size="xs"
+          icon={<Folder />}
+          submenu={
+            <SidebarMenu nested>
+              <SidebarMenuItem size="xs" badge={<span>2</span>}>
+                Nested xs
+              </SidebarMenuItem>
+            </SidebarMenu>
+          }
+        >
+          Parent xs
+        </SidebarMenuItem>
       </SidebarMenu>
     </MenuPrimitiveFrame>
   ),
@@ -624,6 +637,14 @@ export const Densities: StoryObj = {
       const trailing = row.querySelector<HTMLElement>("[data-slot=sidebar-menu-item-trailing]")!
       await expect(trailing.getBoundingClientRect().height).toBe(size === "lg" ? 48 : height)
     }
+    // A nested list lifts its rows to 32px; an xs row stays 28px there too,
+    // and its trailing band with it.
+    const nested = canvas.getByRole("button", { name: "Nested xs" })
+    await expect(nested.getBoundingClientRect().height).toBe(28)
+    const nestedTrailing = nested
+      .closest("[data-slot=sidebar-menu-item-row]")!
+      .querySelector<HTMLElement>("[data-slot=sidebar-menu-item-trailing]")!
+    await expect(nestedTrailing.getBoundingClientRect().height).toBe(28)
   },
 }
 
@@ -635,10 +656,13 @@ export const RowStates: StoryObj = {
         <SidebarMenuItem size="xs" icon={<Folder />}>
           Resting
         </SidebarMenuItem>
-        <SidebarMenuItem size="xs" icon={<Folder />} isActive aria-current="page">
+        <SidebarMenuItem size="xs" icon={<Folder />} badge={<span>1</span>}>
+          Counted
+        </SidebarMenuItem>
+        <SidebarMenuItem size="xs" icon={<Folder />} isActive aria-current="page" badge={<span>1</span>}>
           Current
         </SidebarMenuItem>
-        <SidebarMenuItem size="xs" icon={<Folder />} selected>
+        <SidebarMenuItem size="xs" icon={<Folder />} selected badge={<span>1</span>}>
           Selected
         </SidebarMenuItem>
         <SidebarMenuItem size="xs" icon={<Folder />} unread badge={<span>2 new</span>}>
@@ -661,6 +685,16 @@ export const RowStates: StoryObj = {
     await expect(unread.fontWeight).toBe(current.fontWeight)
     await expect(unread.backgroundColor).toBe(resting.backgroundColor)
     await expect(canvas.getByRole("button", { name: /^Current/ })).toHaveAttribute("aria-current", "page")
+    // A badge on a filled row takes the fill's ink, selected as current.
+    const badgeInk = (name: string) =>
+      getComputedStyle(
+        canvas
+          .getByRole("button", { name: new RegExp(`^${name}`) })
+          .closest("[data-slot=sidebar-menu-item-row]")!
+          .querySelector("[data-slot=sidebar-menu-item-badge]")!,
+      ).color
+    await expect(badgeInk("Selected")).toBe(badgeInk("Current"))
+    await expect(badgeInk("Selected")).not.toBe(badgeInk("Counted"))
   },
 }
 

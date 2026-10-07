@@ -34,7 +34,7 @@ export const Playground: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await expect(canvas.getByRole("heading", { level: 2, name: /^Sessions\s*12$/ })).toBeInTheDocument()
+    await expect(canvas.getByRole("heading", { level: 2, name: "Sessions 12" })).toBeInTheDocument()
   },
 }
 
@@ -116,6 +116,6 @@ export const Collapsible: Story = {
     await expect(add).toHaveFocus()
     await waitFor(() => expect(getComputedStyle(add.parentElement!).opacity).toBe("1"))
     await userEvent.keyboard("{Enter}")
-    await expect(toggle).toHaveTextContent("Projects4")
+    await expect(canvas.getByRole("button", { name: "Projects 4" })).toBe(toggle)
   },
 }

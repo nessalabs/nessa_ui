@@ -130,8 +130,11 @@ export interface SettingsRowProps
   found?: boolean
   /**
    * Marks a change as being applied: a small spinner beside the control and
-   * `aria-busy` on the row. The control stays as the host left it; disable
-   * it too if a second change must wait.
+   * `aria-busy` on the row. The spinner is decorative, so to assistive
+   * technology the state is `aria-busy` alone, which most screen readers do
+   * not announce — say it in `detail` ("Applying…") when it matters. The
+   * control stays as the host left it; disable it too if a second change
+   * must wait.
    * @defaultValue false
    */
   pending?: boolean
@@ -163,9 +166,6 @@ function SettingsRow({
     <div
       data-slot="settings-row"
       data-disabled={disabled || undefined}
-      data-found={found || undefined}
-      data-pending={pending || undefined}
-      aria-busy={pending || undefined}
       className={cn(
         "flex flex-col gap-2 px-3.5 py-2.5",
         // The wash fades in, so a row a search lands on arrives rather than blinks.
@@ -173,10 +173,15 @@ function SettingsRow({
           cn(
             rowCornerClassName,
             "bg-foreground/(--nessa-state-hover-strong) transition-[background-color] [transition-duration:var(--nessa-motion-duration-slow)] [transition-timing-function:var(--nessa-motion-easing-standard)]",
+            // Forced colours drop the wash; an inset outline marks the match.
+            "forced-colors:outline-1 forced-colors:outline-solid forced-colors:-outline-offset-1",
           ),
         className,
       )}
       {...props}
+      data-found={found || undefined}
+      data-pending={pending || undefined}
+      aria-busy={pending || undefined}
     >
       <div className="flex min-h-7 items-center gap-3.5">
         {leading !== undefined ? (

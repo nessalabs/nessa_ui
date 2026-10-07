@@ -72,11 +72,11 @@ function Choices({
 
   return (
     <div
+      {...props}
+      {...label}
       role="radiogroup"
       data-slot="choices"
       aria-disabled={disabled || undefined}
-      {...label}
-      {...props}
       className={cn(
         "grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] gap-2 font-sans",
         className,
@@ -98,12 +98,13 @@ function Choices({
               "transition-[background-color,border-color,box-shadow] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)]",
               "hover:bg-foreground/(--nessa-state-hover)",
               "has-[:checked]:border-foreground has-[:checked]:ring-1 has-[:checked]:ring-inset has-[:checked]:ring-foreground has-[:checked]:hover:bg-card",
-              // Forced colours drop the ring and repaint the border, so the
-              // chosen card is told apart there by a heavier border.
-              "forced-colors:has-[:checked]:border-2",
-              // Its own disabled state dims a card; a disabled fieldset
-              // around the group already dims it, so that is not doubled.
-              "has-[:disabled]:pointer-events-none data-[disabled]:opacity-50",
+              // Forced colours drop the ring, so the chosen card is told
+              // apart there by an inset outline, which moves nothing.
+              "forced-colors:has-[:checked]:outline-2 forced-colors:has-[:checked]:outline-solid forced-colors:has-[:checked]:-outline-offset-2",
+              // Its own disabled state dims a card; inside a disabled
+              // fieldset (a disabled settings row) the fieldset already dims
+              // it, so that is never doubled.
+              "has-[:disabled]:pointer-events-none data-[disabled]:opacity-50 [fieldset:disabled_&]:opacity-100",
             )}
           >
             {/* The radio covers the card, so the card is its target and its

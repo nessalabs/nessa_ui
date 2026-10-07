@@ -57,7 +57,7 @@ export {
 } from "./components/checkbox"
 export { EmptyState, type EmptyStateProps } from "./components/empty-state"
 export { Switch, type SwitchProps } from "./components/switch"
-export { Kbd } from "./components/kbd"
+export { Kbd, type KbdProps } from "./components/kbd"
 export { SearchField, type SearchFieldProps } from "./components/search-field"
 export { GroupHeader, type GroupHeaderProps } from "./components/group-header"
 export {

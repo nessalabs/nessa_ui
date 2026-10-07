@@ -8,7 +8,7 @@ import { Kbd } from "./kbd"
 import { cn } from "@/lib/utils"
 
 const searchFieldVariants = cva(
-  "relative flex w-full min-w-0 items-center rounded-md bg-foreground/(--nessa-state-hover) font-sans text-foreground transition-[background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-foreground/(--nessa-state-hover-strong) focus-within:bg-foreground/(--nessa-state-hover-strong) focus-within:outline-solid focus-within:outline-(length:--nessa-focus-outline-width) focus-within:outline-ring has-[input:disabled]:pointer-events-none has-[input:disabled]:opacity-50",
+  "relative flex w-full min-w-0 items-center rounded-md bg-foreground/(--nessa-state-hover) font-sans text-foreground transition-[background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-foreground/(--nessa-state-hover-strong) focus-within:bg-foreground/(--nessa-state-hover-strong) focus-within:outline-solid focus-within:outline-(length:--nessa-focus-outline-width) focus-within:outline-ring has-[input:disabled]:pointer-events-none has-[input:disabled]:opacity-50 forced-colors:outline-1 forced-colors:outline-solid forced-colors:-outline-offset-1",
   {
     variants: {
       size: {
@@ -94,6 +94,11 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
       if (value === undefined) setOwn(next)
       onValueChange?.(next)
     }
+    // A field that cannot change — read-only, or controlled with nobody
+    // listening — has nothing to clear, so it shows no clear button and
+    // leaves Escape to the host.
+    const clearable =
+      query !== "" && !props.readOnly && (value === undefined || onValueChange !== undefined)
     const clear = () => {
       change("")
       onClear?.()
@@ -102,9 +107,9 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
 
     return (
       <div
+        className={cn(searchFieldVariants({ size }), className)}
         data-slot="search-field"
         data-size={size}
-        className={cn(searchFieldVariants({ size }), className)}
       >
         <Search
           aria-hidden="true"
@@ -112,18 +117,19 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
         />
         <input
           ref={setRef}
-          type="search"
-          data-slot="search-field-input"
           autoComplete="off"
           spellCheck={false}
           disabled={disabled}
           {...props}
+          type="search"
+          data-slot="search-field-input"
           value={query}
           onChange={(event) => change(event.target.value)}
           onKeyDown={(event) => {
             onKeyDown?.(event)
             if (event.defaultPrevented) return
-            if (event.key === "Escape" && query !== "" && !props.readOnly) {
+            // Escape while an IME is composing cancels the composition, not the query.
+            if (event.key === "Escape" && clearable && !event.nativeEvent.isComposing) {
               event.preventDefault()
               event.stopPropagation()
               clear()
@@ -136,7 +142,7 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
             size === "lg" ? "nessa-text-input" : "nessa-text-input-2",
           )}
         />
-        {query !== "" && !props.readOnly ? (
+        {clearable ? (
           <button
             type="button"
             tabIndex={-1}
@@ -149,13 +155,13 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
             <X aria-hidden="true" className="size-3.5" />
           </button>
         ) : shortcut !== undefined ? (
-          <Kbd
+          <span
             aria-hidden="true"
             data-slot="search-field-shortcut"
-            className="me-1.5 peer-focus:hidden"
+            className="me-1.5 flex peer-focus:hidden"
           >
-            {shortcut}
-          </Kbd>
+            <Kbd>{shortcut}</Kbd>
+          </span>
         ) : null}
       </div>
     )

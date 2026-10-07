@@ -185,6 +185,15 @@ export const Compact: Story = {
     resting.focus()
     await userEvent.tab({ shift: true })
     await expect(pressed).toHaveFocus()
+    // Read the settled style, not the first frame: the button transitions
+    // its box-shadow, so a ring that grows from 0 would still read as 0 the
+    // moment focus lands. Wait out the declared duration, then any animation
+    // still running.
+    const duration = Math.max(
+      ...getComputedStyle(pressed).transitionDuration.split(",").map((value) => parseFloat(value) * 1000),
+    )
+    await new Promise((resolve) => setTimeout(resolve, duration + 50))
+    await Promise.all(pressed.getAnimations().map((animation) => animation.finished))
     const focused = getComputedStyle(pressed)
     await expect(focused.outlineStyle).toBe("solid")
     // Chromium snaps outline widths down to whole device pixels, so the

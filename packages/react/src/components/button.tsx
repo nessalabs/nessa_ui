@@ -7,13 +7,14 @@ import { cn } from "@/lib/utils"
 // The compact variants' interaction states: a solid outline in the ring
 // colour instead of the translucent 3px ring, and fills read from the shared
 // state tokens, so a compact control draws hover, press and focus exactly as
-// an application's own controls built on the same tokens do. Selected
-// (`aria-pressed`) and open (`data-state="open"`, a menu trigger) hold the
-// hover fill and full ink.
+// an application's own controls built on the same tokens do. On `tinted`
+// and `plain`, selected (`aria-pressed`) and open (`data-state="open"`, a
+// menu trigger) hold the hover fill and full ink; forced colours drop that
+// fill, so there they draw a 1px system-colour outline instead.
 const compactFocus =
   "focus-visible:ring-0 focus-visible:outline-solid focus-visible:outline-(length:--nessa-focus-outline-width) focus-visible:outline-offset-1 focus-visible:outline-ring"
 const quietStates =
-  "hover:bg-foreground/(--nessa-state-hover-strong) hover:text-foreground active:bg-foreground/(--nessa-state-press) aria-pressed:bg-foreground/(--nessa-state-hover-strong) aria-pressed:text-foreground data-[state=open]:bg-foreground/(--nessa-state-hover-strong) data-[state=open]:text-foreground"
+  "hover:bg-foreground/(--nessa-state-hover-strong) hover:text-foreground active:bg-foreground/(--nessa-state-press) aria-pressed:bg-foreground/(--nessa-state-hover-strong) aria-pressed:text-foreground data-[state=open]:bg-foreground/(--nessa-state-hover-strong) data-[state=open]:text-foreground forced-colors:aria-pressed:outline-1 forced-colors:aria-pressed:outline-solid forced-colors:aria-pressed:-outline-offset-1 forced-colors:data-[state=open]:outline-1 forced-colors:data-[state=open]:outline-solid forced-colors:data-[state=open]:-outline-offset-1"
 
 // Icons default to 16px, but an icon that sets its own `size-*` keeps it —
 // a plain `[&_svg]:size-4` descendant rule outranks a utility class on the
@@ -97,9 +98,10 @@ export interface ButtonProps
  * `shape="pill"` are the dense controls of toolbars, rows and headers; all
  * four take the 1.5px focus outline, and `tinted`, `plain` and `danger` draw
  * hover and press from the shared state tokens (`inverse` deepens its own
- * foreground fill). A selected
- * compact control says so with `aria-pressed`; an open menu trigger with
- * `data-state="open"`, which Radix triggers set themselves.
+ * foreground fill). `tinted` and `plain` are the ones that toggle: a
+ * selected one says so with `aria-pressed`, an open menu trigger with
+ * `data-state="open"` (Radix triggers set it themselves), and both hold the
+ * hover fill. `inverse` and `danger` are actions, with no selected look.
  *
  * Two defaults are worth knowing, because both are places the native
  * behavior is a trap rather than a convenience:

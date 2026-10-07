@@ -119,6 +119,39 @@ export const ClearAndEscape: Story = {
   },
 }
 
+export const ReadOnlyAndUncontrolledValue: Story = {
+  parameters: storyDocumentation(
+    "A field that cannot change has nothing to clear: a read-only field, and a controlled one with no `onValueChange`, show no clear button and leave Escape to the host. The play test presses Escape in each and proves the text stays and the host hears the key.",
+  ),
+  render: () => <FixedFieldsExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    for (const name of ["Read-only search", "Fixed search"]) {
+      onHostEscape.mockClear()
+      const field = canvas.getByRole("searchbox", { name })
+      await userEvent.click(field)
+      await userEvent.keyboard("{Escape}")
+      await expect(field).toHaveValue("pinned")
+      await expect(onHostEscape).toHaveBeenCalledTimes(1)
+    }
+    await expect(canvas.queryByRole("button", { name: "Clear search" })).toBeNull()
+  },
+}
+
+function FixedFieldsExample() {
+  return (
+    <div
+      className="flex max-w-xs flex-col gap-2"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") onHostEscape()
+      }}
+    >
+      <SearchField aria-label="Read-only search" readOnly defaultValue="pinned" />
+      <SearchField aria-label="Fixed search" value="pinned" />
+    </div>
+  )
+}
+
 export const Disabled: Story = {
   parameters: storyDocumentation("A disabled field is dimmed and cannot be typed in."),
   render: () => (

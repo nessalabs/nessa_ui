@@ -327,6 +327,44 @@ export const WithChoices: Story = {
   },
 }
 
+export const ChoicesInADisabledRow: Story = {
+  parameters: storyDocumentation(
+    "A `Choices` in a disabled row is dimmed once, by the row, like every other control there — not again by its cards, including a card that is unavailable on its own. The play test multiplies the opacity from each card up to the row and expects one half.",
+  ),
+  render: () => (
+    <div className="max-w-xl">
+      <SettingsGroup title="Layout">
+        <SettingsRow label="Density" disabled>
+          <Choices
+            defaultValue="regular"
+            options={[
+              { value: "compact", label: "Compact" },
+              { value: "regular", label: "Regular" },
+              { value: "roomy", label: "Roomy", disabled: true },
+            ]}
+          />
+        </SettingsRow>
+      </SettingsGroup>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const row = canvasElement.querySelector<HTMLElement>("[data-slot=settings-row]")!
+    const effectiveOpacity = (element: Element) => {
+      let opacity = 1
+      for (let node: Element | null = element; node && node !== row; node = node.parentElement) {
+        opacity *= Number(getComputedStyle(node).opacity)
+      }
+      return opacity
+    }
+    for (const name of ["Compact", "Roomy"]) {
+      const radio = canvas.getByRole("radio", { name })
+      await expect(radio).toBeDisabled()
+      await expect(effectiveOpacity(radio.closest("label")!)).toBe(0.5)
+    }
+  },
+}
+
 export const ContentKeepsItsName: Story = {
   parameters: storyDocumentation(
     "A control among a row's content keeps its own name; only `Choices` takes the row's label there. The play test asks for the row's switch and a sub-option switch under it by their own names.",
