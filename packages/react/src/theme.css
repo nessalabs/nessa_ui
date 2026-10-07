@@ -66,6 +66,21 @@
      `emphasized` finishes too abruptly to look like something coming to
      rest. */
   --nessa-motion-easing-arrival: cubic-bezier(0.4, 0, 0.15, 1);
+  /* Interaction states, as how much of the element's own ink is laid over
+     its surface: `bg-foreground/(--nessa-state-hover)`, or
+     `color-mix(in oklab, var(--foreground) var(--nessa-state-hover),
+     transparent)` in plain CSS. They are amounts rather than colours so one
+     value reads right on any surface and in either mode — the ink is
+     resolved where it is drawn. A row hovers at the light step; a control
+     (a button, a chip) at the strong one; anything pressed or holding the
+     keyboard in place of a ring deepens to the press step. */
+  --nessa-state-hover: 5%;
+  --nessa-state-hover-strong: 8%;
+  --nessa-state-press: 11%;
+  /* The width of the solid focus outline compact controls draw in the
+     `--ring` colour. The 3px translucent ring larger controls draw is a
+     separate treatment. */
+  --nessa-focus-outline-width: 1.5px;
   --nessa-thinking-fill-base: oklch(0.56 0.2 265);
   --nessa-thinking-fill-current: oklch(0.68 0.2 304);
   --nessa-thinking-fill-highlight: oklch(0.86 0.11 214);
