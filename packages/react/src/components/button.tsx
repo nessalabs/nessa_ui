@@ -28,6 +28,9 @@ const buttonVariants = cva(
         sm: "h-8 gap-1.5 px-3 nessa-text-2",
         lg: "h-10 px-6",
         icon: "size-9",
+        // A 28px square for toolbars, titlebars and rows, where 36px crowds
+        // the line. Still clear of the 24px target-size floor.
+        "icon-sm": "size-7",
       },
     },
     defaultVariants: {

@@ -26,7 +26,7 @@ const meta = {
     },
     size: {
       control: "select",
-      options: ["sm", "default", "lg", "icon"],
+      options: ["sm", "default", "lg", "icon", "icon-sm"],
       description: "Controls the button's height and horizontal padding.",
     },
     asChild: {
@@ -71,6 +71,29 @@ export const IconOnly: Story = {
       <Plus />
     </Button>
   ),
+}
+
+export const CompactIcon: Story = {
+  parameters: storyDocumentation(
+    "`size=\"icon-sm\"` is a 28px square for toolbars, titlebars and rows, beside the 36px `icon`. The play test measures both.",
+  ),
+  render: () => (
+    <div className="flex items-center gap-3">
+      <Button size="icon" variant="ghost" aria-label="Create item">
+        <Plus />
+      </Button>
+      <Button size="icon-sm" variant="ghost" aria-label="Create item, compact">
+        <Plus />
+      </Button>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const regular = canvas.getByRole("button", { name: "Create item" }).getBoundingClientRect()
+    const compact = canvas.getByRole("button", { name: "Create item, compact" }).getBoundingClientRect()
+    await expect([regular.width, regular.height]).toEqual([36, 36])
+    await expect([compact.width, compact.height]).toEqual([28, 28])
+  },
 }
 
 export const AllVariants: Story = {
