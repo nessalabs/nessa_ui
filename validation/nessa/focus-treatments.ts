@@ -79,6 +79,7 @@ type FocusComponent =
   | "message-actions/message-approval"
   | "checkbox"
   | "switch"
+  | "group-header"
   | "drawer"
   | "dropdown-menu"
   | "pagination"
@@ -475,6 +476,16 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
+  // The disclosure in a group header takes the compact solid outline.
+  {
+    component: "group-header",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
   // The shared item recipe is referenced by the plain, checkbox, radio, and
   // sub-trigger items.
   {
@@ -746,6 +757,9 @@ export const focusGeometryClasses = Object.freeze([
   { component: "checkbox", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "switch", className: "focus-visible:outline-2", count: 1 },
   { component: "switch", className: "focus-visible:outline-offset-2", count: 1 },
+  { component: "group-header", className: "focus-visible:outline-solid", count: 1 },
+  { component: "group-header", className: "focus-visible:outline-(length:--nessa-focus-outline-width)", count: 1 },
+  { component: "group-header", className: "focus-visible:outline-offset-1", count: 1 },
   // Menu items draw inset: the content surface clips its overflow, so an
   // outset outline would land on (or past) the padding edge.
   { component: "dropdown-menu", className: "focus-visible:outline-2", count: 4 },

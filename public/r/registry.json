@@ -3159,6 +3159,26 @@
       ]
     },
     {
+      "name": "group-header",
+      "type": "registry:ui",
+      "title": "Group header",
+      "description": "The label above a group of rows: a heading with an optional count, quiet or strong, an optional disclosure that collapses the group, and an optional action at the end that can wait for hover.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/group-header.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/group-header.tsx"
+        }
+      ]
+    },
+    {
       "name": "settings-group",
       "type": "registry:ui",
       "title": "Settings group",
