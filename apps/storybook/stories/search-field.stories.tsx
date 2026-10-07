@@ -21,7 +21,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A search box: a magnifier, the query, and at the end either the key that focuses it (while empty and unfocused) or a button that clears it (once there is text). Escape clears a non-empty query and keeps focus; on an empty field Escape is left to the host. Three heights: `sm` 28px, `md` 32px, `lg` 36px. Name it with `aria-label` when no visible label does.",
+          "A search box: a magnifier, the query, and at the end either the key that focuses it (while empty and unfocused) or a button that clears it (once there is text). Escape clears a non-empty query and keeps focus; on an empty field Escape is left to the host. A Radix overlay around the field (Drawer, DropdownMenu, Popover) hears Escape first, so guard its `onEscapeKeyDown`: prevent it when the target has `data-clearable`, which the input carries exactly while Escape will clear it. Three heights: `sm` 28px, `md` 32px, `lg` 36px. Name it with `aria-label` when no visible label does.",
       },
     },
   },
@@ -156,38 +156,81 @@ export const ReadOnlyAndUncontrolledValue: Story = {
  * holding text have the key.
  */
 function keepOpenWhileSearchHasText(event: KeyboardEvent) {
-  const target = event.target
-  if (
-    target instanceof HTMLInputElement &&
-    target.closest("[data-slot=search-field]") !== null &&
-    target.value !== ""
-  ) {
+  if (event.target instanceof HTMLElement && event.target.dataset.clearable !== undefined) {
     event.preventDefault()
   }
 }
 
-export const InADrawer: Story = {
-  parameters: storyDocumentation(
-    "A search field inside a Drawer. The drawer hears Escape first, so the host guards it: `onEscapeKeyDown` prevents the close while the event's target is a search field with text. The play test proves the first Escape clears the query and the drawer stays open, and the next one closes the drawer.",
-  ),
-  render: () => (
+function DrawerExample({ readOnly }: { readOnly: boolean }) {
+  return (
     <Drawer defaultOpen>
       <DrawerContent onEscapeKeyDown={keepOpenWhileSearchHasText}>
         <DrawerHeader>
-          <DrawerTitle>Sessions</DrawerTitle>
+          <DrawerTitle>{readOnly ? "Pinned" : "Sessions"}</DrawerTitle>
         </DrawerHeader>
         <DrawerBody>
-          <SearchField aria-label="Search sessions" placeholder="Search" />
+          {readOnly ? (
+            <SearchField aria-label="Pinned search" readOnly defaultValue="pinned" />
+          ) : (
+            <SearchField aria-label="Search sessions" placeholder="Search" />
+          )}
         </DrawerBody>
       </DrawerContent>
     </Drawer>
+  )
+}
+
+export const ReadOnlyInADrawer: Story = {
+  parameters: storyDocumentation(
+    "The same guard around a read-only field holding text. The field will not clear, so it has no `data-clearable`, the guard lets the key through, and Escape closes the drawer.",
   ),
+  render: () => <DrawerExample readOnly />,
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body)
+    const dialog = await body.findByRole("dialog", { name: "Pinned" })
+    const field = within(dialog).getByRole("searchbox", { name: "Pinned search" })
+    await expect(field).not.toHaveAttribute("data-clearable")
+    await userEvent.click(field)
+    await userEvent.keyboard("{Escape}")
+    await expect(field).toHaveValue("pinned")
+    await waitFor(() => expect(body.queryByRole("dialog", { name: "Pinned" })).toBeNull())
+  },
+}
+
+const onHostKeyDown = fn((event: React.KeyboardEvent<HTMLInputElement>) => {
+  if (event.key === "Escape") event.preventDefault()
+})
+
+export const HostCancelsEscape: Story = {
+  parameters: storyDocumentation(
+    "The field's own `onKeyDown` can keep the query: calling `preventDefault()` on Escape cancels the clear. The play test proves the text stays.",
+  ),
+  render: () => (
+    <div className="max-w-xs">
+      <SearchField aria-label="Kept search" defaultValue="keep me" onKeyDown={onHostKeyDown} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const field = within(canvasElement).getByRole("searchbox", { name: "Kept search" })
+    await userEvent.click(field)
+    await userEvent.keyboard("{Escape}")
+    await expect(onHostKeyDown).toHaveBeenCalled()
+    await expect(field).toHaveValue("keep me")
+  },
+}
+
+export const InADrawer: Story = {
+  parameters: storyDocumentation(
+    "A search field inside a Drawer. The drawer hears Escape first, so the host guards it: `onEscapeKeyDown` prevents the close while the event's target carries `data-clearable`. The play test proves the first Escape clears the query and the drawer stays open, and the next one closes the drawer — and that a read-only field holding text does not hold the drawer open.",
+  ),
+  render: () => <DrawerExample readOnly={false} />,
   play: async ({ canvasElement }) => {
     const body = within(canvasElement.ownerDocument.body)
     const dialog = await body.findByRole("dialog", { name: "Sessions" })
     const field = within(dialog).getByRole("searchbox", { name: "Search sessions" })
     await userEvent.click(field)
     await userEvent.type(field, "plan")
+    await expect(field).toHaveAttribute("data-clearable", "true")
     await userEvent.keyboard("{Escape}")
     await expect(field).toHaveValue("")
     // A closing drawer stays in the DOM while it slides out, so presence

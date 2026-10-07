@@ -61,8 +61,10 @@ export interface SearchFieldProps
  * field — Drawer, DropdownMenu, Popover — listens for Escape on the document
  * before the field sees it, so it closes on that same key unless the host
  * guards it: in the overlay's `onEscapeKeyDown`, call `preventDefault()` when
- * the event's target is a search field with a value. The field still clears,
- * because only its own `onKeyDown` prop can cancel the clear.
+ * the event's target carries `data-clearable` — the input has it exactly
+ * while Escape will clear it, so a read-only field holding text still lets
+ * the overlay close. The field still clears, because only a
+ * `preventDefault()` called by its own `onKeyDown` prop cancels the clear.
  *
  * The clear button is skipped by Tab, since Escape does the same from the
  * field; a pointer or a screen reader's cursor reaches it. Name the field
@@ -131,14 +133,28 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
           {...props}
           type="search"
           data-slot="search-field-input"
+          data-clearable={clearable || undefined}
           value={query}
           onChange={(event) => change(event.target.value)}
           onKeyDown={(event) => {
-            // Only this field's own handler cancels the clear: an overlay
-            // that prevented the key to stay open has already marked it.
-            const preventedBefore = event.defaultPrevented
-            onKeyDown?.(event)
-            if (event.defaultPrevented && !preventedBefore) return
+            // Only this field's own `onKeyDown` cancels the clear. An overlay
+            // that prevented the key to stay open has marked it already, so
+            // the field watches the call the handler makes rather than the
+            // event's state.
+            if (onKeyDown !== undefined) {
+              let cancelled = false
+              const preventDefault = event.preventDefault
+              event.preventDefault = () => {
+                cancelled = true
+                preventDefault.call(event)
+              }
+              try {
+                onKeyDown(event)
+              } finally {
+                event.preventDefault = preventDefault
+              }
+              if (cancelled) return
+            }
             // Escape while an IME is composing cancels the composition, not the query.
             if (event.key === "Escape" && clearable && !event.nativeEvent.isComposing) {
               event.preventDefault()

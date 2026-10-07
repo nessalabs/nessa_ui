@@ -387,3 +387,27 @@ export const ContentKeepsItsName: Story = {
     await expect(canvas.getByRole("switch", { name: "Only when I am away" })).not.toBeChecked()
   },
 }
+
+export const OwnStateWins: Story = {
+  parameters: storyDocumentation(
+    "`found` and `pending` own `data-found`, `data-pending` and `aria-busy`: the row writes them after the props passed through, so a stray attribute cannot contradict the row's state. The play test passes conflicting attributes and proves the row's own values win.",
+  ),
+  render: () => (
+    <div className="max-w-xl">
+      <SettingsGroup title="Sync">
+        <SettingsRow
+          label="Sync history"
+          aria-busy={true}
+          {...{ "data-found": "true", "data-pending": "true" }}
+          control={<Switch />}
+        />
+      </SettingsGroup>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const row = canvasElement.querySelector<HTMLElement>("[data-slot=settings-row]")!
+    await expect(row).not.toHaveAttribute("aria-busy")
+    await expect(row).not.toHaveAttribute("data-found")
+    await expect(row).not.toHaveAttribute("data-pending")
+  },
+}
