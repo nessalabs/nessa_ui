@@ -111,8 +111,11 @@ export const ClearAndEscape: Story = {
     await expect(onHostEscape).toHaveBeenCalledTimes(1)
     // Tab never stops on the clear button: Escape does its job from the field.
     await userEvent.type(field, "x")
+    const clearButton = canvas.getByRole("button", { name: "Clear search" })
+    await expect(clearButton).toHaveAttribute("tabindex", "-1")
     await userEvent.tab()
-    await expect(canvas.queryByRole("button", { name: "Clear search" })).not.toHaveFocus()
+    await expect(clearButton).not.toHaveFocus()
+    await expect(field).not.toHaveFocus()
   },
 }
 

@@ -326,3 +326,26 @@ export const WithChoices: Story = {
     await expect(within(group).getByRole("radio", { name: "System" })).toBeChecked()
   },
 }
+
+export const ContentKeepsItsName: Story = {
+  parameters: storyDocumentation(
+    "A control among a row's content keeps its own name; only `Choices` takes the row's label there. The play test asks for the row's switch and a sub-option switch under it by their own names.",
+  ),
+  render: () => (
+    <div className="max-w-xl">
+      <SettingsGroup title="Notifications">
+        <SettingsRow label="Notify me" control={<Switch defaultChecked />}>
+          <label className="flex items-center gap-2 nessa-text-2 text-muted-foreground">
+            <Switch />
+            Only when I am away
+          </label>
+        </SettingsRow>
+      </SettingsGroup>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByRole("switch", { name: "Notify me" })).toBeChecked()
+    await expect(canvas.getByRole("switch", { name: "Only when I am away" })).not.toBeChecked()
+  },
+}

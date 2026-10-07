@@ -34,7 +34,7 @@ export const Playground: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    await expect(canvas.getByRole("heading", { level: 2 })).toHaveTextContent("Sessions12")
+    await expect(canvas.getByRole("heading", { level: 2, name: /^Sessions\s*12$/ })).toBeInTheDocument()
   },
 }
 

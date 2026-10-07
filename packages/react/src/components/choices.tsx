@@ -2,7 +2,7 @@
 
 import * as React from "react"
 
-import { useControlLabel } from "@/lib/control-label"
+import { ContentLabelContext, useControlLabel } from "@/lib/control-label"
 import { cn } from "@/lib/utils"
 
 /** One card in a `Choices` group. */
@@ -62,7 +62,12 @@ function Choices({
   const chosen = value ?? own
   const generatedName = React.useId()
   const groupName = name ?? generatedName
-  const label = useControlLabel({ "aria-label": ariaLabel, "aria-labelledby": ariaLabelledby })
+  const ownLabel = useControlLabel({ "aria-label": ariaLabel, "aria-labelledby": ariaLabelledby })
+  const rowLabel = React.useContext(ContentLabelContext)
+  const label =
+    ownLabel["aria-label"] === undefined && ownLabel["aria-labelledby"] === undefined && rowLabel !== undefined
+      ? { "aria-labelledby": rowLabel }
+      : ownLabel
   const idPrefix = React.useId()
 
   return (
@@ -79,6 +84,7 @@ function Choices({
     >
       {options.map((option, index) => {
         const checked = chosen === option.value
+        const unavailable = disabled || option.disabled === true
         const labelId = `${idPrefix}-${index}-label`
         const descriptionId = `${idPrefix}-${index}-description`
         return (
@@ -86,12 +92,18 @@ function Choices({
             key={option.value}
             data-slot="choice"
             data-state={checked ? "checked" : "unchecked"}
+            data-disabled={unavailable || undefined}
             className={cn(
               "relative flex min-w-0 cursor-default flex-col gap-1 rounded-lg border border-border bg-card p-3 text-card-foreground",
               "transition-[background-color,border-color,box-shadow] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)]",
               "hover:bg-foreground/(--nessa-state-hover)",
               "has-[:checked]:border-foreground has-[:checked]:ring-1 has-[:checked]:ring-inset has-[:checked]:ring-foreground has-[:checked]:hover:bg-card",
-              "has-[:disabled]:pointer-events-none has-[:disabled]:opacity-50",
+              // Forced colours drop the ring and repaint the border, so the
+              // chosen card is told apart there by a heavier border.
+              "forced-colors:has-[:checked]:border-2",
+              // Its own disabled state dims a card; a disabled fieldset
+              // around the group already dims it, so that is not doubled.
+              "has-[:disabled]:pointer-events-none data-[disabled]:opacity-50",
             )}
           >
             {/* The radio covers the card, so the card is its target and its
@@ -103,7 +115,7 @@ function Choices({
               checked={checked}
               aria-labelledby={labelId}
               aria-describedby={option.description !== undefined ? descriptionId : undefined}
-              disabled={disabled || option.disabled}
+              disabled={unavailable}
               onChange={() => {
                 if (value === undefined) setOwn(option.value)
                 onValueChange?.(option.value)

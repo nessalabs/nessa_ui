@@ -3,7 +3,7 @@
 import * as React from "react"
 import { LoaderCircle } from "lucide-react"
 
-import { ControlLabelContext } from "@/lib/control-label"
+import { ContentLabelContext, ControlLabelContext } from "@/lib/control-label"
 import { cn } from "@/lib/utils"
 
 export interface SettingsGroupProps
@@ -141,8 +141,9 @@ export interface SettingsRowProps
  * One line in a `SettingsGroup`: a label with an optional detail line, an
  * optional leading mark, and a control at the end. Anything passed as
  * children sits under the label, so a row can carry a fingerprint, an
- * inline message or a `Choices` control without leaving the card; a control
- * there with no name of its own is named by the row's label too.
+ * inline message or a `Choices` control without leaving the card. A
+ * `Choices` there is named by the row's label; anything else keeps its own
+ * name.
  */
 function SettingsRow({
   label,
@@ -166,9 +167,13 @@ function SettingsRow({
       data-pending={pending || undefined}
       aria-busy={pending || undefined}
       className={cn(
-        "flex flex-col gap-2 px-3.5 py-2.5 transition-[background-color] [transition-duration:var(--nessa-motion-duration-slow)] [transition-timing-function:var(--nessa-motion-easing-standard)]",
-        rowCornerClassName,
-        found && "bg-foreground/(--nessa-state-hover-strong)",
+        "flex flex-col gap-2 px-3.5 py-2.5",
+        // The wash fades in, so a row a search lands on arrives rather than blinks.
+        found &&
+          cn(
+            rowCornerClassName,
+            "bg-foreground/(--nessa-state-hover-strong) transition-[background-color] [transition-duration:var(--nessa-motion-duration-slow)] [transition-timing-function:var(--nessa-motion-easing-standard)]",
+          ),
         className,
       )}
       {...props}
@@ -218,11 +223,11 @@ function SettingsRow({
             data-slot="settings-row-content"
             className="m-0 min-w-0 border-0 p-0 opacity-50"
           >
-            <ControlLabelContext.Provider value={labelId}>{children}</ControlLabelContext.Provider>
+            <ContentLabelContext.Provider value={labelId}>{children}</ContentLabelContext.Provider>
           </fieldset>
         ) : (
           <div data-slot="settings-row-content">
-            <ControlLabelContext.Provider value={labelId}>{children}</ControlLabelContext.Provider>
+            <ContentLabelContext.Provider value={labelId}>{children}</ContentLabelContext.Provider>
           </div>
         )
       ) : null}

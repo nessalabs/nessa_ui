@@ -35,23 +35,13 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         // Compact variants, made for `shape="pill"` and the numeric sizes.
         // A quiet fill at rest that deepens on hover: a secondary action.
-        tinted: cn(
-          "bg-foreground/(--nessa-state-hover) text-foreground",
-          quietStates,
-          compactFocus,
-        ),
+        tinted: `bg-foreground/(--nessa-state-hover) text-foreground ${quietStates} ${compactFocus}`,
         // No fill until hovered, in muted ink: a chip, a filter, a minor action.
-        plain: cn("text-muted-foreground", quietStates, compactFocus),
+        plain: `text-muted-foreground ${quietStates} ${compactFocus}`,
         // A foreground fill with background ink: the one action that matters here.
-        inverse: cn(
-          "bg-foreground text-background hover:bg-foreground/90 active:bg-foreground/85",
-          compactFocus,
-        ),
+        inverse: `bg-foreground text-background hover:bg-foreground/90 active:bg-foreground/85 ${compactFocus}`,
         // Destructive ink with a destructive tint on hover: removes or revokes.
-        danger: cn(
-          "text-destructive hover:bg-destructive/(--nessa-state-hover-strong) active:bg-destructive/(--nessa-state-press)",
-          compactFocus,
-        ),
+        danger: `text-destructive hover:bg-destructive/(--nessa-state-hover-strong) active:bg-destructive/(--nessa-state-press) ${compactFocus}`,
       },
       size: {
         default: "h-9 px-4 py-2",
@@ -62,6 +52,9 @@ const buttonVariants = cva(
         // the line. Still clear of the 24px target-size floor.
         "icon-sm": "size-7",
         // Compact heights, named by their pixel height at the default scale.
+        // 22px sits under the 24px target-size floor, so it relies on the
+        // spacing exception: keep 1px clear above and below it (a row of
+        // pills side by side is fine), or use 24 where rows stack tightly.
         "30": "h-7.5 gap-1.5 px-2.5 nessa-text-3",
         "28": "h-7 gap-1.5 px-3 nessa-text-2",
         "26": "h-6.5 gap-1.5 px-3 nessa-text-2",
@@ -101,8 +94,10 @@ export interface ButtonProps
  * `outline`, `ghost`, `destructive`, `link`) at `sm`/`default`/`lg` sizes
  * are the form and dialog actions. The compact variants (`tinted`, `plain`,
  * `inverse`, `danger`) at the numeric heights (`22`–`30`) with
- * `shape="pill"` are the dense controls of toolbars, rows and headers; they
- * draw hover, press and focus from the shared state tokens. A selected
+ * `shape="pill"` are the dense controls of toolbars, rows and headers; all
+ * four take the 1.5px focus outline, and `tinted`, `plain` and `danger` draw
+ * hover and press from the shared state tokens (`inverse` deepens its own
+ * foreground fill). A selected
  * compact control says so with `aria-pressed`; an open menu trigger with
  * `data-state="open"`, which Radix triggers set themselves.
  *

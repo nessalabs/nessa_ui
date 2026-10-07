@@ -123,7 +123,7 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
           onKeyDown={(event) => {
             onKeyDown?.(event)
             if (event.defaultPrevented) return
-            if (event.key === "Escape" && query !== "") {
+            if (event.key === "Escape" && query !== "" && !props.readOnly) {
               event.preventDefault()
               event.stopPropagation()
               clear()
@@ -136,7 +136,7 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
             size === "lg" ? "nessa-text-input" : "nessa-text-input-2",
           )}
         />
-        {query !== "" ? (
+        {query !== "" && !props.readOnly ? (
           <button
             type="button"
             tabIndex={-1}

@@ -191,7 +191,9 @@ export const Compact: Story = {
     // 1.5px token draws 1px at 1x and 1.5px at 2x.
     const dpr = window.devicePixelRatio
     await expect(focused.outlineWidth).toBe(`${Math.max(1, Math.floor(1.5 * dpr)) / dpr}px`)
-    await expect(focused.boxShadow).not.toContain("3px")
+    // The 3px ring is gone, not just hidden: every length in the shadow is 0.
+    const lengths = [...focused.boxShadow.matchAll(/(-?[\d.]+)px/g)].map((match) => Number(match[1]))
+    await expect(lengths.every((length) => length === 0)).toBe(true)
   },
 }
 

@@ -136,7 +136,7 @@ const sidebarMenuSwapClassName =
 
 /** The badge's own presentation, shared by both trailing arrangements. */
 const sidebarMenuBadgeClassName =
-  "pointer-events-none inline-flex min-w-6 items-center justify-center nessa-text-2 font-medium tabular-nums text-sidebar-foreground/60 group-has-data-[active=true]/menu-item:text-sidebar-accent-foreground"
+  "pointer-events-none inline-flex min-w-6 items-center justify-center nessa-text-2 font-medium tabular-nums text-sidebar-foreground/60 group-has-data-[active=true]/menu-item:text-sidebar-accent-foreground group-has-data-[selected=true]/menu-item:text-sidebar-accent-foreground"
 
 /**
  * Creates the class names for a supported Sidebar menu-item presentation.
