@@ -3182,7 +3182,10 @@
       "name": "settings-group",
       "type": "registry:ui",
       "title": "Settings group",
-      "description": "A titled card of settings rows with hairlines between them and an optional footnote, and the row itself: label, detail, leading mark, control, and content under the label.",
+      "description": "A titled card of settings rows with hairlines between them and an optional footnote, disabled as a whole with one reason, and the row itself: label, detail, leading mark, control, content under the label, and found and pending states.",
+      "dependencies": [
+        "lucide-react"
+      ],
       "registryDependencies": [
         "nessalabs/nessa_ui/control-label",
         "nessalabs/nessa_ui/nessa-base",
@@ -3193,6 +3196,24 @@
           "path": "packages/react/src/components/settings-group.tsx",
           "type": "registry:ui",
           "target": "components/ui/settings-group.tsx"
+        }
+      ]
+    },
+    {
+      "name": "choices",
+      "type": "registry:ui",
+      "title": "Choices",
+      "description": "One choice among a few, each a card with an optional picture and description: a radio group on native radios, named by the settings row it sits in.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/control-label",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/choices.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/choices.tsx"
         }
       ]
     },

@@ -66,6 +66,7 @@ export {
   type SettingsGroupProps,
   type SettingsRowProps,
 } from "./components/settings-group"
+export { Choices, type ChoiceOption, type ChoicesProps } from "./components/choices"
 export {
   KeyFingerprint,
   fingerprintGroups,

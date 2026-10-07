@@ -5,6 +5,7 @@ import { Laptop, Smartphone } from "lucide-react"
 import {
   Button,
   Checkbox,
+  Choices,
   EmptyState,
   KeyFingerprint,
   SettingsGroup,
@@ -221,5 +222,107 @@ export const LinkedDevices: Story = {
     await expect(within(list).getByText("Pixel 9")).toBeInTheDocument()
     await userEvent.click(within(list).getByRole("button", { name: "Revoke Pixel 9" }))
     await expect(within(list).queryByText("Pixel 9")).toBeNull()
+  },
+}
+
+export const GroupDisabled: Story = {
+  parameters: storyDocumentation(
+    "`disabled` on the group disables every row at once, and `disabledReason` says why, once, above the card. The play test proves each row's control is unavailable and the reason describes the section.",
+  ),
+  render: () => (
+    <div className="max-w-xl">
+      <SettingsGroup
+        title="Approval"
+        disabled
+        disabledReason="Turn on linking to change these."
+      >
+        <SettingsRow label="Require approval" control={<Switch defaultChecked />} />
+        <SettingsRow label="Notify on new device" control={<Switch />} />
+      </SettingsGroup>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByRole("region", { name: "Approval" })).toHaveAccessibleDescription(
+      "Turn on linking to change these.",
+    )
+    await expect(canvas.getByRole("switch", { name: "Require approval" })).toBeDisabled()
+    await expect(canvas.getByRole("switch", { name: "Notify on new device" })).toBeDisabled()
+  },
+}
+
+function FoundAndPendingExample() {
+  const [on, setOn] = React.useState(false)
+  const [pending, setPending] = React.useState(false)
+  return (
+    <div className="max-w-xl">
+      <SettingsGroup title="Linking">
+        <SettingsRow label="Device name" detail="Shown to devices you link" control={<Button size="sm" variant="outline">Rename</Button>} />
+        <SettingsRow
+          label="Allow linking"
+          detail={pending ? "Applying…" : on ? "On" : "Off"}
+          found
+          pending={pending}
+          control={
+            <Switch
+              checked={on}
+              disabled={pending}
+              onCheckedChange={(next) => {
+                setOn(next)
+                setPending(true)
+              }}
+            />
+          }
+        />
+        <SettingsRow label="Finish applying" control={<Button size="sm" variant="ghost" onClick={() => setPending(false)}>Done</Button>} />
+      </SettingsGroup>
+    </div>
+  )
+}
+
+export const FoundAndPending: Story = {
+  parameters: storyDocumentation(
+    "`found` washes a row a search matched; `pending` shows a small spinner beside the control and marks the row busy while a change is applied. The play test proves the found row is tinted and the others are not, and that turning the switch marks the row busy until the host finishes.",
+  ),
+  render: () => <FoundAndPendingExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const rows = canvasElement.querySelectorAll<HTMLElement>("[data-slot=settings-row]")
+    const found = rows[1]!
+    await expect(found).toHaveAttribute("data-found", "true")
+    await expect(getComputedStyle(found).backgroundColor).not.toBe(getComputedStyle(rows[0]!).backgroundColor)
+    await userEvent.click(canvas.getByRole("switch", { name: "Allow linking" }))
+    await expect(found).toHaveAttribute("aria-busy", "true")
+    await expect(found.querySelector("[data-slot=settings-row-pending]")).not.toBeNull()
+    await userEvent.click(canvas.getByRole("button", { name: "Done" }))
+    await expect(found).not.toHaveAttribute("aria-busy")
+    await expect(canvas.getByRole("switch", { name: "Allow linking" })).toHaveAttribute("aria-checked", "true")
+  },
+}
+
+export const WithChoices: Story = {
+  parameters: storyDocumentation(
+    "A `Choices` control under a row's label takes the row's label as the group's name. The play test asks for the radio group by the row label.",
+  ),
+  render: () => (
+    <div className="max-w-xl">
+      <SettingsGroup title="Appearance">
+        <SettingsRow label="Theme" detail="How the window is drawn">
+          <Choices
+            defaultValue="system"
+            options={[
+              { value: "light", label: "Light" },
+              { value: "dark", label: "Dark" },
+              { value: "system", label: "System", description: "Follows the computer" },
+            ]}
+          />
+        </SettingsRow>
+      </SettingsGroup>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const group = canvas.getByRole("radiogroup", { name: "Theme" })
+    await expect(within(group).getByRole("radio", { name: "System" })).toBeChecked()
   },
 }
