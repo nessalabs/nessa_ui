@@ -135,6 +135,18 @@ export const PointerAndTouch: Story = {
     await expect(mounts).toBe(0)
     await expect(settings).not.toHaveAttribute("aria-describedby")
     settings.blur()
+    // What a phone does on a tap: the finger enters the button (a touch
+    // pointer, which keeps :hover stuck on it), presses and lifts, and only
+    // then does the button take focus. Still no tooltip.
+    const afterTap = await tooltipMounts(async () => {
+      const touch = { bubbles: true, pointerType: "touch", isPrimary: true } as const
+      settings.dispatchEvent(new PointerEvent("pointerover", touch))
+      settings.dispatchEvent(new PointerEvent("pointerdown", touch))
+      settings.dispatchEvent(new PointerEvent("pointerup", touch))
+      settings.focus()
+    })
+    await expect(afterTap).toBe(0)
+    settings.blur()
   },
 }
 
