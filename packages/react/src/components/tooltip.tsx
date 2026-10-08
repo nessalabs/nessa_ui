@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Tooltip as TooltipPrimitive } from "radix-ui"
 
+import { useComposedRefs } from "@/lib/compose"
 import { useNessaLayerScope, usePortalContainer } from "@/lib/portal-container"
 import { cn } from "@/lib/utils"
 
@@ -108,13 +109,16 @@ function currentPlatform(): "apple" | "other" {
  * a key is keyboard focus; focus that follows a pointer press — a click that
  * closed a menu, a tap — is not, whatever the browser's own heuristic says
  * about focus moved by script. One listener pair per document, installed by
- * the first tooltip.
+ * the first tooltip. It starts at "pointer": a press that happened before
+ * the listener existed (the click that opened a panel holding the first
+ * tooltip) must not count as keyboard, and every real keyboard focus is
+ * preceded by a keydown the listener does see.
  */
 const lastModality = new WeakMap<Document, "keyboard" | "pointer">()
 
 function trackModality(doc: Document) {
   if (lastModality.has(doc)) return
-  lastModality.set(doc, "keyboard")
+  lastModality.set(doc, "pointer")
   doc.addEventListener("keydown", () => lastModality.set(doc, "keyboard"), true)
   doc.addEventListener("pointerdown", () => lastModality.set(doc, "pointer"), true)
 }
@@ -128,9 +132,10 @@ type TriggerProps = {
 
 export interface TooltipProps
   extends Pick<
-    React.ComponentProps<typeof TooltipPrimitive.Content>,
-    "side" | "align" | "sideOffset" | "className"
-  > {
+      React.ComponentProps<typeof TooltipPrimitive.Content>,
+      "side" | "align" | "sideOffset" | "className"
+    >,
+    Omit<React.ComponentPropsWithRef<"button">, "children" | "content" | "className"> {
   /**
    * The one element the tooltip describes — usually an icon-only Button.
    * It must accept a ref and forward pointer and focus events, as Button
@@ -181,6 +186,12 @@ export interface TooltipProps
  * shortcut is announced through `aria-keyshortcuts`, which the tooltip adds
  * when only it was given one); `content` of the tooltip's own is announced
  * as the trigger's description. With nothing to say it never opens.
+ *
+ * Inside another `asChild` trigger, put the Tooltip inside it —
+ * `<DropdownMenuTrigger asChild><Tooltip><Button …/></Tooltip></DropdownMenuTrigger>`:
+ * any other prop the Tooltip receives (the menu's handlers, `ref`,
+ * `aria-expanded`, `data-state`) reaches the trigger after the tooltip's
+ * own, so the menu's open state stays on the button.
  */
 function Tooltip({
   children,
@@ -195,16 +206,25 @@ function Tooltip({
   align,
   sideOffset = 6,
   className,
+  ref: forwardedRef,
+  ...triggerProps
 }: TooltipProps) {
   const hasProvider = React.useContext(TooltipProviderPresent)
   const container = usePortalContainer(portalContainer)
   const layerScope = useNessaLayerScope()
   const trigger = children.props as TriggerProps
   const ownText = content !== undefined && content !== null && content !== ""
-  const text = ownText ? content : (trigger.label ?? trigger["aria-label"])
+  // The trigger's accessible name wins, as it does on Button, so what the
+  // tooltip shows is what assistive technology reads.
+  const text = ownText ? content : (trigger["aria-label"] ?? trigger.label)
   const keys = shortcut ?? trigger.shortcut
   const hasText = text !== undefined && text !== null && text !== ""
   const triggerRef = React.useRef<HTMLButtonElement | null>(null)
+  const composedRef = useComposedRefs(triggerRef, forwardedRef)
+  // A mouse (not a touch) resting on the trigger: the one pointer case that
+  // earns a tooltip, read from pointer events rather than `:hover`, which a
+  // tapped element keeps on touch screens.
+  const mouseOver = React.useRef(false)
   const [ownOpen, setOwnOpen] = React.useState(defaultOpen ?? false)
   const isOpen = hasText && (open ?? ownOpen)
   React.useEffect(() => {
@@ -218,9 +238,8 @@ function Tooltip({
       // progress) earns a tooltip; focus that follows a pointer press — a
       // menu handing focus back after a click, a tap — does not.
       const element = triggerRef.current
-      const focusOpen =
-        element !== null && element.ownerDocument.activeElement === element && !element.matches(":hover")
-      if (focusOpen && lastModality.get(element.ownerDocument) === "pointer") return
+      const byKeyboard = element !== null && lastModality.get(element.ownerDocument) === "keyboard"
+      if (!mouseOver.current && !byKeyboard) return
     }
     if (open === undefined) setOwnOpen(next)
     onOpenChange?.(next)
@@ -236,37 +255,53 @@ function Tooltip({
     >
       <TooltipPrimitive.Trigger
         asChild
-        ref={triggerRef}
         aria-keyshortcuts={trigger["aria-keyshortcuts"] === undefined && trigger.shortcut === undefined ? keys : undefined}
+        // Text taken from the trigger is its name already: the tooltip is not
+        // wired to it as a description too (the trigger's own
+        // `aria-describedby`, if any, still applies).
+        {...(ownText ? null : { "aria-describedby": undefined })}
+        // Props from an outer `asChild` trigger (a menu's) land after the
+        // tooltip's own, so its `data-state` and handlers win.
+        {...triggerProps}
+        ref={composedRef}
+        onPointerEnter={(event) => {
+          triggerProps.onPointerEnter?.(event)
+          mouseOver.current = event.pointerType !== "touch"
+        }}
+        onPointerMove={(event) => {
+          triggerProps.onPointerMove?.(event)
+          mouseOver.current = event.pointerType !== "touch"
+        }}
+        onPointerLeave={(event) => {
+          triggerProps.onPointerLeave?.(event)
+          mouseOver.current = false
+        }}
       >
         {children}
       </TooltipPrimitive.Trigger>
       {hasText ? (
-      <TooltipPrimitive.Portal container={container}>
-        <TooltipPrimitive.Content
-          {...layerScope}
-          // Text taken from the trigger is its name already; a blank label
-          // keeps Radix from announcing it again as the description.
-          aria-label={ownText ? undefined : " "}
-          data-slot="tooltip"
-          side={side}
-          align={align}
-          sideOffset={sideOffset}
-          collisionPadding={8}
-          className={cn(
-            "z-50 flex max-w-64 items-center gap-1.5 rounded-md bg-foreground px-2 py-1 font-sans nessa-text-2 text-background shadow-md",
-            "origin-(--radix-tooltip-content-transform-origin) animate-nessa-enter",
-            className,
-          )}
-        >
-          <span data-slot="tooltip-text">{text}</span>
-          {keys ? (
-            <Kbd className="bg-background/15 text-background">
-              {formatShortcut(keys, currentPlatform())}
-            </Kbd>
-          ) : null}
-        </TooltipPrimitive.Content>
-      </TooltipPrimitive.Portal>
+        <TooltipPrimitive.Portal container={container}>
+          <TooltipPrimitive.Content
+            {...layerScope}
+            data-slot="tooltip"
+            side={side}
+            align={align}
+            sideOffset={sideOffset}
+            collisionPadding={8}
+            className={cn(
+              "z-50 flex max-w-64 items-center gap-1.5 rounded-md bg-foreground px-2 py-1 font-sans nessa-text-2 text-background shadow-md",
+              "origin-(--radix-tooltip-content-transform-origin) animate-nessa-enter",
+              className,
+            )}
+          >
+            <span data-slot="tooltip-text">{text}</span>
+            {keys ? (
+              <Kbd className="bg-background/15 text-background">
+                {formatShortcut(keys, currentPlatform())}
+              </Kbd>
+            ) : null}
+          </TooltipPrimitive.Content>
+        </TooltipPrimitive.Portal>
       ) : null}
     </TooltipPrimitive.Root>
   )

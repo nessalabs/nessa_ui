@@ -4,6 +4,10 @@ import { expect, userEvent, waitFor, within } from "storybook/test"
 import { Bell, Search, Settings } from "lucide-react"
 import {
   Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   NessaColorMode,
   NessaProvider,
   PortalContainerProvider,
@@ -197,16 +201,20 @@ export const OwnContent: Story = {
 function ThemedExample() {
   const [container, setContainer] = React.useState<HTMLDivElement | null>(null)
   return (
-    <NessaProvider defaultMode={NessaColorMode.Dark} className="flex items-center gap-3 bg-background p-3 text-foreground">
+    <div className="flex flex-col gap-3">
+      {/* The container sits outside the Dark scope, so the tooltip can only
+          be Dark by carrying the scope itself. */}
       <div ref={setContainer} data-testid="container" />
-      <PortalContainerProvider container={container}>
-        <Tooltip content="Inside the panel">
-          <Button size="sm" variant="tinted" shape="pill">
-            Panel action
-          </Button>
-        </Tooltip>
-      </PortalContainerProvider>
-    </NessaProvider>
+      <NessaProvider defaultMode={NessaColorMode.Dark} className="flex items-center gap-3 bg-background p-3 text-foreground">
+        <PortalContainerProvider container={container}>
+          <Tooltip content="Inside the panel">
+            <Button size="sm" variant="tinted" shape="pill">
+              Panel action
+            </Button>
+          </Tooltip>
+        </PortalContainerProvider>
+      </NessaProvider>
+    </div>
   )
 }
 
@@ -227,6 +235,97 @@ export const ThemedAndContained: Story = {
     await expect(getComputedStyle(content).getPropertyValue("--foreground").trim()).toBe(
       getComputedStyle(scope).getPropertyValue("--foreground").trim(),
     )
+    // And it differs from what the container itself inherits (Light).
+    await expect(getComputedStyle(canvas.getByTestId("container")).getPropertyValue("--foreground").trim()).not.toBe(
+      getComputedStyle(scope).getPropertyValue("--foreground").trim(),
+    )
+    await userEvent.keyboard("{Escape}")
+    await closed(canvasElement)
+  },
+}
+
+export const InsideAMenuTrigger: Story = {
+  parameters: storyDocumentation(
+    "Inside another `asChild` trigger, the Tooltip goes inside it: the menu's props reach the button after the tooltip's own, so the button keeps the menu's `data-state` and `aria-expanded`. The play test opens the menu and proves the button reads open, then closes it.",
+  ),
+  render: () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Tooltip>
+          <Button size="icon-sm" variant="plain" shape="pill" label="More">
+            …
+          </Button>
+        </Tooltip>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuItem>Rename</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ),
+  play: async ({ canvasElement }) => {
+    const button = within(canvasElement).getByRole("button", { name: "More" })
+    await userEvent.click(button)
+    await body(canvasElement).findByRole("menu")
+    await expect(button).toHaveAttribute("data-state", "open")
+    await expect(button).toHaveAttribute("aria-expanded", "true")
+    await userEvent.keyboard("{Escape}")
+    await waitFor(() => expect(body(canvasElement).queryByRole("menu")).toBeNull())
+    await expect(button).toHaveAttribute("data-state", "closed")
+    await userEvent.unhover(button)
+    await closed(canvasElement)
+  },
+}
+
+function PanelExample() {
+  const [open, setOpen] = React.useState(false)
+  return (
+    <div className="flex flex-col items-start gap-2">
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        Open panel
+      </Button>
+      {open ? (
+        <div className="flex gap-2 rounded-md border border-border p-2">
+          <Tooltip>
+            <Button autoFocus size="icon-sm" variant="plain" shape="pill" label="Close panel" onClick={() => setOpen(false)}>
+              ×
+            </Button>
+          </Tooltip>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+export const PanelOpenedByAClick: Story = {
+  parameters: storyDocumentation(
+    "A panel opened by a click that focuses a control inside it shows no tooltip on that control: the focus followed a pointer press. The play test clicks to open the panel, proves the close button has focus and no tooltip mounts.",
+  ),
+  render: () => <PanelExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const mounts = await tooltipMounts(async () => {
+      await userEvent.click(canvas.getByRole("button", { name: "Open panel" }))
+    }, 400)
+    await expect(canvas.getByRole("button", { name: "Close panel" })).toHaveFocus()
+    await expect(mounts).toBe(0)
+  },
+}
+
+export const NameWins: Story = {
+  parameters: storyDocumentation(
+    "When a button has both a `label` and an explicit `aria-label`, the `aria-label` is its name, and the tooltip shows that same name, so what is seen is what is heard. The play test proves it.",
+  ),
+  render: () => (
+    <Tooltip>
+      <Button size="icon-sm" variant="plain" shape="pill" label="Search files" aria-label="Search">
+        <Search />
+      </Button>
+    </Tooltip>
+  ),
+  play: async ({ canvasElement }) => {
+    await userEvent.tab()
+    await body(canvasElement).findByRole("tooltip")
+    await expect(canvasElement.ownerDocument.querySelector("[data-slot=tooltip-text]")).toHaveTextContent(/^Search$/)
     await userEvent.keyboard("{Escape}")
     await closed(canvasElement)
   },
