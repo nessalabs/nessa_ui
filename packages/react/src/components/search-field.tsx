@@ -7,14 +7,24 @@ import { Search, X } from "lucide-react"
 import { Kbd } from "./kbd"
 import { cn } from "@/lib/utils"
 
+/**
+ * The field's surface reads from custom properties a host can set on any
+ * ancestor, each defaulting to the kit's own value: `--nessa-search-radius`,
+ * `--nessa-search-padding-x` (start padding), `--nessa-search-padding-y`,
+ * `--nessa-search-rest-fill`, `--nessa-search-hover-fill` (hover and focus),
+ * `--nessa-search-ink` (the query), `--nessa-search-muted-ink` (icon,
+ * placeholder, clear button) and `--nessa-search-font-size`. The type level
+ * otherwise follows `size`, and a `nessa-text-*` class on the field replaces
+ * it.
+ */
 const searchFieldVariants = cva(
-  "relative flex w-full min-w-0 items-center rounded-md bg-foreground/(--nessa-state-hover) font-sans text-foreground transition-[background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-foreground/(--nessa-state-hover-strong) focus-within:bg-foreground/(--nessa-state-hover-strong) focus-within:outline-solid focus-within:outline-(length:--nessa-focus-outline-width) focus-within:outline-ring has-[input:disabled]:pointer-events-none has-[input:disabled]:opacity-50 forced-colors:outline-1 forced-colors:outline-solid forced-colors:-outline-offset-1",
+  "relative flex w-full min-w-0 items-center rounded-[var(--nessa-search-radius,calc(var(--radius)*0.875))] py-[var(--nessa-search-padding-y,0px)] bg-[color:var(--nessa-search-rest-fill,color-mix(in_oklab,var(--foreground)_var(--nessa-state-hover),transparent))] font-sans text-[color:var(--nessa-search-ink,var(--foreground))] transition-[background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-[color:var(--nessa-search-hover-fill,color-mix(in_oklab,var(--foreground)_var(--nessa-state-hover-strong),transparent))] focus-within:bg-[color:var(--nessa-search-hover-fill,color-mix(in_oklab,var(--foreground)_var(--nessa-state-hover-strong),transparent))] focus-within:outline-solid focus-within:outline-(length:--nessa-focus-outline-width) focus-within:outline-ring has-[input:disabled]:pointer-events-none has-[input:disabled]:opacity-50 forced-colors:outline-1 forced-colors:outline-solid forced-colors:-outline-offset-1",
   {
     variants: {
       size: {
-        sm: "h-7 gap-1.5 ps-2.5 pe-0.5",
-        md: "h-8 gap-2 ps-2.5 pe-1",
-        lg: "h-9 gap-2 ps-3 pe-1.5",
+        sm: "min-h-7 gap-1.5 ps-[var(--nessa-search-padding-x,calc(var(--spacing)*2.5))] pe-0.5 nessa-text-input-2",
+        md: "min-h-8 gap-2 ps-[var(--nessa-search-padding-x,calc(var(--spacing)*2.5))] pe-1 nessa-text-input-2",
+        lg: "min-h-9 gap-2 ps-[var(--nessa-search-padding-x,calc(var(--spacing)*3))] pe-1.5 nessa-text-input",
       },
     },
     defaultVariants: { size: "md" },
@@ -44,10 +54,22 @@ export interface SearchFieldProps
    */
   clearLabel?: string
   /**
-   * Height: `sm` 28px, `md` 32px, `lg` 36px.
+   * Height: `sm` 28px, `md` 32px, `lg` 36px — a minimum, so a larger
+   * `--nessa-search-padding-y` or type level grows the field.
    * @defaultValue "md"
    */
   size?: "sm" | "md" | "lg"
+  /**
+   * The mark at the start, decorative. Pass the host's own icon to match
+   * its family; it is sized like the default unless it sets its own size.
+   * @defaultValue a magnifier
+   */
+  icon?: React.ReactNode
+  /**
+   * The clear button's glyph, decorative.
+   * @defaultValue a cross
+   */
+  clearIcon?: React.ReactNode
 }
 
 /**
@@ -84,6 +106,8 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
       shortcut,
       clearLabel = "Clear search",
       size = "md",
+      icon,
+      clearIcon,
       className,
       onKeyDown,
       disabled,
@@ -142,10 +166,18 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
         data-slot="search-field"
         data-size={size}
       >
-        <Search
+        <span
           aria-hidden="true"
-          className={cn("pointer-events-none shrink-0 text-muted-foreground", size === "lg" ? "size-4" : "size-3.5")}
-        />
+          data-slot="search-field-icon"
+          className={cn(
+            "pointer-events-none flex shrink-0 text-[color:var(--nessa-search-muted-ink,var(--muted-foreground))]",
+            size === "lg"
+              ? "[&_svg:not([class*='size-'])]:size-4"
+              : "[&_svg:not([class*='size-'])]:size-3.5",
+          )}
+        >
+          {icon ?? <Search />}
+        </span>
         <input
           ref={setRef}
           autoComplete="off"
@@ -183,12 +215,11 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
               clear()
             }
           }}
-          // The input's text floors at 1rem on narrow viewports, as every
-          // Nessa field does, so focusing it never zooms the page.
-          className={cn(
-            "peer h-full min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 font-sans text-foreground outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none",
-            size === "lg" ? "nessa-text-input" : "nessa-text-input-2",
-          )}
+          // The type level is the field's (it floors at 1rem on narrow
+          // viewports, as every Nessa field does, so focusing never zooms
+          // the page); the input inherits it unless the host sets
+          // `--nessa-search-font-size`.
+          className="peer min-w-0 flex-1 appearance-none self-stretch border-0 bg-transparent p-0 font-sans [font-size:var(--nessa-search-font-size,inherit)] [line-height:inherit] [letter-spacing:inherit] [color:inherit] outline-none placeholder:text-[color:var(--nessa-search-muted-ink,var(--muted-foreground))] [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
         />
         {clearable ? (
           <button
@@ -198,9 +229,11 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
             aria-label={clearLabel}
             disabled={disabled}
             onClick={clear}
-            className="grid size-6 shrink-0 cursor-default appearance-none place-items-center rounded-full border-0 bg-transparent p-0 text-muted-foreground transition-[color,background-color] [transition-duration:var(--nessa-motion-duration-fast)] hover:bg-foreground/(--nessa-state-hover-strong) hover:text-foreground active:bg-foreground/(--nessa-state-press)"
+            className="grid size-6 shrink-0 cursor-default appearance-none place-items-center rounded-full border-0 bg-transparent p-0 text-[color:var(--nessa-search-muted-ink,var(--muted-foreground))] transition-[color,background-color] [transition-duration:var(--nessa-motion-duration-fast)] hover:bg-foreground/(--nessa-state-hover-strong) hover:text-[color:var(--nessa-search-ink,var(--foreground))] active:bg-foreground/(--nessa-state-press) [&_svg:not([class*='size-'])]:size-3.5"
           >
-            <X aria-hidden="true" className="size-3.5" />
+            <span aria-hidden="true" className="flex">
+              {clearIcon ?? <X />}
+            </span>
           </button>
         ) : shortcut !== undefined && query === "" ? (
           <span

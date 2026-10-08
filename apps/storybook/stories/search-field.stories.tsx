@@ -1,6 +1,7 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, fn, userEvent, waitFor, within } from "storybook/test"
+import { Circle, CircleX } from "lucide-react"
 import {
   Drawer,
   DrawerBody,
@@ -282,6 +283,87 @@ export const FormReset: Story = {
     // It stays reset through the next render rather than snapping back.
     await userEvent.type(field, "!")
     await expect(field).toHaveValue("open!")
+  },
+}
+
+export const SurfaceHooks: Story = {
+  parameters: storyDocumentation(
+    "How a host matches the field to its own surface without overriding classes: `icon` and `clearIcon` take its own glyphs, and custom properties set on any ancestor retune the corner, padding, fills, inks and type size. The play test proves the defaults are exactly the kit's values (against reference elements drawn with the kit's own classes) and that each property, set on a wrapper, reaches the field.",
+  ),
+  render: () => (
+    <div className="flex max-w-xs flex-col gap-3">
+      <SearchField aria-label="Default search" defaultValue="query" />
+      <div data-testid="reference" className="flex flex-col gap-1">
+        <span data-ref="rest" className="block h-2 rounded-md bg-foreground/(--nessa-state-hover)" />
+        <span data-ref="hover" className="block h-2 bg-foreground/(--nessa-state-hover-strong)" />
+        <span data-ref="type" className="nessa-text-input-2 text-foreground">Aa</span>
+        <span data-ref="muted" className="text-muted-foreground ps-2.5">Aa</span>
+      </div>
+      <div
+        data-testid="hooked"
+        style={
+          {
+            "--nessa-search-radius": "12px",
+            "--nessa-search-padding-x": "12px",
+            "--nessa-search-padding-y": "8px",
+            "--nessa-search-rest-fill": "rgb(240, 240, 250)",
+            "--nessa-search-hover-fill": "rgb(230, 230, 242)",
+            "--nessa-search-ink": "rgb(20, 30, 40)",
+            "--nessa-search-muted-ink": "rgb(60, 60, 70)",
+            "--nessa-search-font-size": "13px",
+          } as React.CSSProperties
+        }
+      >
+        <SearchField
+          aria-label="Hooked search"
+          placeholder="Search"
+          icon={<Circle data-testid="own-icon" />}
+          clearIcon={<CircleX data-testid="own-clear" />}
+          defaultValue="query"
+        />
+      </div>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const ref = (name: string) => getComputedStyle(canvasElement.querySelector(`[data-ref=${name}]`)!)
+    const frameOf = (name: string) =>
+      canvas.getByRole("searchbox", { name }).closest<HTMLElement>("[data-slot=search-field]")!
+    // Defaults are the kit's own values.
+    const field = frameOf("Default search")
+    const frame = getComputedStyle(field)
+    const input = getComputedStyle(canvas.getByRole("searchbox", { name: "Default search" }))
+    const icon = getComputedStyle(field.querySelector("[data-slot=search-field-icon]")!)
+    await expect(frame.backgroundColor).toBe(ref("rest").backgroundColor)
+    await expect(frame.borderTopLeftRadius).toBe(ref("rest").borderTopLeftRadius)
+    await expect(frame.paddingInlineStart).toBe(ref("muted").paddingInlineStart)
+    await expect(frame.paddingTop).toBe("0px")
+    await expect(frame.height).toBe("32px")
+    await expect(input.fontSize).toBe(ref("type").fontSize)
+    await expect(input.lineHeight).toBe(ref("type").lineHeight)
+    await expect(input.color).toBe(ref("type").color)
+    await expect(icon.color).toBe(ref("muted").color)
+    await expect(field.querySelector("svg.lucide-search")).not.toBeNull()
+    // Hover and focus share the hover fill; focus is the one a test can drive.
+    canvas.getByRole("searchbox", { name: "Default search" }).focus()
+    await waitFor(() => expect(getComputedStyle(field).backgroundColor).toBe(ref("hover").backgroundColor))
+
+    // Each hook reaches the field.
+    const hooked = frameOf("Hooked search")
+    const hookedFrame = getComputedStyle(hooked)
+    const hookedInput = getComputedStyle(canvas.getByRole("searchbox", { name: "Hooked search" }))
+    await expect(hookedFrame.borderTopLeftRadius).toBe("12px")
+    await expect(hookedFrame.paddingInlineStart).toBe("12px")
+    await expect(hookedFrame.paddingTop).toBe("8px")
+    await waitFor(() => expect(getComputedStyle(hooked).backgroundColor).toBe("rgb(240, 240, 250)"))
+    await expect(hookedInput.color).toBe("rgb(20, 30, 40)")
+    await expect(hookedInput.fontSize).toBe("13px")
+    await expect(getComputedStyle(hooked.querySelector("[data-slot=search-field-icon]")!).color).toBe("rgb(60, 60, 70)")
+    await expect(within(hooked).getByTestId("own-icon")).toBeInTheDocument()
+    await expect(hooked.querySelector("svg.lucide-search")).toBeNull()
+    await expect(within(hooked).getByTestId("own-clear")).toBeInTheDocument()
+    canvas.getByRole("searchbox", { name: "Hooked search" }).focus()
+    await waitFor(() => expect(getComputedStyle(hooked).backgroundColor).toBe("rgb(230, 230, 242)"))
   },
 }
 
