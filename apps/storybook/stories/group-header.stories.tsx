@@ -1,9 +1,10 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, userEvent, waitFor, within } from "storybook/test"
-import { Plus } from "lucide-react"
+import { ChevronsDown, Plus } from "lucide-react"
 import { Button, GroupHeader, SidebarMenu, SidebarMenuItem } from "@nessalabs/ui"
 
+import { stateStyle } from "./state-style"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -129,5 +130,132 @@ export const Collapsible: Story = {
     // The count is the rows drawn under it.
     await expect(within(region).getAllByRole("listitem")).toHaveLength(4)
     await expect(within(region).getByRole("button", { name: "Untitled 4" })).toBeInTheDocument()
+  },
+}
+
+function DenseExample() {
+  const [open, setOpen] = React.useState(true)
+  const [locked, setLocked] = React.useState(true)
+  const toggleRef = React.useRef<HTMLButtonElement>(null)
+  React.useEffect(() => {
+    toggleRef.current?.setAttribute("data-ref-attached", "true")
+  }, [])
+  return (
+    <div className="flex max-w-xs flex-col gap-3">
+      <GroupHeader label="Default" count={3} />
+      <GroupHeader label="Loud" tone="strong" />
+      <GroupHeader label="Plain chevron" open onOpenChange={() => {}} />
+      <div data-testid="reference" className="flex flex-col">
+        <span data-ref="quiet" className="nessa-text-2 font-medium text-muted-foreground">Aa</span>
+        <span data-ref="strong" className="text-foreground">Aa</span>
+        <span data-ref="caption" className="nessa-text-1 font-semibold">Aa</span>
+      </div>
+      <GroupHeader
+        size="dense"
+        label="Channels"
+        count={8}
+        open={open}
+        onOpenChange={setOpen}
+        chevron={<ChevronsDown data-testid="own-chevron" />}
+        toggleProps={{
+          "data-row": "section",
+          "data-section": "channels",
+          className: "host-toggle",
+          ref: toggleRef,
+          onClick: (event) => {
+            if (locked) {
+              event.preventDefault()
+              setLocked(false)
+            }
+          },
+        }}
+      />
+      <div
+        style={
+          {
+            "--nessa-group-header-height": "16.5px",
+            "--nessa-group-header-ink": "rgb(90, 90, 100)",
+            "--nessa-group-header-count-ink": "rgb(80, 80, 90)",
+            "--nessa-group-header-chevron-ink": "rgb(70, 70, 80)",
+            "--nessa-group-header-strong-ink": "rgb(15, 15, 25)",
+            "--nessa-group-header-hover-ink": "rgb(5, 5, 15)",
+          } as React.CSSProperties
+        }
+      >
+        <GroupHeader size="dense" label="Hooked" count={2} open onOpenChange={() => {}} />
+        <GroupHeader label="Hooked loud" tone="strong" />
+      </div>
+    </div>
+  )
+}
+
+export const DenseAndHooks: Story = {
+  parameters: storyDocumentation(
+    "`size=\"dense\"` is a caption header (level 1, semibold, 24px, its disclosure filling it) for a sidebar's section labels. `chevron` takes the host's glyph, `toggleProps` puts `data-*` attributes and handlers on the one disclosure button (an `onClick` there that calls `preventDefault()` keeps the group as it is), and custom properties retune the height and inks. The play test proves the default header is still the kit's 28px level-2 medium muted label, the dense one is a 24px caption whose disclosure fills it, the toggle carries the host's attributes and stays one button, and each property reaches the header.",
+  ),
+  render: () => <DenseExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const ref = (name: string) => getComputedStyle(canvasElement.querySelector(`[data-ref=${name}]`)!)
+    const header = (name: RegExp) =>
+      canvas.getByRole("heading", { name }).closest<HTMLElement>("[data-slot=group-header]")!
+
+    const plain = getComputedStyle(canvas.getByRole("heading", { name: /^Default/ }))
+    await expect(header(/^Default/).getBoundingClientRect().height).toBe(28)
+    await expect(plain.fontSize).toBe(ref("quiet").fontSize)
+    await expect(plain.fontWeight).toBe(ref("quiet").fontWeight)
+    await expect(plain.color).toBe(ref("quiet").color)
+
+    await expect(getComputedStyle(canvas.getByRole("heading", { name: "Loud" })).color).toBe(ref("strong").color)
+    const plainToggle = canvas.getByRole("button", { name: "Plain chevron" })
+    await expect(plainToggle.querySelector("svg")!.getBoundingClientRect().width).toBe(12)
+    await expect(plainToggle.getBoundingClientRect().height).toBe(24)
+    if (matchMedia("(hover: hover)").matches) {
+      await expect(stateStyle(plainToggle, ":hover", "color")).toBe(ref("strong").color)
+    }
+
+    const dense = canvas.getByRole("heading", { name: /^Channels/ })
+    await expect(header(/^Channels/).getBoundingClientRect().height).toBe(24)
+    await expect(getComputedStyle(dense).fontSize).toBe(ref("caption").fontSize)
+    await expect(getComputedStyle(dense).fontWeight).toBe(ref("caption").fontWeight)
+
+    const toggle = within(dense).getByRole("button")
+    await expect(within(dense).getAllByRole("button")).toHaveLength(1)
+    await expect(toggle).toHaveAttribute("data-row", "section")
+    await expect(toggle).toHaveAttribute("data-section", "channels")
+    await expect(toggle).toHaveClass("host-toggle")
+    await expect(toggle).toHaveAttribute("data-ref-attached", "true")
+    // The dense disclosure fills the 24px header: a full target that never
+    // reaches past the header into the rows beside it.
+    const headerBox = header(/^Channels/).getBoundingClientRect()
+    const toggleBox = toggle.getBoundingClientRect()
+    await expect(toggleBox.height).toBe(24)
+    await expect(toggleBox.top).toBeGreaterThanOrEqual(headerBox.top)
+    await expect(toggleBox.bottom).toBeLessThanOrEqual(headerBox.bottom)
+    await expect(within(toggle).getByTestId("own-chevron")).toBeInTheDocument()
+    // The host's onClick prevented the first toggle; the second goes through.
+    // A replacement glyph, drawn pointing down, is shown as drawn while open
+    // and turned a quarter toward the inline end while closed.
+    const glyph = toggle.querySelector<HTMLElement>("[data-slot=group-header-chevron]")!
+    const turn = async () => {
+      await Promise.all(glyph.getAnimations().map((animation) => animation.finished))
+      return getComputedStyle(glyph).rotate
+    }
+    await expect(await turn()).toBe("none")
+    await userEvent.click(toggle)
+    await expect(toggle).toHaveAttribute("aria-expanded", "true")
+    await userEvent.click(toggle)
+    await expect(toggle).toHaveAttribute("aria-expanded", "false")
+    await expect(await turn()).toBe("-90deg")
+
+    const hooked = header(/^Hooked 2/)
+    await expect(hooked.getBoundingClientRect().height).toBe(16.5)
+    await expect(getComputedStyle(canvas.getByRole("heading", { name: /^Hooked 2/ })).color).toBe("rgb(90, 90, 100)")
+    await expect(getComputedStyle(hooked.querySelector("[data-slot=group-header-count]")!).color).toBe("rgb(80, 80, 90)")
+    await expect(getComputedStyle(hooked.querySelector("[data-slot=group-header-chevron]")!).color).toBe("rgb(70, 70, 80)")
+    await expect(getComputedStyle(canvas.getByRole("heading", { name: "Hooked loud" })).color).toBe("rgb(15, 15, 25)")
+    if (matchMedia("(hover: hover)").matches) {
+      await expect(stateStyle(within(hooked).getByRole("button"), ":hover", "color")).toBe("rgb(5, 5, 15)")
+    }
   },
 }

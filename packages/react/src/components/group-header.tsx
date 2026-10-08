@@ -28,6 +28,16 @@ interface GroupHeaderBaseProps
    * @defaultValue "quiet"
    */
   tone?: "quiet" | "strong"
+  /**
+   * `default` is a 28px header in level-2 type; `dense` is a caption header
+   * (level 1, semibold) 24px tall, for the tight section labels of a
+   * sidebar, whose disclosure fills the header's height. Either height is a
+   * minimum a host can retune with `--nessa-group-header-height`; below 24px
+   * a disclosure is under the target-size floor, which a host that does so
+   * answers for (by spacing such headers apart).
+   * @defaultValue "default"
+   */
+  size?: "default" | "dense"
   /** A control at the end of the header — add, filter, more. */
   action?: React.ReactNode
   /**
@@ -46,6 +56,23 @@ interface GroupHeaderBaseProps
 /** A header whose label is a disclosure: `open` comes with its handler. */
 interface GroupHeaderDisclosureProps {
   /**
+   * The disclosure's glyph, decorative. Draw it pointing down: the header
+   * shows it as drawn while open and turns it a quarter toward the inline
+   * end while closed, as it does the default chevron.
+   * @defaultValue a down chevron
+   */
+  chevron?: React.ReactNode
+  /**
+   * Props for the disclosure button itself — `data-*` attributes a host's
+   * keyboard navigation reads, a `ref`, handlers. The header still owns
+   * `type`, `aria-expanded` and `aria-controls`, and an `onClick` here runs
+   * first: calling `preventDefault()` in it keeps the group as it is.
+   */
+  toggleProps?: Omit<
+    React.ComponentPropsWithRef<"button">,
+    "type" | "aria-expanded" | "aria-controls" | "children"
+  > & { [key: `data-${string}`]: string | number | boolean | undefined }
+  /**
    * Whether the group is open. Passing it makes the label a disclosure
    * button with a chevron; the host shows or hides the group's content.
    */
@@ -62,6 +89,8 @@ interface GroupHeaderDisclosureProps {
 
 /** A plain header: no disclosure. */
 interface GroupHeaderStaticProps {
+  chevron?: undefined
+  toggleProps?: undefined
   open?: undefined
   onOpenChange?: undefined
   controls?: undefined
@@ -74,6 +103,14 @@ export type GroupHeaderProps = GroupHeaderBaseProps &
  * The label above a group of rows: a heading with an optional count, an
  * optional disclosure that collapses the group, and an optional action at
  * the end. It draws only the header; the rows are the host's.
+ *
+ * A host retunes it from any ancestor with custom properties, each
+ * defaulting to the kit's value: `--nessa-group-header-height` (minimum
+ * height; 28px, or 24px dense), `--nessa-group-header-ink` (the quiet label;
+ * muted foreground), `--nessa-group-header-strong-ink` (the strong label;
+ * foreground), `--nessa-group-header-count-ink` (muted foreground),
+ * `--nessa-group-header-chevron-ink` (muted foreground) and
+ * `--nessa-group-header-hover-ink` (the disclosure's hover; foreground).
  *
  * With `open`, the heading holds a button that announces its expanded state
  * and names `controls` as the region it toggles, the pattern an accordion
@@ -90,6 +127,9 @@ function GroupHeader({
   action,
   actionOnHover = false,
   level = 2,
+  size = "default",
+  chevron,
+  toggleProps,
   className,
   ...props
 }: GroupHeaderProps) {
@@ -109,7 +149,7 @@ function GroupHeader({
       {count !== undefined ? (
         <span
           data-slot="group-header-count"
-          className="shrink-0 font-normal text-muted-foreground tabular-nums"
+          className="shrink-0 font-normal text-[color:var(--nessa-group-header-count-ink,var(--muted-foreground))] tabular-nums"
         >
           {count}
         </span>
@@ -122,31 +162,54 @@ function GroupHeader({
       {...props}
       data-slot="group-header"
       data-tone={tone}
+      data-size={size}
       data-state={collapsible ? (open ? "open" : "closed") : undefined}
-      className={cn("group/group-header flex min-h-7 min-w-0 items-center gap-1 ps-2 pe-1 font-sans", className)}
+      className={cn(
+        "group/group-header flex min-w-0 items-center gap-1 ps-2 pe-1 font-sans",
+        size === "dense"
+          ? "min-h-[var(--nessa-group-header-height,calc(var(--spacing)*6))]"
+          : "min-h-[var(--nessa-group-header-height,calc(var(--spacing)*7))]",
+        className,
+      )}
     >
       <Heading
         className={cn(
-          "m-0 flex min-w-0 flex-1 items-center nessa-text-2 font-medium",
-          tone === "strong" ? "text-foreground" : "text-muted-foreground",
+          "m-0 flex min-w-0 flex-1 items-center self-stretch",
+          size === "dense" ? "nessa-text-1 font-semibold" : "nessa-text-2 font-medium",
+          tone === "strong"
+            ? "text-[color:var(--nessa-group-header-strong-ink,var(--foreground))]"
+            : "text-[color:var(--nessa-group-header-ink,var(--muted-foreground))]",
         )}
       >
         {collapsible ? (
           <button
+            {...toggleProps}
             type="button"
             aria-expanded={open}
             aria-controls={controls}
-            onClick={() => onOpenChange?.(!open)}
-            className="-ms-1 flex min-h-6 min-w-0 cursor-default appearance-none items-center gap-1.5 rounded-sm border-0 bg-transparent px-1 font-[inherit] text-inherit outline-none transition-[color] [transition-duration:var(--nessa-motion-duration-fast)] hover:text-foreground focus-visible:outline-solid focus-visible:outline-(length:--nessa-focus-outline-width) focus-visible:outline-offset-1 focus-visible:outline-ring"
+            onClick={(event) => {
+              toggleProps?.onClick?.(event)
+              if (!event.defaultPrevented) onOpenChange?.(!open)
+            }}
+            className={cn(
+              "-ms-1 flex min-w-0 cursor-default appearance-none items-center gap-1.5 rounded-sm border-0 bg-transparent px-1 font-[inherit] text-inherit outline-none transition-[color] [transition-duration:var(--nessa-motion-duration-fast)] hover:text-[color:var(--nessa-group-header-hover-ink,var(--foreground))] focus-visible:outline-solid focus-visible:outline-(length:--nessa-focus-outline-width) focus-visible:outline-offset-1 focus-visible:outline-ring",
+              // A dense disclosure fills the header's height, so its target is
+              // the header itself and never reaches into the rows beside it.
+              size === "dense" ? "min-h-0 self-stretch" : "min-h-6",
+              toggleProps?.className,
+            )}
           >
             {text}
-            <ChevronDown
+            <span
               aria-hidden="true"
+              data-slot="group-header-chevron"
               className={cn(
-                "size-3 shrink-0 text-muted-foreground transition-transform [transition-duration:var(--nessa-motion-duration-fast)] motion-reduce:transition-none",
+                "flex shrink-0 text-[color:var(--nessa-group-header-chevron-ink,var(--muted-foreground))] transition-transform [transition-duration:var(--nessa-motion-duration-fast)] motion-reduce:transition-none [&_svg:not([class*='size-'])]:size-3",
                 !open && "ltr:-rotate-90 rtl:rotate-90",
               )}
-            />
+            >
+              {chevron ?? <ChevronDown />}
+            </span>
           </button>
         ) : (
           <span className="flex min-w-0 items-center gap-1.5">{text}</span>
