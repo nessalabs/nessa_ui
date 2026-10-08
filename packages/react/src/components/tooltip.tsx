@@ -230,6 +230,9 @@ function Tooltip({
   // earns a tooltip, read from pointer events rather than `:hover`, which a
   // tapped element keeps on touch screens.
   const mouseOver = React.useRef(false)
+  // Set for the length of a focus event, so an open request made from it is
+  // judged as focus (keyboard only) and never as hover.
+  const focusing = React.useRef(false)
   const [ownOpen, setOwnOpen] = React.useState(defaultOpen ?? false)
   const isOpen = hasText && (open ?? ownOpen)
   React.useEffect(() => {
@@ -239,12 +242,13 @@ function Tooltip({
   const handleOpenChange = (next: boolean) => {
     if (next) {
       if (!hasText) return
-      // Radix opens on any focus. Only keyboard focus (or a hover in
-      // progress) earns a tooltip; focus that follows a pointer press — a
-      // menu handing focus back after a click, a tap — does not.
+      // Radix opens on any focus and on hover. A focus open needs a key
+      // before it — focus a menu hands back after a click, or a tap, earns
+      // nothing even with the mouse resting on the trigger; a hover open
+      // needs a mouse (not a touch) over the trigger.
       const element = triggerRef.current
       const byKeyboard = element !== null && lastModality.get(element.ownerDocument) === "keyboard"
-      if (!mouseOver.current && !byKeyboard) return
+      if (focusing.current ? !byKeyboard : !mouseOver.current) return
     }
     if (open === undefined) setOwnOpen(next)
     onOpenChange?.(next)
@@ -279,6 +283,14 @@ function Tooltip({
         onPointerLeave={(event) => {
           triggerProps.onPointerLeave?.(event)
           mouseOver.current = false
+        }}
+        // Runs before Radix's own focus handler, which asks to open.
+        onFocus={(event) => {
+          triggerProps.onFocus?.(event)
+          focusing.current = true
+          queueMicrotask(() => {
+            focusing.current = false
+          })
         }}
       >
         {

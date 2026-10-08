@@ -194,6 +194,40 @@ export const FocusReturnedByAPointer: Story = {
   },
 }
 
+export const ScriptFocusUnderTheMouse: Story = {
+  parameters: storyDocumentation(
+    "Focus moved by script after a click — a menu handing focus back — opens nothing even while the mouse rests on the trigger; only a key before the focus, or the hover delay, opens it. The play test rests a mouse on the trigger (with a long hover delay), clicks elsewhere, focuses the trigger by script, and proves no tooltip mounts.",
+  ),
+  render: () => (
+    <TooltipProvider delayDuration={5000}>
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline">
+          Elsewhere
+        </Button>
+        <Tooltip>
+          <Button size="icon-sm" variant="plain" shape="pill" label="Options">
+            …
+          </Button>
+        </Tooltip>
+      </div>
+    </TooltipProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const options = canvas.getByRole("button", { name: "Options" })
+    const mounts = await tooltipMounts(async () => {
+      options.dispatchEvent(new PointerEvent("pointerover", { bubbles: true, pointerType: "mouse" }))
+      await userEvent.click(canvas.getByRole("button", { name: "Elsewhere" }), { skipHover: true })
+      options.dispatchEvent(new PointerEvent("pointerover", { bubbles: true, pointerType: "mouse" }))
+      options.focus()
+    }, 400)
+    await expect(options).toHaveFocus()
+    await expect(mounts).toBe(0)
+    options.dispatchEvent(new PointerEvent("pointerout", { bubbles: true, pointerType: "mouse" }))
+    options.blur()
+  },
+}
+
 export const OwnContent: Story = {
   parameters: storyDocumentation(
     "A tooltip with its own `content` and `shortcut` describes the button with that text, alongside any description the button already has, and announces the key on it. The play test proves the button keeps its name and its own description, gains the tooltip's, and gains `aria-keyshortcuts`.",
