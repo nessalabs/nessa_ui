@@ -128,6 +128,7 @@ type TriggerProps = {
   shortcut?: string
   "aria-label"?: string
   "aria-keyshortcuts"?: string
+  "aria-describedby"?: string
 }
 
 export interface TooltipProps
@@ -217,7 +218,11 @@ function Tooltip({
   // The trigger's accessible name wins, as it does on Button, so what the
   // tooltip shows is what assistive technology reads.
   const text = ownText ? content : (trigger["aria-label"] ?? trigger.label)
-  const keys = shortcut ?? trigger.shortcut
+  // The key shown is the key announced: the tooltip's own, else the
+  // trigger's explicit `aria-keyshortcuts`, else its `shortcut` — the same
+  // precedence Button gives the attribute.
+  const keys = shortcut ?? trigger["aria-keyshortcuts"] ?? trigger.shortcut
+  const textId = React.useId()
   const hasText = text !== undefined && text !== null && text !== ""
   const triggerRef = React.useRef<HTMLButtonElement | null>(null)
   const composedRef = useComposedRefs(triggerRef, forwardedRef)
@@ -256,10 +261,10 @@ function Tooltip({
       <TooltipPrimitive.Trigger
         asChild
         aria-keyshortcuts={trigger["aria-keyshortcuts"] === undefined && trigger.shortcut === undefined ? keys : undefined}
-        // Text taken from the trigger is its name already: the tooltip is not
-        // wired to it as a description too (the trigger's own
-        // `aria-describedby`, if any, still applies).
-        {...(ownText ? null : { "aria-describedby": undefined })}
+        // Radix's own description link is replaced: text taken from the
+        // trigger is its name already and is not linked at all; the
+        // tooltip's own text is linked below, composed with the trigger's.
+        {...{ "aria-describedby": undefined }}
         // Props from an outer `asChild` trigger (a menu's) land after the
         // tooltip's own, so its `data-state` and handlers win.
         {...triggerProps}
@@ -277,7 +282,16 @@ function Tooltip({
           mouseOver.current = false
         }}
       >
-        {children}
+        {ownText
+          ? // The tooltip's own text describes the trigger, alongside any
+            // description the trigger already has. Written on the child, as
+            // a slotted child's own prop wins the merge.
+            React.cloneElement(children as React.ReactElement<TriggerProps>, {
+              "aria-describedby":
+                [trigger["aria-describedby"], isOpen ? textId : undefined].filter(Boolean).join(" ") ||
+                undefined,
+            })
+          : children}
       </TooltipPrimitive.Trigger>
       {hasText ? (
         <TooltipPrimitive.Portal container={container}>
@@ -294,7 +308,7 @@ function Tooltip({
               className,
             )}
           >
-            <span data-slot="tooltip-text">{text}</span>
+            <span id={textId} data-slot="tooltip-text">{text}</span>
             {keys ? (
               <Kbd className="bg-background/15 text-background">
                 {formatShortcut(keys, currentPlatform())}

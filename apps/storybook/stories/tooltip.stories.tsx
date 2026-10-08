@@ -61,8 +61,14 @@ async function tooltipMounts(act: () => Promise<void>, settle = 700): Promise<nu
   return mounts
 }
 
-async function closed(canvasElement: HTMLElement) {
+/**
+ * Waits for the tooltip to be gone and for the provider's skip-delay timer,
+ * which starts when a tooltip closes, to run out — so a play leaves nothing
+ * ticking for the next story.
+ */
+async function closed(canvasElement: HTMLElement, skipDelay = 300) {
   await waitFor(() => expect(body(canvasElement).queryByRole("tooltip")).toBeNull())
+  await new Promise((resolve) => setTimeout(resolve, skipDelay + 50))
 }
 
 export const FromTheButton: Story = {
@@ -190,14 +196,19 @@ export const FocusReturnedByAPointer: Story = {
 
 export const OwnContent: Story = {
   parameters: storyDocumentation(
-    "A tooltip with its own `content` and `shortcut` describes the button with that text and announces the key on it. The play test proves the button keeps its name, gains the description and `aria-keyshortcuts`.",
+    "A tooltip with its own `content` and `shortcut` describes the button with that text, alongside any description the button already has, and announces the key on it. The play test proves the button keeps its name and its own description, gains the tooltip's, and gains `aria-keyshortcuts`.",
   ),
   render: () => (
-    <Tooltip content="Moves it out of the inbox" shortcut="Meta+E">
-      <Button size="sm" variant="tinted" shape="pill">
-        Archive
-      </Button>
-    </Tooltip>
+    <div className="flex flex-col items-start gap-2">
+      <Tooltip content="Moves it out of the inbox" shortcut="Meta+E">
+        <Button size="sm" variant="tinted" shape="pill" aria-describedby="archive-hint">
+          Archive
+        </Button>
+      </Tooltip>
+      <p id="archive-hint" className="m-0 font-sans nessa-text-2 text-muted-foreground">
+        Archived mail stays searchable.
+      </p>
+    </div>
   ),
   play: async ({ canvasElement }) => {
     const button = within(canvasElement).getByRole("button", { name: "Archive" })
@@ -205,6 +216,7 @@ export const OwnContent: Story = {
     await userEvent.tab()
     await body(canvasElement).findByRole("tooltip")
     await expect(button).toHaveAccessibleDescription(/Moves it out of the inbox/)
+    await expect(button).toHaveAccessibleDescription(/Archived mail stays searchable/)
     await userEvent.keyboard("{Escape}")
     await closed(canvasElement)
   },
@@ -323,6 +335,31 @@ export const PanelOpenedByAClick: Story = {
   },
 }
 
+export const ShortcutWins: Story = {
+  parameters: storyDocumentation(
+    "The key the cap shows is the key announced: an explicit `aria-keyshortcuts` on the button wins over its `shortcut`, in the tooltip as on the button. The play test proves both read Control+K.",
+  ),
+  render: () => (
+    <Tooltip>
+      <Button size="icon-sm" variant="plain" shape="pill" label="Find" shortcut="Meta+K" aria-keyshortcuts="Control+K">
+        <Search />
+      </Button>
+    </Tooltip>
+  ),
+  play: async ({ canvasElement }) => {
+    const button = within(canvasElement).getByRole("button", { name: "Find" })
+    await expect(button).toHaveAttribute("aria-keyshortcuts", "Control+K")
+    await userEvent.tab()
+    await body(canvasElement).findByRole("tooltip")
+    const platform = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent) ? "apple" : "other"
+    await expect(canvasElement.ownerDocument.querySelector("[data-slot=tooltip] kbd")).toHaveTextContent(
+      formatShortcut("Control+K", platform),
+    )
+    await userEvent.keyboard("{Escape}")
+    await closed(canvasElement)
+  },
+}
+
 export const NameWins: Story = {
   parameters: storyDocumentation(
     "When a button has both a `label` and an explicit `aria-label`, the `aria-label` is its name, and the tooltip shows that same name, so what is seen is what is heard. The play test proves it.",
@@ -377,7 +414,7 @@ export const GroupedDelay: Story = {
     })
     await expect(performance.now() - started).toBeLessThan(1000)
     await userEvent.unhover(forward)
-    await closed(canvasElement)
+    await closed(canvasElement, 1500)
   },
 }
 
