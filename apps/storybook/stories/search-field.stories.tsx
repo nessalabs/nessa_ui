@@ -11,6 +11,7 @@ import {
   SearchField,
 } from "@nessalabs/ui"
 
+import { stateStyle } from "./state-style"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -293,11 +294,15 @@ export const SurfaceHooks: Story = {
   render: () => (
     <div className="flex max-w-xs flex-col gap-3">
       <SearchField aria-label="Default search" defaultValue="query" />
+      <SearchField aria-label="Small search" size="sm" />
+      <SearchField aria-label="Large search" size="lg" />
       <div data-testid="reference" className="flex flex-col gap-1">
         <span data-ref="rest" className="block h-2 rounded-md bg-foreground/(--nessa-state-hover)" />
         <span data-ref="hover" className="block h-2 bg-foreground/(--nessa-state-hover-strong)" />
         <span data-ref="type" className="nessa-text-input-2 text-foreground">Aa</span>
         <span data-ref="muted" className="text-muted-foreground ps-2.5">Aa</span>
+        <span data-ref="large" className="nessa-text-input ps-3">Aa</span>
+        <span data-ref="press" className="block h-2 bg-foreground/(--nessa-state-press)" />
       </div>
       <div
         data-testid="hooked"
@@ -311,6 +316,8 @@ export const SurfaceHooks: Story = {
             "--nessa-search-ink": "rgb(20, 30, 40)",
             "--nessa-search-muted-ink": "rgb(60, 60, 70)",
             "--nessa-search-font-size": "13px",
+            "--nessa-search-clear-hover": "rgb(220, 220, 232)",
+            "--nessa-search-clear-press": "rgb(210, 210, 224)",
           } as React.CSSProperties
         }
       >
@@ -344,6 +351,19 @@ export const SurfaceHooks: Story = {
     await expect(input.color).toBe(ref("type").color)
     await expect(icon.color).toBe(ref("muted").color)
     await expect(field.querySelector("svg.lucide-search")).not.toBeNull()
+    // The other sizes keep their own padding and type level.
+    await expect(getComputedStyle(frameOf("Small search")).paddingInlineStart).toBe(ref("muted").paddingInlineStart)
+    await expect(getComputedStyle(frameOf("Large search")).paddingInlineStart).toBe(ref("large").paddingInlineStart)
+    await expect(getComputedStyle(canvas.getByRole("searchbox", { name: "Large search" })).fontSize).toBe(ref("large").fontSize)
+    await expect(getComputedStyle(canvas.getByRole("searchbox", { name: "Small search" })).fontSize).toBe(ref("type").fontSize)
+    // The clear button: muted ink, a 14px glyph, and the kit's hover and press fills.
+    const clear = within(field).getByRole("button", { name: "Clear search", hidden: true })
+    await expect(getComputedStyle(clear).color).toBe(ref("muted").color)
+    await expect(clear.querySelector("svg")!.getBoundingClientRect().width).toBe(14)
+    await expect(stateStyle(clear, ":active", "background-color")).toBe(ref("press").backgroundColor)
+    if (matchMedia("(hover: hover)").matches) {
+      await expect(stateStyle(clear, ":hover", "background-color")).toBe(ref("hover").backgroundColor)
+    }
     // Hover and focus share the hover fill; focus is the one a test can drive.
     canvas.getByRole("searchbox", { name: "Default search" }).focus()
     await waitFor(() => expect(getComputedStyle(field).backgroundColor).toBe(ref("hover").backgroundColor))
@@ -362,6 +382,14 @@ export const SurfaceHooks: Story = {
     await expect(within(hooked).getByTestId("own-icon")).toBeInTheDocument()
     await expect(hooked.querySelector("svg.lucide-search")).toBeNull()
     await expect(within(hooked).getByTestId("own-clear")).toBeInTheDocument()
+    const hookedClear = within(hooked).getByRole("button", { name: "Clear search", hidden: true })
+    await expect(getComputedStyle(hookedClear).color).toBe("rgb(60, 60, 70)")
+    await expect(stateStyle(hookedClear, ":active", "background-color")).toBe("rgb(210, 210, 224)")
+    if (matchMedia("(hover: hover)").matches) {
+      await expect(stateStyle(hookedClear, ":hover", "background-color")).toBe("rgb(220, 220, 232)")
+    }
+    const hookedInput2 = canvas.getByRole("searchbox", { name: "Hooked search" })
+    await expect(getComputedStyle(hookedInput2, "::placeholder").color).toBe("rgb(60, 60, 70)")
     canvas.getByRole("searchbox", { name: "Hooked search" }).focus()
     await waitFor(() => expect(getComputedStyle(hooked).backgroundColor).toBe("rgb(230, 230, 242)"))
   },

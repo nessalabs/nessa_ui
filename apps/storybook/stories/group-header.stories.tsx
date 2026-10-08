@@ -4,6 +4,7 @@ import { expect, userEvent, waitFor, within } from "storybook/test"
 import { ChevronRight, Plus } from "lucide-react"
 import { Button, GroupHeader, SidebarMenu, SidebarMenuItem } from "@nessalabs/ui"
 
+import { stateStyle } from "./state-style"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -135,9 +136,15 @@ export const Collapsible: Story = {
 function DenseExample() {
   const [open, setOpen] = React.useState(true)
   const [locked, setLocked] = React.useState(true)
+  const toggleRef = React.useRef<HTMLButtonElement>(null)
+  React.useEffect(() => {
+    toggleRef.current?.setAttribute("data-ref-attached", "true")
+  }, [])
   return (
     <div className="flex max-w-xs flex-col gap-3">
       <GroupHeader label="Default" count={3} />
+      <GroupHeader label="Loud" tone="strong" />
+      <GroupHeader label="Plain chevron" open onOpenChange={() => {}} />
       <div data-testid="reference" className="flex flex-col">
         <span data-ref="quiet" className="nessa-text-2 font-medium text-muted-foreground">Aa</span>
         <span data-ref="strong" className="text-foreground">Aa</span>
@@ -153,13 +160,15 @@ function DenseExample() {
         toggleProps={{
           "data-row": "section",
           "data-section": "channels",
+          className: "host-toggle",
+          ref: toggleRef,
           onClick: (event) => {
             if (locked) {
               event.preventDefault()
               setLocked(false)
             }
           },
-        } as React.ComponentProps<"button">}
+        }}
       />
       <div
         style={
@@ -168,10 +177,13 @@ function DenseExample() {
             "--nessa-group-header-ink": "rgb(90, 90, 100)",
             "--nessa-group-header-count-ink": "rgb(80, 80, 90)",
             "--nessa-group-header-chevron-ink": "rgb(70, 70, 80)",
+            "--nessa-group-header-strong-ink": "rgb(15, 15, 25)",
+            "--nessa-group-header-hover-ink": "rgb(5, 5, 15)",
           } as React.CSSProperties
         }
       >
         <GroupHeader size="dense" label="Hooked" count={2} open onOpenChange={() => {}} />
+        <GroupHeader label="Hooked loud" tone="strong" />
       </div>
     </div>
   )
@@ -194,6 +206,14 @@ export const DenseAndHooks: Story = {
     await expect(plain.fontWeight).toBe(ref("quiet").fontWeight)
     await expect(plain.color).toBe(ref("quiet").color)
 
+    await expect(getComputedStyle(canvas.getByRole("heading", { name: "Loud" })).color).toBe(ref("strong").color)
+    const plainToggle = canvas.getByRole("button", { name: "Plain chevron" })
+    await expect(plainToggle.querySelector("svg")!.getBoundingClientRect().width).toBe(12)
+    await expect(plainToggle.getBoundingClientRect().height).toBe(24)
+    if (matchMedia("(hover: hover)").matches) {
+      await expect(stateStyle(plainToggle, ":hover", "color")).toBe(ref("strong").color)
+    }
+
     const dense = canvas.getByRole("heading", { name: /^Channels/ })
     await expect(header(/^Channels/).getBoundingClientRect().height).toBe(20)
     await expect(getComputedStyle(dense).fontSize).toBe(ref("caption").fontSize)
@@ -203,6 +223,10 @@ export const DenseAndHooks: Story = {
     await expect(within(dense).getAllByRole("button")).toHaveLength(1)
     await expect(toggle).toHaveAttribute("data-row", "section")
     await expect(toggle).toHaveAttribute("data-section", "channels")
+    await expect(toggle).toHaveClass("host-toggle")
+    await expect(toggle).toHaveAttribute("data-ref-attached", "true")
+    // The dense disclosure is drawn 20px tall but its hit area is 24px.
+    await expect(getComputedStyle(toggle, "::after").height).toBe("24px")
     await expect(within(toggle).getByTestId("own-chevron")).toBeInTheDocument()
     // The host's onClick prevented the first toggle; the second goes through.
     await userEvent.click(toggle)
@@ -210,10 +234,14 @@ export const DenseAndHooks: Story = {
     await userEvent.click(toggle)
     await expect(toggle).toHaveAttribute("aria-expanded", "false")
 
-    const hooked = header(/^Hooked/)
+    const hooked = header(/^Hooked 2/)
     await expect(hooked.getBoundingClientRect().height).toBe(16.5)
-    await expect(getComputedStyle(canvas.getByRole("heading", { name: /^Hooked/ })).color).toBe("rgb(90, 90, 100)")
+    await expect(getComputedStyle(canvas.getByRole("heading", { name: /^Hooked 2/ })).color).toBe("rgb(90, 90, 100)")
     await expect(getComputedStyle(hooked.querySelector("[data-slot=group-header-count]")!).color).toBe("rgb(80, 80, 90)")
     await expect(getComputedStyle(hooked.querySelector("[data-slot=group-header-chevron]")!).color).toBe("rgb(70, 70, 80)")
+    await expect(getComputedStyle(canvas.getByRole("heading", { name: "Hooked loud" })).color).toBe("rgb(15, 15, 25)")
+    if (matchMedia("(hover: hover)").matches) {
+      await expect(stateStyle(within(hooked).getByRole("button"), ":hover", "color")).toBe("rgb(5, 5, 15)")
+    }
   },
 }

@@ -68,7 +68,7 @@ interface GroupHeaderDisclosureProps {
   toggleProps?: Omit<
     React.ComponentPropsWithRef<"button">,
     "type" | "aria-expanded" | "aria-controls" | "children"
-  >
+  > & { [key: `data-${string}`]: string | number | boolean | undefined }
   /**
    * Whether the group is open. Passing it makes the label a disclosure
    * button with a chevron; the host shows or hides the group's content.
@@ -100,6 +100,14 @@ export type GroupHeaderProps = GroupHeaderBaseProps &
  * The label above a group of rows: a heading with an optional count, an
  * optional disclosure that collapses the group, and an optional action at
  * the end. It draws only the header; the rows are the host's.
+ *
+ * A host retunes it from any ancestor with custom properties, each
+ * defaulting to the kit's value: `--nessa-group-header-height` (minimum
+ * height; 28px, or 20px dense), `--nessa-group-header-ink` (the quiet label;
+ * muted foreground), `--nessa-group-header-strong-ink` (the strong label;
+ * foreground), `--nessa-group-header-count-ink` (muted foreground),
+ * `--nessa-group-header-chevron-ink` (muted foreground) and
+ * `--nessa-group-header-hover-ink` (the disclosure's hover; foreground).
  *
  * With `open`, the heading holds a button that announces its expanded state
  * and names `controls` as the region it toggles, the pattern an accordion
@@ -182,10 +190,13 @@ function GroupHeader({
             }}
             className={cn(
               "-ms-1 flex min-w-0 cursor-default appearance-none items-center gap-1.5 rounded-sm border-0 bg-transparent px-1 font-[inherit] text-inherit outline-none transition-[color] [transition-duration:var(--nessa-motion-duration-fast)] hover:text-[color:var(--nessa-group-header-hover-ink,var(--foreground))] focus-visible:outline-solid focus-visible:outline-(length:--nessa-focus-outline-width) focus-visible:outline-offset-1 focus-visible:outline-ring",
-              // A dense header is a caption; its disclosure is as tall as
-              // the header, under the 24px target floor, so a dense list
-              // keeps its headers spaced apart (WCAG's spacing exception).
-              size === "dense" ? "min-h-0" : "min-h-6",
+              // A dense header is a caption drawn shorter than the 24px
+              // target floor; its disclosure keeps a 24px hit area through a
+              // centred pseudo-element, so the target meets the floor
+              // without the header growing.
+              size === "dense"
+                ? "relative min-h-0 after:absolute after:inset-x-0 after:top-1/2 after:h-6 after:-translate-y-1/2 after:content-['']"
+                : "min-h-6",
               toggleProps?.className,
             )}
           >

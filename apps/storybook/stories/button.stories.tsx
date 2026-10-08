@@ -4,6 +4,7 @@ import { expect, userEvent, within } from "storybook/test"
 import { Button } from "@nessalabs/ui"
 import { ArrowRight, ChevronDown, Plus } from "lucide-react"
 
+import { stateStyle } from "./state-style"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -216,6 +217,7 @@ export const SurfaceHooks: Story = {
         <Button shape="pill" size="28" variant="tinted">Tinted</Button>
         <Button shape="pill" size="28" variant="plain">Plain</Button>
         <Button shape="pill" size="28" variant="plain" aria-pressed="true">Plain on</Button>
+        <Button shape="pill" size="28" variant="tinted" aria-pressed="true">Tinted on</Button>
         <Button shape="pill" size="28" variant="inverse">Inverse</Button>
         <Button shape="pill" size="28" variant="danger">Danger</Button>
       </div>
@@ -226,6 +228,11 @@ export const SurfaceHooks: Story = {
         <span data-ref="muted" className="text-muted-foreground">a</span>
         <span data-ref="destructive" className="text-destructive">a</span>
         <span data-ref="ink" className="text-foreground">a</span>
+        <span data-ref="press" className="size-2 bg-foreground/(--nessa-state-press)" />
+        <span data-ref="fg90" className="size-2 bg-foreground/90" />
+        <span data-ref="fg85" className="size-2 bg-foreground/85" />
+        <span data-ref="dhover" className="size-2 bg-destructive/(--nessa-state-hover-strong)" />
+        <span data-ref="dpress" className="size-2 bg-destructive/(--nessa-state-press)" />
       </div>
       <div
         className="flex gap-2"
@@ -233,6 +240,11 @@ export const SurfaceHooks: Story = {
           {
             "--nessa-button-tinted-rest": "rgb(230, 230, 240)",
             "--nessa-button-tinted-ink": "rgb(20, 20, 30)",
+            "--nessa-button-tinted-hover": "rgb(220, 220, 232)",
+            "--nessa-button-tinted-press": "rgb(210, 210, 224)",
+            "--nessa-button-plain-press": "rgb(215, 215, 228)",
+            "--nessa-button-danger-hover": "rgb(250, 230, 230)",
+            "--nessa-button-danger-press": "rgb(245, 220, 220)",
             "--nessa-button-plain-ink": "rgb(70, 70, 80)",
             "--nessa-button-plain-hover": "rgb(225, 225, 235)",
             "--nessa-button-plain-hover-ink": "rgb(10, 10, 20)",
@@ -243,10 +255,13 @@ export const SurfaceHooks: Story = {
         }
       >
         <Button shape="pill" size="28" variant="tinted">Mapped tinted</Button>
+        <Button shape="pill" size="28" variant="tinted" aria-pressed="true">Mapped tinted on</Button>
         <Button shape="pill" size="28" variant="plain">Mapped plain</Button>
         <Button shape="pill" size="28" variant="plain" aria-pressed="true">Mapped plain on</Button>
         <Button shape="pill" size="28" variant="inverse">Mapped inverse</Button>
         <Button shape="pill" size="28" variant="danger">Mapped danger</Button>
+        <span data-ref="mapped90" className="size-2" style={{ backgroundColor: "color-mix(in oklab, rgb(30, 30, 40) 90%, transparent)" }} />
+        <span data-ref="mapped85" className="size-2" style={{ backgroundColor: "color-mix(in oklab, rgb(30, 30, 40) 85%, transparent)" }} />
       </div>
     </div>
   ),
@@ -263,6 +278,26 @@ export const SurfaceHooks: Story = {
     await expect(style("Inverse").backgroundColor).toBe(ref("fg").backgroundColor)
     await expect(style("Inverse").color).toBe(ref("fg").color)
     await expect(style("Danger").color).toBe(ref("destructive").color)
+    await expect(style("Tinted on").backgroundColor).toBe(ref("strong").backgroundColor)
+    await expect(style("Tinted on").color).toBe(ref("ink").color)
+    // Hover and press, read from the rules the browser would apply. A
+    // touch screen has no hover, and the hover rules say so.
+    const canHover = matchMedia("(hover: hover)").matches
+    const state = (name: string, pseudo: ":hover" | ":active", property = "background-color") =>
+      stateStyle(canvas.getByRole("button", { name }), pseudo, property)
+    const hover = async (name: string, expected: string, property = "background-color") => {
+      await expect(state(name, ":hover", property)).toBe(canHover ? expected : null)
+    }
+    await hover("Tinted", ref("strong").backgroundColor)
+    await hover("Tinted", ref("ink").color, "color")
+    await expect(state("Tinted", ":active")).toBe(ref("press").backgroundColor)
+    await hover("Plain", ref("strong").backgroundColor)
+    await hover("Plain", ref("ink").color, "color")
+    await expect(state("Plain", ":active")).toBe(ref("press").backgroundColor)
+    await hover("Inverse", ref("fg90").backgroundColor)
+    await expect(state("Inverse", ":active")).toBe(ref("fg85").backgroundColor)
+    await hover("Danger", ref("dhover").backgroundColor)
+    await expect(state("Danger", ":active")).toBe(ref("dpress").backgroundColor)
 
     await expect(style("Mapped tinted").backgroundColor).toBe("rgb(230, 230, 240)")
     await expect(style("Mapped tinted").color).toBe("rgb(20, 20, 30)")
@@ -272,6 +307,38 @@ export const SurfaceHooks: Story = {
     await expect(style("Mapped inverse").backgroundColor).toBe("rgb(30, 30, 40)")
     await expect(style("Mapped inverse").color).toBe("rgb(250, 250, 255)")
     await expect(style("Mapped danger").color).toBe("rgb(160, 20, 20)")
+    await expect(style("Mapped tinted on").backgroundColor).toBe("rgb(220, 220, 232)")
+    await hover("Mapped tinted", "rgb(220, 220, 232)")
+    await expect(state("Mapped tinted", ":active")).toBe("rgb(210, 210, 224)")
+    await hover("Mapped plain", "rgb(225, 225, 235)")
+    await hover("Mapped plain", "rgb(10, 10, 20)", "color")
+    await expect(state("Mapped plain", ":active")).toBe("rgb(215, 215, 228)")
+    // Inverse hover and press follow a mapped rest fill.
+    await hover("Mapped inverse", ref("mapped90").backgroundColor)
+    await expect(state("Mapped inverse", ":active")).toBe(ref("mapped85").backgroundColor)
+    await hover("Mapped danger", "rgb(250, 230, 230)")
+    await expect(state("Mapped danger", ":active")).toBe("rgb(245, 220, 220)")
+  },
+}
+
+export const PressScale: Story = {
+  parameters: storyDocumentation(
+    "`press=\"scale\"` shrinks the button slightly on press instead of the default 1px drop. The play test reads the press rule each button would get.",
+  ),
+  render: () => (
+    <div className="flex gap-2">
+      <Button shape="pill" size="28" variant="tinted">Drops</Button>
+      <Button shape="pill" size="28" variant="tinted" press="scale">Shrinks</Button>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const drops = canvas.getByRole("button", { name: "Drops" })
+    const shrinks = canvas.getByRole("button", { name: "Shrinks" })
+    await expect(stateStyle(drops, ":active", "--tw-translate-y")).toBe("1px")
+    await expect(stateStyle(drops, ":active", "scale")).toBeNull()
+    await expect(stateStyle(shrinks, ":active", "scale")).toBe("0.97")
+    await expect(stateStyle(shrinks, ":active", "--tw-translate-y")).toBe("0px")
   },
 }
 
@@ -287,13 +354,21 @@ export const Wrap: Story = {
       <Button shape="pill" size="26" variant="plain" wrap>
         Allow
       </Button>
+      <Button shape="pill" size="22" variant="plain" wrap>
+        Deny
+      </Button>
+      <Button shape="pill" size="24" variant="plain" wrap>
+        Later
+      </Button>
       <Button shape="pill" size="26" variant="plain" className="max-w-40 overflow-hidden">
         Allow the agent to read every file in this project
       </Button>
     </div>
   ),
   play: async ({ canvasElement }) => {
-    const [long, short, single] = within(canvasElement).getAllByRole("button")
+    const [long, short, tiny, small, single] = within(canvasElement).getAllByRole("button")
+    await expect(tiny!.getBoundingClientRect().height).toBe(22)
+    await expect(small!.getBoundingClientRect().height).toBe(24)
     await expect(long!.getBoundingClientRect().height).toBeGreaterThan(26)
     await expect(long!.getBoundingClientRect().width).toBeLessThanOrEqual(160)
     await expect(short!.getBoundingClientRect().height).toBe(26)

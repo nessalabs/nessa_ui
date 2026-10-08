@@ -13,12 +13,15 @@ import { cn } from "@/lib/utils"
  * `--nessa-search-padding-x` (start padding), `--nessa-search-padding-y`,
  * `--nessa-search-rest-fill`, `--nessa-search-hover-fill` (hover and focus),
  * `--nessa-search-ink` (the query), `--nessa-search-muted-ink` (icon,
- * placeholder, clear button) and `--nessa-search-font-size`. The type level
- * otherwise follows `size`, and a `nessa-text-*` class on the field replaces
- * it.
+ * placeholder, clear button), `--nessa-search-clear-hover` and
+ * `--nessa-search-clear-press` (the clear button's fills), and
+ * `--nessa-search-font-size`. The font size keeps the 1rem floor every
+ * Nessa field has below 48rem, so focusing never zooms the page. Without
+ * it the type level follows `size`; a `nessa-text-input` or
+ * `nessa-text-input-2` class on the field replaces that level.
  */
 const searchFieldVariants = cva(
-  "relative flex w-full min-w-0 items-center rounded-[var(--nessa-search-radius,calc(var(--radius)*0.875))] py-[var(--nessa-search-padding-y,0px)] bg-[color:var(--nessa-search-rest-fill,color-mix(in_oklab,var(--foreground)_var(--nessa-state-hover),transparent))] font-sans text-[color:var(--nessa-search-ink,var(--foreground))] transition-[background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-[color:var(--nessa-search-hover-fill,color-mix(in_oklab,var(--foreground)_var(--nessa-state-hover-strong),transparent))] focus-within:bg-[color:var(--nessa-search-hover-fill,color-mix(in_oklab,var(--foreground)_var(--nessa-state-hover-strong),transparent))] focus-within:outline-solid focus-within:outline-(length:--nessa-focus-outline-width) focus-within:outline-ring has-[input:disabled]:pointer-events-none has-[input:disabled]:opacity-50 forced-colors:outline-1 forced-colors:outline-solid forced-colors:-outline-offset-1",
+  "relative flex w-full min-w-0 items-center rounded-[var(--nessa-search-radius,var(--radius-md))] py-[var(--nessa-search-padding-y,0px)] bg-[color:var(--nessa-search-rest-fill,color-mix(in_oklab,var(--foreground)_var(--nessa-state-hover),transparent))] font-sans text-[color:var(--nessa-search-ink,var(--foreground))] transition-[background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-[color:var(--nessa-search-hover-fill,color-mix(in_oklab,var(--foreground)_var(--nessa-state-hover-strong),transparent))] focus-within:bg-[color:var(--nessa-search-hover-fill,color-mix(in_oklab,var(--foreground)_var(--nessa-state-hover-strong),transparent))] focus-within:outline-solid focus-within:outline-(length:--nessa-focus-outline-width) focus-within:outline-ring has-[input:disabled]:pointer-events-none has-[input:disabled]:opacity-50 forced-colors:outline-1 forced-colors:outline-solid forced-colors:-outline-offset-1",
   {
     variants: {
       size: {
@@ -217,9 +220,10 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
           }}
           // The type level is the field's (it floors at 1rem on narrow
           // viewports, as every Nessa field does, so focusing never zooms
-          // the page); the input inherits it unless the host sets
-          // `--nessa-search-font-size`.
-          className="peer min-w-0 flex-1 appearance-none self-stretch border-0 bg-transparent p-0 font-sans [font-size:var(--nessa-search-font-size,inherit)] [line-height:inherit] [letter-spacing:inherit] [color:inherit] outline-none placeholder:text-[color:var(--nessa-search-muted-ink,var(--muted-foreground))] [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
+          // the page). With `--nessa-search-font-size` unset these two
+          // declarations are invalid, so font-size falls back to inheriting
+          // the field's level; set, the floor still holds below 48rem.
+          className="peer min-w-0 flex-1 appearance-none self-stretch border-0 bg-transparent p-0 font-sans [font-size:max(1rem,var(--nessa-search-font-size))] md:[font-size:var(--nessa-search-font-size)] [line-height:inherit] [letter-spacing:inherit] [color:inherit] outline-none placeholder:text-[color:var(--nessa-search-muted-ink,var(--muted-foreground))] [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
         />
         {clearable ? (
           <button
@@ -229,7 +233,7 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
             aria-label={clearLabel}
             disabled={disabled}
             onClick={clear}
-            className="grid size-6 shrink-0 cursor-default appearance-none place-items-center rounded-full border-0 bg-transparent p-0 text-[color:var(--nessa-search-muted-ink,var(--muted-foreground))] transition-[color,background-color] [transition-duration:var(--nessa-motion-duration-fast)] hover:bg-foreground/(--nessa-state-hover-strong) hover:text-[color:var(--nessa-search-ink,var(--foreground))] active:bg-foreground/(--nessa-state-press) [&_svg:not([class*='size-'])]:size-3.5"
+            className="grid size-6 shrink-0 cursor-default appearance-none place-items-center rounded-full border-0 bg-transparent p-0 text-[color:var(--nessa-search-muted-ink,var(--muted-foreground))] transition-[color,background-color] [transition-duration:var(--nessa-motion-duration-fast)] hover:bg-[color:var(--nessa-search-clear-hover,color-mix(in_oklab,var(--foreground)_var(--nessa-state-hover-strong),transparent))] hover:text-[color:var(--nessa-search-ink,var(--foreground))] active:bg-[color:var(--nessa-search-clear-press,color-mix(in_oklab,var(--foreground)_var(--nessa-state-press),transparent))] [&_svg:not([class*='size-'])]:size-3.5"
           >
             <span aria-hidden="true" className="flex">
               {clearIcon ?? <X />}
