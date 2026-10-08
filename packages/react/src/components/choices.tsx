@@ -23,7 +23,12 @@ export interface ChoicesProps
   extends Omit<React.ComponentProps<"div">, "defaultValue" | "onChange" | "role"> {
   /** The cards, in reading order. */
   options: readonly ChoiceOption[]
-  /** The chosen value. Pass it to control the group. */
+  /**
+   * The chosen value. Pass it to control the group. A controlled group is the
+   * host's to reset, as with any controlled input: listen to the form's
+   * `onReset` and set the value; the group restores `defaultValue` itself only
+   * when it is not controlled.
+   */
   value?: string
   /** The value chosen at first, when the group is not controlled. */
   defaultValue?: string
