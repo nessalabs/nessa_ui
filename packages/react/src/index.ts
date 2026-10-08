@@ -57,12 +57,16 @@ export {
 } from "./components/checkbox"
 export { EmptyState, type EmptyStateProps } from "./components/empty-state"
 export { Switch, type SwitchProps } from "./components/switch"
+export { Kbd, type KbdProps } from "./components/kbd"
+export { SearchField, type SearchFieldProps } from "./components/search-field"
+export { GroupHeader, type GroupHeaderProps } from "./components/group-header"
 export {
   SettingsGroup,
   SettingsRow,
   type SettingsGroupProps,
   type SettingsRowProps,
 } from "./components/settings-group"
+export { Choices, type ChoiceOption, type ChoicesProps } from "./components/choices"
 export {
   KeyFingerprint,
   fingerprintGroups,

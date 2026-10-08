@@ -4,6 +4,18 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+// The compact variants' interaction states: a solid outline in the ring
+// colour instead of the translucent 3px ring, and fills read from the shared
+// state tokens, so a compact control draws hover, press and focus exactly as
+// an application's own controls built on the same tokens do. On `tinted`
+// and `plain`, selected (`aria-pressed`) and open (`data-state="open"`, a
+// menu trigger) hold the hover fill and full ink; forced colours drop that
+// fill, so there they draw a 1px system-colour outline instead.
+const compactFocus =
+  "focus-visible:ring-0 focus-visible:outline-solid focus-visible:outline-(length:--nessa-focus-outline-width) focus-visible:outline-offset-1 focus-visible:outline-ring"
+const quietStates =
+  "hover:bg-foreground/(--nessa-state-hover-strong) hover:text-foreground active:bg-foreground/(--nessa-state-press) aria-pressed:bg-foreground/(--nessa-state-hover-strong) aria-pressed:text-foreground data-[state=open]:bg-foreground/(--nessa-state-hover-strong) data-[state=open]:text-foreground forced-colors:aria-pressed:outline-1 forced-colors:aria-pressed:outline-solid forced-colors:aria-pressed:-outline-offset-1 forced-colors:data-[state=open]:outline-1 forced-colors:data-[state=open]:outline-solid forced-colors:data-[state=open]:-outline-offset-1"
+
 // Icons default to 16px, but an icon that sets its own `size-*` keeps it —
 // a plain `[&_svg]:size-4` descendant rule outranks a utility class on the
 // child and would silently override the author. Note the opt-out matches
@@ -22,17 +34,43 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
+        // Compact variants, made for `shape="pill"` and the numeric sizes.
+        // A quiet fill at rest that deepens on hover: a secondary action.
+        tinted: `bg-foreground/(--nessa-state-hover) text-foreground ${quietStates} ${compactFocus}`,
+        // No fill until hovered, in muted ink: a chip, a filter, a minor action.
+        plain: `text-muted-foreground ${quietStates} ${compactFocus}`,
+        // A foreground fill with background ink: the one action that matters here.
+        inverse: `bg-foreground text-background hover:bg-foreground/90 active:bg-foreground/85 ${compactFocus}`,
+        // Destructive ink with a destructive tint on hover: removes or revokes.
+        danger: `text-destructive hover:bg-destructive/(--nessa-state-hover-strong) active:bg-destructive/(--nessa-state-press) ${compactFocus}`,
       },
       size: {
         default: "h-9 px-4 py-2",
         sm: "h-8 gap-1.5 px-3 nessa-text-2",
         lg: "h-10 px-6",
         icon: "size-9",
+        // A 28px square for toolbars, titlebars and rows, where 36px crowds
+        // the line. Still clear of the 24px target-size floor.
+        "icon-sm": "size-7",
+        // Compact heights, named by their pixel height at the default scale.
+        // 22px sits under the 24px target-size floor, so it relies on the
+        // spacing exception: keep 1px clear above and below it (a row of
+        // pills side by side is fine), or use 24 where rows stack tightly.
+        "30": "h-7.5 gap-1.5 px-2.5 nessa-text-3",
+        "28": "h-7 gap-1.5 px-3 nessa-text-2",
+        "26": "h-6.5 gap-1.5 px-3 nessa-text-2",
+        "24": "h-6 gap-1 px-2.5 nessa-text-2 [&_svg:not([class*='size-'])]:size-3.5",
+        "22": "h-5.5 gap-1 px-2 nessa-text-2 [&_svg:not([class*='size-'])]:size-3.5",
+      },
+      shape: {
+        default: "",
+        pill: "rounded-full",
       },
     },
     defaultVariants: {
       variant: "default",
       size: "default",
+      shape: "default",
     },
   },
 )
@@ -41,10 +79,29 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean
+  /**
+   * `"default"` keeps the theme's control radius; `"pill"` rounds the ends
+   * fully. Compact variants (`tinted`, `plain`, `inverse`, `danger`) and the
+   * numeric sizes are made for the pill, though any combination works.
+   * @defaultValue "default"
+   */
+  shape?: VariantProps<typeof buttonVariants>["shape"]
 }
 
 /**
  * The action primitive.
+ *
+ * Two families share it. The standard variants (`default`, `secondary`,
+ * `outline`, `ghost`, `destructive`, `link`) at `sm`/`default`/`lg` sizes
+ * are the form and dialog actions. The compact variants (`tinted`, `plain`,
+ * `inverse`, `danger`) at the numeric heights (`22`–`30`) with
+ * `shape="pill"` are the dense controls of toolbars, rows and headers; all
+ * four take the 1.5px focus outline, and `tinted`, `plain` and `danger` draw
+ * hover and press from the shared state tokens (`inverse` deepens its own
+ * foreground fill). `tinted` and `plain` are the ones that toggle: a
+ * selected one says so with `aria-pressed`, an open menu trigger with
+ * `data-state="open"` (Radix triggers set it themselves), and both hold the
+ * hover fill. `inverse` and `danger` are actions, with no selected look.
  *
  * Two defaults are worth knowing, because both are places the native
  * behavior is a trap rather than a convenience:
@@ -75,6 +132,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       className,
       variant,
       size,
+      shape,
       asChild = false,
       type,
       disabled,
@@ -100,7 +158,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <Comp
         {...props}
-        className={cn(buttonVariants({ variant, size, className }))}
+        className={cn(buttonVariants({ variant, size, shape, className }))}
         ref={ref}
         type={asChild ? type : (type ?? "button")}
         disabled={disabled}

@@ -94,6 +94,10 @@
           "nessa-motion-easing-standard": "cubic-bezier(0.2, 0, 0, 1)",
           "nessa-motion-easing-emphasized": "cubic-bezier(0.4, 0, 0.2, 1)",
           "nessa-motion-easing-arrival": "cubic-bezier(0.4, 0, 0.15, 1)",
+          "nessa-state-hover": "5%",
+          "nessa-state-hover-strong": "8%",
+          "nessa-state-press": "11%",
+          "nessa-focus-outline-width": "1.5px",
           "nessa-thinking-fill-base": "oklch(0.56 0.2 265)",
           "nessa-thinking-fill-current": "oklch(0.68 0.2 304)",
           "nessa-thinking-fill-highlight": "oklch(0.86 0.11 214)",
@@ -3116,10 +3120,72 @@
       ]
     },
     {
+      "name": "kbd",
+      "type": "registry:ui",
+      "title": "Kbd",
+      "description": "A key or a chord written as one key cap, on the kbd element, as menus, fields and tooltips show a shortcut.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/kbd.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/kbd.tsx"
+        }
+      ]
+    },
+    {
+      "name": "search-field",
+      "type": "registry:ui",
+      "title": "Search field",
+      "description": "A search box in three heights with a magnifier, the shortcut that focuses it while empty, and a clear button once there is text; Escape clears.",
+      "dependencies": [
+        "class-variance-authority",
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/kbd",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/search-field.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/search-field.tsx"
+        }
+      ]
+    },
+    {
+      "name": "group-header",
+      "type": "registry:ui",
+      "title": "Group header",
+      "description": "The label above a group of rows: a heading with an optional count, quiet or strong, an optional disclosure that collapses the group, and an optional action at the end that can wait for hover.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/group-header.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/group-header.tsx"
+        }
+      ]
+    },
+    {
       "name": "settings-group",
       "type": "registry:ui",
       "title": "Settings group",
-      "description": "A titled card of settings rows with hairlines between them and an optional footnote, and the row itself: label, detail, leading mark, control, and content under the label.",
+      "description": "A titled card of settings rows with hairlines between them and an optional footnote, disabled as a whole with one reason, and the row itself: label, detail, leading mark, control, content under the label, and found and pending states.",
+      "dependencies": [
+        "lucide-react"
+      ],
       "registryDependencies": [
         "nessalabs/nessa_ui/control-label",
         "nessalabs/nessa_ui/nessa-base",
@@ -3130,6 +3196,24 @@
           "path": "packages/react/src/components/settings-group.tsx",
           "type": "registry:ui",
           "target": "components/ui/settings-group.tsx"
+        }
+      ]
+    },
+    {
+      "name": "choices",
+      "type": "registry:ui",
+      "title": "Choices",
+      "description": "One choice among a few, each a card with an optional picture and description: a radio group on native radios, named by the settings row it sits in.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/control-label",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/choices.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/choices.tsx"
         }
       ]
     },

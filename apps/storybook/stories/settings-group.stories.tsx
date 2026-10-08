@@ -5,6 +5,7 @@ import { Laptop, Smartphone } from "lucide-react"
 import {
   Button,
   Checkbox,
+  Choices,
   EmptyState,
   KeyFingerprint,
   SettingsGroup,
@@ -221,5 +222,192 @@ export const LinkedDevices: Story = {
     await expect(within(list).getByText("Pixel 9")).toBeInTheDocument()
     await userEvent.click(within(list).getByRole("button", { name: "Revoke Pixel 9" }))
     await expect(within(list).queryByText("Pixel 9")).toBeNull()
+  },
+}
+
+export const GroupDisabled: Story = {
+  parameters: storyDocumentation(
+    "`disabled` on the group disables every row at once, and `disabledReason` says why, once, above the card. The play test proves each row's control is unavailable and the reason describes the section.",
+  ),
+  render: () => (
+    <div className="max-w-xl">
+      <SettingsGroup
+        title="Approval"
+        disabled
+        disabledReason="Turn on linking to change these."
+      >
+        <SettingsRow label="Require approval" control={<Switch defaultChecked />} />
+        <SettingsRow label="Notify on new device" control={<Switch />} />
+      </SettingsGroup>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByRole("region", { name: "Approval" })).toHaveAccessibleDescription(
+      "Turn on linking to change these.",
+    )
+    await expect(canvas.getByRole("switch", { name: "Require approval" })).toBeDisabled()
+    await expect(canvas.getByRole("switch", { name: "Notify on new device" })).toBeDisabled()
+  },
+}
+
+function FoundAndPendingExample() {
+  const [on, setOn] = React.useState(false)
+  const [pending, setPending] = React.useState(false)
+  return (
+    <div className="max-w-xl">
+      <SettingsGroup title="Linking">
+        <SettingsRow label="Device name" detail="Shown to devices you link" control={<Button size="sm" variant="outline">Rename</Button>} />
+        <SettingsRow
+          label="Allow linking"
+          detail={pending ? "Applying…" : on ? "On" : "Off"}
+          found
+          pending={pending}
+          control={
+            <Switch
+              checked={on}
+              disabled={pending}
+              onCheckedChange={(next) => {
+                setOn(next)
+                setPending(true)
+              }}
+            />
+          }
+        />
+        <SettingsRow label="Finish applying" control={<Button size="sm" variant="ghost" onClick={() => setPending(false)}>Done</Button>} />
+      </SettingsGroup>
+    </div>
+  )
+}
+
+export const FoundAndPending: Story = {
+  parameters: storyDocumentation(
+    "`found` washes a row a search matched; `pending` shows a small spinner beside the control and marks the row busy while a change is applied. The play test proves the found row is tinted and the others are not, and that turning the switch marks the row busy until the host finishes.",
+  ),
+  render: () => <FoundAndPendingExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const rows = canvasElement.querySelectorAll<HTMLElement>("[data-slot=settings-row]")
+    const found = rows[1]!
+    await expect(found).toHaveAttribute("data-found", "true")
+    await expect(getComputedStyle(found).backgroundColor).not.toBe(getComputedStyle(rows[0]!).backgroundColor)
+    await userEvent.click(canvas.getByRole("switch", { name: "Allow linking" }))
+    await expect(found).toHaveAttribute("aria-busy", "true")
+    await expect(found.querySelector("[data-slot=settings-row-pending]")).not.toBeNull()
+    await userEvent.click(canvas.getByRole("button", { name: "Done" }))
+    await expect(found).not.toHaveAttribute("aria-busy")
+    await expect(canvas.getByRole("switch", { name: "Allow linking" })).toHaveAttribute("aria-checked", "true")
+  },
+}
+
+export const WithChoices: Story = {
+  parameters: storyDocumentation(
+    "A `Choices` control under a row's label takes the row's label as the group's name. The play test asks for the radio group by the row label.",
+  ),
+  render: () => (
+    <div className="max-w-xl">
+      <SettingsGroup title="Appearance">
+        <SettingsRow label="Theme" detail="How the window is drawn">
+          <Choices
+            defaultValue="system"
+            options={[
+              { value: "light", label: "Light" },
+              { value: "dark", label: "Dark" },
+              { value: "system", label: "System", description: "Follows the computer" },
+            ]}
+          />
+        </SettingsRow>
+      </SettingsGroup>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const group = canvas.getByRole("radiogroup", { name: "Theme" })
+    await expect(within(group).getByRole("radio", { name: "System" })).toBeChecked()
+  },
+}
+
+export const ChoicesInADisabledRow: Story = {
+  parameters: storyDocumentation(
+    "A `Choices` in a disabled row is dimmed once, by the row, like every other control there — not again by its cards, including a card that is unavailable on its own. The play test multiplies the opacity from each card up to the row and expects one half.",
+  ),
+  render: () => (
+    <div className="max-w-xl">
+      <SettingsGroup title="Layout">
+        <SettingsRow label="Density" disabled>
+          <Choices
+            defaultValue="regular"
+            options={[
+              { value: "compact", label: "Compact" },
+              { value: "regular", label: "Regular" },
+              { value: "roomy", label: "Roomy", disabled: true },
+            ]}
+          />
+        </SettingsRow>
+      </SettingsGroup>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const row = canvasElement.querySelector<HTMLElement>("[data-slot=settings-row]")!
+    const effectiveOpacity = (element: Element) => {
+      let opacity = 1
+      for (let node: Element | null = element; node && node !== row; node = node.parentElement) {
+        opacity *= Number(getComputedStyle(node).opacity)
+      }
+      return opacity
+    }
+    for (const name of ["Compact", "Roomy"]) {
+      const radio = canvas.getByRole("radio", { name })
+      await expect(radio).toBeDisabled()
+      await expect(effectiveOpacity(radio.closest("label")!)).toBe(0.5)
+    }
+  },
+}
+
+export const ContentKeepsItsName: Story = {
+  parameters: storyDocumentation(
+    "A control among a row's content keeps its own name; only `Choices` takes the row's label there. The play test asks for the row's switch and a sub-option switch under it by their own names.",
+  ),
+  render: () => (
+    <div className="max-w-xl">
+      <SettingsGroup title="Notifications">
+        <SettingsRow label="Notify me" control={<Switch defaultChecked />}>
+          <label className="flex items-center gap-2 nessa-text-2 text-muted-foreground">
+            <Switch />
+            Only when I am away
+          </label>
+        </SettingsRow>
+      </SettingsGroup>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    await expect(canvas.getByRole("switch", { name: "Notify me" })).toBeChecked()
+    await expect(canvas.getByRole("switch", { name: "Only when I am away" })).not.toBeChecked()
+  },
+}
+
+export const OwnStateWins: Story = {
+  parameters: storyDocumentation(
+    "`found` and `pending` own `data-found`, `data-pending` and `aria-busy`: the row writes them after the props passed through, so a stray attribute cannot contradict the row's state. The play test passes conflicting attributes and proves the row's own values win.",
+  ),
+  render: () => (
+    <div className="max-w-xl">
+      <SettingsGroup title="Sync">
+        <SettingsRow
+          label="Sync history"
+          aria-busy={true}
+          {...{ "data-found": "true", "data-pending": "true" }}
+          control={<Switch />}
+        />
+      </SettingsGroup>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const row = canvasElement.querySelector<HTMLElement>("[data-slot=settings-row]")!
+    await expect(row).not.toHaveAttribute("aria-busy")
+    await expect(row).not.toHaveAttribute("data-found")
+    await expect(row).not.toHaveAttribute("data-pending")
   },
 }

@@ -79,6 +79,8 @@ type FocusComponent =
   | "message-actions/message-approval"
   | "checkbox"
   | "switch"
+  | "group-header"
+  | "choices"
   | "drawer"
   | "dropdown-menu"
   | "pagination"
@@ -166,6 +168,18 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     state: "focus-visible",
     className: "focus-visible:outline-ring",
     count: 2,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The compact variants (tinted, plain, inverse, danger) share one solid
+  // outline in place of the translucent ring, so it is counted once per
+  // variant that composes it.
+  {
+    component: "button",
+    layer: "outline",
+    state: "focus-visible:compact",
+    className: "focus-visible:outline-ring",
+    count: 4,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -463,6 +477,27 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
+  // Each card's radio covers the card, so its outline is drawn at the
+  // card's edge, outset past the selected card's inner ring.
+  {
+    component: "choices",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The disclosure in a group header takes the compact solid outline.
+  {
+    component: "group-header",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
   // The shared item recipe is referenced by the plain, checkbox, radio, and
   // sub-trigger items.
   {
@@ -614,6 +649,12 @@ export const focusSurfaces = Object.freeze(["--background", "--card", "--popover
 // review-owned by A11Y-003 while ring/border colors are measured by A11Y-002.
 export const focusGeometryClasses = Object.freeze([
   { component: "button", className: "focus-visible:ring-[3px]" },
+  // The compact variants trade the 3px ring for a 1.5px solid outline,
+  // outset by 1px so it clears the pill's fill.
+  { component: "button", className: "focus-visible:ring-0", count: 4 },
+  { component: "button", className: "focus-visible:outline-solid", count: 4 },
+  { component: "button", className: "focus-visible:outline-(length:--nessa-focus-outline-width)", count: 4 },
+  { component: "button", className: "focus-visible:outline-offset-1", count: 4 },
   { component: "badge", className: "focus-visible:ring-[3px]" },
   { component: "input", className: "focus-visible:ring-[3px]" },
   { component: "questionnaire", className: "focus-visible:outline-2", count: 1 },
@@ -728,6 +769,12 @@ export const focusGeometryClasses = Object.freeze([
   { component: "checkbox", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "switch", className: "focus-visible:outline-2", count: 1 },
   { component: "switch", className: "focus-visible:outline-offset-2", count: 1 },
+  { component: "group-header", className: "focus-visible:outline-solid", count: 1 },
+  { component: "group-header", className: "focus-visible:outline-(length:--nessa-focus-outline-width)", count: 1 },
+  { component: "group-header", className: "focus-visible:outline-offset-1", count: 1 },
+  { component: "choices", className: "focus-visible:outline-solid", count: 1 },
+  { component: "choices", className: "focus-visible:outline-(length:--nessa-focus-outline-width)", count: 1 },
+  { component: "choices", className: "focus-visible:outline-offset-2", count: 1 },
   // Menu items draw inset: the content surface clips its overflow, so an
   // outset outline would land on (or past) the padding edge.
   { component: "dropdown-menu", className: "focus-visible:outline-2", count: 4 },
