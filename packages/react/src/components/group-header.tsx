@@ -30,9 +30,11 @@ interface GroupHeaderBaseProps
   tone?: "quiet" | "strong"
   /**
    * `default` is a 28px header in level-2 type; `dense` is a caption header
-   * (level 1, semibold) 20px tall, for the tight section labels of a
-   * sidebar. Either height is a minimum a host can retune with
-   * `--nessa-group-header-height`.
+   * (level 1, semibold) 24px tall, for the tight section labels of a
+   * sidebar, whose disclosure fills the header's height. Either height is a
+   * minimum a host can retune with `--nessa-group-header-height`; below 24px
+   * a disclosure is under the target-size floor, which a host that does so
+   * answers for (by spacing such headers apart).
    * @defaultValue "default"
    */
   size?: "default" | "dense"
@@ -103,7 +105,7 @@ export type GroupHeaderProps = GroupHeaderBaseProps &
  *
  * A host retunes it from any ancestor with custom properties, each
  * defaulting to the kit's value: `--nessa-group-header-height` (minimum
- * height; 28px, or 20px dense), `--nessa-group-header-ink` (the quiet label;
+ * height; 28px, or 24px dense), `--nessa-group-header-ink` (the quiet label;
  * muted foreground), `--nessa-group-header-strong-ink` (the strong label;
  * foreground), `--nessa-group-header-count-ink` (muted foreground),
  * `--nessa-group-header-chevron-ink` (muted foreground) and
@@ -164,14 +166,14 @@ function GroupHeader({
       className={cn(
         "group/group-header flex min-w-0 items-center gap-1 ps-2 pe-1 font-sans",
         size === "dense"
-          ? "min-h-[var(--nessa-group-header-height,calc(var(--spacing)*5))]"
+          ? "min-h-[var(--nessa-group-header-height,calc(var(--spacing)*6))]"
           : "min-h-[var(--nessa-group-header-height,calc(var(--spacing)*7))]",
         className,
       )}
     >
       <Heading
         className={cn(
-          "m-0 flex min-w-0 flex-1 items-center",
+          "m-0 flex min-w-0 flex-1 items-center self-stretch",
           size === "dense" ? "nessa-text-1 font-semibold" : "nessa-text-2 font-medium",
           tone === "strong"
             ? "text-[color:var(--nessa-group-header-strong-ink,var(--foreground))]"
@@ -190,13 +192,9 @@ function GroupHeader({
             }}
             className={cn(
               "-ms-1 flex min-w-0 cursor-default appearance-none items-center gap-1.5 rounded-sm border-0 bg-transparent px-1 font-[inherit] text-inherit outline-none transition-[color] [transition-duration:var(--nessa-motion-duration-fast)] hover:text-[color:var(--nessa-group-header-hover-ink,var(--foreground))] focus-visible:outline-solid focus-visible:outline-(length:--nessa-focus-outline-width) focus-visible:outline-offset-1 focus-visible:outline-ring",
-              // A dense header is a caption drawn shorter than the 24px
-              // target floor; its disclosure keeps a 24px hit area through a
-              // centred pseudo-element, so the target meets the floor
-              // without the header growing.
-              size === "dense"
-                ? "relative min-h-0 after:absolute after:inset-x-0 after:top-1/2 after:h-6 after:-translate-y-1/2 after:content-['']"
-                : "min-h-6",
+              // A dense disclosure fills the header's height, so its target is
+              // the header itself and never reaches into the rows beside it.
+              size === "dense" ? "min-h-0 self-stretch" : "min-h-6",
               toggleProps?.className,
             )}
           >

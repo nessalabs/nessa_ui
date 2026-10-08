@@ -8,6 +8,10 @@
  * declared value in the element's own context, so custom properties set
  * on its ancestors apply exactly as they would on the element itself.
  * Returns `null` when no rule sets it.
+ *
+ * It strips the pseudo-class from every selector before matching, so a
+ * `group-hover`/`peer-hover` rule (an ancestor's or sibling's state) would
+ * match too; assert only on the element's own state rules.
  */
 export function stateStyle(element: HTMLElement, pseudo: ":hover" | ":active", property: string): string | null {
   let declared: string | null = null

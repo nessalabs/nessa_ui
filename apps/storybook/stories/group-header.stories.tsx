@@ -191,7 +191,7 @@ function DenseExample() {
 
 export const DenseAndHooks: Story = {
   parameters: storyDocumentation(
-    "`size=\"dense\"` is a caption header (level 1, semibold, 20px) for a sidebar's section labels. `chevron` takes the host's glyph, `toggleProps` puts `data-*` attributes and handlers on the one disclosure button (an `onClick` there that calls `preventDefault()` keeps the group as it is), and custom properties retune the height and inks. The play test proves the default header is still the kit's 28px level-2 medium muted label, the dense one is a 20px caption, the toggle carries the host's attributes and stays one button, and each property reaches the header.",
+    "`size=\"dense\"` is a caption header (level 1, semibold, 24px, its disclosure filling it) for a sidebar's section labels. `chevron` takes the host's glyph, `toggleProps` puts `data-*` attributes and handlers on the one disclosure button (an `onClick` there that calls `preventDefault()` keeps the group as it is), and custom properties retune the height and inks. The play test proves the default header is still the kit's 28px level-2 medium muted label, the dense one is a 24px caption whose disclosure fills it, the toggle carries the host's attributes and stays one button, and each property reaches the header.",
   ),
   render: () => <DenseExample />,
   play: async ({ canvasElement }) => {
@@ -215,7 +215,7 @@ export const DenseAndHooks: Story = {
     }
 
     const dense = canvas.getByRole("heading", { name: /^Channels/ })
-    await expect(header(/^Channels/).getBoundingClientRect().height).toBe(20)
+    await expect(header(/^Channels/).getBoundingClientRect().height).toBe(24)
     await expect(getComputedStyle(dense).fontSize).toBe(ref("caption").fontSize)
     await expect(getComputedStyle(dense).fontWeight).toBe(ref("caption").fontWeight)
 
@@ -225,8 +225,13 @@ export const DenseAndHooks: Story = {
     await expect(toggle).toHaveAttribute("data-section", "channels")
     await expect(toggle).toHaveClass("host-toggle")
     await expect(toggle).toHaveAttribute("data-ref-attached", "true")
-    // The dense disclosure is drawn 20px tall but its hit area is 24px.
-    await expect(getComputedStyle(toggle, "::after").height).toBe("24px")
+    // The dense disclosure fills the 24px header: a full target that never
+    // reaches past the header into the rows beside it.
+    const headerBox = header(/^Channels/).getBoundingClientRect()
+    const toggleBox = toggle.getBoundingClientRect()
+    await expect(toggleBox.height).toBe(24)
+    await expect(toggleBox.top).toBeGreaterThanOrEqual(headerBox.top)
+    await expect(toggleBox.bottom).toBeLessThanOrEqual(headerBox.bottom)
     await expect(within(toggle).getByTestId("own-chevron")).toBeInTheDocument()
     // The host's onClick prevented the first toggle; the second goes through.
     await userEvent.click(toggle)

@@ -223,7 +223,7 @@ const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
           // the page). With `--nessa-search-font-size` unset these two
           // declarations are invalid, so font-size falls back to inheriting
           // the field's level; set, the floor still holds below 48rem.
-          className="peer min-w-0 flex-1 appearance-none self-stretch border-0 bg-transparent p-0 font-sans [font-size:max(1rem,var(--nessa-search-font-size))] md:[font-size:var(--nessa-search-font-size)] [line-height:inherit] [letter-spacing:inherit] [color:inherit] outline-none placeholder:text-[color:var(--nessa-search-muted-ink,var(--muted-foreground))] [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
+          className="peer min-w-0 flex-1 appearance-none self-stretch border-0 bg-transparent p-0 font-sans [font-size:max(1rem,var(--nessa-search-font-size))] [@media(width>=48rem)]:[font-size:var(--nessa-search-font-size)] [line-height:inherit] [letter-spacing:inherit] [color:inherit] outline-none placeholder:text-[color:var(--nessa-search-muted-ink,var(--muted-foreground))] [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
         />
         {clearable ? (
           <button
