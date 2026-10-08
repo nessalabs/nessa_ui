@@ -56,9 +56,10 @@ interface GroupHeaderBaseProps
 /** A header whose label is a disclosure: `open` comes with its handler. */
 interface GroupHeaderDisclosureProps {
   /**
-   * The disclosure's glyph, decorative. It points down when open and turns
-   * toward the inline end when closed.
-   * @defaultValue a chevron
+   * The disclosure's glyph, decorative. Draw it pointing down: the header
+   * shows it as drawn while open and turns it a quarter toward the inline
+   * end while closed, as it does the default chevron.
+   * @defaultValue a down chevron
    */
   chevron?: React.ReactNode
   /**

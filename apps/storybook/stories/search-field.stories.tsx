@@ -377,7 +377,12 @@ export const SurfaceHooks: Story = {
     await expect(hookedFrame.paddingTop).toBe("8px")
     await waitFor(() => expect(getComputedStyle(hooked).backgroundColor).toBe("rgb(240, 240, 250)"))
     await expect(hookedInput.color).toBe("rgb(20, 30, 40)")
-    await expect(hookedInput.fontSize).toBe("13px")
+    // Below 48rem the font size keeps its 1rem floor, so a narrow preview
+    // reads the larger of the two.
+    const expectedHookedFontSize = matchMedia("(min-width: 48rem)").matches
+      ? "13px"
+      : `${Math.max(13, Number.parseFloat(getComputedStyle(document.documentElement).fontSize))}px`
+    await expect(hookedInput.fontSize).toBe(expectedHookedFontSize)
     await expect(getComputedStyle(hooked.querySelector("[data-slot=search-field-icon]")!).color).toBe("rgb(60, 60, 70)")
     await expect(within(hooked).getByTestId("own-icon")).toBeInTheDocument()
     await expect(hooked.querySelector("svg.lucide-search")).toBeNull()

@@ -1,7 +1,7 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, userEvent, waitFor, within } from "storybook/test"
-import { ChevronRight, Plus } from "lucide-react"
+import { ChevronsDown, Plus } from "lucide-react"
 import { Button, GroupHeader, SidebarMenu, SidebarMenuItem } from "@nessalabs/ui"
 
 import { stateStyle } from "./state-style"
@@ -156,7 +156,7 @@ function DenseExample() {
         count={8}
         open={open}
         onOpenChange={setOpen}
-        chevron={<ChevronRight data-testid="own-chevron" />}
+        chevron={<ChevronsDown data-testid="own-chevron" />}
         toggleProps={{
           "data-row": "section",
           "data-section": "channels",
@@ -234,10 +234,19 @@ export const DenseAndHooks: Story = {
     await expect(toggleBox.bottom).toBeLessThanOrEqual(headerBox.bottom)
     await expect(within(toggle).getByTestId("own-chevron")).toBeInTheDocument()
     // The host's onClick prevented the first toggle; the second goes through.
+    // A replacement glyph, drawn pointing down, is shown as drawn while open
+    // and turned a quarter toward the inline end while closed.
+    const glyph = toggle.querySelector<HTMLElement>("[data-slot=group-header-chevron]")!
+    const turn = async () => {
+      await Promise.all(glyph.getAnimations().map((animation) => animation.finished))
+      return getComputedStyle(glyph).rotate
+    }
+    await expect(await turn()).toBe("none")
     await userEvent.click(toggle)
     await expect(toggle).toHaveAttribute("aria-expanded", "true")
     await userEvent.click(toggle)
     await expect(toggle).toHaveAttribute("aria-expanded", "false")
+    await expect(await turn()).toBe("-90deg")
 
     const hooked = header(/^Hooked 2/)
     await expect(hooked.getBoundingClientRect().height).toBe(16.5)

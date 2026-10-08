@@ -64,12 +64,15 @@ export interface SearchFieldProps
   size?: "sm" | "md" | "lg"
   /**
    * The mark at the start, decorative. Pass the host's own icon to match
-   * its family; it is sized like the default unless it sets its own size.
+   * its family. An SVG is drawn at the default's size (14px, 16px at `lg`)
+   * unless it carries a `size-*` class, the one opt-out — a `width`
+   * attribute or `h-*`/`w-*` classes do not escape it, as in Button.
    * @defaultValue a magnifier
    */
   icon?: React.ReactNode
   /**
-   * The clear button's glyph, decorative.
+   * The clear button's glyph, decorative, drawn at 14px unless it carries
+   * a `size-*` class.
    * @defaultValue a cross
    */
   clearIcon?: React.ReactNode
