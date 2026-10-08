@@ -360,6 +360,31 @@ export const ShortcutWins: Story = {
   },
 }
 
+export const TooltipShortcutWins: Story = {
+  parameters: storyDocumentation(
+    "A shortcut given to the Tooltip wins over the button's own, for the cap and for `aria-keyshortcuts` alike. The play test proves both read Meta+P.",
+  ),
+  render: () => (
+    <Tooltip shortcut="Meta+P">
+      <Button size="icon-sm" variant="plain" shape="pill" label="Print" shortcut="Meta+K">
+        <Search />
+      </Button>
+    </Tooltip>
+  ),
+  play: async ({ canvasElement }) => {
+    const button = within(canvasElement).getByRole("button", { name: "Print" })
+    await expect(button).toHaveAttribute("aria-keyshortcuts", "Meta+P")
+    await userEvent.tab()
+    await body(canvasElement).findByRole("tooltip")
+    const platform = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent) ? "apple" : "other"
+    await expect(canvasElement.ownerDocument.querySelector("[data-slot=tooltip] kbd")).toHaveTextContent(
+      formatShortcut("Meta+P", platform),
+    )
+    await userEvent.keyboard("{Escape}")
+    await closed(canvasElement)
+  },
+}
+
 export const NameWins: Story = {
   parameters: storyDocumentation(
     "When a button has both a `label` and an explicit `aria-label`, the `aria-label` is its name, and the tooltip shows that same name, so what is seen is what is heard. The play test proves it.",

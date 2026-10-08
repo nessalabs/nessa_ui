@@ -260,7 +260,6 @@ function Tooltip({
     >
       <TooltipPrimitive.Trigger
         asChild
-        aria-keyshortcuts={trigger["aria-keyshortcuts"] === undefined && trigger.shortcut === undefined ? keys : undefined}
         // Radix's own description link is replaced: text taken from the
         // trigger is its name already and is not linked at all; the
         // tooltip's own text is linked below, composed with the trigger's.
@@ -282,16 +281,25 @@ function Tooltip({
           mouseOver.current = false
         }}
       >
-        {ownText
-          ? // The tooltip's own text describes the trigger, alongside any
-            // description the trigger already has. Written on the child, as
-            // a slotted child's own prop wins the merge.
-            React.cloneElement(children as React.ReactElement<TriggerProps>, {
-              "aria-describedby":
-                [trigger["aria-describedby"], isOpen ? textId : undefined].filter(Boolean).join(" ") ||
-                undefined,
-            })
-          : children}
+        {
+          // Written on the child, as a slotted child's own prop wins the
+          // merge: the key announced is the key shown (`keys`, Tooltip
+          // first), and the tooltip's own text describes the trigger
+          // alongside any description it already has.
+          keys !== undefined || ownText
+            ? React.cloneElement(children as React.ReactElement<TriggerProps>, {
+                ...(keys !== undefined ? { "aria-keyshortcuts": keys } : null),
+                ...(ownText
+                  ? {
+                      "aria-describedby":
+                        [trigger["aria-describedby"], isOpen ? textId : undefined]
+                          .filter(Boolean)
+                          .join(" ") || undefined,
+                    }
+                  : null),
+              })
+            : children
+        }
       </TooltipPrimitive.Trigger>
       {hasText ? (
         <TooltipPrimitive.Portal container={container}>
