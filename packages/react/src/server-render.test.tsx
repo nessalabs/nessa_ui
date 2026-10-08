@@ -26,6 +26,7 @@ import { ProportionBar } from "./components/proportion-bar"
 import { SearchableListbox } from "./components/searchable-listbox"
 import { SectionedListbox } from "./components/sectioned-listbox"
 import { Sparkline } from "./components/sparkline"
+import { Tooltip } from "./components/tooltip"
 import {
   SegmentedControl,
   SegmentedControlOption,
@@ -75,6 +76,16 @@ test("primitives render without a browser global", () => {
       </Card>,
     ).includes("Body"),
   )
+})
+
+test("a tooltip renders its trigger on the server, open or not", () => {
+  const markup = server(
+    <Tooltip content="Search" shortcut="Meta+K" defaultOpen>
+      <Button label="Search">S</Button>
+    </Tooltip>,
+  )
+  assert.ok(markup.includes('aria-label="Search"'))
+  assert.ok(markup.includes('aria-keyshortcuts="Meta+K"'))
 })
 
 test("a Radix-backed composite renders its initial tab on the server", () => {

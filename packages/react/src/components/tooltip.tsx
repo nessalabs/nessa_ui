@@ -70,15 +70,26 @@ const keyWords: Record<string, string> = {
   Space: "Space",
 }
 
+/** Apple writes modifiers in one order whatever order they were typed in. */
+const appleModifierOrder = ["Control", "Alt", "Shift", "Meta"]
+
 /**
  * Writes an `aria-keyshortcuts` value the way a key cap shows it: the
- * first shortcut only, as Apple glyphs run together (`Meta+Shift+P` →
- * `⌘⇧P`) or, with `platform: "other"`, as words joined by `+`
- * (`Ctrl+Shift+P`). Unknown keys pass through, single letters upper-cased.
+ * first shortcut only, as Apple glyphs run together in Apple's modifier
+ * order (`Meta+Shift+P` → `⇧⌘P`) or, with `platform: "other"`, as words
+ * joined by `+` (`Ctrl+Shift+P`). Unknown keys pass through, single
+ * letters upper-cased.
  */
 function formatShortcut(shortcut: string, platform: "apple" | "other" = "apple"): string {
   const first = shortcut.trim().split(/\s+/)[0] ?? ""
-  const keys = first.split("+").filter(Boolean)
+  let keys = first.split("+").filter(Boolean)
+  if (platform === "apple") {
+    const rank = (key: string) => {
+      const index = appleModifierOrder.indexOf(key)
+      return index === -1 ? appleModifierOrder.length : index
+    }
+    keys = [...keys].sort((a, b) => rank(a) - rank(b))
+  }
   const name = (key: string) => {
     const table = platform === "apple" ? keyGlyphs : keyWords
     if (Object.hasOwn(table, key)) return table[key]!
@@ -92,10 +103,27 @@ function currentPlatform(): "apple" | "other" {
   return /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent) ? "apple" : "other"
 }
 
+/**
+ * How the person last interacted: by key, or by pointer. Focus that follows
+ * a key is keyboard focus; focus that follows a pointer press — a click that
+ * closed a menu, a tap — is not, whatever the browser's own heuristic says
+ * about focus moved by script. One listener pair per document, installed by
+ * the first tooltip.
+ */
+const lastModality = new WeakMap<Document, "keyboard" | "pointer">()
+
+function trackModality(doc: Document) {
+  if (lastModality.has(doc)) return
+  lastModality.set(doc, "keyboard")
+  doc.addEventListener("keydown", () => lastModality.set(doc, "keyboard"), true)
+  doc.addEventListener("pointerdown", () => lastModality.set(doc, "pointer"), true)
+}
+
 type TriggerProps = {
   label?: string
   shortcut?: string
   "aria-label"?: string
+  "aria-keyshortcuts"?: string
 }
 
 export interface TooltipProps
@@ -143,10 +171,16 @@ export interface TooltipProps
  * its own, so `<Tooltip><Button label="Search" shortcut="Meta+K" …>` names
  * the button, announces its shortcut, and shows both, from one place.
  *
+ * Keyboard focus opens it; focus that arrives any other way — returned
+ * by a closing menu, or following a tap — does not, so a pointer or touch
+ * person never sees a tooltip they did not hover for.
+ *
  * The tooltip repeats the trigger's name; it does not replace it. The
- * trigger keeps its own accessible name, and the tooltip is wired to it as
- * a description. With nothing to say (no content, no label) it renders the
- * trigger alone.
+ * trigger keeps its own accessible name. Text taken from the trigger is
+ * not announced again as a description (the name already says it, and the
+ * shortcut is announced through `aria-keyshortcuts`, which the tooltip adds
+ * when only it was given one); `content` of the tooltip's own is announced
+ * as the trigger's description. With nothing to say it never opens.
  */
 function Tooltip({
   children,
@@ -166,21 +200,54 @@ function Tooltip({
   const container = usePortalContainer(portalContainer)
   const layerScope = useNessaLayerScope()
   const trigger = children.props as TriggerProps
-  const text = content ?? trigger.label ?? trigger["aria-label"]
+  const ownText = content !== undefined && content !== null && content !== ""
+  const text = ownText ? content : (trigger.label ?? trigger["aria-label"])
   const keys = shortcut ?? trigger.shortcut
-  if (text === undefined || text === null || text === "") return children
+  const hasText = text !== undefined && text !== null && text !== ""
+  const triggerRef = React.useRef<HTMLButtonElement | null>(null)
+  const [ownOpen, setOwnOpen] = React.useState(defaultOpen ?? false)
+  const isOpen = hasText && (open ?? ownOpen)
+  React.useEffect(() => {
+    if (triggerRef.current) trackModality(triggerRef.current.ownerDocument)
+  }, [])
 
+  const handleOpenChange = (next: boolean) => {
+    if (next) {
+      if (!hasText) return
+      // Radix opens on any focus. Only keyboard focus (or a hover in
+      // progress) earns a tooltip; focus that follows a pointer press — a
+      // menu handing focus back after a click, a tap — does not.
+      const element = triggerRef.current
+      const focusOpen =
+        element !== null && element.ownerDocument.activeElement === element && !element.matches(":hover")
+      if (focusOpen && lastModality.get(element.ownerDocument) === "pointer") return
+    }
+    if (open === undefined) setOwnOpen(next)
+    onOpenChange?.(next)
+  }
+
+  // One tree whatever there is to say, so a trigger that gains or loses its
+  // label while focused is never remounted.
   const tooltip = (
     <TooltipPrimitive.Root
-      open={open}
-      defaultOpen={defaultOpen}
-      onOpenChange={onOpenChange}
+      open={isOpen}
+      onOpenChange={handleOpenChange}
       delayDuration={delayDuration}
     >
-      <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
+      <TooltipPrimitive.Trigger
+        asChild
+        ref={triggerRef}
+        aria-keyshortcuts={trigger["aria-keyshortcuts"] === undefined && trigger.shortcut === undefined ? keys : undefined}
+      >
+        {children}
+      </TooltipPrimitive.Trigger>
+      {hasText ? (
       <TooltipPrimitive.Portal container={container}>
         <TooltipPrimitive.Content
           {...layerScope}
+          // Text taken from the trigger is its name already; a blank label
+          // keeps Radix from announcing it again as the description.
+          aria-label={ownText ? undefined : " "}
           data-slot="tooltip"
           side={side}
           align={align}
@@ -200,6 +267,7 @@ function Tooltip({
           ) : null}
         </TooltipPrimitive.Content>
       </TooltipPrimitive.Portal>
+      ) : null}
     </TooltipPrimitive.Root>
   )
 
