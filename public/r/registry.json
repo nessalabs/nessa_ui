@@ -3137,6 +3137,28 @@
       ]
     },
     {
+      "name": "tooltip",
+      "type": "registry:ui",
+      "title": "Tooltip",
+      "description": "A short label for a control, shown on pointer rest or keyboard focus and never on touch, with the action's shortcut in a key cap; reads a Button's own label and shortcut, groups delays through TooltipProvider, and portals into the nearest Nessa container.",
+      "dependencies": [
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/kbd",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/portal-container",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/tooltip.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/tooltip.tsx"
+        }
+      ]
+    },
+    {
       "name": "search-field",
       "type": "registry:ui",
       "title": "Search field",

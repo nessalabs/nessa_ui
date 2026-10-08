@@ -129,6 +129,19 @@ export interface ButtonProps
    * @defaultValue "translate"
    */
   press?: "translate" | "scale"
+  /**
+   * The action's name, for a button whose content does not say it — an
+   * icon. It becomes the button's `aria-label` (an explicit `aria-label`
+   * wins), and a `Tooltip` around the button shows it.
+   */
+  label?: string
+  /**
+   * The key that runs the action, in `aria-keyshortcuts` form — `"Meta+K"`,
+   * `"Shift+Slash"`. It becomes the button's `aria-keyshortcuts` (an
+   * explicit one wins), and a `Tooltip` around the button shows it as a key
+   * cap. The button announces the key; binding it stays the host's job.
+   */
+  shortcut?: string
 }
 
 /**
@@ -178,6 +191,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       shape,
       wrap,
       press,
+      label,
+      shortcut,
       asChild = false,
       type,
       disabled,
@@ -202,6 +217,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     // native `submit` default this exists to avoid.
     return (
       <Comp
+        aria-label={label}
+        aria-keyshortcuts={shortcut}
         {...props}
         className={cn(buttonVariants({ variant, size, shape, wrap, press, className }))}
         ref={ref}
