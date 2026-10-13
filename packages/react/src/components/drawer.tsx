@@ -6,9 +6,8 @@ import { X } from "lucide-react"
 
 import {
   longestTransitionMs,
-  openerFromFocus,
-  restoreFocusToOpener,
   useDragGesture,
+  useOpenerFocusReturn,
 } from "@/lib/overlay-panel"
 import { cn } from "@/lib/utils"
 
@@ -417,11 +416,9 @@ function DrawerContent({
 
   // Radix restores focus to its own trigger, so a drawer opened from
   // anything else — a row, a menu item, a controlled host — would drop focus
-  // onto the body. The opener is captured here, before focus moves, and
-  // restored by the close handler below, which explains how the two restores
-  // compose.
-  const openerRef = React.useRef<HTMLElement | null>(null)
-  const [keyboardOpened, setKeyboardOpened] = React.useState(false)
+  // onto the body. The shared hook captures the opener before focus moves and
+  // restores it on close; it explains how the two restores compose.
+  const focusReturn = useOpenerFocusReturn(onReturnFocus)
 
   // A dialog with no name is announced as "dialog" and nothing else. Radix
   // dropped its own warning for this, so the drawer checks the rendered node.
@@ -616,18 +613,10 @@ function DrawerContent({
         forceMount
         ref={composedRef}
         onOpenAutoFocus={(event) => {
-          const opener = openerFromFocus(panelNode?.ownerDocument)
-          openerRef.current = opener
           // Read now, not in a state updater: an updater runs during the
           // render it schedules, by which point the focus move below has
           // already blurred the opener and nothing matches `:focus-visible`.
-          let openedByKeyboard = false
-          try {
-            openedByKeyboard = Boolean(opener?.matches(":focus-visible"))
-          } catch {
-            // A browser without :focus-visible draws no indicator here.
-          }
-          setKeyboardOpened(openedByKeyboard)
+          focusReturn.capture(panelNode)
           onOpenAutoFocus?.(event)
           if (event.defaultPrevented) return
           // The panel takes focus, not its first control: a screen reader
@@ -638,46 +627,7 @@ function DrawerContent({
         }}
         onCloseAutoFocus={(event) => {
           onCloseAutoFocus?.(event)
-          if (event.defaultPrevented) return
-          const opener = openerRef.current
-          openerRef.current = null
-          // Nothing was focused when the drawer opened — a programmatic open,
-          // or a browser that does not focus a button on click. Radix's own
-          // trigger restore is the right outcome when there is a trigger, so
-          // this defers to it rather than reporting a missing opener. The
-          // host's fallback is the last resort, and only if that restore
-          // left focus on the body.
-          if (!opener) {
-            if (!onReturnFocus) return
-            const ownerDocument = panelNode?.ownerDocument
-            window.setTimeout(() => {
-              const body = ownerDocument?.body
-              // The resting state, not a destination: a host that parks focus
-              // on the body itself makes it focusable first, and that choice
-              // is deliberate and left alone.
-              if (!body || ownerDocument.activeElement !== body) return
-              if (body.hasAttribute("tabindex")) return
-              onReturnFocus()
-            }, 0)
-            return
-          }
-          // A control that is gone cannot take focus back; hosts that unmount
-          // the opener from inside the drawer say where focus should land.
-          if (!opener.isConnected) {
-            if (!onReturnFocus) return
-            // The host owns the fallback, so it also owns the outcome: Radix
-            // would otherwise focus a still-mounted trigger afterwards and
-            // undo wherever the host just put focus.
-            event.preventDefault()
-            onReturnFocus()
-            return
-          }
-          // Claimed only if it took. Radix prevents this event's default and
-          // focuses its own trigger, and it composes with
-          // `checkForDefaultPrevented`, so preventing here *replaces* that
-          // restore rather than following it — worth doing only when focus
-          // actually moved.
-          if (restoreFocusToOpener(opener)) event.preventDefault()
+          focusReturn.release(event)
         }}
         data-slot="drawer-content"
         data-side={side}
@@ -707,7 +657,7 @@ function DrawerContent({
           // outset one on a panel flush with the viewport edge would be half
           // off-screen — and restates `outline-style`, which `outline-none`
           // otherwise leaves at `none` for the whole rule.
-          keyboardOpened &&
+          focusReturn.keyboardOpened &&
             "focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
           // Only `translate` transitions, so a drag on the size never has to
           // suspend it — and the exit timing is read from this one property.
