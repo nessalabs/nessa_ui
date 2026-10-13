@@ -511,23 +511,27 @@ export const FromAClosingMenu: Story = {
     await userEvent.click(trigger)
     const item = await page.findByRole("menuitem", { name: "Share…" })
     const menu = item.closest<HTMLElement>('[role="menu"]')!
-    await userEvent.click(item)
-    const dialog = await page.findByRole("dialog", { name: "Share conversation" })
-    await waitFor(async () => {
-      await expect(dialog.contains(document.activeElement)).toBe(true)
-    })
-    await userEvent.keyboard("{Escape}")
-    await waitFor(async () => {
-      await expect(dialog.isConnected).toBe(false)
-    })
-    // The premise: the item outlived the dialog, in a menu that has closed.
-    await expect(item.isConnected).toBe(true)
-    await expect(menu).toHaveAttribute("data-state", "closed")
-    await waitFor(async () => {
-      await expect(trigger).toHaveFocus()
-    })
-    // Leave nothing running: end the exit, and wait for the menu to go.
-    for (const animation of menu.getAnimations()) animation.finish()
+    try {
+      await userEvent.click(item)
+      const dialog = await page.findByRole("dialog", { name: "Share conversation" })
+      await waitFor(async () => {
+        await expect(dialog.contains(document.activeElement)).toBe(true)
+      })
+      await userEvent.keyboard("{Escape}")
+      await waitFor(async () => {
+        await expect(dialog.isConnected).toBe(false)
+      })
+      // The premise: the item outlived the dialog, in a menu that has closed.
+      await expect(item.isConnected).toBe(true)
+      await expect(menu).toHaveAttribute("data-state", "closed")
+      await waitFor(async () => {
+        await expect(trigger).toHaveFocus()
+      })
+    } finally {
+      // Leave nothing running, even when an assertion above failed.
+      for (const animation of menu.getAnimations()) animation.finish()
+    }
+    // Then wait for the menu to go.
     await waitFor(async () => {
       await expect(item.isConnected).toBe(false)
     })
