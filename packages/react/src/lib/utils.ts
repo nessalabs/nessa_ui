@@ -28,3 +28,13 @@ const twMerge = extendTailwindMerge({
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
+
+/**
+ * Whether an optional slot was given anything to show. `null`, `false`,
+ * `undefined` and `""` all mean no — the forms `cond && node` and
+ * `value ?? null` produce — so a component never draws an empty frame, or
+ * points an ARIA reference at an empty element, for a slot left empty.
+ */
+export function hasContent(node: unknown): boolean {
+  return node !== undefined && node !== null && node !== false && node !== ""
+}

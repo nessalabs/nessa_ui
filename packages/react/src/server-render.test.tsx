@@ -19,6 +19,8 @@ import { Button } from "./components/button"
 import { Card, CardContent } from "./components/card"
 import { ChartTooltip } from "./components/chart-tooltip"
 import { Checkbox } from "./components/checkbox"
+import { CheckboxList } from "./components/checkbox-list"
+import { Dialog } from "./components/dialog"
 import { EmptyState } from "./components/empty-state"
 import { Input } from "./components/input"
 import { Message } from "./components/message"
@@ -86,6 +88,45 @@ test("a tooltip renders its trigger on the server, open or not", () => {
   )
   assert.ok(markup.includes('aria-label="Search"'))
   assert.ok(markup.includes('aria-keyshortcuts="Meta+K"'))
+})
+
+test("a dialog renders on the server, open or not", () => {
+  const closed = server(
+    <Dialog title="Share" trigger={<Button>Share</Button>}>
+      Body
+    </Dialog>,
+  )
+  assert.ok(closed.includes("Share"))
+  // An open dialog portals, and a portal has nowhere to go without a
+  // document; what matters is that rendering it does not throw.
+  assert.doesNotThrow(() =>
+    server(
+      <Dialog title="Share" description="Pick hosts" defaultOpen>
+        Body
+      </Dialog>,
+    ),
+  )
+})
+
+test("a checkbox list renders its rows, count and states on the server", () => {
+  const markup = server(
+    <CheckboxList
+      label="Hosts"
+      options={[
+        { value: "a", label: "Alpha", description: "SSH" },
+        { value: "b", label: "Beta" },
+        { value: "c", label: "Gamma", disabled: true, disabledReason: "Offline" },
+      ]}
+      value={["a"]}
+      onValueChange={() => {}}
+      max={1}
+    />,
+  )
+  assert.ok(markup.includes('role="group"'))
+  assert.ok(markup.includes("1 of 1 selected"))
+  assert.ok(markup.includes("checked=\"\""))
+  assert.ok(markup.includes("Offline"))
+  assert.ok(markup.includes('aria-disabled="true"'))
 })
 
 test("a Radix-backed composite renders its initial tab on the server", () => {

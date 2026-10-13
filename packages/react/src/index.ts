@@ -75,6 +75,12 @@ export {
 } from "./components/settings-group"
 export { Choices, type ChoiceOption, type ChoicesProps } from "./components/choices"
 export {
+  CheckboxList,
+  type CheckboxListCount,
+  type CheckboxListOption,
+  type CheckboxListProps,
+} from "./components/checkbox-list"
+export {
   KeyFingerprint,
   fingerprintGroups,
   type KeyFingerprintProps,
@@ -125,6 +131,12 @@ export {
   type DrawerProps,
   type DrawerSide,
 } from "./components/drawer"
+export {
+  Dialog,
+  DialogClose,
+  type DialogProps,
+  type DialogSize,
+} from "./components/dialog"
 export {
   DropdownMenu,
   DropdownMenuCheckboxItem,

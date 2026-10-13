@@ -2433,6 +2433,32 @@
       ]
     },
     {
+      "name": "dialog",
+      "type": "registry:ui",
+      "title": "Dialog",
+      "description": "A modal dialog centered over a dimmed page: a title that names it, an optional description, a body that scrolls on its own when tall, and footer actions. Focus is trapped inside, Escape, the close button and an outside press dismiss it, focus returns to whatever opened it, and its own menus and tooltips portal into it.",
+      "dependencies": [
+        "lucide-react",
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/compose",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/overlay-panel",
+        "nessalabs/nessa_ui/portal-container",
+        "nessalabs/nessa_ui/size-observer",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/dialog.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/dialog.tsx"
+        }
+      ]
+    },
+    {
       "name": "dropdown-menu",
       "type": "registry:ui",
       "title": "Dropdown menu",
@@ -3219,6 +3245,26 @@
           "path": "packages/react/src/components/settings-group.tsx",
           "type": "registry:ui",
           "target": "components/ui/settings-group.tsx"
+        }
+      ]
+    },
+    {
+      "name": "checkbox-list",
+      "type": "registry:ui",
+      "title": "Checkbox list",
+      "description": "Several choices from a list: a labelled group of checkbox rows with optional descriptions, unavailable rows with a reason, an optional limit with a selected-count hint, and the same Arrow, Home and End navigation as Nessa's listboxes.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/checkbox",
+        "nessalabs/nessa_ui/control-label",
+        "nessalabs/nessa_ui/listbox-collection",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/checkbox-list.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/checkbox-list.tsx"
         }
       ]
     },
