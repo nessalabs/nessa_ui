@@ -136,11 +136,16 @@ export function restoreFocusToOpener(
  * it controls but did not open the element's container as a popup, and is
  * not a place to return focus to. The walk stops at a dialog: what opened an
  * enclosing modal is behind it, not a destination.
+ *
+ * The popups themselves come back too, so a later reader can tell whether
+ * something inside one is still somewhere a person can reach.
  */
-function controllersOf(element: HTMLElement | null): HTMLElement[] {
+function popupContextOf(element: HTMLElement | null): PopupContext {
   const controllers: HTMLElement[] = []
+  const popups: HTMLElement[] = []
+  const context = { controllers, popups }
   const ownerDocument = element?.ownerDocument
-  if (!element || !ownerDocument) return controllers
+  if (!element || !ownerDocument) return context
   const byControlledId = new Map<string, HTMLElement[]>()
   for (const control of ownerDocument.querySelectorAll<HTMLElement>("[aria-haspopup][aria-controls]")) {
     if (control.getAttribute("aria-haspopup") === "false") continue
@@ -149,20 +154,57 @@ function controllersOf(element: HTMLElement | null): HTMLElement[] {
     }
   }
   const add = (control: Element | null) => {
-    if (!(control instanceof HTMLElement) || controllers.includes(control)) return
+    if (!(control instanceof HTMLElement)) return false
     const popup = control.getAttribute("aria-haspopup")
-    if (popup === null || popup === "false") return
-    controllers.push(control)
+    if (popup === null || popup === "false") return false
+    if (!controllers.includes(control)) controllers.push(control)
+    return true
   }
   for (let node = element.parentElement; node; node = node.parentElement) {
     const role = node.getAttribute("role")
     if (role === "dialog" || role === "alertdialog") break
-    if (node.id) for (const control of byControlledId.get(node.id) ?? []) add(control)
+    let opened = false
+    if (node.id) for (const control of byControlledId.get(node.id) ?? []) opened = add(control) || opened
     for (const id of node.getAttribute("aria-labelledby")?.split(/\s+/) ?? []) {
-      if (id) add(ownerDocument.getElementById(id))
+      if (id) opened = add(ownerDocument.getElementById(id)) || opened
     }
+    if (opened) popups.push(node)
   }
-  return controllers
+  return context
+}
+
+interface PopupContext {
+  /** The controls that opened the popups, innermost first. */
+  controllers: HTMLElement[]
+  /** The popups those controls opened, innermost first. */
+  popups: HTMLElement[]
+}
+
+/**
+ * Whether a popup recorded open has since closed, even if it is still in the
+ * document. A menu stays mounted after it closes while its exit animation
+ * runs, and a force-mounted one stays for good; its items can still take
+ * focus, but focus there is in something nobody can see. Closed is read from
+ * every way a popup says so: Radix's `data-state`, `hidden`, `inert`,
+ * `aria-hidden`, or no longer being rendered at all.
+ */
+function popupDismissed(popup: HTMLElement) {
+  if (!popup.isConnected) return true
+  if (popup.getAttribute("data-state") === "closed") return true
+  if (popup.closest('[hidden], [inert], [aria-hidden="true"]')) return true
+  // `checkVisibility` answers for the whole ancestor chain, which an
+  // element's own computed `display` does not.
+  if (typeof popup.checkVisibility === "function") return !popup.checkVisibility()
+  return popup.getClientRects().length === 0
+}
+
+/**
+ * Whether focus may go back to this element: it is still in the document,
+ * and no popup recorded around it has closed.
+ */
+function reachable(element: HTMLElement, popups: readonly HTMLElement[]) {
+  if (!element.isConnected) return false
+  return !popups.some((popup) => popup.contains(element) && popupDismissed(popup))
 }
 
 export interface OpenerFocusReturn {
@@ -208,6 +250,9 @@ export interface OpenerFocusReturn {
  * - The opener sat in a popup that is gone by close — a menu item that
  *   opened the panel, whose menu closed behind it: focus goes to the control
  *   that opened that popup, the menu's trigger, found by `aria-controls`.
+ *   A popup that has closed but is still mounted — an exit animation still
+ *   running, a force-mounted menu — counts as gone: its items still take
+ *   focus, but nobody can see them.
  * - The opener is gone by close and nothing opened it (a row deleted from
  *   inside its own panel): `onReturnFocus` decides, and Radix's restore is
  *   prevented so it cannot undo the host's choice. Without `onReturnFocus`,
@@ -230,7 +275,7 @@ export function useOpenerFocusReturn(
 ): OpenerFocusReturn {
   const openerRef = React.useRef<HTMLElement | null>(null)
   const documentRef = React.useRef<Document | null>(null)
-  const controllersRef = React.useRef<HTMLElement[]>([])
+  const popupContextRef = React.useRef<PopupContext>({ controllers: [], popups: [] })
   const onReturnFocusRef = React.useRef(onReturnFocus)
   const [keyboardOpened, setKeyboardOpened] = React.useState(false)
   React.useLayoutEffect(() => {
@@ -244,7 +289,7 @@ export function useOpenerFocusReturn(
           panel?.ownerDocument ?? (typeof document === "undefined" ? null : document)
         const opener = openerFromFocus(ownerDocument)
         openerRef.current = opener
-        controllersRef.current = controllersOf(opener)
+        popupContextRef.current = popupContextOf(opener)
         documentRef.current = ownerDocument
         let keyboard = false
         try {
@@ -256,14 +301,23 @@ export function useOpenerFocusReturn(
       },
       release(event: Event) {
         const prevented = event.defaultPrevented
-        // The opener, or else the control that opened the popup it was in.
+        // The opener, or else the control that opened the popup it was in —
+        // whenever the opener is gone, or still mounted in a popup that has
+        // closed. One that is only connected is not enough: a closed menu
+        // still running its exit keeps its items, and they take focus.
+        const { controllers, popups } = popupContextRef.current
+        const recorded = openerRef.current
+        const candidates = recorded ? [recorded, ...controllers] : controllers
+        const reachableOpener = candidates.find((candidate) => reachable(candidate, popups))
+        // With nothing reachable, an opener stranded in a closed popup is
+        // treated like one that would not take focus: Radix's restore, then
+        // the host's fallback. Never focus it.
         const opener =
-          [openerRef.current, ...controllersRef.current].find(
-            (candidate) => candidate?.isConnected,
-          ) ?? openerRef.current
+          reachableOpener ??
+          (recorded && !recorded.isConnected ? recorded : null)
         const ownerDocument = documentRef.current
         openerRef.current = null
-        controllersRef.current = []
+        popupContextRef.current = { controllers: [], popups: [] }
         documentRef.current = null
         setKeyboardOpened(false)
         // The host's own handler took the restore; only the record is cleared.

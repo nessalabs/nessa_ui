@@ -213,6 +213,13 @@ function Dialog({
             // Radix makes the page behind inert to assistive technology with
             // `aria-hidden` but does not declare it; the dialog says so too.
             aria-modal="true"
+            // With no description, the panel is described by nothing. Radix
+            // before react-dialog 1.1.20 (inside this package's `radix-ui`
+            // range) points `aria-describedby` at its description id either
+            // way, naming an element that does not exist, and warns; an
+            // explicit `undefined` is its documented opt-out. A consumer's own
+            // `aria-describedby`, spread below, still wins.
+            {...(hasDescription ? null : { "aria-describedby": undefined })}
             onOpenAutoFocus={(event) => {
               // Read before focus moves, while the opener still holds it.
               const panel = panelRef.current

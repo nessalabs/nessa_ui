@@ -469,3 +469,68 @@ export const FromAMenuItem: Story = {
     })
   },
 }
+
+export const FromAClosingMenu: Story = {
+  parameters: storyDocumentation(
+    "A menu that stays mounted after it closes — running a long exit animation, or force-mounted — still holds the item the dialog opened from. That item could take focus, but inside a menu nobody can see, so the dialog returns focus to the menu's trigger instead.",
+  ),
+  render: function FromAClosingMenuExample() {
+    const [menuOpen, setMenuOpen] = React.useState(false)
+    const [open, setOpen] = React.useState(false)
+    return (
+      <>
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">Conversation actions</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            // An exit long enough to outlast the dialog, so the closed menu
+            // and its item are still in the document when the dialog closes.
+            style={menuOpen ? undefined : { animation: "nessa-enter 60s linear reverse both" }}
+          >
+            <DropdownMenuItem onSelect={() => setOpen(true)}>Share…</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Dialog
+          open={open}
+          onOpenChange={setOpen}
+          title="Share conversation"
+          footer={
+            <DialogClose asChild>
+              <Button>Done</Button>
+            </DialogClose>
+          }
+        />
+      </>
+    )
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const page = within(canvasElement.ownerDocument.body)
+    const trigger = canvas.getByRole("button", { name: "Conversation actions" })
+    await userEvent.click(trigger)
+    const item = await page.findByRole("menuitem", { name: "Share…" })
+    const menu = item.closest<HTMLElement>('[role="menu"]')!
+    await userEvent.click(item)
+    const dialog = await page.findByRole("dialog", { name: "Share conversation" })
+    await waitFor(async () => {
+      await expect(dialog.contains(document.activeElement)).toBe(true)
+    })
+    await userEvent.keyboard("{Escape}")
+    await waitFor(async () => {
+      await expect(dialog.isConnected).toBe(false)
+    })
+    // The premise: the item outlived the dialog, in a menu that has closed.
+    await expect(item.isConnected).toBe(true)
+    await expect(menu).toHaveAttribute("data-state", "closed")
+    await waitFor(async () => {
+      await expect(trigger).toHaveFocus()
+    })
+    // Leave nothing running: end the exit, and wait for the menu to go.
+    for (const animation of menu.getAnimations()) animation.finish()
+    await waitFor(async () => {
+      await expect(item.isConnected).toBe(false)
+    })
+    await expect(trigger).toHaveFocus()
+  },
+}
