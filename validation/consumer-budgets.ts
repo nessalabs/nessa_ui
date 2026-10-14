@@ -115,6 +115,25 @@
  * static set, and only then defer the things that reach it. `MessageMarkdown`
  * and its react-markdown stack are next, and this file is where the answer
  * gets recorded.
+ *
+ * ## Re-recorded for the compact kit additions (#120)
+ *
+ * Adding `Kbd`, `SearchField`, `GroupHeader`, `Choices` and the compact
+ * Button variants moved every fixture by the same amount — about 4.4 kB
+ * minified and 1.0–1.2 kB gzip, measured against the base commit — because
+ * the barrel still hands every export to every consumer. Nothing new was
+ * pulled into the import graph. `rich-transcript` had sat 0.5 kB under its
+ * gzip ceiling, so it crossed; its ceiling now matches `file-preview`'s,
+ * which it measures just under.
+ *
+ * ## Re-recorded for the app-fit hooks and Tooltip (#124, #123)
+ *
+ * The custom-property hooks lengthen the class strings of SearchField,
+ * GroupHeader and Button, and Tooltip brings Radix's tooltip into the
+ * barrel. Every fixture moved by the same amount again — about 0.8 kB
+ * gzip for the hooks, 0.3 kB for Tooltip — with no new heavy input.
+ * `file-preview` crossed by 0.5 kB; all four ceilings move up by 5 kB so
+ * the two changes fit with the usual headroom.
  */
 
 export interface ConsumerBudget {
@@ -145,7 +164,7 @@ export const consumerBudgets: readonly ConsumerBudget[] = Object.freeze([
     rationale:
       "An app that wanted one control. If the barrel leaks, it leaks here first — and it does: the whole rich-content stack, as the note above records.",
     maximumBytes: 1_650_000,
-    maximumGzipBytes: 475_000,
+    maximumGzipBytes: 480_000,
     maximumCssBytes: 48_000,
   },
   {
@@ -153,7 +172,7 @@ export const consumerBudgets: readonly ConsumerBudget[] = Object.freeze([
     rationale:
       "Radix, a portalled popover and the listbox engine, and — through the barrel, not through anything it imports — the same rich-content stack every other fixture carries.",
     maximumBytes: 1_670_000,
-    maximumGzipBytes: 480_000,
+    maximumGzipBytes: 485_000,
     maximumCssBytes: 48_000,
   },
   {
@@ -161,7 +180,7 @@ export const consumerBudgets: readonly ConsumerBudget[] = Object.freeze([
     rationale:
       "An app that previews one kind of file. It reads within a couple of kilobytes of button-only, which is the finding: what a consumer fetches is the barrel, not the component it named.",
     maximumBytes: 1_840_000,
-    maximumGzipBytes: 530_000,
+    maximumGzipBytes: 535_000,
     maximumCssBytes: 48_000,
   },
   {
@@ -169,7 +188,7 @@ export const consumerBudgets: readonly ConsumerBudget[] = Object.freeze([
     rationale:
       "Markdown, highlighting, maths and diagrams — everything the barrel already hands the other three. It reads close to them, and that is the finding rather than the reassurance.",
     maximumBytes: 1_830_000,
-    maximumGzipBytes: 525_000,
+    maximumGzipBytes: 535_000,
     maximumCssBytes: 48_000,
   },
 ] satisfies readonly ConsumerBudget[])

@@ -57,12 +57,29 @@ export {
 } from "./components/checkbox"
 export { EmptyState, type EmptyStateProps } from "./components/empty-state"
 export { Switch, type SwitchProps } from "./components/switch"
+export { Kbd, type KbdProps } from "./components/kbd"
+export {
+  Tooltip,
+  TooltipProvider,
+  formatShortcut,
+  type TooltipProps,
+  type TooltipProviderProps,
+} from "./components/tooltip"
+export { SearchField, type SearchFieldProps } from "./components/search-field"
+export { GroupHeader, type GroupHeaderProps } from "./components/group-header"
 export {
   SettingsGroup,
   SettingsRow,
   type SettingsGroupProps,
   type SettingsRowProps,
 } from "./components/settings-group"
+export { Choices, type ChoiceOption, type ChoicesProps } from "./components/choices"
+export {
+  CheckboxList,
+  type CheckboxListCount,
+  type CheckboxListOption,
+  type CheckboxListProps,
+} from "./components/checkbox-list"
 export {
   KeyFingerprint,
   fingerprintGroups,
@@ -114,6 +131,12 @@ export {
   type DrawerProps,
   type DrawerSide,
 } from "./components/drawer"
+export {
+  Dialog,
+  DialogClose,
+  type DialogProps,
+  type DialogSize,
+} from "./components/dialog"
 export {
   DropdownMenu,
   DropdownMenuCheckboxItem,

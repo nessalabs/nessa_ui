@@ -700,8 +700,8 @@ function ToolApprovalAction({
 }
 
 export interface ToolApprovalActionMenuProps
-  extends Omit<ButtonProps, "asChild"> {
-  /** The trigger's label, e.g. "Always allow". */
+  extends Omit<ButtonProps, "asChild" | "label"> {
+  /** The trigger's visible text, e.g. "Always allow". */
   label: React.ReactNode
   /** Optional muted heading rendered above the choices, e.g. "Apply to". */
   menuLabel?: React.ReactNode

@@ -56,6 +56,8 @@ try {
     "shell-sidebar-primitives-menu--menu-skeleton",
     "shell-sidebar-primitives-menu--nested-menu",
     "shell-sidebar-primitives-menu--nested-menu-guides",
+    "shell-sidebar-primitives-menu--densities",
+    "shell-sidebar-primitives-menu--row-states",
     "shell-sidebar-primitives-menu--collapsible-submenu",
     "shell-sidebar-primitives-menu--trailing-action",
     "shell-sidebar-compositions--documentation",

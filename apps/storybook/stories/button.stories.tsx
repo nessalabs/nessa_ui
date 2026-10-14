@@ -2,8 +2,9 @@ import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, userEvent, within } from "storybook/test"
 import { Button } from "@nessalabs/ui"
-import { ArrowRight, Plus } from "lucide-react"
+import { ArrowRight, ChevronDown, Plus } from "lucide-react"
 
+import { stateStyle } from "./state-style"
 import { storyDocumentation } from "./story-documentation"
 
 const meta = {
@@ -21,13 +22,29 @@ const meta = {
   argTypes: {
     variant: {
       control: "select",
-      options: ["default", "secondary", "outline", "ghost", "link", "destructive"],
+      options: [
+        "default",
+        "secondary",
+        "outline",
+        "ghost",
+        "link",
+        "destructive",
+        "tinted",
+        "plain",
+        "inverse",
+        "danger",
+      ],
       description: "Controls the action's semantic emphasis.",
     },
     size: {
       control: "select",
-      options: ["sm", "default", "lg", "icon"],
+      options: ["sm", "default", "lg", "icon", "icon-sm", "30", "28", "26", "24", "22"],
       description: "Controls the button's height and horizontal padding.",
+    },
+    shape: {
+      control: "inline-radio",
+      options: ["default", "pill"],
+      description: "Keeps the theme's control radius, or rounds the ends fully.",
     },
     asChild: {
       description:
@@ -73,6 +90,29 @@ export const IconOnly: Story = {
   ),
 }
 
+export const CompactIcon: Story = {
+  parameters: storyDocumentation(
+    "`size=\"icon-sm\"` is a 28px square for toolbars, titlebars and rows, beside the 36px `icon`. The play test measures both.",
+  ),
+  render: () => (
+    <div className="flex items-center gap-3">
+      <Button size="icon" variant="ghost" aria-label="Create item">
+        <Plus />
+      </Button>
+      <Button size="icon-sm" variant="ghost" aria-label="Create item, compact">
+        <Plus />
+      </Button>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const regular = canvas.getByRole("button", { name: "Create item" }).getBoundingClientRect()
+    const compact = canvas.getByRole("button", { name: "Create item, compact" }).getBoundingClientRect()
+    await expect([regular.width, regular.height]).toEqual([36, 36])
+    await expect([compact.width, compact.height]).toEqual([28, 28])
+  },
+}
+
 export const AllVariants: Story = {
   parameters: storyDocumentation(
     "Semantic variants establish hierarchy without changing the component API.",
@@ -87,6 +127,253 @@ export const AllVariants: Story = {
       <Button variant="link">Link</Button>
     </div>
   ),
+}
+
+const compactSizes = ["30", "28", "26", "24", "22"] as const
+
+export const Compact: Story = {
+  parameters: storyDocumentation(
+    "The compact family for toolbars, rows and headers: `tinted`, `plain`, `inverse` and `danger` at 22–30px with `shape=\"pill\"`. A selected chip says so with `aria-pressed`. The play test measures each height, proves `plain` has no fill at rest while `tinted` does, that a pressed chip holds the hover fill, and that keyboard focus draws a 1.5px solid outline rather than the 3px ring.",
+  ),
+  render: () => (
+    <div className="flex flex-col gap-3">
+      {compactSizes.map((size) => (
+        <div key={size} className="flex flex-wrap items-center gap-2">
+          <Button shape="pill" size={size} variant="tinted" data-testid={`tinted-${size}`}>
+            Open
+          </Button>
+          <Button shape="pill" size={size} variant="plain">
+            Filter
+            <ChevronDown />
+          </Button>
+          <Button shape="pill" size={size} variant="inverse">
+            Approve
+          </Button>
+          <Button shape="pill" size={size} variant="danger">
+            Revoke
+          </Button>
+          <Button shape="pill" size={size} variant="link">
+            Details
+          </Button>
+        </div>
+      ))}
+      <div className="flex items-center gap-1">
+        <Button shape="pill" size="22" variant="plain" aria-pressed="true">
+          Running 3
+        </Button>
+        <Button shape="pill" size="22" variant="plain" aria-pressed="false">
+          Waiting 1
+        </Button>
+      </div>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    for (const size of compactSizes) {
+      const height = canvas.getByTestId(`tinted-${size}`).getBoundingClientRect().height
+      await expect(height).toBe(Number(size))
+    }
+    const [plain] = canvas.getAllByRole("button", { name: "Filter" })
+    const [tinted] = canvas.getAllByRole("button", { name: "Open" })
+    await expect(getComputedStyle(plain!).backgroundColor).toBe("rgba(0, 0, 0, 0)")
+    await expect(getComputedStyle(tinted!).backgroundColor).not.toBe("rgba(0, 0, 0, 0)")
+    const pressed = canvas.getByRole("button", { name: "Running 3", pressed: true })
+    const resting = canvas.getByRole("button", { name: "Waiting 1", pressed: false })
+    await expect(getComputedStyle(pressed).backgroundColor).not.toBe(
+      getComputedStyle(resting).backgroundColor,
+    )
+    pressed.blur()
+    resting.focus()
+    await userEvent.tab({ shift: true })
+    await expect(pressed).toHaveFocus()
+    // Read the settled style, not the first frame: the button transitions
+    // its box-shadow, so a ring that grows from 0 would still read as 0 the
+    // moment focus lands. Wait out the declared duration, then any animation
+    // still running.
+    const duration = Math.max(
+      ...getComputedStyle(pressed).transitionDuration.split(",").map((value) => parseFloat(value) * 1000),
+    )
+    await new Promise((resolve) => setTimeout(resolve, duration + 50))
+    await Promise.all(pressed.getAnimations().map((animation) => animation.finished))
+    const focused = getComputedStyle(pressed)
+    await expect(focused.outlineStyle).toBe("solid")
+    // Chromium snaps outline widths down to whole device pixels, so the
+    // 1.5px token draws 1px at 1x and 1.5px at 2x.
+    const dpr = window.devicePixelRatio
+    await expect(focused.outlineWidth).toBe(`${Math.max(1, Math.floor(1.5 * dpr)) / dpr}px`)
+    // The 3px ring is gone, not just hidden: every length in the shadow is 0.
+    const lengths = [...focused.boxShadow.matchAll(/(-?[\d.]+)px/g)].map((match) => Number(match[1]))
+    await expect(lengths.every((length) => length === 0)).toBe(true)
+  },
+}
+
+export const SurfaceHooks: Story = {
+  parameters: storyDocumentation(
+    "How a surface maps the compact variants to its own inks: custom properties on any ancestor — `--nessa-button-<variant>-ink`, `-rest`, `-hover` (also selected and open), `-press`, and `plain`'s `-hover-ink` — each defaulting to the kit's value. The play test proves the defaults are exactly the kit's (against reference elements drawn with the kit's own classes) and that each property set on a wrapper reaches the button, including the selected state.",
+  ),
+  render: () => (
+    <div className="flex flex-col gap-3">
+      <div className="flex gap-2">
+        <Button shape="pill" size="28" variant="tinted">Tinted</Button>
+        <Button shape="pill" size="28" variant="plain">Plain</Button>
+        <Button shape="pill" size="28" variant="plain" aria-pressed="true">Plain on</Button>
+        <Button shape="pill" size="28" variant="tinted" aria-pressed="true">Tinted on</Button>
+        <Button shape="pill" size="28" variant="inverse">Inverse</Button>
+        <Button shape="pill" size="28" variant="danger">Danger</Button>
+      </div>
+      <div className="flex gap-1">
+        <span data-ref="hover" className="size-2 bg-foreground/(--nessa-state-hover)" />
+        <span data-ref="strong" className="size-2 bg-foreground/(--nessa-state-hover-strong)" />
+        <span data-ref="fg" className="size-2 bg-foreground text-background" />
+        <span data-ref="muted" className="text-muted-foreground">a</span>
+        <span data-ref="destructive" className="text-destructive">a</span>
+        <span data-ref="ink" className="text-foreground">a</span>
+        <span data-ref="press" className="size-2 bg-foreground/(--nessa-state-press)" />
+        <span data-ref="fg90" className="size-2 bg-foreground/90" />
+        <span data-ref="fg85" className="size-2 bg-foreground/85" />
+        <span data-ref="dhover" className="size-2 bg-destructive/(--nessa-state-hover-strong)" />
+        <span data-ref="dpress" className="size-2 bg-destructive/(--nessa-state-press)" />
+      </div>
+      <div
+        className="flex gap-2"
+        style={
+          {
+            "--nessa-button-tinted-rest": "rgb(230, 230, 240)",
+            "--nessa-button-tinted-ink": "rgb(20, 20, 30)",
+            "--nessa-button-tinted-hover": "rgb(220, 220, 232)",
+            "--nessa-button-tinted-press": "rgb(210, 210, 224)",
+            "--nessa-button-plain-press": "rgb(215, 215, 228)",
+            "--nessa-button-danger-hover": "rgb(250, 230, 230)",
+            "--nessa-button-danger-press": "rgb(245, 220, 220)",
+            "--nessa-button-plain-ink": "rgb(70, 70, 80)",
+            "--nessa-button-plain-hover": "rgb(225, 225, 235)",
+            "--nessa-button-plain-hover-ink": "rgb(10, 10, 20)",
+            "--nessa-button-inverse-rest": "rgb(30, 30, 40)",
+            "--nessa-button-inverse-ink": "rgb(250, 250, 255)",
+            "--nessa-button-danger-ink": "rgb(160, 20, 20)",
+          } as React.CSSProperties
+        }
+      >
+        <Button shape="pill" size="28" variant="tinted">Mapped tinted</Button>
+        <Button shape="pill" size="28" variant="tinted" aria-pressed="true">Mapped tinted on</Button>
+        <Button shape="pill" size="28" variant="plain">Mapped plain</Button>
+        <Button shape="pill" size="28" variant="plain" aria-pressed="true">Mapped plain on</Button>
+        <Button shape="pill" size="28" variant="inverse">Mapped inverse</Button>
+        <Button shape="pill" size="28" variant="danger">Mapped danger</Button>
+        <span data-ref="mapped90" className="size-2" style={{ backgroundColor: "color-mix(in oklab, rgb(30, 30, 40) 90%, transparent)" }} />
+        <span data-ref="mapped85" className="size-2" style={{ backgroundColor: "color-mix(in oklab, rgb(30, 30, 40) 85%, transparent)" }} />
+      </div>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const ref = (name: string) => getComputedStyle(canvasElement.querySelector(`[data-ref=${name}]`)!)
+    const style = (name: string) => getComputedStyle(canvas.getByRole("button", { name }))
+    await expect(style("Tinted").backgroundColor).toBe(ref("hover").backgroundColor)
+    await expect(style("Tinted").color).toBe(ref("ink").color)
+    await expect(style("Plain").backgroundColor).toBe("rgba(0, 0, 0, 0)")
+    await expect(style("Plain").color).toBe(ref("muted").color)
+    await expect(style("Plain on").backgroundColor).toBe(ref("strong").backgroundColor)
+    await expect(style("Plain on").color).toBe(ref("ink").color)
+    await expect(style("Inverse").backgroundColor).toBe(ref("fg").backgroundColor)
+    await expect(style("Inverse").color).toBe(ref("fg").color)
+    await expect(style("Danger").color).toBe(ref("destructive").color)
+    await expect(style("Tinted on").backgroundColor).toBe(ref("strong").backgroundColor)
+    await expect(style("Tinted on").color).toBe(ref("ink").color)
+    // Hover and press, read from the rules the browser would apply. A
+    // touch screen has no hover, and the hover rules say so.
+    const canHover = matchMedia("(hover: hover)").matches
+    const state = (name: string, pseudo: ":hover" | ":active", property = "background-color") =>
+      stateStyle(canvas.getByRole("button", { name }), pseudo, property)
+    const hover = async (name: string, expected: string, property = "background-color") => {
+      await expect(state(name, ":hover", property)).toBe(canHover ? expected : null)
+    }
+    await hover("Tinted", ref("strong").backgroundColor)
+    await hover("Tinted", ref("ink").color, "color")
+    await expect(state("Tinted", ":active")).toBe(ref("press").backgroundColor)
+    await hover("Plain", ref("strong").backgroundColor)
+    await hover("Plain", ref("ink").color, "color")
+    await expect(state("Plain", ":active")).toBe(ref("press").backgroundColor)
+    await hover("Inverse", ref("fg90").backgroundColor)
+    await expect(state("Inverse", ":active")).toBe(ref("fg85").backgroundColor)
+    await hover("Danger", ref("dhover").backgroundColor)
+    await expect(state("Danger", ":active")).toBe(ref("dpress").backgroundColor)
+
+    await expect(style("Mapped tinted").backgroundColor).toBe("rgb(230, 230, 240)")
+    await expect(style("Mapped tinted").color).toBe("rgb(20, 20, 30)")
+    await expect(style("Mapped plain").color).toBe("rgb(70, 70, 80)")
+    await expect(style("Mapped plain on").backgroundColor).toBe("rgb(225, 225, 235)")
+    await expect(style("Mapped plain on").color).toBe("rgb(10, 10, 20)")
+    await expect(style("Mapped inverse").backgroundColor).toBe("rgb(30, 30, 40)")
+    await expect(style("Mapped inverse").color).toBe("rgb(250, 250, 255)")
+    await expect(style("Mapped danger").color).toBe("rgb(160, 20, 20)")
+    await expect(style("Mapped tinted on").backgroundColor).toBe("rgb(220, 220, 232)")
+    await hover("Mapped tinted", "rgb(220, 220, 232)")
+    await expect(state("Mapped tinted", ":active")).toBe("rgb(210, 210, 224)")
+    await hover("Mapped plain", "rgb(225, 225, 235)")
+    await hover("Mapped plain", "rgb(10, 10, 20)", "color")
+    await expect(state("Mapped plain", ":active")).toBe("rgb(215, 215, 228)")
+    // Inverse hover and press follow a mapped rest fill.
+    await hover("Mapped inverse", ref("mapped90").backgroundColor)
+    await expect(state("Mapped inverse", ":active")).toBe(ref("mapped85").backgroundColor)
+    await hover("Mapped danger", "rgb(250, 230, 230)")
+    await expect(state("Mapped danger", ":active")).toBe("rgb(245, 220, 220)")
+  },
+}
+
+export const PressScale: Story = {
+  parameters: storyDocumentation(
+    "`press=\"scale\"` shrinks the button slightly on press instead of the default 1px drop. The play test reads the press rule each button would get.",
+  ),
+  render: () => (
+    <div className="flex gap-2">
+      <Button shape="pill" size="28" variant="tinted">Drops</Button>
+      <Button shape="pill" size="28" variant="tinted" press="scale">Shrinks</Button>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const drops = canvas.getByRole("button", { name: "Drops" })
+    const shrinks = canvas.getByRole("button", { name: "Shrinks" })
+    await expect(stateStyle(drops, ":active", "--tw-translate-y")).toBe("1px")
+    await expect(stateStyle(drops, ":active", "scale")).toBeNull()
+    await expect(stateStyle(shrinks, ":active", "scale")).toBe("0.97")
+    await expect(stateStyle(shrinks, ":active", "--tw-translate-y")).toBe("0px")
+  },
+}
+
+export const Wrap: Story = {
+  parameters: storyDocumentation(
+    "`wrap` lets a long label break onto more lines: the size's height becomes a minimum. The play test proves a wrapping button in a narrow column grows past 26px and stays at least 26px, while the same label without `wrap` stays one 26px line.",
+  ),
+  render: () => (
+    <div className="flex w-40 flex-col items-start gap-2">
+      <Button shape="pill" size="26" variant="plain" wrap>
+        Allow the agent to read every file in this project
+      </Button>
+      <Button shape="pill" size="26" variant="plain" wrap>
+        Allow
+      </Button>
+      <Button shape="pill" size="22" variant="plain" wrap>
+        Deny
+      </Button>
+      <Button shape="pill" size="24" variant="plain" wrap>
+        Later
+      </Button>
+      <Button shape="pill" size="26" variant="plain" className="max-w-40 overflow-hidden">
+        Allow the agent to read every file in this project
+      </Button>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const [long, short, tiny, small, single] = within(canvasElement).getAllByRole("button")
+    await expect(tiny!.getBoundingClientRect().height).toBe(22)
+    await expect(small!.getBoundingClientRect().height).toBe(24)
+    await expect(long!.getBoundingClientRect().height).toBeGreaterThan(26)
+    await expect(long!.getBoundingClientRect().width).toBeLessThanOrEqual(160)
+    await expect(short!.getBoundingClientRect().height).toBe(26)
+    await expect(single!.getBoundingClientRect().height).toBe(26)
+  },
 }
 
 function FormComposition() {

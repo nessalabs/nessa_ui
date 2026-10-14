@@ -1,8 +1,9 @@
 "use client"
 
 import * as React from "react"
+import { LoaderCircle } from "lucide-react"
 
-import { ControlLabelContext } from "@/lib/control-label"
+import { ContentLabelContext, ControlLabelContext } from "@/lib/control-label"
 import { cn } from "@/lib/utils"
 
 export interface SettingsGroupProps
@@ -13,7 +14,26 @@ export interface SettingsGroupProps
   footnote?: React.ReactNode
   /** The rows, or any content, drawn inside the card. */
   children: React.ReactNode
+  /**
+   * Disables every row in the group at once, as `disabled` on each row
+   * would. Say why with `disabledReason`.
+   * @defaultValue false
+   */
+  disabled?: boolean
+  /**
+   * Why the group is unavailable — "Turn on linking to change these" —
+   * written once above the card while `disabled` is set, and read as the
+   * section's description.
+   */
+  disabledReason?: React.ReactNode
 }
+
+/** Whether the enclosing group is disabled; a row folds it into its own. */
+const SettingsGroupDisabledContext = /* @__PURE__ */ React.createContext(false)
+
+/** The inner radius of the group's card, so a tinted row meets its corners. */
+const rowCornerClassName =
+  "first:rounded-t-[calc(var(--radius)*1.5-1px)] last:rounded-b-[calc(var(--radius)*1.5-1px)]"
 
 /**
  * A titled card of settings rows: a small heading, one card holding the rows
@@ -23,15 +43,21 @@ export interface SettingsGroupProps
 function SettingsGroup({
   title,
   footnote,
+  disabled = false,
+  disabledReason,
   className,
   children,
   ...props
 }: SettingsGroupProps) {
   const titleId = React.useId()
+  const reasonId = React.useId()
+  const showsReason = disabled && disabledReason !== undefined
   return (
     <section
       data-slot="settings-group"
+      data-disabled={disabled || undefined}
       aria-labelledby={title !== undefined ? titleId : undefined}
+      aria-describedby={showsReason ? reasonId : undefined}
       className={cn("flex flex-col gap-2 font-sans", className)}
       {...props}
     >
@@ -44,11 +70,22 @@ function SettingsGroup({
           {title}
         </h2>
       ) : null}
+      {showsReason ? (
+        <p
+          id={reasonId}
+          data-slot="settings-group-reason"
+          className="m-0 px-3.5 nessa-text-2 text-muted-foreground"
+        >
+          {disabledReason}
+        </p>
+      ) : null}
       <div
         data-slot="settings-group-card"
         className="flex flex-col rounded-xl border border-border bg-card text-card-foreground [&>[data-slot=settings-row]+[data-slot=settings-row]]:border-t [&>[data-slot=settings-row]+[data-slot=settings-row]]:border-border"
       >
-        {children}
+        <SettingsGroupDisabledContext.Provider value={disabled}>
+          {children}
+        </SettingsGroupDisabledContext.Provider>
       </div>
       {footnote !== undefined ? (
         <p
@@ -84,13 +121,35 @@ export interface SettingsRowProps
    * a disabled fieldset makes them.
    */
   disabled?: boolean
+  /**
+   * Marks the row as a search result: a soft wash over the row, so a
+   * setting found by search stands out where it lives. Scrolling to it is
+   * the host's.
+   * @defaultValue false
+   */
+  found?: boolean
+  /**
+   * Marks a change as being applied: a small spinner beside the control and
+   * `aria-busy` on the row. The spinner is decorative, so to assistive
+   * technology the state is `aria-busy` alone, which most screen readers do
+   * not announce — say it in `detail` ("Applying…") when it matters. The
+   * control stays as the host left it; disable it too if a second change
+   * must wait.
+   * @defaultValue false
+   */
+  pending?: boolean
 }
 
 /**
  * One line in a `SettingsGroup`: a label with an optional detail line, an
  * optional leading mark, and a control at the end. Anything passed as
- * children sits under the label, so a row can carry a fingerprint or an
- * inline message without leaving the card.
+ * children sits under the label, so a row can carry a fingerprint, an
+ * inline message or a `Choices` control without leaving the card. A
+ * `Choices` there is named by the row's label; anything else keeps its own
+ * name.
+ *
+ * `data-found`, `data-pending` and `aria-busy` are written after the props
+ * passed through, so they always reflect `found` and `pending`.
  */
 function SettingsRow({
   label,
@@ -98,17 +157,34 @@ function SettingsRow({
   leading,
   control,
   children,
-  disabled = false,
+  disabled: ownDisabled = false,
+  found = false,
+  pending = false,
   className,
   ...props
 }: SettingsRowProps) {
   const labelId = React.useId()
+  const disabled = React.useContext(SettingsGroupDisabledContext) || ownDisabled
   return (
     <div
       data-slot="settings-row"
       data-disabled={disabled || undefined}
-      className={cn("flex flex-col gap-2 px-3.5 py-2.5", className)}
+      className={cn(
+        "flex flex-col gap-2 px-3.5 py-2.5",
+        // The wash fades in, so a row a search lands on arrives rather than blinks.
+        found &&
+          cn(
+            rowCornerClassName,
+            "bg-foreground/(--nessa-state-hover-strong) transition-[background-color] [transition-duration:var(--nessa-motion-duration-slow)] [transition-timing-function:var(--nessa-motion-easing-standard)]",
+            // Forced colours drop the wash; an inset outline marks the match.
+            "forced-colors:outline-1 forced-colors:outline-solid forced-colors:-outline-offset-1",
+          ),
+        className,
+      )}
       {...props}
+      data-found={found || undefined}
+      data-pending={pending || undefined}
+      aria-busy={pending || undefined}
     >
       <div className="flex min-h-7 items-center gap-3.5">
         {leading !== undefined ? (
@@ -126,6 +202,13 @@ function SettingsRow({
             </span>
           ) : null}
         </div>
+        {pending ? (
+          <LoaderCircle
+            aria-hidden="true"
+            data-slot="settings-row-pending"
+            className="size-3.5 shrink-0 animate-spin text-muted-foreground motion-reduce:animate-none"
+          />
+        ) : null}
         {control !== undefined ? (
           <fieldset
             data-slot="settings-row-control"
@@ -148,10 +231,12 @@ function SettingsRow({
             data-slot="settings-row-content"
             className="m-0 min-w-0 border-0 p-0 opacity-50"
           >
-            {children}
+            <ContentLabelContext.Provider value={labelId}>{children}</ContentLabelContext.Provider>
           </fieldset>
         ) : (
-          <div data-slot="settings-row-content">{children}</div>
+          <div data-slot="settings-row-content">
+            <ContentLabelContext.Provider value={labelId}>{children}</ContentLabelContext.Provider>
+          </div>
         )
       ) : null}
     </div>
