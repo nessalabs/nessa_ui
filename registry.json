@@ -798,12 +798,30 @@
       ]
     },
     {
+      "name": "loading-text",
+      "type": "registry:ui",
+      "title": "Loading Text",
+      "description": "Text with a highlight sweeping across it, the default loader for any frame with nothing to show yet. Plain muted text under reduced motion, announced politely after it mounts and when the label changes.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/loading-text.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/loading-text.tsx"
+        }
+      ]
+    },
+    {
       "name": "generating-surface",
       "type": "registry:ui",
       "title": "Generating Surface",
       "description": "An ambient placeholder for content that takes a while to generate \u2014 drifting smoke and a shimmering status label reserve the space, then morph into the finished content when generation completes.",
       "registryDependencies": [
         "nessalabs/nessa_ui/compose",
+        "nessalabs/nessa_ui/loading-text",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/size-observer",
         "nessalabs/nessa_ui/utils"

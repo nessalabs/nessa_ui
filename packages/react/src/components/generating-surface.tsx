@@ -6,6 +6,8 @@ import { useComposedRefs } from "@/lib/compose"
 import { observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 
+import { LoadingText } from "./loading-text"
+
 const reducedMotionQuery = "(prefers-reduced-motion: reduce)"
 
 function subscribeToReducedMotion(callback: () => void) {
@@ -38,13 +40,9 @@ function cssDurationInMilliseconds(value: string, fallback: number) {
 }
 
 /**
- * The shimmer sweep and the smoke plumes are painted with theme tokens —
- * muted-foreground body, foreground crest — so they read in both schemes
- * without `dark:` variants.
+ * The smoke plumes are painted with theme tokens, so they read in both
+ * schemes without `dark:` variants.
  */
-const generatingLabelShimmerClasses =
-  "data-[shimmer=true]:[background-image:linear-gradient(90deg,var(--muted-foreground)_0%,var(--muted-foreground)_38%,var(--foreground)_50%,var(--muted-foreground)_62%,var(--muted-foreground)_100%)] data-[shimmer=true]:bg-[length:200%_100%] data-[shimmer=true]:bg-[position:150%_0] data-[shimmer=true]:bg-clip-text data-[shimmer=true]:[-webkit-background-clip:text] data-[shimmer=true]:text-transparent"
-
 const generatingPlumeGradientClass =
   "[background:radial-gradient(closest-side,var(--foreground),transparent)]"
 
@@ -124,44 +122,6 @@ function GeneratingSurfaceSmoke() {
         />
       ))}
     </div>
-  )
-}
-
-/**
- * The status label centered in the placeholder, sweeping the same
- * glyph-clipped highlight as ToolCall's running shimmer. The gradient is
- * clipped to the text so the label stays real, announceable text; under
- * reduced motion it renders as plain muted text.
- */
-function GeneratingSurfaceLabel({ children }: { children: React.ReactNode }) {
-  const reducedMotion = useReducedMotion()
-  const ref = React.useRef<HTMLSpanElement>(null)
-  React.useEffect(() => {
-    const node = ref.current
-    if (!node || reducedMotion) return
-    const duration = cssDurationInMilliseconds(
-      getComputedStyle(node).getPropertyValue("--nessa-motion-duration-ambient"),
-      3200,
-    )
-    if (duration === 0) return
-    // The highlight sits at the center of a double-width background, so
-    // sliding the position from 150% to -50% carries it once across the
-    // text per cycle, left to right.
-    const animation = node.animate(
-      [{ backgroundPosition: "150% 0" }, { backgroundPosition: "-50% 0" }],
-      { duration, easing: "linear", iterations: Infinity },
-    )
-    return () => animation.cancel()
-  }, [reducedMotion])
-  return (
-    <span
-      ref={ref}
-      data-slot="generating-surface-label"
-      data-shimmer={reducedMotion ? undefined : "true"}
-      className={cn("relative nessa-text-4 text-muted-foreground", generatingLabelShimmerClasses)}
-    >
-      {children}
-    </span>
   )
 }
 
@@ -458,9 +418,7 @@ function GeneratingSurface({
           )}
         >
           <GeneratingSurfaceSmoke />
-          <span className="relative">
-            <GeneratingSurfaceLabel>{label}</GeneratingSurfaceLabel>
-          </span>
+          <LoadingText announce={false}>{label}</LoadingText>
         </div>
       )}
       <span role="status" className="sr-only">

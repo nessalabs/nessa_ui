@@ -81,7 +81,7 @@ export const Generating: Story = {
     const plumes = placeholder.firstElementChild!.children
     await expect(plumes.length).toBe(3)
     await expect(getComputedStyle(plumes[0]!).filter).toContain("blur")
-    const label = surface.querySelector('[data-slot="generating-surface-label"]')!
+    const label = surface.querySelector('[data-slot="loading-text"]')!
     await expect(label.textContent).toBe("Generating preview")
     // The visible label is decorative; the announcement comes from the
     // persistent status region, whose text is injected post-mount so live

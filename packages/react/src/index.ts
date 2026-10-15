@@ -352,6 +352,7 @@ export {
   type CodeBlockProviderProps,
 } from "./components/code-block"
 export { MathBlock, type MathBlockProps } from "./components/math-block"
+export { LoadingText, type LoadingTextProps } from "./components/loading-text"
 export {
   GeneratingSurface,
   type GeneratingSurfaceProps,
