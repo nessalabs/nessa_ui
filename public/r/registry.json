@@ -801,7 +801,7 @@
       "name": "loading-text",
       "type": "registry:ui",
       "title": "Loading Text",
-      "description": "Text with a highlight sweeping across it, the default loader for any frame with nothing to show yet. Plain muted text under reduced motion, announced politely once.",
+      "description": "Text with a highlight sweeping across it, the default loader for any frame with nothing to show yet. Plain muted text under reduced motion, announced politely after it mounts and when the label changes.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"

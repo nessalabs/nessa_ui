@@ -12,7 +12,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Text with a highlight sweeping across it, the default loader for any frame that has nothing to show yet. Pass what is loading as the children (`Loading Files`); it defaults to `Loading`. The sweep is clipped to the glyphs, so the label stays real text, and under reduced motion it is plain muted text. It announces itself politely once; set `announce` off when the host already carries the status, as GeneratingSurface does.",
+          "Text with a highlight sweeping across it, the default loader for any frame that has nothing to show yet. Pass what is loading as the children (`Loading Files`); it defaults to `Loading`. The sweep is clipped to the glyphs, so the label stays real text, and under reduced motion it is plain muted text. It announces itself politely once it mounts, and again when the label changes; set `announce` off when the host already carries the status, as GeneratingSurface does.",
       },
     },
   },
@@ -31,17 +31,20 @@ export const Playground: Story = {
     const visible = root.firstElementChild as HTMLElement
     await expect(visible.textContent).toBe("Loading Files")
     await expect(visible).toHaveAttribute("aria-hidden", "true")
+    const status = () =>
+      expect(root.querySelector('[role="status"]')!.textContent).toBe("Loading Files")
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      // Plain muted text: no sweep painted and nothing animating.
+      // The announcement proves the effects have run; then: plain muted
+      // text, no sweep painted and nothing animating.
+      await waitFor(status)
       await expect(visible).not.toHaveAttribute("data-shimmer")
       await expect(visible.getAnimations()).toHaveLength(0)
     } else {
       await expect(getComputedStyle(visible).backgroundClip).toBe("text")
-      await expect(visible.getAnimations()).toHaveLength(1)
+      // The sweep is attached in an effect, after paint.
+      await waitFor(() => expect(visible.getAnimations()).toHaveLength(1))
+      await waitFor(status)
     }
-    await waitFor(() =>
-      expect(root.querySelector('[role="status"]')!.textContent).toBe("Loading Files"),
-    )
   },
 }
 

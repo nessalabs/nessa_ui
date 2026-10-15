@@ -51,9 +51,9 @@ export interface LoadingTextProps
  * Text with a highlight sweeping across it, for anything still loading:
  * the default loader wherever a frame has nothing to show yet. The
  * gradient is clipped to the glyphs, so the label stays real text; under
- * reduced motion it is plain muted text. It is announced politely once,
- * after it mounts, since a live region only reads changes made after it
- * joins the accessibility tree.
+ * reduced motion it is plain muted text. It is announced politely after
+ * it mounts (a live region only reads changes made after it joins the
+ * accessibility tree), and again whenever the label changes.
  */
 function LoadingText({
   children = "Loading",
