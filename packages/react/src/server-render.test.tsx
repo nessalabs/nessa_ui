@@ -23,6 +23,7 @@ import { CheckboxList } from "./components/checkbox-list"
 import { Dialog } from "./components/dialog"
 import { EmptyState } from "./components/empty-state"
 import { Input } from "./components/input"
+import { LoadingText } from "./components/loading-text"
 import { Message } from "./components/message"
 import { ProportionBar } from "./components/proportion-bar"
 import { SearchableListbox } from "./components/searchable-listbox"
@@ -71,6 +72,7 @@ test("primitives render without a browser global", () => {
   assert.ok(server(<Badge>New</Badge>).includes("New"))
   assert.ok(server(<Input aria-label="Name" defaultValue="Ada" />).includes("Ada"))
   assert.ok(server(<Checkbox aria-label="Agree" />).length > 0)
+  assert.ok(server(<LoadingText>Loading Files</LoadingText>).includes("Loading Files"))
   assert.ok(
     server(
       <Card>
