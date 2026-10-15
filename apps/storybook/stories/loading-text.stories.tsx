@@ -4,6 +4,23 @@ import { LoadingText } from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 
+/**
+ * Cancels the infinite sweep so a play test leaves nothing running into
+ * the rest of the suite. The sweep starts in an effect, after paint, so
+ * it waits for it first. No-ops outside the vitest/webdriver runner so
+ * the canvas stays live for people watching it.
+ */
+async function stopSweep(canvasElement: HTMLElement) {
+  const view = canvasElement.ownerDocument.defaultView
+  if (!view?.navigator.webdriver) return
+  if (!view.matchMedia("(prefers-reduced-motion: reduce)").matches)
+    await waitFor(() =>
+      expect(canvasElement.getAnimations({ subtree: true }).length).toBeGreaterThan(0),
+    )
+  canvasElement.getAnimations({ subtree: true }).forEach((animation) => animation.cancel())
+  await expect(canvasElement.getAnimations({ subtree: true })).toHaveLength(0)
+}
+
 const meta = {
   title: "Primitives/LoadingText",
   component: LoadingText,
@@ -12,7 +29,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Text with a highlight sweeping across it, the default loader for any frame that has nothing to show yet. Pass what is loading as the children (`Loading Files`); it defaults to `Loading`. The sweep is clipped to the glyphs, so the label stays real text, and under reduced motion it is plain muted text. It announces itself politely once it mounts, and again when the label changes; set `announce` off when the host already carries the status, as GeneratingSurface does.",
+          "Text with a highlight sweeping across it, the default loader for any frame that has nothing to show yet. Pass what is loading as its text children (`Loading Files`); it defaults to `Loading`. The sweep is clipped to the glyphs, so the label stays real text, and under reduced motion it is plain muted text. It announces itself politely once it mounts, and again when the label changes; set `announce` off when the host already carries the status, as GeneratingSurface does.",
       },
     },
   },
@@ -45,6 +62,7 @@ export const Playground: Story = {
       await waitFor(() => expect(visible.getAnimations()).toHaveLength(1))
       await waitFor(status)
     }
+    await stopSweep(canvasElement)
   },
 }
 
@@ -54,6 +72,7 @@ export const Default: Story = {
   play: async ({ canvasElement }) => {
     const root = canvasElement.querySelector<HTMLElement>('[data-slot="loading-text"]')!
     await expect(root.firstElementChild!.textContent).toBe("Loading")
+    await stopSweep(canvasElement)
   },
 }
 
@@ -66,5 +85,6 @@ export const Unannounced: Story = {
     const root = canvasElement.querySelector<HTMLElement>('[data-slot="loading-text"]')!
     await expect(root.querySelector('[role="status"]')).toBeNull()
     await expect(root.querySelector("[aria-hidden]")).toBeNull()
+    await stopSweep(canvasElement)
   },
 }

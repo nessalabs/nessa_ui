@@ -37,8 +37,12 @@ const shimmerClasses =
 
 export interface LoadingTextProps
   extends Omit<React.ComponentProps<"span">, "children"> {
-  /** What is loading, shown and announced. Defaults to "Loading". */
-  children?: React.ReactNode
+  /**
+   * What is loading, shown and announced. Plain text only: the status
+   * region repeats it, and a copy of an element tree there would mount
+   * its effects, ids and focus stops twice. Defaults to "Loading".
+   */
+  children?: string
   /**
    * Whether the text is announced to assistive technology. Turn it off
    * when the host already carries the status, as GeneratingSurface does.
@@ -63,8 +67,11 @@ function LoadingText({
 }: LoadingTextProps) {
   const reducedMotion = useReducedMotion()
   const ref = React.useRef<HTMLSpanElement>(null)
+  // Starts empty and fills after mount, and empties again whenever
+  // announcing is off, so a region that appears always receives its text
+  // as a change it can read out.
   const [announced, setAnnounced] = React.useState(false)
-  React.useEffect(() => setAnnounced(true), [])
+  React.useEffect(() => setAnnounced(announce), [announce])
   React.useEffect(() => {
     const node = ref.current
     if (!node || reducedMotion) return
