@@ -64,14 +64,16 @@ export interface AgentActivityProps extends React.ComponentProps<"div"> {
 
 /**
  * A collapsed run of tool work in an agent transcript: one quiet cue. The
- * transcript stays a conversation; clicking the cue opens the extra-details
- * sheet with that beat's thinking and tool calls. The sheet is the host's
- * — AgentActivity owns the cue, not the overlay.
+ * transcript stays a conversation; clicking the cue opens that beat's
+ * thinking and tool calls, by default in the host's extra-details sheet —
+ * AgentActivity owns the cue, not the overlay. A host with no sheet sets
+ * `opens="inline"` on the trigger and shows the details right below it.
  *
  * Compose AgentActivityTrigger for a disclosing cue. A thought or live
  * line with nothing behind it should be AgentActivityCue instead. Render
- * AgentActivityContent in the extra-details sheet — it is always visible
- * and is not a collapsible region under the trigger.
+ * AgentActivityContent in the sheet body, or, for an inline trigger, below
+ * the trigger while it is expanded; the content itself is always visible,
+ * and the host decides when to render it.
  */
 function AgentActivity({
   status = "complete",

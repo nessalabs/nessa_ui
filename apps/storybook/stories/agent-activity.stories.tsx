@@ -66,7 +66,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Collapsed agent work in a transcript: a quiet cue such as “Explored 3 files, 2 searches” that opens the extra-details sheet with that beat’s thinking and tool calls, a named-task card for a delegated run, and a standalone thought or live “Exploring…” line. Exploring cues and named cards carry a RandomAvatar — busy (flooding paint) while that agent is working, still once it is not. The transcript stays a conversation; the tools never expand inline.",
+          "Collapsed agent work in a transcript: a quiet cue such as “Explored 3 files, 2 searches” that opens the extra-details sheet with that beat’s thinking and tool calls, a named-task card for a delegated run, and a standalone thought or live “Exploring…” line. Exploring cues and named cards carry a RandomAvatar — busy (flooding paint) while that agent is working, still once it is not. The transcript stays a conversation: by default the tools open in the host’s sheet, and a host with no sheet sets `opens=\"inline\"` on the trigger to show them right below it.",
       },
     },
   },
