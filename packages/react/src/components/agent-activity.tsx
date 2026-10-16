@@ -316,7 +316,6 @@ function AgentActivityTrigger({
       type="button"
       data-slot="agent-activity-trigger"
       data-opens={opens}
-      aria-haspopup={opens === "sheet" ? "dialog" : undefined}
       className={cn(
         cueClassName,
         "min-h-6 cursor-pointer hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
@@ -327,6 +326,9 @@ function AgentActivityTrigger({
         className,
       )}
       {...props}
+      // `opens` decides the popup semantics, so a forwarded value cannot
+      // make an inline disclosure announce a dialog.
+      aria-haspopup={opens === "sheet" ? "dialog" : undefined}
     >
       {icon != null ? (
         <span aria-hidden="true" className={cueIconClassName}>
