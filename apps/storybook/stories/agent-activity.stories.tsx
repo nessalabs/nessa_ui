@@ -1,6 +1,6 @@
-import * as React from "react"
-import type { Meta, StoryObj } from "@storybook/react-vite"
-import { expect, userEvent, waitFor, within } from "storybook/test"
+import * as React from "react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 import {
   AgentActivity,
   AgentActivityCard,
@@ -21,16 +21,16 @@ import {
   ToolCallContent,
   ToolCallTabs,
   ToolCallTrigger,
-} from "@nessalabs/ui"
-import { FileSearch } from "lucide-react"
+} from "@nessalabs/ui";
+import { FileSearch } from "lucide-react";
 
-import { SearchIcon } from "./icons/nucleo"
-import { storyDocumentation } from "./story-documentation"
+import { SearchIcon } from "./icons/nucleo";
+import { storyDocumentation } from "./story-documentation";
 
-const explored = formatAgentActivitySummary({ files: 3, searches: 2 })
-const thought = formatAgentThoughtSummary(1)
+const explored = formatAgentActivitySummary({ files: 3, searches: 2 });
+const thought = formatAgentThoughtSummary(1);
 const thoughtDetail =
-  "The playground already has ToolCall rows. Collapse them behind a cue so the transcript stays a conversation."
+  "The playground already has ToolCall rows. Collapse them behind a cue so the transcript stays a conversation.";
 
 function ToolRows() {
   return (
@@ -55,7 +55,7 @@ function ToolRows() {
         </ToolCallContent>
       </ToolCall>
     </AgentActivityContent>
-  )
+  );
 }
 
 const meta = {
@@ -66,14 +66,14 @@ const meta = {
     docs: {
       description: {
         component:
-          "Collapsed agent work in a transcript: a quiet cue such as “Explored 3 files, 2 searches” that opens the extra-details sheet with that beat’s thinking and tool calls, a named-task card for a delegated run, and a standalone thought or live “Exploring…” line. Exploring cues and named cards carry a RandomAvatar — busy (flooding paint) while that agent is working, still once it is not. The transcript stays a conversation; the tools never expand inline.",
+          "Collapsed agent work in a transcript: a quiet cue such as “Explored 3 files, 2 searches” that opens the extra-details sheet with that beat’s thinking and tool calls, a named-task card for a delegated run, and a standalone thought or live “Exploring…” line. Exploring cues and named cards carry a RandomAvatar — busy (flooding paint) while that agent is working, still once it is not. The transcript stays a conversation: by default the tools open in the host’s sheet, and a host with no sheet sets `opens=\"inline\"` on the trigger to show them right below it.",
       },
     },
   },
-} satisfies Meta<typeof AgentActivity>
+} satisfies Meta<typeof AgentActivity>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const Playground: Story = {
   parameters: storyDocumentation(
@@ -83,9 +83,9 @@ export const Playground: Story = {
     function Example() {
       const [open, setOpen] = React.useState<"thought" | "explored" | null>(
         null,
-      )
-      const sheetId = React.useId()
-      const title = open === "thought" ? thought : explored
+      );
+      const sheetId = React.useId();
+      const title = open === "thought" ? thought : explored;
       return (
         <div className="relative h-96 w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-[2rem] bg-background p-4">
           <div className="flex flex-col gap-3">
@@ -139,50 +139,48 @@ export const Playground: Story = {
             </Sheet>
           ) : null}
         </div>
-      )
+      );
     }
-    return <Example />
+    return <Example />;
   },
   play: async ({ canvasElement }) => {
-    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
-    const canvas = within(canvasElement)
-    await expect(canvas.getByText(thought)).toBeVisible()
-    const trigger = canvas.getByRole("button", { name: explored })
-    await expect(trigger).toHaveAttribute("aria-haspopup", "dialog")
-    await expect(trigger).toHaveAttribute("aria-expanded", "false")
-    await expect(trigger.querySelector("[data-slot=random-avatar]")).not.toHaveAttribute(
-      "aria-busy",
-    )
-    await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
-    await userEvent.click(trigger)
-    const dialog = canvas.getByRole("dialog", { name: explored })
-    await waitFor(() => expect(dialog).toBeVisible())
-    await expect(dialog).not.toHaveAttribute("aria-modal")
-    await expect(trigger).toHaveAttribute("aria-expanded", "true")
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return;
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText(thought)).toBeVisible();
+    const trigger = canvas.getByRole("button", { name: explored });
+    await expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
+    await expect(trigger).toHaveAttribute("aria-expanded", "false");
+    await expect(
+      trigger.querySelector("[data-slot=random-avatar]"),
+    ).not.toHaveAttribute("aria-busy");
+    await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull();
+    await userEvent.click(trigger);
+    const dialog = canvas.getByRole("dialog", { name: explored });
+    await waitFor(() => expect(dialog).toBeVisible());
+    await expect(dialog).not.toHaveAttribute("aria-modal");
+    await expect(trigger).toHaveAttribute("aria-expanded", "true");
     await waitFor(() =>
       expect(canvas.getByRole("button", { name: /read/i })).toBeVisible(),
-    )
-    await userEvent.click(canvas.getByRole("button", { name: "Done" }))
+    );
+    await userEvent.click(canvas.getByRole("button", { name: "Done" }));
     await waitFor(() =>
       expect(
         canvas.queryByRole("dialog", { name: explored }),
       ).not.toBeInTheDocument(),
-    )
-    await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
-    await userEvent.click(canvas.getByRole("button", { name: thought }))
-    await expect(canvas.getByRole("dialog", { name: thought })).toBeVisible()
-    await waitFor(() =>
-      expect(canvas.getByText(thoughtDetail)).toBeVisible(),
-    )
-    await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull()
-    await userEvent.click(canvas.getByRole("button", { name: "Done" }))
+    );
+    await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull();
+    await userEvent.click(canvas.getByRole("button", { name: thought }));
+    await expect(canvas.getByRole("dialog", { name: thought })).toBeVisible();
+    await waitFor(() => expect(canvas.getByText(thoughtDetail)).toBeVisible());
+    await expect(canvas.queryByRole("button", { name: /read/i })).toBeNull();
+    await userEvent.click(canvas.getByRole("button", { name: "Done" }));
     await waitFor(() =>
       expect(
         canvas.queryByRole("dialog", { name: thought }),
       ).not.toBeInTheDocument(),
-    )
+    );
   },
-}
+};
 
 export const LiveAndCard: Story = {
   parameters: storyDocumentation(
@@ -190,11 +188,11 @@ export const LiveAndCard: Story = {
   ),
   render: () => {
     function Example() {
-      const [open, setOpen] = React.useState(false)
+      const [open, setOpen] = React.useState(false);
       const [status, setStatus] = React.useState<"running" | "complete">(
         "running",
-      )
-      const sheetId = React.useId()
+      );
+      const sheetId = React.useId();
       return (
         <div className="relative h-80 w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-[2rem] bg-background p-4">
           <div className="flex flex-col gap-3">
@@ -249,8 +247,8 @@ export const LiveAndCard: Story = {
               label="Exploring…"
               modal={false}
               onClose={() => {
-                setOpen(false)
-                setStatus("complete")
+                setOpen(false);
+                setStatus("complete");
               }}
             >
               <SheetHandle />
@@ -271,83 +269,139 @@ export const LiveAndCard: Story = {
             </Sheet>
           ) : null}
         </div>
-      )
+      );
     }
-    return <Example />
+    return <Example />;
   },
   play: async ({ canvasElement }) => {
-    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
-    const canvas = within(canvasElement)
-    const group = canvasElement.querySelector('[data-slot="agent-activity"]')
-    await expect(group).toHaveAttribute("data-status", "running")
-    await expect(group).toHaveAttribute("aria-busy", "true")
-    const exploring = canvas.getByRole("button", { name: /exploring/i })
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return;
+    const canvas = within(canvasElement);
+    const group = canvasElement.querySelector('[data-slot="agent-activity"]');
+    await expect(group).toHaveAttribute("data-status", "running");
+    await expect(group).toHaveAttribute("aria-busy", "true");
+    const exploring = canvas.getByRole("button", { name: /exploring/i });
     await expect(
       exploring.querySelector("[data-slot=random-avatar]"),
-    ).toHaveAttribute("aria-busy", "true")
+    ).toHaveAttribute("aria-busy", "true");
     const named = canvas.getByRole("button", {
       name: /explore chat ui components/i,
-    })
-    await expect(named).toBeVisible()
-    await expect(named.querySelector("[data-slot=random-avatar]")).toHaveAttribute(
-      "aria-busy",
-      "true",
-    )
+    });
+    await expect(named).toBeVisible();
+    await expect(
+      named.querySelector("[data-slot=random-avatar]"),
+    ).toHaveAttribute("aria-busy", "true");
     // The cue and the card hold that rule in separate class strings, so each
     // is measured in both slots: a bare glyph drawn at 14px, a sized one left
     // alone. The avatar's own fill is RandomAvatar's invariant, measured
     // there.
-    const sized = canvasElement.querySelectorAll("[data-testid=sized-glyph]")
-    await expect(sized).toHaveLength(2)
+    const sized = canvasElement.querySelectorAll("[data-testid=sized-glyph]");
+    await expect(sized).toHaveLength(2);
     for (const glyph of sized) {
-      const box = glyph.getBoundingClientRect()
-      await expect(box.width).toBeCloseTo(20, 1)
-      await expect(box.height).toBeCloseTo(20, 1)
+      const box = glyph.getBoundingClientRect();
+      await expect(box.width).toBeCloseTo(20, 1);
+      await expect(box.height).toBeCloseTo(20, 1);
     }
     // A glyph larger than the card's 28px slot keeps its own size and is
     // clipped by the circle, as the slot's JSDoc promises. It is a flex item
     // in a fixed-width box, so without an explicit `shrink-0` on the child
     // the 40px glyph would be squeezed to 28px wide and stay 40px tall.
-    const huge = canvasElement.querySelector("[data-testid=huge-glyph]")
-    await expect(huge).not.toBeNull()
-    const hugeBox = huge!.getBoundingClientRect()
-    await expect(hugeBox.width).toBeCloseTo(40, 1)
-    await expect(hugeBox.height).toBeCloseTo(40, 1)
-    const bare = canvasElement.querySelectorAll("[data-testid=bare-glyph]")
-    await expect(bare).toHaveLength(2)
+    const huge = canvasElement.querySelector("[data-testid=huge-glyph]");
+    await expect(huge).not.toBeNull();
+    const hugeBox = huge!.getBoundingClientRect();
+    await expect(hugeBox.width).toBeCloseTo(40, 1);
+    await expect(hugeBox.height).toBeCloseTo(40, 1);
+    const bare = canvasElement.querySelectorAll("[data-testid=bare-glyph]");
+    await expect(bare).toHaveLength(2);
     for (const glyph of bare) {
-      const box = glyph.getBoundingClientRect()
-      await expect(box.width).toBeCloseTo(14, 1)
-      await expect(box.height).toBeCloseTo(14, 1)
+      const box = glyph.getBoundingClientRect();
+      await expect(box.width).toBeCloseTo(14, 1);
+      await expect(box.height).toBeCloseTo(14, 1);
     }
     await expect(
       canvas.queryByRole("button", { name: /searching composer/i }),
-    ).toBeNull()
-    await userEvent.click(canvas.getByRole("button", { name: /exploring/i }))
+    ).toBeNull();
+    await userEvent.click(canvas.getByRole("button", { name: /exploring/i }));
     await expect(
       canvas.getByRole("dialog", { name: "Exploring…" }),
-    ).toBeVisible()
+    ).toBeVisible();
     await waitFor(() =>
       expect(
         canvas.getByRole("button", { name: /searching composer/i }),
       ).toBeVisible(),
-    )
-    await userEvent.click(canvas.getByRole("button", { name: "Done" }))
+    );
+    await userEvent.click(canvas.getByRole("button", { name: "Done" }));
     await waitFor(() =>
       expect(
         canvas.queryByRole("dialog", { name: "Exploring…" }),
       ).not.toBeInTheDocument(),
-    )
-    await expect(group).toHaveAttribute("data-status", "complete")
-    await expect(group).not.toHaveAttribute("aria-busy")
+    );
+    await expect(group).toHaveAttribute("data-status", "complete");
+    await expect(group).not.toHaveAttribute("aria-busy");
     await expect(
       canvas
         .getByRole("button", { name: explored })
         .querySelector("[data-slot=random-avatar]"),
-    ).not.toHaveAttribute("aria-busy")
-    await expect(named.querySelector("[data-slot=random-avatar]")).toHaveAttribute(
-      "aria-busy",
-      "true",
-    )
+    ).not.toHaveAttribute("aria-busy");
+    await expect(
+      named.querySelector("[data-slot=random-avatar]"),
+    ).toHaveAttribute("aria-busy", "true");
   },
+};
+
+function InlineDisclosure() {
+  const [open, setOpen] = React.useState(false);
+  const contentId = React.useId();
+  return (
+    <AgentActivity status="complete">
+      <AgentActivityTrigger
+        opens="inline"
+        aria-expanded={open}
+        aria-controls={open ? contentId : undefined}
+        onClick={() => setOpen((shown) => !shown)}
+      >
+        Ran 3 tools · 2 read
+      </AgentActivityTrigger>
+      {open ? (
+        <AgentActivityContent id={contentId}>
+          <ToolCall>
+            <ToolCallTrigger icon={<FileSearch />}>
+              Read desktop-app.tsx
+            </ToolCallTrigger>
+          </ToolCall>
+          <ToolCall>
+            <ToolCallTrigger icon={<FileSearch />}>
+              Read split-view-math.ts
+            </ToolCallTrigger>
+          </ToolCall>
+          <ToolCall>
+            <ToolCallTrigger icon={<SearchIcon />}>
+              Searched for SplitView
+            </ToolCallTrigger>
+          </ToolCall>
+        </AgentActivityContent>
+      ) : null}
+    </AgentActivity>
+  );
 }
+
+export const Inline: Story = {
+  parameters: storyDocumentation(
+    'A host with no sheet discloses the run in place: `opens="inline"` makes the cue a disclosure, so it announces no dialog, and its chevron turns down while the steps below are shown.',
+  ),
+  render: () => <InlineDisclosure />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const cue = canvas.getByRole("button", { name: /ran 3 tools/i });
+    await expect(cue).not.toHaveAttribute("aria-haspopup");
+    await expect(cue).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(cue);
+    await expect(cue).toHaveAttribute("aria-expanded", "true");
+    await expect(canvas.getByText("Read split-view-math.ts")).toBeVisible();
+    // The chevron settles turned down, not merely on its way there.
+    const chevron = cue.querySelector("svg:last-child")!;
+    await waitFor(() => expect(getComputedStyle(chevron).rotate).toBe("90deg"));
+    await userEvent.click(cue);
+    await expect(canvas.queryByText("Read split-view-math.ts")).toBeNull();
+    await waitFor(() => expect(getComputedStyle(chevron).rotate).toBe("none"));
+  },
+};

@@ -1898,7 +1898,7 @@
       "name": "agent-activity",
       "type": "registry:ui",
       "title": "Agent Activity",
-      "description": "Collapsed agent work in a transcript: a quiet cue that opens the extra-details sheet with that beat\u2019s thinking and tool calls, a named-task card for a delegated run, and a standalone thought or live Exploring line. Hosts pass a RandomAvatar on exploring cues and named cards \u2014 busy while that agent is working, still once it is not. The cue does not expand inline \u2014 hosts own the Sheet (open/defaultOpen/onOpenChange are gone). Put AgentActivityContent in the sheet body, not under the trigger.",
+      "description": "Collapsed agent work in a transcript: a quiet cue that opens the extra-details sheet with that beat\u2019s thinking and tool calls, a named-task card for a delegated run, and a standalone thought or live Exploring line. Hosts pass a RandomAvatar on exploring cues and named cards \u2014 busy while that agent is working, still once it is not. By default the cue opens the host\u2019s Sheet (open/defaultOpen/onOpenChange are gone): put AgentActivityContent in the sheet body. A host with no sheet sets opens=\"inline\" on the trigger and renders AgentActivityContent below it while it is expanded.",
       "dependencies": [
         "lucide-react"
       ],
