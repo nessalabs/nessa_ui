@@ -126,7 +126,10 @@ function Favicon({ href, fallback = null, className, ...props }: FaviconProps) {
           onLoad={(event) => settle(event.currentTarget, "loaded")}
           onError={(event) => settle(event.currentTarget, "failed")}
           className={cn(
-            "size-full object-contain transition-opacity duration-150 ease-out motion-reduce:transition-none",
+            // Icons are drawn for a light tab; a hairline of the text colour keeps a
+            // dark one (a black logo on nothing) visible on a dark surface, and a
+            // light one on a light surface.
+            "size-full object-contain transition-opacity duration-150 ease-out motion-reduce:transition-none [filter:drop-shadow(0_0_0.75px_color-mix(in_oklab,var(--foreground)_60%,transparent))]",
             status === "loaded" ? "opacity-100" : "absolute inset-0 size-[1em] opacity-0",
           )}
         />
