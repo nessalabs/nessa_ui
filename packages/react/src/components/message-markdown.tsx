@@ -7,6 +7,7 @@ import remarkMath from "remark-math"
 
 import { cn } from "@/lib/utils"
 import { CodeBlock, CopyButton } from "./code-block"
+import { Favicon } from "./favicon"
 // Optional renderers load only when their corresponding node is present.
 const MathBlock = React.lazy(() =>
   import("./math-block").then((module) => ({ default: module.MathBlock })),
@@ -252,7 +253,29 @@ function MarkdownTable({ node, children, ...rest }: TableProps) {
   )
 }
 
+type LinkProps = React.ComponentProps<"a"> & { node?: unknown }
+
+/**
+ * A link, led by its site's icon where it goes to a public web page, so a
+ * reply's sources read at a glance. A link with no icon to show stays plain
+ * text. While the reply streams no icon is asked for: an address still
+ * arriving (`https://github.c`) is already a link, and would ask a host the
+ * reply never named.
+ */
+function MarkdownLink({ node: _node, href, children, ...rest }: LinkProps) {
+  const streaming = React.useContext(MarkdownStreamingContext)
+  return (
+    <a href={href} {...rest}>
+      {href && !streaming ? (
+        <Favicon href={href} className="mr-[0.3em] align-[-0.125em]" />
+      ) : null}
+      {children}
+    </a>
+  )
+}
+
 const defaultComponents: Components = {
+  a: MarkdownLink,
   pre: MarkdownPre,
   code: MarkdownCode,
   table: MarkdownTable,
@@ -261,8 +284,9 @@ const defaultComponents: Components = {
 /**
  * Renders assistant markdown inside a message: GitHub-flavored markdown plus
  * TeX math (`$…$` inline, `$$…$$` display) rendered through MathBlock,
- * fenced code highlighted through CodeBlock, and ```mermaid fences drawn
- * through MermaidDiagram — all styled with Nessa tokens and following the
+ * fenced code highlighted through CodeBlock, ```mermaid fences drawn
+ * through MermaidDiagram, and each link to a web page led by its site's
+ * Favicon — all styled with Nessa tokens and following the
  * nearest CodeBlockProvider, so the host's code theme and color mode apply
  * app-wide. Code, tables, and display math each carry a copy control that
  * copies their original markdown source. Compose it inside a plain
