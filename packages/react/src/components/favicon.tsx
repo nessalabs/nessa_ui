@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils"
  */
 const iconStatus = new Map<string, { status: "loaded" | "failed"; at: number }>()
 const retryFailedMs = 5 * 60_000
+const maxRemembered = 500
 
 function cachedStatus(source: string): "loading" | "loaded" | "failed" {
   const known = iconStatus.get(source)
@@ -85,16 +86,26 @@ function Favicon({ href, fallback = null, className, ...props }: FaviconProps) {
       if (!source) return
       // A site answering with a 1×1 pixel or an empty image has no icon to show.
       const outcome = next === "loaded" && image.naturalWidth <= 1 ? "failed" : next
+      iconStatus.delete(source)
       iconStatus.set(source, { status: outcome, at: Date.now() })
+      // Kept to the sites seen lately: the oldest outcome goes first.
+      if (iconStatus.size > maxRemembered) {
+        const oldest = iconStatus.keys().next().value
+        if (oldest !== undefined) iconStatus.delete(oldest)
+      }
       setSettled({ source, status: outcome })
     },
     [source],
   )
-  // An image that finished before its handlers were attached (a server-rendered
-  // page hydrating, a cached icon) has no load event left to send.
+  // An image that finished, or failed, before its handlers were attached (a
+  // server-rendered page hydrating, a cached icon) has no event left to send.
   const image = React.useCallback(
     (node: HTMLImageElement | null) => {
-      if (node?.complete && node.naturalWidth > 0) settle(node, "loaded")
+      if (!node?.complete) return
+      // A lazy image not yet asked for can read as complete; only an eager
+      // one that is complete with no pixels has failed.
+      if (node.naturalWidth > 0) settle(node, "loaded")
+      else if (node.loading === "eager") settle(node, "failed")
     },
     [settle],
   )
