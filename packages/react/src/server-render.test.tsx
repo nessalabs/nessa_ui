@@ -75,7 +75,10 @@ test("primitives render without a browser global", () => {
   assert.ok(server(<Checkbox aria-label="Agree" />).length > 0)
   assert.ok(server(<LoadingText>Loading Files</LoadingText>).includes("Loading Files"))
   assert.ok(server(<Favicon href="https://example.com/a" />).includes("https://example.com/favicon.ico"))
-  assert.equal(server(<Favicon href="mailto:ada@example.com" fallback="@" />), "@")
+  assert.ok(server(<Favicon href="mailto:ada@example.com" fallback="@" />).includes("@"))
+  assert.ok(!server(<Favicon href="setup.html" fallback="@" />).includes("<img"))
+  assert.ok(!server(<Favicon href="http://printer.local/" fallback="@" />).includes("<img"))
+  assert.ok(server(<Favicon href="http://example.com." />).includes("https://example.com/favicon.ico"))
   assert.ok(
     server(
       <Card>

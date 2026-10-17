@@ -256,17 +256,18 @@ function MarkdownTable({ node, children, ...rest }: TableProps) {
 type LinkProps = React.ComponentProps<"a"> & { node?: unknown }
 
 /**
- * A link, led by its site's icon where it goes to a web page, so a reply's
- * sources read at a glance. A link with no icon to show stays plain text.
+ * A link, led by its site's icon where it goes to a public web page, so a
+ * reply's sources read at a glance. A link with no icon to show stays plain
+ * text. While the reply streams no icon is asked for: an address still
+ * arriving (`https://github.c`) is already a link, and would ask a host the
+ * reply never named.
  */
 function MarkdownLink({ node: _node, href, children, ...rest }: LinkProps) {
+  const streaming = React.useContext(MarkdownStreamingContext)
   return (
     <a href={href} {...rest}>
-      {href ? (
-        <Favicon
-          href={href}
-          className="mr-[0.3em] align-[-0.125em] [&_img]:rounded-[3px]"
-        />
+      {href && !streaming ? (
+        <Favicon href={href} className="mr-[0.3em] align-[-0.125em]" />
       ) : null}
       {children}
     </a>

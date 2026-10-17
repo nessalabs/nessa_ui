@@ -13,7 +13,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A site's own icon beside a link to it. It is asked for lazily from the site's `/favicon.ico`, without a referrer, and shows only once it has loaded; until then, and wherever it cannot load, the `fallback` stands in its place. Links that are not web pages on a named host (`mailto:`, `localhost`, an address on the local network) never ask. It is decorative and `1em` square by default, so it follows the text beside it.",
+          "A site's own icon beside a link to it. It is asked for lazily from the site's `/favicon.ico`, without a referrer, and shows only once it has loaded; until then, and wherever it cannot load, the `fallback` stands in its place. Only an absolute URL on a public, named host asks, always over HTTPS: a relative link, `mailto:`, `localhost`, an IP address or a local-network name (`.local`, `.home.arpa`) never does. It is decorative and `1em` square by default, so it follows the text beside it.",
       },
     },
   },
@@ -28,6 +28,8 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Playground: Story = {
+  // It asks a real site, so it is for looking at, not for the test run.
+  tags: ["!test"],
   parameters: storyDocumentation(
     "A site with an icon: the globe stands in until the site's icon has loaded, then the icon fades in.",
   ),
@@ -51,7 +53,11 @@ export const Unreachable: Story = {
       timeout: 10_000,
     })
     await expect(svg()).not.toBeNull()
-    await expect(canvasElement.querySelector('[data-slot="favicon"]')).toBeNull()
+    // The wrapper stays, so the fallback keeps the size the host gave it.
+    await expect(canvasElement.querySelector('[data-slot="favicon"]')).toHaveAttribute(
+      "data-state",
+      "failed",
+    )
   },
 }
 
@@ -63,5 +69,34 @@ export const NotAWebPage: Story = {
   play: async ({ canvasElement }) => {
     await expect(canvasElement.querySelector("img")).toBeNull()
     await expect(canvasElement.querySelector("svg")).not.toBeNull()
+  },
+}
+
+export const LocalNetwork: Story = {
+  args: { href: "http://printer.local/status" },
+  parameters: storyDocumentation(
+    "A name on the person's own network never asks: the fallback is drawn and no request leaves.",
+  ),
+  play: async ({ canvasElement }) => {
+    await expect(canvasElement.querySelector("img")).toBeNull()
+    await expect(canvasElement.querySelector("svg")).not.toBeNull()
+  },
+}
+
+export const WithoutFallback: Story = {
+  args: { href: "https://favicon-story.invalid/page", fallback: undefined },
+  parameters: storyDocumentation(
+    "With no fallback, nothing takes room until the icon loads, and nothing is left when it cannot: text beside it moves only for an icon.",
+  ),
+  render: (args) => (
+    <span data-testid="line" className="nessa-text-4">
+      <Favicon {...args} />
+      unreachable.invalid
+    </span>
+  ),
+  play: async ({ canvasElement }) => {
+    const slot = () => canvasElement.querySelector<HTMLElement>('[data-slot="favicon"]')
+    if (slot()) await expect(slot()!.getBoundingClientRect().width).toBe(0)
+    await waitFor(() => expect(slot()).toBeNull(), { timeout: 10_000 })
   },
 }
