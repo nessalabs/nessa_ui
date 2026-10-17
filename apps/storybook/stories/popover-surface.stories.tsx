@@ -13,7 +13,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "The floating overlay surface underneath Nessa's popover-style chrome: popover tokens over a hairline border, with elevation (md/xl shadow) and radius (lg/xl/2xl) variants. Purely presentational — positioning, portals, and dismissal stay with the consumer — and asChild projects the surface classes onto another element, such as a positioning library's content node. The EventCalendar's built-in confirmation dialog and quick-create demos sit on this surface.",
+          "The floating overlay surface underneath Nessa's popover-style chrome: popover tokens over a hairline border, with elevation (md, the overlay shadow token; xl) and radius (lg/xl/2xl) variants. Purely presentational — positioning, portals, and dismissal stay with the consumer — and asChild projects the surface classes onto another element, such as a positioning library's content node. The EventCalendar's built-in confirmation dialog and quick-create demos sit on this surface.",
       },
     },
   },

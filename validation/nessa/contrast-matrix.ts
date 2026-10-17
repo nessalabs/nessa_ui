@@ -34,6 +34,15 @@ export const contrastMatrix = Object.freeze([
   { foreground: "--sidebar-foreground", background: "--sidebar", minimum: 4.5, role: "normal-text" },
   { foreground: "--sidebar-accent-foreground", background: "--sidebar-accent", minimum: 4.5, role: "normal-text" },
   { foreground: "--sidebar-ring", background: "--sidebar", minimum: 3, role: "focus-source" },
+  // The panel and sunken surfaces carry the canvas foregrounds, so both have
+  // to hold them, and the focus ring of a control docked in a toolbar or set
+  // inside a well.
+  { foreground: "--foreground", background: "--nessa-surface-panel", minimum: 4.5, role: "normal-text" },
+  { foreground: "--muted-foreground", background: "--nessa-surface-panel", minimum: 4.5, role: "normal-text" },
+  { foreground: "--ring", background: "--nessa-surface-panel", minimum: 3, role: "focus-source" },
+  { foreground: "--foreground", background: "--nessa-surface-sunken", minimum: 4.5, role: "normal-text" },
+  { foreground: "--muted-foreground", background: "--nessa-surface-sunken", minimum: 4.5, role: "normal-text" },
+  { foreground: "--ring", background: "--nessa-surface-sunken", minimum: 3, role: "focus-source" },
   { foreground: "--nessa-diff-addition", background: "--card", minimum: 4.5, role: "normal-text" },
   { foreground: "--nessa-diff-addition", background: "--card", overlay: { token: "--accent", opacity: 0.5 }, minimum: 4.5, role: "normal-text" },
   { foreground: "--nessa-diff-deletion", background: "--card", minimum: 4.5, role: "normal-text" },
