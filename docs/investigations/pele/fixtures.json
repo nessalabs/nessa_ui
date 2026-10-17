@@ -1,0 +1,134 @@
+[
+  {
+    "name": "flowchart",
+    "source": "graph TD\n A[Chunk arrives] --> B{Backlog?}\n B -- yes --> C[Ease velocity]\n C --> A"
+  },
+  {
+    "name": "sequence",
+    "source": "sequenceDiagram\n participant H as Host app\n participant S as Stream\n H->>S: text arrives\n S->>S: pace reveal\n S-->>H: display"
+  },
+  {
+    "name": "class",
+    "source": "classDiagram\n Animal <|-- Duck\n Animal : +int age\n Duck : +quack()"
+  },
+  {
+    "name": "state",
+    "source": "stateDiagram-v2\n [*] --> Idle\n Idle --> Running: start\n Running --> [*]"
+  },
+  {
+    "name": "er",
+    "source": "erDiagram\n CUSTOMER ||--o{ ORDER : places\n CUSTOMER {\n string name\n }"
+  },
+  {
+    "name": "gantt",
+    "source": "gantt\n dateFormat YYYY-MM-DD\n title Plan\n section Build\n Task :a, 2026-10-01, 3d\n Test :after a, 2d"
+  },
+  {
+    "name": "git",
+    "source": "gitGraph\n commit\n branch develop\n checkout develop\n commit\n checkout main\n merge develop"
+  },
+  {
+    "name": "pie",
+    "source": "pie title Pets\n \"Dogs\" : 3\n \"Cats\" : 5"
+  },
+  {
+    "name": "mindmap",
+    "source": "mindmap\n root((Nessa))\n  Chat\n  Agents"
+  },
+  {
+    "name": "timeline",
+    "source": "timeline\n title History\n 2025 : Start\n 2026 : Ship"
+  },
+  {
+    "name": "journey",
+    "source": "journey\n title User path\n section Chat\n Ask: 5: User\n Read: 4: User"
+  },
+  {
+    "name": "quadrant",
+    "source": "quadrantChart\n title Priorities\n x-axis Low --> High\n y-axis Low --> High\n Task: [0.3, 0.6]"
+  },
+  {
+    "name": "xy",
+    "source": "xychart-beta\n x-axis [Jan, Feb, Mar]\n y-axis \"Count\" 0 --> 10\n bar [2, 5, 8]"
+  },
+  {
+    "name": "requirement",
+    "source": "requirementDiagram\n requirement safety {\n id: 1\n text: pass tests\n risk: low\n verifymethod: test\n }\n element code {\n type: source\n }\n code - satisfies -> safety"
+  },
+  {
+    "name": "sankey",
+    "source": "sankey-beta\n A,B,10\n B,C,5\n B,D,5"
+  },
+  {
+    "name": "architecture",
+    "source": "architecture-beta\n group api(cloud)[API]\n service db(database)[Database] in api\n service server(server)[Server] in api\n db:R -- L:server"
+  },
+  {
+    "name": "c4",
+    "source": "C4Context\n title System\n Person(user, \"User\")\n System(app, \"Nessa\")\n Rel(user, app, \"Uses\")"
+  },
+  {
+    "name": "block",
+    "source": "block-beta\n columns 2\n a[\"Start\"] b[\"End\"]\n a --> b"
+  },
+  {
+    "name": "kanban",
+    "source": "kanban\n todo[Todo]\n  task[Render diagrams]\n done[Done]\n  shipped[Chat]"
+  },
+  {
+    "name": "packet",
+    "source": "packet-beta\n 0-7: \"Header\"\n 8-15: \"Data\""
+  },
+  {
+    "name": "radar",
+    "source": "radar-beta\n axis a[\"Speed\"], b[\"Safety\"], c[\"Size\"]\n curve x[\"Current\"]{3,4,5}"
+  },
+  {
+    "name": "treemap",
+    "source": "treemap-beta\n \"Root\"\n  \"One\": 10\n  \"Two\": 20"
+  },
+  {
+    "name": "info",
+    "source": "info"
+  },
+  {
+    "name": "accessibility",
+    "source": "flowchart LR\n accTitle: A useful title\n accDescr: A useful description\n A[Start] --> B[End]"
+  },
+  {
+    "name": "html-label",
+    "source": "flowchart LR\n A[\"H<sub>2</sub>O and x<sup>2</sup>\"] --> B[\"<u>Underlined</u>\"]"
+  },
+  {
+    "name": "theme-directive",
+    "source": "%%{init: {\"theme\": \"base\", \"themeVariables\": {\"primaryColor\": \"#ff0000\", \"primaryTextColor\": \"#ffffff\", \"fontFamily\": \"monospace\"}}}%%\n flowchart LR\n A[Custom red node] --> B[Monospace text]"
+  },
+  {
+    "name": "subgraph",
+    "source": "flowchart LR\n subgraph Inner\n direction TB\n A[One] --> B[Two]\n end\n B --> C[Outside]"
+  },
+  {
+    "name": "safe-link",
+    "source": "flowchart LR\n A[Open docs]\n click A \"https://example.com/docs\" \"Docs\" _blank"
+  },
+  {
+    "name": "unsafe-link",
+    "source": "flowchart LR\n A[Unsafe]\n click A \"javascript:window.__injected=1\""
+  },
+  {
+    "name": "untrusted-label",
+    "source": "flowchart LR\n A[\"<img src=x onerror=window.__injected=1>\"] --> B[\"&lt;script&gt;window.__injected=1&lt;/script&gt;\"]"
+  },
+  {
+    "name": "style-injection",
+    "source": "flowchart LR\n A[Styled]\n style A fill:url(\"https://example.com/track.svg\")"
+  },
+  {
+    "name": "malformed",
+    "source": "flowchart TD\n A[Incomplete] -->"
+  },
+  {
+    "name": "markdown-label",
+    "source": "flowchart LR\n A[\"`**Bold** and *italic*`\"] --> B[\"Unicode \u6f22\u5b57 \u0627\u0644\u0639\u0631\u0628\u064a\u0629 \ud83d\udc69\u200d\ud83d\udcbb\"]"
+  }
+]

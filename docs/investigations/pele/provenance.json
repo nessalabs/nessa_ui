@@ -1,0 +1,44 @@
+{
+  "checkedAt": "2026-10-17",
+  "site": "https://pele.run/",
+  "source": "https://github.com/obsidianmd/pele",
+  "commit": "659c3593ce43794dce7ec7ab45d424ad2de182a5",
+  "repositoryCreatedAt": "2026-10-05T23:32:40Z",
+  "repositoryPushedAt": "2026-10-17T14:19:57Z",
+  "archived": false,
+  "version": "1.6.0",
+  "registry": "https://registry.npmjs.org/pele/1.6.0",
+  "repository": {
+    "url": "git+https://github.com/obsidianmd/pele.git",
+    "type": "git"
+  },
+  "dist": {
+    "shasum": "470378606722e5c0499376bd82e2377630e9d263",
+    "tarball": "https://registry.npmjs.org/pele/-/pele-1.6.0.tgz",
+    "fileCount": 416,
+    "integrity": "sha512-VfAiVItsOGlGhvnBfphdT28VCG7mXMZxQNOwAGsCtxI2ztbUsT39MraEOYjsapLxVETkdUZscm0DdotYDQMLdw==",
+    "signatures": [
+      {
+        "sig": "MEYCIQCCNuYpstcWRcOIOkbrrUObEr2gybYl5mCooCAMwmd8fgIhAKvWHpD0UB8+StpBCsVWtddVjPfOpmt+pzNkl7mfvKlI",
+        "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+      },
+      {
+        "sig": "MEYCIQDAeG4DyE4GiXCWvHveEq8v5Qauon079WC5xdF+zi8+cgIhAI+y0Fox+UopeUHevYo3XKvmcJlGk+iKL/qQ+/1QxUPs",
+        "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+      }
+    ],
+    "attestations": {
+      "url": "https://registry.npmjs.org/-/npm/v1/attestations/pele@1.6.0",
+      "provenance": {
+        "predicateType": "https://slsa.dev/provenance/v1"
+      }
+    },
+    "unpackedSize": 2240912
+  },
+  "dependencies": {},
+  "license": "MIT",
+  "node": {
+    "node": ">=20"
+  },
+  "attestationInspection": "Decoded npm SLSA statement names official repository, tag 1.6.0 and matching commit. Tarball SHA-512 recomputed and matched dist.integrity. Attestation signature was not independently cryptographically verified."
+}
