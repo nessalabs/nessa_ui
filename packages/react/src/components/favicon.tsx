@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 /**
  * What each site's icon came to, for this page's life: a link repeated down
@@ -10,55 +10,73 @@ import { cn } from "@/lib/utils"
  * no icon is asked again only after `retryFailedMs`, so a brief network
  * error does not hide its icon until the page reloads.
  */
-const iconStatus = new Map<string, { status: "loaded" | "failed"; at: number }>()
-const retryFailedMs = 5 * 60_000
-const maxRemembered = 500
+const iconStatus = new Map<
+  string,
+  { status: "loaded" | "failed"; at: number }
+>();
+const retryFailedMs = 5 * 60_000;
+const maxRemembered = 500;
 
 function cachedStatus(source: string): "loading" | "loaded" | "failed" {
-  const known = iconStatus.get(source)
-  if (!known) return "loading"
+  const known = iconStatus.get(source);
+  if (!known) return "loading";
   if (known.status === "failed" && Date.now() - known.at > retryFailedMs) {
-    iconStatus.delete(source)
-    return "loading"
+    iconStatus.delete(source);
+    return "loading";
   }
-  return known.status
+  return known.status;
 }
 
 /** Names that only ever reach the person's own machine or network. */
-const localSuffixes = [".localhost", ".local", ".home.arpa", ".internal", ".lan"]
+const localSuffixes = [
+  ".localhost",
+  ".local",
+  ".home.arpa",
+  ".internal",
+  ".lan",
+];
 
 /**
  * Where a web page's site keeps its icon: `/favicon.ico` at the site's own
- * origin, always over HTTPS. Only an absolute `http:` or `https:` URL on a
+ * origin, always over HTTPS, on the page's port where it names one. Only an absolute `http:` or `https:` URL on a
  * public, named host has one to ask for — not a relative link, a `mailto:`
  * or `file:` link, `localhost`, an IP address, or a name that resolves on
  * the person's own network, which the request would otherwise reach.
  */
 function faviconSource(href: string): string | undefined {
-  let url: URL
+  let url: URL;
   try {
-    url = new URL(href)
+    url = new URL(href);
   } catch {
-    return undefined
+    return undefined;
   }
-  if (url.protocol !== "https:" && url.protocol !== "http:") return undefined
-  const host = url.hostname.replace(/\.$/, "").toLowerCase()
-  if (!host.includes(".") || host.startsWith("[") || /^[\d.]+$/.test(host)) return undefined
-  if (host === "localhost" || localSuffixes.some((suffix) => host.endsWith(suffix)))
-    return undefined
-  return `https://${host}/favicon.ico`
+  if (url.protocol !== "https:" && url.protocol !== "http:") return undefined;
+  const host = url.hostname.replace(/\.$/, "").toLowerCase();
+  if (!host.includes(".") || host.startsWith("[") || /^[\d.]+$/.test(host))
+    return undefined;
+  if (
+    host === "localhost" ||
+    localSuffixes.some((suffix) => host.endsWith(suffix))
+  )
+    return undefined;
+  // A site on its own HTTPS port keeps it; one on a plain-HTTP port has no HTTPS origin to ask.
+  if (url.port && url.protocol === "http:") return undefined;
+  return `https://${host}${url.port ? `:${url.port}` : ""}/favicon.ico`;
 }
 
-export interface FaviconProps extends Omit<React.ComponentProps<"span">, "children"> {
+export interface FaviconProps extends Omit<
+  React.ComponentProps<"span">,
+  "children"
+> {
   /** The web page the icon stands for, as an absolute URL (`https://example.com/a`). */
-  href: string
+  href: string;
   /**
    * Drawn until the site's icon has loaded, and kept when it cannot load —
    * no icon at the site, the site unreachable, or `href` not a public web
    * page. With none, nothing is drawn and no room is kept until the icon
    * has loaded, so text beside it moves only when there is an icon to show.
    */
-  fallback?: React.ReactNode
+  fallback?: React.ReactNode;
 }
 
 /**
@@ -70,47 +88,52 @@ export interface FaviconProps extends Omit<React.ComponentProps<"span">, "childr
  * `className`; it defaults to `1em` square, so it follows the text it sits in.
  */
 function Favicon({ href, fallback = null, className, ...props }: FaviconProps) {
-  const source = faviconSource(href)
+  const source = faviconSource(href);
   const [settled, setSettled] = React.useState<{
-    source: string
-    status: "loaded" | "failed"
-  }>()
-  // Read in render, so a new `href` never shows the last one's outcome.
+    source: string;
+    status: "loaded" | "failed";
+    at: number;
+  }>();
+  // Read in render, so a new `href` never shows the last one's outcome, and a
+  // failure here expires as the shared one does.
   const status = !source
     ? "failed"
-    : settled?.source === source
+    : settled?.source === source &&
+        (settled.status === "loaded" ||
+          Date.now() - settled.at <= retryFailedMs)
       ? settled.status
-      : cachedStatus(source)
+      : cachedStatus(source);
   const settle = React.useCallback(
     (image: HTMLImageElement, next: "loaded" | "failed") => {
-      if (!source) return
+      if (!source) return;
       // A site answering with a 1×1 pixel or an empty image has no icon to show.
-      const outcome = next === "loaded" && image.naturalWidth <= 1 ? "failed" : next
-      iconStatus.delete(source)
-      iconStatus.set(source, { status: outcome, at: Date.now() })
+      const outcome =
+        next === "loaded" && image.naturalWidth <= 1 ? "failed" : next;
+      iconStatus.delete(source);
+      iconStatus.set(source, { status: outcome, at: Date.now() });
       // Kept to the sites seen lately: the oldest outcome goes first.
       if (iconStatus.size > maxRemembered) {
-        const oldest = iconStatus.keys().next().value
-        if (oldest !== undefined) iconStatus.delete(oldest)
+        const oldest = iconStatus.keys().next().value;
+        if (oldest !== undefined) iconStatus.delete(oldest);
       }
-      setSettled({ source, status: outcome })
+      setSettled({ source, status: outcome, at: Date.now() });
     },
     [source],
-  )
+  );
   // An image that finished, or failed, before its handlers were attached (a
   // server-rendered page hydrating, a cached icon) has no event left to send.
   const image = React.useCallback(
     (node: HTMLImageElement | null) => {
-      if (!node?.complete) return
+      if (!node?.complete) return;
       // A lazy image not yet asked for can read as complete; only an eager
       // one that is complete with no pixels has failed.
-      if (node.naturalWidth > 0) settle(node, "loaded")
-      else if (node.loading === "eager") settle(node, "failed")
+      if (node.naturalWidth > 0) settle(node, "loaded");
+      else if (node.loading === "eager") settle(node, "failed");
     },
     [settle],
-  )
-  if (status === "failed" && fallback === null) return null
-  const reserves = fallback !== null || status === "loaded"
+  );
+  if (status === "failed" && fallback === null) return null;
+  const reserves = fallback !== null || status === "loaded";
   return (
     <span
       data-slot="favicon"
@@ -141,12 +164,14 @@ function Favicon({ href, fallback = null, className, ...props }: FaviconProps) {
             // dark one (a black logo on nothing) visible on a dark surface, and a
             // light one on a light surface.
             "size-full object-contain transition-opacity duration-150 ease-out motion-reduce:transition-none [filter:drop-shadow(0_0_0.75px_color-mix(in_oklab,var(--foreground)_60%,transparent))]",
-            status === "loaded" ? "opacity-100" : "absolute inset-0 size-[1em] opacity-0",
+            status === "loaded"
+              ? "opacity-100"
+              : "absolute inset-0 size-[1em] opacity-0",
           )}
         />
       ) : null}
     </span>
-  )
+  );
 }
 
-export { Favicon }
+export { Favicon };
