@@ -22,6 +22,7 @@ import { Checkbox } from "./components/checkbox"
 import { CheckboxList } from "./components/checkbox-list"
 import { Dialog } from "./components/dialog"
 import { EmptyState } from "./components/empty-state"
+import { Favicon } from "./components/favicon"
 import { Input } from "./components/input"
 import { LoadingText } from "./components/loading-text"
 import { Message } from "./components/message"
@@ -73,6 +74,8 @@ test("primitives render without a browser global", () => {
   assert.ok(server(<Input aria-label="Name" defaultValue="Ada" />).includes("Ada"))
   assert.ok(server(<Checkbox aria-label="Agree" />).length > 0)
   assert.ok(server(<LoadingText>Loading Files</LoadingText>).includes("Loading Files"))
+  assert.ok(server(<Favicon href="https://example.com/a" />).includes("https://example.com/favicon.ico"))
+  assert.equal(server(<Favicon href="mailto:ada@example.com" fallback="@" />), "@")
   assert.ok(
     server(
       <Card>

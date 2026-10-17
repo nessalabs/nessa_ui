@@ -798,6 +798,23 @@
       ]
     },
     {
+      "name": "favicon",
+      "type": "registry:ui",
+      "title": "Favicon",
+      "description": "A site's own icon beside a link to it, asked for lazily from the site without a referrer, with a fallback shown until it loads and wherever it cannot.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/favicon.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/favicon.tsx"
+        }
+      ]
+    },
+    {
       "name": "loading-text",
       "type": "registry:ui",
       "title": "Loading Text",
@@ -1009,6 +1026,7 @@
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils",
         "nessalabs/nessa_ui/code-block",
+        "nessalabs/nessa_ui/favicon",
         "nessalabs/nessa_ui/math-block",
         "nessalabs/nessa_ui/mermaid-diagram"
       ],

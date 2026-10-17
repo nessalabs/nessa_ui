@@ -353,6 +353,7 @@ export {
 } from "./components/code-block"
 export { MathBlock, type MathBlockProps } from "./components/math-block"
 export { LoadingText, type LoadingTextProps } from "./components/loading-text"
+export { Favicon, type FaviconProps } from "./components/favicon"
 export {
   GeneratingSurface,
   type GeneratingSurfaceProps,
