@@ -368,6 +368,8 @@ export const DesktopHost: Story = {
 function AncestorScrollExample() {
   const [held, setHeld] = React.useState<"both" | "archive" | "none">("both");
   const [suffix, setSuffix] = React.useState("");
+  const [keys, setKeys] = React.useState(true);
+  const [pressed, setPressed] = React.useState("");
   const shown = {
     both: actions,
     archive: actions.slice(0, 1),
@@ -388,6 +390,10 @@ function AncestorScrollExample() {
         <button type="button" onClick={() => setSuffix((now) => `${now}'`)}>
           New ids
         </button>
+        <button type="button" onClick={() => setKeys((now) => !now)}>
+          {keys ? "Pointer only" : "Keys too"}
+        </button>
+        <output data-testid="pressed">{pressed}</output>
       </div>
       <div
         data-testid="page"
@@ -402,9 +408,11 @@ function AncestorScrollExample() {
                 value={item.id + suffix}
                 name={item.title}
                 actions={shown}
+                openOnContextMenu={keys}
               >
                 <button
                   type="button"
+                  onClick={() => setPressed(item.title)}
                   className="w-full rounded-xl border-0 bg-transparent px-3 py-6 text-start font-sans nessa-text-4 text-foreground"
                 >
                   {item.title}
@@ -548,6 +556,57 @@ export const AncestorScroll: Story = {
     // closed, not stuck where the gesture was.
     wheel(audit, [40, 40, 40]);
     fireEvent.click(canvas.getByRole("button", { name: "New ids" }));
+    await expectClosed(audit);
+
+    // A press under the slop when the value changes lets the press go: the
+    // drag that carries on past the slop opens nothing under the old value,
+    // so the next press in the list is the list's, not an outside press.
+    const pressBox = audit.getBoundingClientRect();
+    const [px, py] = [
+      pressBox.left + pressBox.width / 2,
+      pressBox.top + pressBox.height / 2,
+    ];
+    fireEvent.pointerDown(audit, {
+      ...mouse,
+      button: 0,
+      buttons: 1,
+      clientX: px,
+      clientY: py,
+    });
+    fireEvent.pointerMove(audit, {
+      ...mouse,
+      buttons: 1,
+      clientX: px - 2,
+      clientY: py,
+    });
+    fireEvent.click(canvas.getByRole("button", { name: "New ids" }));
+    fireEvent.pointerMove(audit, {
+      ...mouse,
+      buttons: 1,
+      clientX: px - 160,
+      clientY: py,
+    });
+    fireEvent.pointerUp(audit, {
+      ...mouse,
+      button: 0,
+      clientX: px - 160,
+      clientY: py,
+    });
+    await expectClosed(audit);
+    await userEvent.click(notes);
+    await waitFor(() =>
+      expect(canvas.getByTestId("pressed")).toHaveTextContent("Release notes"),
+    );
+
+    // A tray made the pointer's alone while an action holds focus gives
+    // focus to the content before it hides.
+    audit.focus();
+    await userEvent.keyboard("{Shift>}{F10}{/Shift}");
+    await waitFor(() => expect(actionsOf()[0]).toHaveFocus());
+    fireEvent.click(canvas.getByRole("button", { name: "Pointer only" }));
+    await waitFor(() => expect(audit).toHaveFocus());
+    fireEvent.click(canvas.getByRole("button", { name: "Keys too" }));
+    await userEvent.keyboard("{Escape}");
     await expectClosed(audit);
   },
 };

@@ -801,17 +801,22 @@ function SwipeRow({
     pointerRef.current = null;
   }, []);
 
-  // A row whose actions are taken away mid-gesture lets the gesture go: a
-  // pointer still under the slop, a wheel waiting out its idle time, or a
-  // settle in flight would otherwise open a row the group no longer knows.
+  // A gesture belongs to the row the group knows it as: one whose actions
+  // are taken away, or whose value changes, mid-gesture lets the gesture go.
+  // A pointer still under the slop, a wheel waiting out its idle time, or a
+  // settle in flight would otherwise open a row under a value the group no
+  // longer knows.
+  const gestureIdRef = React.useRef(id);
   React.useLayoutEffect(() => {
-    if (hasActions) return;
+    const sameRow = gestureIdRef.current === id;
+    gestureIdRef.current = id;
+    if (hasActions && sameRow) return;
     endPointer();
     clearWheel();
     clearSettleTimer();
     pendingCommitRef.current = null;
     if (swipeRef.current) showSwipe(null);
-  }, [clearSettleTimer, clearWheel, endPointer, hasActions, showSwipe]);
+  }, [clearSettleTimer, clearWheel, endPointer, hasActions, id, showSwipe]);
 
   /**
    * Moves the row to `displacement` on the motion token, then runs `done`.
@@ -997,6 +1002,17 @@ function SwipeRow({
     setConfirmingId(null);
     announce("");
   }, [actions, announce, confirmingId, id, trace]);
+
+  // A tray that becomes the pointer's alone (`openOnContextMenu` turned off)
+  // is hidden from the keys and assistive technology: focus on one of its
+  // actions goes to the content first.
+  React.useLayoutEffect(() => {
+    if (openOnContextMenu) return;
+    const tray = trayRef.current;
+    if (tray?.contains(tray.ownerDocument.activeElement)) {
+      itemRef.current?.focus({ preventScroll: true });
+    }
+  }, [openOnContextMenu]);
 
   // The one rule for focus in the tray: an action whose button goes while
   // focus is on it (taken away, confirming or not, or the whole tray with
