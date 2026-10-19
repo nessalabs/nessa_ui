@@ -320,11 +320,9 @@ function SwipeRowGroup({
   React.useEffect(() => {
     if (!active || !element) return;
     const ownerDocument = element.ownerDocument;
-    const NodeOfDocument = ownerDocument.defaultView?.Node ?? Node;
     const onPointerDown = (event: PointerEvent) => {
       const openId = store.openId();
-      const target =
-        event.target instanceof NodeOfDocument ? event.target : null;
+      const target = eventNode(event, ownerDocument);
       const openRow = openId === null ? null : store.rows().get(openId)?.row();
       if (openId === null || (target && openRow?.contains(target))) {
         // The open row handles presses on itself: a tap closes it, a drag
@@ -353,8 +351,8 @@ function SwipeRowGroup({
       const openId = store.openId();
       if (openId === null) return;
       const openRow = store.rows().get(openId)?.row();
-      const target = event.target;
-      if (!openRow || !(target instanceof Node)) return;
+      const target = eventNode(event, ownerDocument);
+      if (!openRow || !target) return;
       if (openRow.contains(target) || !target.contains(openRow)) return;
       store.close();
     };
@@ -431,6 +429,16 @@ function rowSettleDurationMs(row: Element) {
     "--nessa-motion-duration-normal",
   );
   return parseCssTime(value) ?? 0;
+}
+
+/**
+ * The node an event is aimed at, checked against its own document's realm:
+ * a list portalled into an iframe gets that frame's nodes, which the outer
+ * window's `Node` does not recognize.
+ */
+function eventNode(event: Event, ownerDocument: Document): Node | null {
+  const NodeOfDocument = ownerDocument.defaultView?.Node ?? Node;
+  return event.target instanceof NodeOfDocument ? event.target : null;
 }
 
 interface RowMeasurement {
@@ -944,16 +952,21 @@ function SwipeRow({
     settle("settling", 0, () => showSwipe(null));
   }, [announce, clearWheel, endPointer, open, settle, showSwipe]);
 
-  // An open row is measured again whenever what its tray is sized from
-  // changes: its own size (a narrowed column, a font that loaded) or how
-  // many actions it holds. A gesture in flight measures for itself.
+  // An open row is measured again, size and writing direction both,
+  // whenever what its tray is laid out from may have changed: its own size
+  // or content (a narrowed column, a font that loaded, a locale's new text)
+  // or how many actions it holds. A gesture in flight measures for itself.
   const actionCount = actions.length;
   React.useLayoutEffect(() => {
     const row = rowRef.current;
     if (!open || !row || actionCount === 0) return;
     const refit = () => {
       if (swipeRef.current) return;
-      const next = measureRow(row, actionCount).geometry;
+      const measured = measureRow(row, actionCount);
+      const next = measured.geometry;
+      // The writing direction too: a locale that flips it moves the tray to
+      // the other edge, and the content must slide toward it.
+      setDirection(measured.direction);
       setGeometry((current) =>
         !current ||
         (current.rowWidth === next.rowWidth &&

@@ -456,6 +456,23 @@ export const AncestorScroll: Story = {
       expect(Math.abs(trayWidth() - taller())).toBeLessThanOrEqual(1),
     );
 
+    // A locale that flips the writing direction while the row is open: its
+    // text changes with it, and the content slides toward the new leading
+    // edge, uncovering the tray at the new trailing one.
+    const list = canvas.getByRole("list", { name: "Inbox" });
+    const before = parseFloat(notes.style.translate);
+    await expect(before).toBeLessThan(0);
+    list.dir = "rtl";
+    notes.textContent = "ملاحظات الإصدار";
+    await waitFor(() =>
+      expect(parseFloat(notes.style.translate)).toBeGreaterThan(0),
+    );
+    list.dir = "ltr";
+    notes.textContent = "Release notes";
+    await waitFor(() =>
+      expect(parseFloat(notes.style.translate)).toBeLessThan(0),
+    );
+
     // Scrolling the page around the list closes the row.
     const page = canvas.getByTestId("page");
     page.scrollTop = 40;
