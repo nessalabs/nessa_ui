@@ -10,11 +10,11 @@ import { RandomAvatar } from "./random-avatar"
 import {
   SwipeRow,
   SwipeRowGroup,
-  useSwipeRowTrace,
   type SwipeRowAction,
   type SwipeRowActionDetails,
   type SwipeRowActionState,
 } from "./swipe-row"
+import { useSwipeRowTrace } from "./swipe-row-context"
 
 export interface ConversationHistoryEntry {
   /** Identifies the conversation across selection. */
@@ -544,6 +544,9 @@ function ConversationHistory({
         data-slot="conversation-history"
         debug={debug}
         debugGlobal="__nessaConversationHistory"
+        // The status region stays with the list while `rowActions` is set,
+        // even when a search empties it.
+        hasActions={rowActions !== undefined}
       >
         <ConversationHistoryBody
           conversations={conversations}

@@ -31,6 +31,14 @@ import {
   type SwipeSample,
   type WheelSwipeTrack,
 } from "./conversation-history-swipe"
+import {
+  SwipeRowGroupContext,
+  type RowHandle,
+  type SwipeRowGroupContextValue,
+  type SwipeRowStore,
+  type SwipeRowTraceEntry,
+  type Trace,
+} from "./swipe-row-context"
 
 /** What a custom action face is drawn for. */
 export interface SwipeRowActionState {
@@ -91,11 +99,6 @@ export interface SwipeRowActionDetails {
   via: "press" | "swipe"
 }
 
-/** One flat trace entry; see `SwipeRowGroup`'s `debug`. */
-export type SwipeRowTraceEntry = Record<string, string | number | boolean | null>
-
-/** The trace sink: `null` unless the group is in `debug`. */
-type Trace = ((entry: SwipeRowTraceEntry) => void) | null
 
 /** How many trace entries the ring buffer keeps. */
 const traceLimit = 4000
@@ -117,29 +120,6 @@ function useReducedMotion() {
   )
 }
 
-/** What a registered row lends its group: its elements, read when needed. */
-interface RowHandle {
-  row: () => HTMLElement | null
-  content: () => HTMLElement | null
-}
-
-/**
- * Which single row of a group is open, and which rows have actions at all.
- * Rows subscribe to their own `open` bit, so opening one row re-renders that
- * row and the one it closes — never every row in the list.
- */
-interface SwipeRowStore {
-  subscribe: (listener: () => void) => () => void
-  openId: () => string | null
-  /** Whether any row in the group has actions; the group adds nothing until one does. */
-  active: () => boolean
-  /** Makes one row the open row, or frees the slot if that row held it. */
-  setOpen: (value: string, open: boolean) => void
-  /** Closes whichever row is open. */
-  close: () => void
-  register: (value: string, handle: RowHandle) => () => void
-  rows: () => ReadonlyMap<string, RowHandle>
-}
 
 function createSwipeRowStore(traceRef: React.RefObject<Trace>): SwipeRowStore {
   let openId: string | null = null
@@ -166,43 +146,30 @@ function createSwipeRowStore(traceRef: React.RefObject<Trace>): SwipeRowStore {
       setOpenId(open ? value : openId === value ? null : openId)
     },
     close: () => setOpenId(null),
+    // Rows come and go by the thousand when a host refilters; only a change
+    // someone reads is announced: the group becoming active or idle, or the
+    // open row leaving.
     register: (value, handle) => {
       rows.set(value, handle)
-      active = true
-      notify()
+      if (!active) {
+        active = true
+        notify()
+      }
       return () => {
         if (rows.get(value) === handle) rows.delete(value)
+        const wasActive = active
         active = rows.size > 0
         // A row that leaves — unmounted, or its actions taken away — gives
         // up the open slot with it.
-        if (openId === value) openId = null
-        notify()
+        const freed = openId === value
+        if (freed) openId = null
+        if (freed || active !== wasActive) notify()
       }
     },
     rows: () => rows,
   }
 }
 
-interface SwipeRowGroupContextValue {
-  store: SwipeRowStore
-  trace: Trace
-  reducedMotion: boolean
-  /** Speaks a short status through the group's live region; "" clears it. */
-  announce: (message: string) => void
-}
-
-const SwipeRowGroupContext = React.createContext<SwipeRowGroupContextValue | null>(
-  null,
-)
-
-/**
- * The trace sink of the enclosing `SwipeRowGroup`, for a component built on
- * it to record its own events beside the rows' — `null` unless the group is
- * in `debug`, or outside any group.
- */
-export function useSwipeRowTrace(): Trace {
-  return React.useContext(SwipeRowGroupContext)?.trace ?? null
-}
 
 export interface SwipeRowGroupProps extends React.HTMLAttributes<HTMLElement> {
   ref?: React.Ref<HTMLElement>
@@ -229,6 +196,14 @@ export interface SwipeRowGroupProps extends React.HTMLAttributes<HTMLElement> {
   debug?: boolean
   /** The `window` property `debug` publishes under. Defaults to `__nessaSwipeRows`. */
   debugGlobal?: string
+  /**
+   * Declares that the group's rows have actions, so its status region, its
+   * listeners, and its overscroll containment are in place for the group's
+   * whole life — on the server, and while it holds no rows at all (a search
+   * that emptied the list). Without it they arrive with the first row that
+   * has actions and leave with the last.
+   */
+  hasActions?: boolean
 }
 
 /**
@@ -241,7 +216,8 @@ export interface SwipeRowGroupProps extends React.HTMLAttributes<HTMLElement> {
  * element's children stay exactly the host's (a `ul` keeps only `li`s).
  *
  * The group adds nothing — no listeners, no class, no status region — until
- * a row inside it has actions. Then it marks its element
+ * a row inside it has actions, or `hasActions` says they will. Then it marks
+ * its element
  * `overscroll-x-contain`, so a sideways swipe that outruns a row cannot
  * become history navigation.
  */
@@ -249,6 +225,7 @@ function SwipeRowGroup({
   asChild = false,
   debug = false,
   debugGlobal = "__nessaSwipeRows",
+  hasActions = false,
   "data-slot": slot = "swipe-row-group",
   className,
   children,
@@ -279,7 +256,12 @@ function SwipeRowGroup({
     traceRef.current = trace
   })
   const [store] = React.useState(() => createSwipeRowStore(traceRef))
-  const active = React.useSyncExternalStore(store.subscribe, store.active, () => false)
+  const rowsHaveActions = React.useSyncExternalStore(
+    store.subscribe,
+    store.active,
+    () => false,
+  )
+  const active = hasActions || rowsHaveActions
 
   // What the live region says; rows set it when an action asks to be
   // confirmed and clear it when that is resolved.
@@ -398,7 +380,8 @@ function SwipeRowGroup({
         {children}
       </Comp>
       {active ? (
-        // Mounted with the first row that has actions and empty until a row
+        // Mounted with the group (or its first row that has actions) and
+        // empty until a row
         // has something to say, so assistive technology is already
         // listening when it speaks.
         <span role="status" data-slot={`${slot}-status`} className="sr-only">
@@ -580,7 +563,11 @@ export interface SwipeRowProps
    * or Shift+F10 — opens the row's actions. Defaults to `true`. Pass `false`
    * when the host shows its own context menu: the row then leaves the
    * `contextmenu` event and those keys entirely to the host, which owns the
-   * keyboard path to the same actions (offering them in that menu, say).
+   * keyboard and assistive-technology path to the same actions (offering
+   * them in that menu, say). The revealed tray is then a pointer surface
+   * only: it is `aria-hidden`, its buttons are out of the tab order and do
+   * not take focus when pressed, and nothing moves focus into it — so a row
+   * inside a `listbox` never puts a group of buttons inside the listbox.
    * A touch or pen long-press still opens the actions.
    */
   openOnContextMenu?: boolean
@@ -1260,12 +1247,15 @@ function SwipeRow({
       // since `open` will not change to do it.
       clearSettleTimer()
       showSwipe(null)
-      trayRef.current
-        ?.querySelector<HTMLButtonElement>("button")
-        ?.focus({ preventScroll: true })
+      if (openOnContextMenu) {
+        trayRef.current
+          ?.querySelector<HTMLButtonElement>("button")
+          ?.focus({ preventScroll: true })
+      }
       return
     }
-    focusTrayRef.current = true
+    // A pointer-only tray never takes focus; the host owns that route.
+    focusTrayRef.current = openOnContextMenu
     beginSwipe(measureRow(row, actions.length))
     showSwipe(null)
   }
@@ -1280,7 +1270,8 @@ function SwipeRow({
     if (confirmingId !== null) announce("")
     setConfirmingId(null)
     onOpenChange(false)
-    itemRef.current?.focus({ preventScroll: true })
+    // A pointer-only tray never held focus, so there is none to hand back.
+    if (openOnContextMenu) itemRef.current?.focus({ preventScroll: true })
   }
 
   const rawDisplacement = swipe
@@ -1330,8 +1321,9 @@ function SwipeRow({
   const contentChild = React.cloneElement(children, {
     ref: composedItemRef,
     "aria-keyshortcuts":
-      content["aria-keyshortcuts"] ??
-      (openOnContextMenu ? "ContextMenu Shift+F10" : undefined),
+      [content["aria-keyshortcuts"], openOnContextMenu ? "ContextMenu Shift+F10" : null]
+        .filter(Boolean)
+        .join(" ") || undefined,
     onKeyDown: composeEventHandler(content.onKeyDown, (event) => {
       swallowClickRef.current = false
       if (
@@ -1417,6 +1409,9 @@ function SwipeRow({
         ref={trayRef}
         role="group"
         aria-label={`Actions for ${name}`}
+        // A pointer surface only when the host owns the keyboard and
+        // assistive-technology route (see `openOnContextMenu`).
+        aria-hidden={openOnContextMenu ? undefined : "true"}
         data-slot={`${slot}-actions`}
         inert={committing || undefined}
         onKeyDown={(event) => {
@@ -1473,6 +1468,12 @@ function SwipeRow({
                   // A collapsed action is out of sight, so it is out of
                   // reach too.
                   inert={collapsed || undefined}
+                  tabIndex={openOnContextMenu ? undefined : -1}
+                  // Pressing a pointer-only action must not pull focus into
+                  // a tray assistive technology cannot see.
+                  onMouseDown={
+                    openOnContextMenu ? undefined : (event) => event.preventDefault()
+                  }
                   aria-label={
                     confirming
                       ? `${confirmLabel}: ${action.label} ${name}`
@@ -1490,8 +1491,11 @@ function SwipeRow({
                       announce(`${confirmLabel}: ${action.label} ${name}`)
                       return
                     }
+                    // A keyboard-reachable action was pressed from inside
+                    // the row; a pointer-only one says where focus is.
+                    const hadFocus = openOnContextMenu || holdsFocus()
                     closeActions()
-                    act(action.id, { hadFocus: true, via: "press" })
+                    act(action.id, { hadFocus, via: "press" })
                   }}
                   className={cn(
                     // A transparent border is invisible until forced colors paint it,

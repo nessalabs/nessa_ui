@@ -285,5 +285,25 @@ export const DesktopHost: Story = {
     )
     await expectClosed(notes)
     await expect(log).toHaveTextContent(/^menu:notes$/)
+
+    // Open, the tray is a pointer surface only: the host's context menu is
+    // the keyboard and assistive-technology route to the same actions, so
+    // no group of buttons appears inside the listbox and focus stays out.
+    // The story ends here, open and settled, so the accessibility check
+    // that runs after it sees the listbox with a tray showing.
+    notes.focus()
+    wheel(notes, [40, 40, 40])
+    await waitFor(() => expect(rowOf(notes)).toHaveAttribute("data-swipe", "open"))
+    const tray = rowOf(notes).querySelector<HTMLElement>("[data-slot=swipe-row-actions]")!
+    await expect(tray).toHaveAttribute("aria-hidden", "true")
+    await expect(canvas.queryByRole("group", { name: "Actions for Release notes" })).toBeNull()
+    const trayButtons = Array.from(tray.querySelectorAll("button"))
+    await expect(trayButtons).toHaveLength(2)
+    for (const button of trayButtons) await expect(button.tabIndex).toBe(-1)
+    await expect(notes).toHaveFocus()
+    // A press on a pointer-only action does not pull focus into the tray.
+    const mousedown = new MouseEvent("mousedown", { bubbles: true, cancelable: true })
+    trayButtons[0]!.dispatchEvent(mousedown)
+    await expect(mousedown.defaultPrevented).toBe(true)
   },
 }

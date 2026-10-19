@@ -1097,6 +1097,11 @@
           "target": "components/ui/swipe-row.tsx"
         },
         {
+          "path": "packages/react/src/components/swipe-row-context.ts",
+          "type": "registry:ui",
+          "target": "components/ui/swipe-row-context.ts"
+        },
+        {
           "path": "packages/react/src/components/conversation-history-swipe.ts",
           "type": "registry:ui",
           "target": "components/ui/conversation-history-swipe.ts"
