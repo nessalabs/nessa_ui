@@ -644,6 +644,19 @@ export const AncestorScroll: Story = {
     );
     await expectClosed(audit);
 
+    // A tray sliding shut takes no focus: a quick Tab cannot land in it.
+    audit.focus();
+    await userEvent.keyboard("{Shift>}{F10}{/Shift}");
+    await waitFor(() => expect(actionsOf()[0]).toHaveFocus());
+    await userEvent.keyboard("{Escape}");
+    await expect(audit).toHaveFocus();
+    await expect(actionsOf()).toHaveLength(2);
+    for (const button of actionsOf()) {
+      button.focus();
+      await expect(button).not.toHaveFocus();
+    }
+    await expectClosed(audit);
+
     // A press that does not focus its button, with focus elsewhere on the
     // page, says the row did not hold focus.
     wheel(notes, [40, 40, 40]);

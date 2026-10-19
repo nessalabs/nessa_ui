@@ -1621,7 +1621,9 @@ function SwipeRow({
         // assistive-technology route (see `openOnContextMenu`).
         aria-hidden={openOnContextMenu ? undefined : "true"}
         data-slot={`${slot}-actions`}
-        inert={committing || undefined}
+        // Usable only while the row rests open or is dragged from open: a
+        // tray sliding shut or out takes no focus and no press.
+        inert={committing || !open || undefined}
         onFocus={(event) => {
           trayFocusRef.current = event.target;
         }}
