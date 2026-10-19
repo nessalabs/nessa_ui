@@ -416,7 +416,7 @@ function AncestorScrollExample() {
 
 export const AncestorScroll: Story = {
   parameters: storyDocumentation(
-    "The list does not scroll itself; the page around it does. Scrolling that ancestor moves the open row, so it closes. An open row whose actions or size change is measured again, so its tray fits what it now holds.",
+    "The list does not scroll itself; the page around it does. Scrolling that ancestor moves the open row, so it closes. An open row whose actions or size change is measured again, so its tray fits what it now holds, and an action taken away while focused hands focus to the row.",
   ),
   render: () => <AncestorScrollExample />,
   play: async ({ canvasElement }) => {
@@ -513,6 +513,29 @@ export const AncestorScroll: Story = {
       clientX: x - 160,
       clientY: y,
     });
+    fireEvent.click(canvas.getByRole("button", { name: "Both actions" }));
+    await expectClosed(audit);
+
+    // An action taken away while focus is on it hands focus to the row's
+    // content, not to the page: Delete, then the whole tray.
+    const actionsOf = () =>
+      rowOf(audit).querySelectorAll<HTMLButtonElement>(
+        "[data-slot=swipe-row-actions] button",
+      );
+    audit.focus();
+    await userEvent.keyboard("{Shift>}{F10}{/Shift}");
+    await waitFor(() =>
+      expect(rowOf(audit)).toHaveAttribute("data-swipe", "open"),
+    );
+    await waitFor(() => expect(actionsOf()).toHaveLength(2));
+    actionsOf()[1].focus();
+    await expect(actionsOf()[1]).toHaveFocus();
+    fireEvent.click(canvas.getByRole("button", { name: "Archive only" }));
+    await waitFor(() => expect(audit).toHaveFocus());
+    actionsOf()[0].focus();
+    await expect(actionsOf()[0]).toHaveFocus();
+    fireEvent.click(canvas.getByRole("button", { name: "No actions" }));
+    await waitFor(() => expect(audit).toHaveFocus());
     fireEvent.click(canvas.getByRole("button", { name: "Both actions" }));
     await expectClosed(audit);
   },

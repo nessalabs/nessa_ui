@@ -686,6 +686,9 @@ function SwipeRow({
   const rowRef = React.useRef<HTMLElement>(null);
   const itemRef = React.useRef<HTMLElement>(null);
   const trayRef = React.useRef<HTMLDivElement>(null);
+  // The tray action focus is on, until focus moves somewhere else of its
+  // own; focus going nowhere is its button being removed.
+  const trayFocusRef = React.useRef<HTMLElement | null>(null);
   const composedRowRef = useComposedRefs(ref, rowRef);
   const composedItemRef = useComposedRefs(itemRef, children.props.ref);
 
@@ -982,20 +985,29 @@ function SwipeRow({
 
   // An action taken away while it waited for confirmation takes the
   // confirmation with it; otherwise every remaining action would stay
-  // stepped aside and inert. Its button unmounted, so focus returns to the
-  // content rather than falling out of the page.
+  // stepped aside and inert.
   React.useLayoutEffect(() => {
     if (confirmingId === null) return;
     if (actions.some((action) => action.id === confirmingId)) return;
     trace?.({ ev: "confirm-lost", row: id, action: confirmingId });
     setConfirmingId(null);
     announce("");
+  }, [actions, announce, confirmingId, id, trace]);
+
+  // The one rule for focus in the tray: an action whose button goes while
+  // focus is on it (taken away, confirming or not, or the whole tray with
+  // it) hands focus to the content rather than letting it fall out of the
+  // page. Only when nothing else took it meanwhile.
+  React.useLayoutEffect(() => {
+    const was = trayFocusRef.current;
+    if (!was || was.isConnected) return;
+    trayFocusRef.current = null;
     const ownerDocument = itemRef.current?.ownerDocument;
     const active = ownerDocument?.activeElement;
-    if (!active || active === ownerDocument?.body) {
+    if (!active || active === ownerDocument?.body || !active.isConnected) {
       itemRef.current?.focus({ preventScroll: true });
     }
-  }, [actions, announce, confirmingId, id, trace]);
+  }, [actions]);
 
   // Opening from the keyboard hands focus to the first action once the tray
   // is visible, which is only true after the render that opened it.
@@ -1463,7 +1475,8 @@ function SwipeRow({
         onClickCapture={onClickCaptureProp}
         onBlur={onBlurProp}
       >
-        {children}
+        {/* Still the row's content: focus handed back lands on it. */}
+        {React.cloneElement(children, { ref: composedItemRef })}
       </Wrapper>
     );
   }
@@ -1569,6 +1582,12 @@ function SwipeRow({
         aria-hidden={openOnContextMenu ? undefined : "true"}
         data-slot={`${slot}-actions`}
         inert={committing || undefined}
+        onFocus={(event) => {
+          trayFocusRef.current = event.target;
+        }}
+        onBlur={(event) => {
+          if (event.relatedTarget !== null) trayFocusRef.current = null;
+        }}
         onKeyDown={(event) => {
           if (event.key !== "Escape") return;
           event.preventDefault();
