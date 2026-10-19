@@ -1023,8 +1023,11 @@ function SwipeRow({
       ?.focus({ preventScroll: true });
   }, [open]);
 
-  React.useEffect(
-    () => () => {
+  // Unmount only: a row whose value or callbacks change stays the same row,
+  // mid-gesture included, so its teardown reads the newest of them by ref.
+  const teardownRef = React.useRef(() => {});
+  React.useLayoutEffect(() => {
+    teardownRef.current = () => {
       endPointer();
       clearWheel();
       clearSettleTimer();
@@ -1035,9 +1038,9 @@ function SwipeRow({
       const committed = pendingCommitRef.current;
       pendingCommitRef.current = null;
       if (committed !== null) act(committed, { hadFocus: false, via: "swipe" });
-    },
-    [act, announce, clearSettleTimer, clearWheel, endPointer],
-  );
+    };
+  });
+  React.useEffect(() => () => teardownRef.current(), []);
 
   // Horizontal trackpad scrolling swipes the row the way a two-finger swipe
   // does in Mail. React's wheel listener is passive and cannot cancel, so

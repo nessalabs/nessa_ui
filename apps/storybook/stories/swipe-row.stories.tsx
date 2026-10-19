@@ -367,6 +367,7 @@ export const DesktopHost: Story = {
 
 function AncestorScrollExample() {
   const [held, setHeld] = React.useState<"both" | "archive" | "none">("both");
+  const [suffix, setSuffix] = React.useState("");
   const shown = {
     both: actions,
     archive: actions.slice(0, 1),
@@ -384,6 +385,9 @@ function AncestorScrollExample() {
         <button type="button" onClick={() => setHeld("none")}>
           No actions
         </button>
+        <button type="button" onClick={() => setSuffix((now) => `${now}'`)}>
+          New ids
+        </button>
       </div>
       <div
         data-testid="page"
@@ -395,7 +399,7 @@ function AncestorScrollExample() {
               <SwipeRow
                 key={item.id}
                 as="li"
-                value={item.id}
+                value={item.id + suffix}
                 name={item.title}
                 actions={shown}
               >
@@ -537,6 +541,13 @@ export const AncestorScroll: Story = {
     fireEvent.click(canvas.getByRole("button", { name: "No actions" }));
     await waitFor(() => expect(audit).toHaveFocus());
     fireEvent.click(canvas.getByRole("button", { name: "Both actions" }));
+    await expectClosed(audit);
+
+    // A row given a new value mid-swipe is still the same row: the group no
+    // longer holds it open under its old value, so its swipe comes to rest
+    // closed, not stuck where the gesture was.
+    wheel(audit, [40, 40, 40]);
+    fireEvent.click(canvas.getByRole("button", { name: "New ids" }));
     await expectClosed(audit);
   },
 };
