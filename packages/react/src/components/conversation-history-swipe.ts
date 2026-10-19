@@ -1,4 +1,4 @@
-/** @responsibility Decides what a ConversationHistory row swipe means — which axis a gesture belongs to, how far the row may travel, which of a trackpad's wheel deltas are the fingers' and which are inertia, and whether a release closes it, rests it open, or commits its primary action. */
+/** @responsibility Decides what a SwipeRow swipe (and so a ConversationHistory row's) means — which axis a gesture belongs to, how far the row may travel, which of a trackpad's wheel deltas are the fingers' and which are inertia, and whether a release closes it, rests it open, or commits its primary action. */
 
 /**
  * One action a row can reveal. Only the fields the gesture decides on are

@@ -3,35 +3,18 @@
 import * as React from "react"
 import { Pin, Search } from "lucide-react"
 
+import { useComposedRefs } from "@/lib/compose"
 import { cn } from "@/lib/utils"
-import {
-  actionNeedsConfirm,
-  clampSwipeDisplacement,
-  committableSwipeAction,
-  presentedSwipeDisplacement,
-  resolveSwipeAxis,
-  settleSwipe,
-  settleWheelSwipe,
-  startWheelSwipe,
-  stepWheelSwipe,
-  swipeArmed,
-  swipeDisplacement,
-  swipeGeometry,
-  swipeContentOpacity,
-  swipeVelocity,
-  wheelDeltaInPixels,
-  wheelSwipeDisplacement,
-  wheelSwipeIdleMs,
-  type SwipeAxis,
-  type SwipeCommitCandidate,
-  type SwipeDirection,
-  type SwipeGeometry,
-  type SwipeRelease,
-  type SwipeSample,
-  type WheelSwipeTrack,
-} from "./conversation-history-swipe"
 import { Input } from "./input"
 import { RandomAvatar } from "./random-avatar"
+import {
+  SwipeRow,
+  SwipeRowGroup,
+  useSwipeRowTrace,
+  type SwipeRowAction,
+  type SwipeRowActionDetails,
+  type SwipeRowActionState,
+} from "./swipe-row"
 
 export interface ConversationHistoryEntry {
   /** Identifies the conversation across selection. */
@@ -54,34 +37,14 @@ export interface ConversationHistoryEntry {
 }
 
 /** One action a row reveals when it is swiped or opened from the keyboard. */
-export interface ConversationHistoryAction {
-  /** Reported to `onRowAction`. Unique within one row's actions. */
-  id: string
+export interface ConversationHistoryAction
+  extends Omit<SwipeRowAction, "label" | "render"> {
   /**
    * The visible label. The action's accessible name is this label followed
    * by the conversation title — "Archive Release notes" — so a list of
    * identical buttons still says which row each one acts on.
    */
   label: string
-  /** A decorative icon drawn above the label. */
-  icon?: React.ReactNode
-  /**
-   * `destructive` marks the action with the destructive token — a light
-   * wash and a destructive icon, deepening while it asks to be confirmed.
-   * A destructive action is never committed by a full swipe, even when it
-   * comes first, and asks for confirmation unless `confirm` says otherwise.
-   */
-  tone?: SwipeCommitCandidate["tone"]
-  /**
-   * Whether pressing the action first asks for confirmation: the action
-   * grows to fill the tray and reads `confirmLabel`, and only a second press
-   * runs it. Escape, closing the row, or pressing elsewhere backs out.
-   * Defaults to `true` for destructive actions and `false` otherwise. An
-   * action that confirms never commits from a full swipe.
-   */
-  confirm?: boolean
-  /** The visible label while confirming. Defaults to "Confirm". */
-  confirmLabel?: string
   /**
    * Draws the action's content in place of the default icon and label.
    * The button, its colors, sizing, confirmation, and accessible name stay
@@ -96,13 +59,9 @@ export interface ConversationHistoryAction {
 }
 
 /** What a custom action face is drawn for. */
-export interface ConversationHistoryActionState {
+export interface ConversationHistoryActionState extends SwipeRowActionState {
   /** The row the action belongs to. */
   conversation: ConversationHistoryEntry
-  /** The action is waiting for its confirming second press. */
-  confirming: boolean
-  /** A full swipe past the commit threshold will run this action on release. */
-  armed: boolean
 }
 
 /** Project path when present, otherwise the conversation id. */
@@ -163,137 +122,6 @@ export interface ConversationHistoryProps
 
 const noActions: readonly ConversationHistoryAction[] = Object.freeze([])
 
-/** One flat trace entry; see `debug`. */
-type TraceEntry = Record<string, string | number | boolean | null>
-
-/** The trace sink handed to rows: `null` unless `debug` is set. */
-type Trace = ((entry: TraceEntry) => void) | null
-
-/** How many trace entries the ring buffer keeps. */
-const traceLimit = 4000
-
-const reducedMotionQuery = "(prefers-reduced-motion: reduce)"
-
-function subscribeToReducedMotion(callback: () => void) {
-  const query = window.matchMedia(reducedMotionQuery)
-  query.addEventListener("change", callback)
-  return () => query.removeEventListener("change", callback)
-}
-
-/** Returns the live, server-safe reduced-motion preference. */
-function useReducedMotion() {
-  return React.useSyncExternalStore(
-    subscribeToReducedMotion,
-    () => window.matchMedia(reducedMotionQuery).matches,
-    () => false,
-  )
-}
-
-/**
- * A CSS time in milliseconds, or `null` when the value is not one. A bare
- * number is rejected: CSS requires a unit.
- */
-function parseCssTime(value: string): number | null {
-  const trimmed = value.trim()
-  const parsed = Number.parseFloat(trimmed)
-  if (!Number.isFinite(parsed)) return null
-  if (trimmed.endsWith("ms")) return parsed
-  if (trimmed.endsWith("s")) return parsed * 1000
-  return null
-}
-
-/**
- * How long a row takes to settle, read from the motion token the row's own
- * transition uses, so the wait and the movement agree — including the zero
- * the theme substitutes under reduced motion. A missing token makes the
- * transition invalid, which CSS treats as none, so it reads as zero too.
- */
-function rowSettleDurationMs(row: Element) {
-  const value = getComputedStyle(row).getPropertyValue(
-    "--nessa-motion-duration-normal",
-  )
-  return parseCssTime(value) ?? 0
-}
-
-interface RowMeasurement {
-  geometry: SwipeGeometry
-  direction: SwipeDirection
-}
-
-/** The row's swipe geometry and writing direction, measured now. */
-function measureRow(row: HTMLElement, actionCount: number): RowMeasurement {
-  const { width, height } = row.getBoundingClientRect()
-  return {
-    geometry: swipeGeometry(width, height, actionCount),
-    direction: getComputedStyle(row).direction === "rtl" ? "rtl" : "ltr",
-  }
-}
-
-/**
- * How long a still touch or pen press takes to open a row's actions. A swipe
- * is a path gesture; this is the single-point way in for anyone who cannot
- * make one, including touch screen readers passing a double-tap-and-hold.
- */
-const longPressMs = 500
-
-/** How many recent positions a pointer swipe keeps for its release speed. */
-const swipeSampleLimit = 8
-
-/** The row's settle motion, shared by the row, its tray, and the tray's contents. */
-const settleTransitionClassName =
-  "[transition-duration:var(--nessa-motion-duration-normal)] [transition-timing-function:var(--nessa-motion-easing-standard)]"
-
-type SwipePhase = "tracking" | "settling" | "committing"
-
-interface SwipeState {
-  phase: SwipePhase
-  /** Displacement toward the leading edge, in pixels. */
-  displacement: number
-  /**
-   * The displacement a release here is judged at, when that is not where the
-   * row is drawn: a wheel swipe is drawn where its deltas put it but judged
-   * where the fingers left it, so inertia never arms or commits a row.
-   */
-  reach?: number
-}
-
-interface PointerSwipe {
-  pointerId: number
-  originX: number
-  originY: number
-  axis: SwipeAxis
-  /** The displacement the row had when the press landed. */
-  start: number
-  /** Whether the row was open at the press, so a tap on it closes it. */
-  wasOpen: boolean
-  geometry: SwipeGeometry
-  direction: SwipeDirection
-  samples: SwipeSample[]
-}
-
-interface WheelSwipe {
-  /** Decided once the summed deltas cross the same slop a pointer uses. */
-  axis: SwipeAxis
-  /** Summed pixel deltas while the axis is still undecided. */
-  dx: number
-  dy: number
-  /**
-   * The last horizontal delta while the axis was undecided, and whether
-   * those deltas ever grew — so a gesture that is only inertia left over
-   * from an earlier one is known as such from its first events.
-   */
-  pendingDelta: number
-  pendingGrew: boolean
-  /** The displacement the row had when the axis was decided. */
-  start: number
-  /** The fingers' travel and the inertia's since then. */
-  track: WheelSwipeTrack | null
-  geometry: SwipeGeometry | null
-  direction: SwipeDirection
-  /** When the last event of the gesture arrived, from `performance.now()`. */
-  last: number
-}
-
 // A prop added here must also be compared in `sameRowProps`.
 interface ConversationHistoryRowProps {
   conversation: ConversationHistoryEntry
@@ -302,14 +130,7 @@ interface ConversationHistoryRowProps {
   /** Reserve the preview and project lines even when this row has none. */
   reservePreview: boolean
   reserveProject: boolean
-  open: boolean
-  reducedMotion: boolean
-  onOpenChange: (conversationId: string, open: boolean) => void
   onSelect: (conversationId: string) => void
-  /** Speaks a short status through the list's live region; "" clears it. */
-  onAnnounce: (message: string) => void
-  /** Records a trace entry when the list is in `debug`. */
-  trace: Trace
   onAction: (
     conversationId: string,
     actionId: string,
@@ -362,20 +183,14 @@ function sameRowProps(
     previous.selected === next.selected &&
     previous.reservePreview === next.reservePreview &&
     previous.reserveProject === next.reserveProject &&
-    previous.open === next.open &&
-    previous.reducedMotion === next.reducedMotion &&
-    previous.onOpenChange === next.onOpenChange &&
     previous.onSelect === next.onSelect &&
-    previous.onAnnounce === next.onAnnounce &&
-    previous.trace === next.trace &&
     previous.onAction === next.onAction
   )
 }
 
 /**
- * One conversation row: the selectable button and, when the host gives the
- * row actions, the swipe that reveals them. Private to ConversationHistory,
- * which decides which single row may be open.
+ * One conversation row: the selectable button, inside the SwipeRow that
+ * reveals the host's actions for it. Private to ConversationHistory.
  */
 const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
   conversation,
@@ -383,726 +198,43 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
   actions,
   reservePreview,
   reserveProject,
-  open,
-  reducedMotion,
-  onOpenChange,
   onSelect,
-  onAnnounce,
-  trace,
   onAction,
 }: ConversationHistoryRowProps) {
   const id = conversation.id
-  const hasActions = actions.length > 0
-  const committable = committableSwipeAction(actions)
-
-  const rowRef = React.useRef<HTMLLIElement>(null)
-  const itemRef = React.useRef<HTMLButtonElement>(null)
-  const trayRef = React.useRef<HTMLDivElement>(null)
-
-  const [swipe, setSwipe] = React.useState<SwipeState | null>(null)
-  const [geometry, setGeometry] = React.useState<SwipeGeometry | null>(null)
-  const [direction, setDirection] = React.useState<SwipeDirection>("ltr")
-  // The action waiting for its confirming second press, if any.
-  const [confirmingId, setConfirmingId] = React.useState<string | null>(null)
-  React.useLayoutEffect(() => {
-    latest.current = {
-      actions,
-      open,
-      onOpenChange,
-      onAction,
-      onAnnounce,
-      trace,
-      confirming: confirmingId !== null,
-    }
-  })
-
-  // Native listeners and timers read the newest values through refs, so they
-  // attach once rather than on every drag step.
-  const swipeRef = React.useRef<SwipeState | null>(null)
-  const latest = React.useRef({
-    actions,
-    open,
-    onOpenChange,
-    onAction,
-    onAnnounce,
-    trace,
-    confirming: false,
-  })
-
-  const pointerRef = React.useRef<PointerSwipe | null>(null)
-  const detachPointerRef = React.useRef<(() => void) | null>(null)
-  const wheelRef = React.useRef<WheelSwipe | null>(null)
-  const wheelTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-  const longPressTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-  const settleTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-  // A press that became a swipe, or a tap that closed an open row, must not
-  // also select the conversation when its click arrives.
-  const swallowClickRef = React.useRef(false)
-  const focusTrayRef = React.useRef(false)
-  // A committed action still owed to the host while the row slides out.
-  const pendingCommitRef = React.useRef<string | null>(null)
-  const closedByBlurRef = React.useRef(false)
-
-  /** Sets the swipe state and the ref native handlers read it through. */
-  const showSwipe = React.useCallback((next: SwipeState | null) => {
-    swipeRef.current = next
-    setSwipe(next)
-  }, [])
-
-  const clearSettleTimer = React.useCallback(() => {
-    if (settleTimerRef.current !== null) clearTimeout(settleTimerRef.current)
-    settleTimerRef.current = null
-  }, [])
-
-  const clearWheel = React.useCallback(() => {
-    if (wheelTimerRef.current !== null) clearTimeout(wheelTimerRef.current)
-    wheelTimerRef.current = null
-    wheelRef.current = null
-  }, [])
-
-  const endPointer = React.useCallback(() => {
-    if (longPressTimerRef.current !== null) clearTimeout(longPressTimerRef.current)
-    longPressTimerRef.current = null
-    detachPointerRef.current?.()
-    detachPointerRef.current = null
-    pointerRef.current = null
-  }, [])
-
-  /**
-   * Moves the row to `displacement` on the motion token, then runs `done`.
-   * The wait is the token's own duration, so under reduced motion `done`
-   * runs at once and nothing is left scheduled.
-   */
-  const settle = React.useCallback(
-    (phase: "settling" | "committing", displacement: number, done: () => void) => {
-      clearSettleTimer()
-      showSwipe({ phase, displacement })
-      const row = rowRef.current
-      const duration = row ? rowSettleDurationMs(row) : 0
-      latest.current.trace?.({ ev: "settle", row: id, phase, to: Math.round(displacement), ms: duration })
-      const finish = () => {
-        latest.current.trace?.({ ev: "settled", row: id, phase })
-        done()
-      }
-      if (duration <= 0) {
-        finish()
-        return
-      }
-      settleTimerRef.current = setTimeout(() => {
-        settleTimerRef.current = null
-        finish()
-      }, duration)
-    },
-    [clearSettleTimer, id, showSwipe],
+  // A custom face is drawn for this conversation.
+  const swipeActions = React.useMemo(
+    () =>
+      actions.map(({ render, ...action }): SwipeRowAction =>
+        render ? { ...action, render: (state) => render({ ...state, conversation }) } : action,
+      ),
+    [actions, conversation],
   )
-
-  /** Whether focus is anywhere inside this row right now. */
-  const holdsFocus = React.useCallback(() => {
-    const row = rowRef.current
-    return Boolean(row?.contains(row.ownerDocument.activeElement))
-  }, [])
-
-  /**
-   * Carries out a release: claims or frees this row's place as the single
-   * open row, settles it, and for a commit reports the action to the host
-   * once the row has slid out.
-   */
-  const applyRelease = React.useCallback(
-    (release: SwipeRelease, measured: SwipeGeometry) => {
-      const { onOpenChange: setOpen, onAction: act } = latest.current
-      latest.current.trace?.({
-        ev: "release",
-        row: id,
-        kind: release.kind,
-        action: release.kind === "commit" ? release.actionId : null,
-        at: Math.round(swipeRef.current?.displacement ?? 0),
-      })
-      if (release.kind === "closed") {
-        setOpen(id, false)
-        settle("settling", 0, () => showSwipe(null))
-      } else if (release.kind === "open") {
-        setOpen(id, true)
-        settle("settling", measured.openWidth, () => showSwipe(null))
-      } else {
-        setOpen(id, true)
-        pendingCommitRef.current = release.actionId
-        settle("committing", measured.rowWidth, () => {
-          pendingCommitRef.current = null
-          showSwipe(null)
-          setOpen(id, false)
-          latest.current.trace?.({ ev: "action", row: id, action: release.actionId, via: "swipe" })
-          act(id, release.actionId, holdsFocus())
-        })
-      }
-    },
-    [holdsFocus, id, settle, showSwipe],
+  const reportAction = React.useCallback(
+    (actionId: string, details: SwipeRowActionDetails) =>
+      onAction(id, actionId, details.hadFocus),
+    [id, onAction],
   )
-
-  /** Settles a release made at the row's current displacement. */
-  const release = React.useCallback(
-    (measured: SwipeGeometry, velocity: number, committable: string | null) => {
-      applyRelease(
-        settleSwipe({
-          displacement: swipeRef.current?.displacement ?? 0,
-          velocity,
-          geometry: measured,
-          committable,
-        }),
-        measured,
-      )
-    },
-    [applyRelease],
-  )
-
-  /** Where a new gesture starts from: wherever the row is, or at rest. */
-  const restingDisplacement = React.useCallback(
-    (measured: SwipeGeometry) =>
-      swipeRef.current?.displacement ??
-      (latest.current.open ? measured.openWidth : 0),
-    [],
-  )
-
-  /** Claims the single open slot and records what the gesture measures against. */
-  const beginSwipe = React.useCallback(
-    (measured: RowMeasurement) => {
-      latest.current.trace?.({
-        ev: "begin",
-        row: id,
-        open: Math.round(measured.geometry.openWidth),
-        commit: Math.round(measured.geometry.commitWidth),
-        dir: measured.direction,
-      })
-      clearSettleTimer()
-      setGeometry(measured.geometry)
-      setDirection(measured.direction)
-      latest.current.onOpenChange(id, true)
-    },
-    [clearSettleTimer, id],
-  )
-
-  // Another row opening, a tap elsewhere, or a scroll closes this one: slide
-  // back from wherever it rests.
-  const wasOpenRef = React.useRef(open)
-  React.useLayoutEffect(() => {
-    const wasOpen = wasOpenRef.current
-    wasOpenRef.current = open
-    if (!wasOpen || open) return
-    // Only one row is open, so any prompt showing is this row's.
-    if (latest.current.confirming) latest.current.onAnnounce("")
-    setConfirmingId(null)
-    const current = swipeRef.current
-    if (current?.phase === "committing") return
-    if (current?.phase === "settling" && current.displacement === 0) return
-    if (pointerRef.current) endPointer()
-    clearWheel()
-    // A tray about to hide must not take focus with it — unless focus is
-    // already leaving the row, which is what closed it.
-    const tray = trayRef.current
-    const blurred = closedByBlurRef.current
-    closedByBlurRef.current = false
-    if (!blurred && tray?.contains(tray.ownerDocument.activeElement)) {
-      itemRef.current?.focus({ preventScroll: true })
-    }
-    settle("settling", 0, () => showSwipe(null))
-  }, [clearWheel, endPointer, open, settle, showSwipe])
-
-  // An action taken away while it waited for confirmation takes the
-  // confirmation with it; otherwise every remaining action would stay
-  // stepped aside and inert. Its button unmounted, so focus returns to the
-  // row rather than falling out of the page.
-  React.useLayoutEffect(() => {
-    if (confirmingId === null) return
-    if (actions.some((action) => action.id === confirmingId)) return
-    trace?.({ ev: "confirm-lost", row: id, action: confirmingId })
-    setConfirmingId(null)
-    onAnnounce("")
-    const ownerDocument = itemRef.current?.ownerDocument
-    const active = ownerDocument?.activeElement
-    if (!active || active === ownerDocument?.body) {
-      itemRef.current?.focus({ preventScroll: true })
-    }
-  }, [actions, confirmingId, id, onAnnounce, trace])
-
-  // A row whose actions were taken away while it was open has nothing left
-  // to show; give up the open slot.
-  React.useEffect(() => {
-    if (open && !hasActions) onOpenChange(id, false)
-  }, [hasActions, id, onOpenChange, open])
-
-  // Opening from the keyboard hands focus to the first action once the tray
-  // is visible, which is only true after the render that opened it.
-  React.useLayoutEffect(() => {
-    if (!open || !focusTrayRef.current) return
-    focusTrayRef.current = false
-    trayRef.current
-      ?.querySelector<HTMLButtonElement>("button")
-      ?.focus({ preventScroll: true })
-  }, [open])
-
-  React.useEffect(
-    () => () => {
-      endPointer()
-      clearWheel()
-      clearSettleTimer()
-      // Committing is a decision the viewer already made; a row unmounted
-      // mid-slide (the host refiltered the list) still reports it.
-      // A row removed mid-confirmation takes its prompt with it.
-      if (latest.current.confirming) latest.current.onAnnounce("")
-      const committed = pendingCommitRef.current
-      pendingCommitRef.current = null
-      if (committed !== null) latest.current.onAction(id, committed, false)
-    },
-    [clearSettleTimer, clearWheel, endPointer, id],
-  )
-
-  // Horizontal trackpad scrolling swipes the row the way a two-finger swipe
-  // does in Mail. React's wheel listener is passive and cannot cancel, so
-  // this one is attached natively; a vertical wheel is never cancelled and
-  // keeps scrolling the list.
-  React.useEffect(() => {
-    const row = rowRef.current
-    if (!row || !hasActions) return
-    /** Settles a wheel gesture, judged where the fingers left the row. */
-    const releaseWheel = (gesture: WheelSwipe) => {
-      if (!gesture.geometry || !gesture.track) return
-      applyRelease(
-        settleWheelSwipe({
-          track: gesture.track,
-          start: gesture.start,
-          geometry: gesture.geometry,
-          committable: committableSwipeAction(latest.current.actions),
-        }),
-        gesture.geometry,
-      )
-    }
-    // One timer per gesture, re-checked when it fires, rather than one
-    // cleared and re-armed on every event of a 120 Hz scroll.
-    const armIdle = () => {
-      if (wheelTimerRef.current !== null) return
-      const check = () => {
-        const gesture = wheelRef.current
-        const quiet = gesture ? performance.now() - gesture.last : wheelSwipeIdleMs
-        if (quiet < wheelSwipeIdleMs) {
-          wheelTimerRef.current = setTimeout(check, wheelSwipeIdleMs - quiet)
-          return
-        }
-        clearWheel()
-        // A coasting gesture was released when its inertia began; its end
-        // only frees the row for the next one.
-        if (gesture?.axis !== "x" || gesture.track?.phase !== "fingers") return
-        releaseWheel(gesture)
-      }
-      wheelTimerRef.current = setTimeout(check, wheelSwipeIdleMs)
-    }
-    const onWheel = (event: WheelEvent) => {
-      let gesture = wheelRef.current
-      if (!gesture) {
-        if (event.ctrlKey || pointerRef.current) return
-        if (swipeRef.current?.phase === "committing") return
-        gesture = {
-          axis: "pending",
-          dx: 0,
-          dy: 0,
-          pendingDelta: 0,
-          pendingGrew: false,
-          start: 0,
-          track: null,
-          geometry: null,
-          direction: "ltr",
-          last: 0,
-        }
-        wheelRef.current = gesture
-      }
-      gesture.last = performance.now()
-      armIdle()
-      // A vertical gesture keeps scrolling the list for its whole life, and
-      // costs nothing more than noting that it is still going.
-      if (gesture.axis === "y") return
-      // Only page-based deltas need the row's width; reading it on every
-      // event would force layout during ordinary scrolling.
-      const pageSize = event.deltaMode === 2 ? row.getBoundingClientRect().width : 0
-      const deltaX = wheelDeltaInPixels(event.deltaX, event.deltaMode, pageSize)
-      if (gesture.axis === "pending") {
-        // The axis is decided on summed travel, not on one event, so a
-        // vertical scroll that opens with a pixel of sideways wobble stays
-        // a scroll.
-        gesture.dx += deltaX
-        gesture.dy += wheelDeltaInPixels(event.deltaY, event.deltaMode, pageSize)
-        if (deltaX !== 0) {
-          gesture.pendingGrew ||=
-            Math.sign(deltaX) === Math.sign(gesture.pendingDelta) &&
-            Math.abs(deltaX) > Math.abs(gesture.pendingDelta)
-          gesture.pendingDelta = deltaX
-        }
-        gesture.axis = resolveSwipeAxis(gesture.dx, gesture.dy)
-        if (gesture.axis !== "pending") {
-          latest.current.trace?.({ ev: "axis", row: id, via: "wheel", axis: gesture.axis })
-        }
-        // Chrome only lets a page cancel the first event of a trackpad
-        // sequence; the rest arrive uncancellable. So a gesture leaning
-        // sideways is claimed before its axis is certain — otherwise the
-        // swipe would also scroll ancestors or trigger history navigation.
-        // A vertical-leaning event is never claimed, so scrolling survives.
-        if (
-          gesture.axis === "pending" &&
-          Math.abs(gesture.dx) > Math.abs(gesture.dy)
-        ) {
-          event.preventDefault()
-        }
-        if (gesture.axis !== "x") return
-        const measured = measureRow(row, latest.current.actions.length)
-        gesture.start = restingDisplacement(measured.geometry)
-        gesture.geometry = measured.geometry
-        gesture.direction = measured.direction
-        // The travel that decided the axis counts toward the swipe.
-        gesture.track = startWheelSwipe(
-          wheelSwipeDisplacement(gesture.dx, gesture.direction),
-          event.timeStamp,
-          {
-            previous: wheelSwipeDisplacement(gesture.pendingDelta, gesture.direction),
-            grew: gesture.pendingGrew,
-          },
-        )
-        beginSwipe(measured)
-      } else if (gesture.track) {
-        // The whole gesture is this row's, inertia included: nothing of it
-        // may scroll an ancestor or navigate history.
-        event.preventDefault()
-        // Once committed, the rest of the inertia has nothing left to move;
-        // and a press that took the row over during inertia owns it now.
-        if (swipeRef.current?.phase === "committing" || pointerRef.current) return
-        const step = stepWheelSwipe(
-          gesture.track,
-          wheelSwipeDisplacement(deltaX, gesture.direction),
-          event.timeStamp,
-        )
-        gesture.track = step.track
-        if (step.event === "ignore") return
-        if (step.event === "coast") {
-          latest.current.trace?.({
-            ev: "coast",
-            row: id,
-            reach: Math.round(gesture.start + step.track.reach),
-            v: Math.round(step.track.velocity * 1000) / 1000,
-          })
-          releaseWheel(gesture)
-          return
-        }
-        if (step.event === "resume") {
-          const measured = measureRow(row, latest.current.actions.length)
-          gesture.start = restingDisplacement(measured.geometry)
-          gesture.geometry = measured.geometry
-          latest.current.trace?.({ ev: "resume", row: id, from: Math.round(gesture.start) })
-          beginSwipe(measured)
-        }
-      }
-      if (!gesture.geometry || !gesture.track) return
-      event.preventDefault()
-      const canCommit = committableSwipeAction(latest.current.actions) !== null
-      showSwipe({
-        phase: "tracking",
-        displacement: clampSwipeDisplacement(
-          gesture.start + gesture.track.travel,
-          gesture.geometry,
-          canCommit,
-        ),
-        reach: clampSwipeDisplacement(
-          gesture.start + gesture.track.reach,
-          gesture.geometry,
-          canCommit,
-        ),
-      })
-    }
-    row.addEventListener("wheel", onWheel, { passive: false })
-    return () => row.removeEventListener("wheel", onWheel)
-  }, [applyRelease, beginSwipe, clearWheel, hasActions, id, restingDisplacement, showSwipe])
-
-  /** Whether fingers on a trackpad are swiping this row right now. */
-  const wheelSwiping = () => wheelRef.current?.track?.phase === "fingers"
-
-  // Not the overlay panels' useDragGesture: that one tracks a single axis and
-  // captures the pointer at the press, where a row must wait to learn the
-  // gesture's axis and hand vertical ones back to the list untouched.
-  const onPointerDown = (event: React.PointerEvent<HTMLLIElement>) => {
-    if (!hasActions) return
-    // Any press starts a fresh click: a flag left by a swipe whose finger
-    // lifted without clicking must not eat this one.
-    swallowClickRef.current = false
-    if (pointerRef.current || wheelSwiping()) return
-    if (event.pointerType === "mouse" && event.button !== 0) return
-    if (swipeRef.current?.phase === "committing") return
-    if (trayRef.current?.contains(event.target as Node)) return
-    latest.current.trace?.({ ev: "press", row: id, pointer: event.pointerType, open })
-    const row = event.currentTarget
-    const measured = measureRow(row, actions.length)
-    const gesture: PointerSwipe = {
-      pointerId: event.pointerId,
-      originX: event.clientX,
-      originY: event.clientY,
-      axis: "pending",
-      start: restingDisplacement(measured.geometry),
-      wasOpen: open,
-      geometry: measured.geometry,
-      direction: measured.direction,
-      samples: [],
-    }
-    pointerRef.current = gesture
-    const ownerDocument = row.ownerDocument
-
-    const move = (moved: PointerEvent) => {
-      if (pointerRef.current !== gesture || moved.pointerId !== gesture.pointerId) {
-        return
-      }
-      const dx = moved.clientX - gesture.originX
-      const dy = moved.clientY - gesture.originY
-      if (gesture.axis === "pending") {
-        gesture.axis = resolveSwipeAxis(dx, dy)
-        if (gesture.axis !== "pending") {
-          latest.current.trace?.({ ev: "axis", row: id, via: moved.pointerType, axis: gesture.axis })
-        }
-        if (gesture.axis === "y") {
-          endPointer()
-          return
-        }
-        if (gesture.axis === "pending") return
-        if (longPressTimerRef.current !== null) clearTimeout(longPressTimerRef.current)
-        longPressTimerRef.current = null
-        swallowClickRef.current = true
-        try {
-          row.setPointerCapture(gesture.pointerId)
-        } catch {
-          // Capture is optional; the document listeners are not. A
-          // synthetic pointer (a play test) has no active pointer id.
-        }
-        beginSwipe(measured)
-      }
-      const displacement = clampSwipeDisplacement(
-        gesture.start + swipeDisplacement(dx, gesture.direction),
-        gesture.geometry,
-        committableSwipeAction(latest.current.actions) !== null,
-      )
-      gesture.samples.push({ time: moved.timeStamp, displacement })
-      if (gesture.samples.length > swipeSampleLimit) gesture.samples.shift()
-      latest.current.trace?.({ ev: "f", row: id, d: Math.round(displacement) })
-      showSwipe({ phase: "tracking", displacement })
-    }
-
-    const up = (released: PointerEvent) => {
-      if (pointerRef.current !== gesture || released.pointerId !== gesture.pointerId) {
-        return
-      }
-      endPointer()
-      if (gesture.axis === "x") {
-        release(
-          gesture.geometry,
-          swipeVelocity(gesture.samples, released.timeStamp),
-          committableSwipeAction(latest.current.actions),
-        )
-      } else if (gesture.wasOpen) {
-        // A tap on an open row closes it, as in Mail, rather than opening
-        // the conversation underneath.
-        swallowClickRef.current = true
-        latest.current.onOpenChange(id, false)
-      }
-    }
-
-    const cancel = (cancelled: PointerEvent) => {
-      if (pointerRef.current !== gesture || cancelled.pointerId !== gesture.pointerId) {
-        return
-      }
-      endPointer()
-      if (gesture.axis !== "x") return
-      // The platform took the pointer back: rest at the nearer position,
-      // and never commit from a gesture that did not end by letting go.
-      release(gesture.geometry, 0, null)
-    }
-
-    if (event.pointerType !== "mouse" && !open) {
-      longPressTimerRef.current = setTimeout(() => {
-        longPressTimerRef.current = null
-        if (pointerRef.current !== gesture || gesture.axis !== "pending") return
-        // The finger is still down; the click it lifts into must not select.
-        swallowClickRef.current = true
-        endPointer()
-        latest.current.trace?.({ ev: "longpress", row: id })
-        openActionsRef.current()
-      }, longPressMs)
-    }
-
-    ownerDocument.addEventListener("pointermove", move)
-    ownerDocument.addEventListener("pointerup", up)
-    ownerDocument.addEventListener("pointercancel", cancel)
-    detachPointerRef.current = () => {
-      ownerDocument.removeEventListener("pointermove", move)
-      ownerDocument.removeEventListener("pointerup", up)
-      ownerDocument.removeEventListener("pointercancel", cancel)
-    }
-  }
-
-  /**
-   * Opens the row's actions without a swipe — from the ContextMenu key,
-   * Shift+F10, a right-click, or a touch long-press — and focuses the first.
-   */
-  const openActions = () => {
-    const row = rowRef.current
-    if (!row || !hasActions || pointerRef.current || wheelSwiping()) {
-      return
-    }
-    if (swipeRef.current?.phase === "committing") return
-    if (open) {
-      // Already open, or settling open: finish there and move focus now,
-      // since `open` will not change to do it.
-      clearSettleTimer()
-      showSwipe(null)
-      trayRef.current
-        ?.querySelector<HTMLButtonElement>("button")
-        ?.focus({ preventScroll: true })
-      return
-    }
-    focusTrayRef.current = true
-    beginSwipe(measureRow(row, actions.length))
-    showSwipe(null)
-  }
-
-  const openActionsRef = React.useRef(openActions)
-  React.useLayoutEffect(() => {
-    openActionsRef.current = openActions
-  })
-
-  /** Closes the row's actions and returns focus to the row. */
-  const closeActions = () => {
-    if (confirmingId !== null) onAnnounce("")
-    setConfirmingId(null)
-    onOpenChange(id, false)
-    itemRef.current?.focus({ preventScroll: true })
-  }
-
-  const rawDisplacement = swipe
-    ? swipe.displacement
-    : open && hasActions && geometry
-      ? geometry.openWidth
-      : 0
-  const displacement =
-    geometry && swipe?.phase === "tracking"
-      ? presentedSwipeDisplacement(rawDisplacement, geometry, reducedMotion)
-      : rawDisplacement
-  const tracking = swipe?.phase === "tracking"
-  const committing = swipe?.phase === "committing"
-  const armed =
-    committing ||
-    (tracking &&
-      geometry !== null &&
-      swipeArmed(swipe.reach ?? swipe.displacement, geometry, committable !== null))
-  const trayVisible = hasActions && (open || swipe !== null)
-  // While confirming, the confirming action takes the tray the way the
-  // primary action does when armed; the others step aside.
-  const expandedId = armed ? committable : trayVisible ? confirmingId : null
-  const displaced = displacement > 0
-  const contentOpacity = geometry
-    ? swipeContentOpacity(displacement, geometry)
-    : 0
-  const swipeState = swipe?.phase ?? (open ? "open" : undefined)
-
   return (
-    <li
-      ref={rowRef}
+    <SwipeRow
+      as="li"
+      value={id}
+      name={conversation.title}
+      actions={swipeActions}
+      onAction={reportAction}
       data-slot="conversation-history-row"
-      data-conversation-id={conversation.id}
-      data-swipe={hasActions ? swipeState : undefined}
-      data-armed={armed || undefined}
-      className={cn(
-        "min-w-0",
-        hasActions && "relative touch-pan-y touch-pinch-zoom select-none",
-        // Clip only while displaced: at rest the row's focus outline draws
-        // outside its box and must not be cut.
-        hasActions && displaced && "overflow-hidden",
-      )}
-      onPointerDown={hasActions ? onPointerDown : undefined}
-      onContextMenu={
-        hasActions
-          ? (event) => {
-              // Held on the row, not the button: the Menu key's own
-              // contextmenu arrives after keyup, by which time focus is on
-              // an action, and must not open the native menu over the tray.
-              event.preventDefault()
-              if (itemRef.current?.contains(event.target as Node)) openActions()
-            }
-          : undefined
-      }
-      onClickCapture={
-        hasActions
-          ? (event) => {
-              if (!swallowClickRef.current) return
-              swallowClickRef.current = false
-              // Only the row's own click is spent on a swipe; an action
-              // button pressed afterwards always runs.
-              if (trayRef.current?.contains(event.target as Node)) return
-              event.preventDefault()
-              event.stopPropagation()
-            }
-          : undefined
-      }
-      onBlur={
-        hasActions
-          ? (event) => {
-              // Tabbing out of an open row closes it. A blur with no
-              // destination is a press on something unfocusable, which the
-              // list's outside-press handling already covers.
-              const next = event.relatedTarget
-              if (open && next && !event.currentTarget.contains(next)) {
-                closedByBlurRef.current = true
-                onOpenChange(id, false)
-              }
-            }
-          : undefined
-      }
+      data-conversation-id={id}
+      className="min-w-0"
     >
       <button
-        ref={itemRef}
         type="button"
         aria-current={selected ? "true" : undefined}
-        aria-keyshortcuts={hasActions ? "ContextMenu Shift+F10" : undefined}
         data-slot="conversation-history-item"
         data-pinned={conversation.pinned || undefined}
-        onClick={() => onSelect(conversation.id)}
-        onKeyDown={
-          hasActions
-            ? (event) => {
-                swallowClickRef.current = false
-                if (
-                  event.key === "ContextMenu" ||
-                  (event.key === "F10" && event.shiftKey)
-                ) {
-                  event.preventDefault()
-                  openActions()
-                } else if (event.key === "Escape" && open) {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  onOpenChange(id, false)
-                }
-              }
-            : undefined
-        }
-        style={
-          displaced
-            ? {
-                translate: `${direction === "rtl" ? displacement : -displacement}px`,
-              }
-            : undefined
-        }
+        onClick={() => onSelect(id)}
         className={cn(
-          "flex w-full min-w-0 items-start gap-3 rounded-xl border-0 bg-transparent px-2.5 py-2.5 text-start hover:bg-accent",
-          hasActions
-            ? cn("transition-[color,background-color,translate]", settleTransitionClassName)
-            : "transition-colors",
-          tracking && "transition-none",
-          // Promote only the moving row: its avatar's filters are costly to
-          // repaint every frame, and idle rows need no layer of their own.
-          swipe !== null && "[will-change:translate]",
+          "flex w-full min-w-0 items-start gap-3 rounded-xl border-0 bg-transparent px-2.5 py-2.5 text-start hover:bg-accent transition-colors",
           rowFocusClassName,
-          // Slid open, the row is clipped at its own edges, so its outline
-          // draws inside them.
-          displaced && "focus-visible:-outline-offset-2",
         )}
       >
         <RandomAvatar
@@ -1149,150 +281,155 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
           </span>
         ) : null}
       </button>
-      {hasActions ? (
-        <div
-          ref={trayRef}
-          role="group"
-          aria-label={`Actions for ${conversation.title}`}
-          data-slot="conversation-history-row-actions"
-          inert={committing || undefined}
-          onKeyDown={(event) => {
-            if (event.key !== "Escape") return
-            event.preventDefault()
-            event.stopPropagation()
-            // The first Escape backs out of a confirmation; the next closes.
-            if (confirmingId !== null) {
-              setConfirmingId(null)
-              onAnnounce("")
-            } else closeActions()
-          }}
-          style={{ width: displacement }}
-          className={cn(
-            // The clip: exactly as wide as the row has moved, with no padding
-            // of its own, so a closed or barely moved row shows nothing.
-            "absolute inset-y-0 end-0 overflow-hidden transition-[width]",
-            settleTransitionClassName,
-            tracking && "transition-none",
-            !trayVisible && "invisible",
-            // The committed action is already on its way; nothing in the tray
-            // may run a second time while the row slides out.
-            committing && "pointer-events-none",
-          )}
-        >
-          {trayVisible ? (
-            <div
-              style={{ width: Math.max(displacement, geometry?.openWidth ?? 0) }}
-              className={cn(
-                // Laid out at full size from the row's trailing edge, so the
-                // actions slide in with the row and are uncovered rather than
-                // squeezed. Past the resting width they stretch with it.
-                // Reversed so the primary action sits at the trailing edge,
-                // where a full swipe grows it, while staying first in the tab
-                // order.
-                "absolute inset-y-0 start-0 flex flex-row-reverse gap-1 p-1.5 transition-[width]",
-                settleTransitionClassName,
-                tracking && "transition-none",
-              )}
-            >
-              {actions.map((action) => {
-                const needsConfirm = actionNeedsConfirm(action)
-                const confirming = confirmingId === action.id
-                const expanded = expandedId === action.id
-                const collapsed = expandedId !== null && !expanded
-                const confirmLabel = action.confirmLabel ?? "Confirm"
-                return (
-                  <button
-                    key={action.id}
-                    type="button"
-                    data-slot="conversation-history-row-action"
-                    data-tone={action.tone ?? "default"}
-                    data-confirming={confirming || undefined}
-                    // A collapsed action is out of sight, so it is out of
-                    // reach too.
-                    inert={collapsed || undefined}
-                    aria-label={
-                      confirming
-                        ? `${confirmLabel}: ${action.label} ${conversation.title}`
-                        : `${action.label} ${conversation.title}`
-                    }
-                    onClick={() => {
-                      if (swipeRef.current?.phase === "committing") return
-                      if (needsConfirm && !confirming) {
-                        setConfirmingId(action.id)
-                        trace?.({ ev: "confirm", row: id, action: action.id })
-                        // Focus stays put and only the name changes, which
-                        // screen readers do not reliably speak; say it.
-                        // The button's new name, so the words stay the
-                        // host's (and translatable).
-                        onAnnounce(
-                          `${confirmLabel}: ${action.label} ${conversation.title}`,
-                        )
-                        return
-                      }
-                      closeActions()
-                      trace?.({ ev: "action", row: id, action: action.id, via: "press" })
-                      onAction(id, action.id, true)
-                    }}
-                    className={cn(
-                      // A transparent border is invisible until forced colors paint it,
-                      // which is then the action's only visible edge.
-                      "flex min-w-0 grow basis-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-lg border border-transparent px-1 font-sans nessa-text-1 font-medium",
-                      "transition-[flex-grow,opacity,color,background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)]",
-                      // Quiet surfaces, like a secondary button: the tray
-                      // sits beside the row's text and must not outshout
-                      // it. A destructive action is marked by a red wash
-                      // and a red icon — its label stays in the foreground
-                      // colour, which is what holds text contrast on the
-                      // wash — and while it asks to be confirmed the wash
-                      // deepens and gains a destructive edge.
-                      action.tone !== "destructive"
-                        ? "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                        : cn(
-                            "text-foreground [&_svg]:text-destructive",
-                            confirming
-                              ? "border-destructive/60 bg-destructive/20 hover:bg-destructive/25"
-                              : "bg-destructive/10 hover:bg-destructive/15",
-                          ),
-                      // The expanded action — armed by a full swipe, or
-                      // waiting to be confirmed — takes the whole tray, so
-                      // what happens next is plain before it happens.
-                      collapsed && "grow-0 px-0 opacity-0",
-                      rowFocusClassName,
-                    )}
-                  >
-                    <span
-                      style={{ opacity: contentOpacity }}
-                      className="flex min-w-0 max-w-full flex-col items-center gap-1"
-                    >
-                      {action.render ? (
-                        action.render({
-                          conversation,
-                          confirming,
-                          armed: armed && expanded,
-                        })
-                      ) : (
-                        <>
-                          {action.icon ? (
-                            <span aria-hidden="true" className="flex shrink-0 [&_svg]:size-4">
-                              {action.icon}
-                            </span>
-                          ) : null}
-                          <span className="max-w-full truncate">
-                            {confirming ? confirmLabel : action.label}
-                          </span>
-                        </>
-                      )}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </li>
+    </SwipeRow>
   )
 }, sameRowProps)
+
+interface ConversationHistoryBodyProps extends React.HTMLAttributes<HTMLElement> {
+  ref?: React.Ref<HTMLElement>
+  conversations: readonly ConversationHistoryEntry[]
+  value: string | null
+  label: string
+  emptyMessage: string
+  rowActions: ConversationHistoryProps["rowActions"]
+  onRowAction: ConversationHistoryProps["onRowAction"]
+  onValueChange: ConversationHistoryProps["onValueChange"]
+  /** The search field, which takes focus when the last row goes. */
+  searchRef: React.RefObject<HTMLInputElement | null>
+}
+
+/**
+ * The list of rows, or the empty state when there are none — the element
+ * the SwipeRowGroup merges into, so the group's region is the list itself.
+ * Private to ConversationHistory.
+ */
+function ConversationHistoryBody({
+  conversations,
+  value,
+  label,
+  emptyMessage,
+  rowActions,
+  onRowAction,
+  onValueChange,
+  searchRef,
+  ref,
+  className,
+  ...groupProps
+}: ConversationHistoryBodyProps) {
+  const trace = useSwipeRowTrace()
+  const listRef = React.useRef<HTMLUListElement>(null)
+  const emptyRef = React.useRef<HTMLParagraphElement>(null)
+  const composedListRef = useComposedRefs<HTMLElement>(ref, listRef)
+  const composedEmptyRef = useComposedRefs<HTMLElement>(ref, emptyRef)
+  // Where focus was when a pressed action may remove its own row.
+  const focusRescueRef = React.useRef<number | null>(null)
+
+  // Rows share one height: a line any row uses is held by every row.
+  const reservePreview = conversations.some((conversation) => Boolean(conversation.preview))
+  const reserveProject = conversations.some((conversation) => Boolean(conversation.project))
+
+  // Rows are memoized, so everything handed to them keeps its identity
+  // across renders and reads the host's newest props through a ref. Opening
+  // one row then re-renders that row and the one it closes, not the list.
+  const hostRef = React.useRef({ conversations, onRowAction, onValueChange })
+  React.useLayoutEffect(() => {
+    hostRef.current = { conversations, onRowAction, onValueChange }
+  })
+
+  const selectRow = React.useCallback((conversationId: string) => {
+    hostRef.current.onValueChange?.(conversationId)
+  }, [])
+
+  /**
+   * Reports an action to the host. When focus was in the acting row, it
+   * remembers where, so focus can move to the row that takes its place if
+   * the host removes it.
+   */
+  const runRowAction = React.useCallback(
+    (conversationId: string, actionId: string, hadFocus: boolean) => {
+      const host = hostRef.current
+      if (hadFocus) {
+        focusRescueRef.current = host.conversations.findIndex(
+          (conversation) => conversation.id === conversationId,
+        )
+      }
+      host.onRowAction?.(conversationId, actionId)
+    },
+    [],
+  )
+
+  // A pressed action that removed its row took focus with it; hand focus to
+  // the row now in its place so the keyboard stays in the list.
+  React.useLayoutEffect(() => {
+    const index = focusRescueRef.current
+    if (index === null) return
+    focusRescueRef.current = null
+    if (index < 0) return
+    trace?.({ ev: "rescue", index })
+    // Focus still somewhere real means the host put it there, or the row
+    // was not removed; only focus that fell out of the page is rescued.
+    const ownerDocument = (listRef.current ?? emptyRef.current ?? searchRef.current)
+      ?.ownerDocument
+    const active = ownerDocument?.activeElement
+    if (!ownerDocument || (active && active !== ownerDocument.body)) return
+    const list = listRef.current
+    if (!list) {
+      // The last row went; the search field, or else the empty state, keeps
+      // focus inside the component.
+      ;(searchRef.current ?? emptyRef.current)?.focus()
+      return
+    }
+    const items = list.querySelectorAll<HTMLElement>(
+      "[data-slot=conversation-history-item]",
+    )
+    items[Math.min(index, items.length - 1)]?.focus()
+  })
+
+  if (conversations.length === 0) {
+    return (
+      <p
+        {...groupProps}
+        ref={composedEmptyRef}
+        tabIndex={-1}
+        className={cn(
+          "m-0 rounded-xl px-1 py-6 text-center font-sans nessa-text-3 text-muted-foreground",
+          // It takes focus only when the last row goes, so the keyboard
+          // has somewhere visible to land.
+          rowFocusClassName,
+          className,
+        )}
+      >
+        {emptyMessage}
+      </p>
+    )
+  }
+  return (
+    <ul
+      {...groupProps}
+      ref={composedListRef}
+      data-slot="conversation-history-list"
+      role="list"
+      aria-label={label}
+      className={cn(
+        "m-0 flex min-h-0 flex-1 list-none flex-col overflow-y-auto p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        className,
+      )}
+    >
+      {conversations.map((conversation) => (
+        <ConversationHistoryRow
+          key={conversation.id}
+          conversation={conversation}
+          selected={conversation.id === value}
+          actions={rowActions?.(conversation) ?? noActions}
+          reservePreview={reservePreview}
+          reserveProject={reserveProject}
+          onSelect={selectRow}
+          onAction={runRowAction}
+        />
+      ))}
+    </ul>
+  )
+}
 
 /**
  * A roster of conversations: an optional search field and a list of rows
@@ -1348,6 +485,9 @@ const ConversationHistoryRow = React.memo(function ConversationHistoryRow({
  * row does not slide: it jumps between closed and open as the gesture
  * crosses the same thresholds, and every action still works. A closed row
  * carries no transform.
+ *
+ * Each row is a `SwipeRow` inside one `SwipeRowGroup`, which own all of the
+ * behavior above; a host list of its own can use them directly.
  */
 function ConversationHistory({
   conversations,
@@ -1365,177 +505,7 @@ function ConversationHistory({
   ...props
 }: ConversationHistoryProps) {
   const searchId = React.useId()
-  const instanceId = React.useId()
-  const reducedMotion = useReducedMotion()
-  const hasRowActions = rowActions !== undefined
-
-  // Dev-only event ring buffer. `trace` is null unless `debug`, so every
-  // call site is one optional call and the production cost is nil.
-  const traceBufferRef = React.useRef<TraceEntry[]>([])
-  const trace = React.useMemo<Trace>(
-    () =>
-      debug
-        ? (entry) => {
-            const buffer = traceBufferRef.current
-            buffer.push({ t: Math.round(performance.now()), ...entry })
-            if (buffer.length > traceLimit) buffer.splice(0, buffer.length - traceLimit)
-          }
-        : null,
-    [debug],
-  )
-  // Rows share one height: a line any row uses is held by every row.
-  const reservePreview = conversations.some((conversation) => Boolean(conversation.preview))
-  const reserveProject = conversations.some((conversation) => Boolean(conversation.project))
-
-  const listRef = React.useRef<HTMLUListElement>(null)
-  const emptyRef = React.useRef<HTMLParagraphElement>(null)
-  // What the live region says; rows set it when an action asks to be
-  // confirmed and clear it when that is resolved.
-  const [announcement, setAnnouncement] = React.useState("")
   const searchRef = React.useRef<HTMLInputElement>(null)
-  const [openRowId, setOpenRowId] = React.useState<string | null>(null)
-  const openRowIdRef = React.useRef(openRowId)
-  const traceRef = React.useRef(trace)
-  React.useLayoutEffect(() => {
-    openRowIdRef.current = openRowId
-    traceRef.current = trace
-  })
-  // A press that closed an open row is spent on closing it: the click it
-  // produces must not select whichever row it landed on.
-  const swallowClickRef = React.useRef(false)
-  // Where focus was when a pressed action may remove its own row.
-  const focusRescueRef = React.useRef<number | null>(null)
-
-  React.useEffect(() => {
-    if (!debug) return
-    const host = window as unknown as {
-      __nessaConversationHistory?: Record<string, unknown>
-    }
-    host.__nessaConversationHistory = host.__nessaConversationHistory ?? {}
-    host.__nessaConversationHistory[instanceId] = {
-      events: traceBufferRef.current,
-      snapshot: () => ({
-        openRowId: openRowIdRef.current,
-        rows: Array.from(
-          listRef.current?.querySelectorAll<HTMLElement>(
-            "[data-slot=conversation-history-row]",
-          ) ?? [],
-          (row) => ({
-            id: row.getAttribute("data-conversation-id"),
-            swipe: row.getAttribute("data-swipe"),
-            armed: row.hasAttribute("data-armed"),
-            translate:
-              row.querySelector<HTMLElement>("[data-slot=conversation-history-item]")
-                ?.style.translate ?? "",
-          }),
-        ),
-        focused:
-          listRef.current?.ownerDocument.activeElement?.getAttribute("aria-label") ??
-          null,
-      }),
-    }
-    return () => {
-      delete host.__nessaConversationHistory?.[instanceId]
-    }
-  }, [debug, instanceId])
-
-  /** Makes one row the open row, or frees the slot if that row held it. */
-  const setRowOpen = React.useCallback((conversationId: string, open: boolean) => {
-    traceRef.current?.({ ev: "open", row: conversationId, open })
-    setOpenRowId((current) =>
-      open ? conversationId : current === conversationId ? null : current,
-    )
-  }, [])
-
-  // Rows are memoized, so everything handed to them keeps its identity
-  // across renders and reads the host's newest props through a ref. Opening
-  // one row then re-renders that row and the one it closes, not the list.
-  const hostRef = React.useRef({ conversations, onRowAction, onValueChange })
-  React.useLayoutEffect(() => {
-    hostRef.current = { conversations, onRowAction, onValueChange }
-  })
-
-  const selectRow = React.useCallback((conversationId: string) => {
-    hostRef.current.onValueChange?.(conversationId)
-  }, [])
-
-  /**
-   * Reports an action to the host. When focus was in the acting row, it
-   * remembers where, so focus can move to the row that takes its place if
-   * the host removes it.
-   */
-  const runRowAction = React.useCallback(
-    (conversationId: string, actionId: string, hadFocus: boolean) => {
-      const host = hostRef.current
-      if (hadFocus) {
-        focusRescueRef.current = host.conversations.findIndex(
-          (conversation) => conversation.id === conversationId,
-        )
-      }
-      host.onRowAction?.(conversationId, actionId)
-    },
-    [],
-  )
-
-  React.useEffect(() => {
-    if (!hasRowActions) return
-    const onPointerDown = (event: PointerEvent) => {
-      const openId = openRowIdRef.current
-      const target = event.target instanceof Node ? event.target : null
-      const row =
-        target instanceof Element
-          ? target.closest("[data-slot=conversation-history-row]")
-          : target?.parentElement?.closest("[data-slot=conversation-history-row]")
-      const ownRow = row && listRef.current?.contains(row) ? row : null
-      if (openId === null || ownRow?.getAttribute("data-conversation-id") === openId) {
-        // The open row handles presses on itself: a tap closes it, a drag
-        // moves it, and its action buttons run.
-        swallowClickRef.current = false
-        return
-      }
-      swallowClickRef.current = Boolean(target && listRef.current?.contains(target))
-      traceRef.current?.({ ev: "outside", closed: openId })
-      setOpenRowId(null)
-    }
-    document.addEventListener("pointerdown", onPointerDown, true)
-    return () => document.removeEventListener("pointerdown", onPointerDown, true)
-  }, [hasRowActions])
-
-  React.useEffect(() => {
-    if (
-      openRowId !== null &&
-      !conversations.some((conversation) => conversation.id === openRowId)
-    ) {
-      setOpenRowId(null)
-    }
-  }, [conversations, openRowId])
-
-  // A pressed action that removed its row took focus with it; hand focus to
-  // the row now in its place so the keyboard stays in the list.
-  React.useLayoutEffect(() => {
-    const index = focusRescueRef.current
-    if (index === null) return
-    focusRescueRef.current = null
-    if (index < 0) return
-    trace?.({ ev: "rescue", index })
-    // Focus still somewhere real means the host put it there, or the row
-    // was not removed; only focus that fell out of the page is rescued.
-    const ownerDocument = (listRef.current ?? emptyRef.current ?? searchRef.current)
-      ?.ownerDocument
-    const active = ownerDocument?.activeElement
-    if (!ownerDocument || (active && active !== ownerDocument.body)) return
-    const list = listRef.current
-    if (!list) {
-      // The last row went; the search field, or else the empty state, keeps
-      // focus inside the component.
-      ;(searchRef.current ?? emptyRef.current)?.focus()
-      return
-    }
-    const items = list.querySelectorAll<HTMLElement>(
-      "[data-slot=conversation-history-item]",
-    )
-    items[Math.min(index, items.length - 1)]?.focus()
-  })
 
   return (
     <div
@@ -1566,86 +536,26 @@ function ConversationHistory({
           />
         </div>
       ) : null}
-      {conversations.length === 0 ? (
-        <p
-          ref={emptyRef}
-          tabIndex={-1}
-          className={cn(
-            "m-0 rounded-xl px-1 py-6 text-center font-sans nessa-text-3 text-muted-foreground",
-            // It takes focus only when the last row goes, so the keyboard
-            // has somewhere visible to land.
-            rowFocusClassName,
-          )}
-        >
-          {emptyMessage}
-        </p>
-      ) : (
-        <ul
-          ref={listRef}
-          data-slot="conversation-history-list"
-          role="list"
-          aria-label={label}
-          className={cn(
-            "m-0 flex min-h-0 flex-1 list-none flex-col overflow-y-auto p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-            // A sideways swipe that outruns a row must not become history
-            // navigation.
-            hasRowActions && "overscroll-x-contain",
-          )}
-          onScroll={
-            hasRowActions
-              ? () => {
-                  if (openRowIdRef.current !== null) setOpenRowId(null)
-                }
-              : undefined
-          }
-          onKeyDownCapture={
-            hasRowActions
-              ? () => {
-                  swallowClickRef.current = false
-                }
-              : undefined
-          }
-          onClickCapture={
-            hasRowActions
-              ? (event) => {
-                  if (!swallowClickRef.current) return
-                  swallowClickRef.current = false
-                  event.preventDefault()
-                  event.stopPropagation()
-                }
-              : undefined
-          }
-        >
-          {conversations.map((conversation) => (
-            <ConversationHistoryRow
-              key={conversation.id}
-              conversation={conversation}
-              selected={conversation.id === value}
-              actions={rowActions?.(conversation) ?? noActions}
-              reservePreview={reservePreview}
-              reserveProject={reserveProject}
-              open={openRowId === conversation.id}
-              reducedMotion={reducedMotion}
-              onOpenChange={setRowOpen}
-              onSelect={selectRow}
-              onAnnounce={setAnnouncement}
-              trace={trace}
-              onAction={runRowAction}
-            />
-          ))}
-        </ul>
-      )}
-      {hasRowActions ? (
-        // Mounted with the list and empty until a row has something to say,
-        // so assistive technology is already listening when it speaks.
-        <span
-          role="status"
-          data-slot="conversation-history-status"
-          className="sr-only"
-        >
-          {announcement}
-        </span>
-      ) : null}
+      {/* The group merges into the list, so a press on the search field is
+          "elsewhere" and only the list's own scroll closes a row. Its status
+          region follows the list, named conversation-history-status. */}
+      <SwipeRowGroup
+        asChild
+        data-slot="conversation-history"
+        debug={debug}
+        debugGlobal="__nessaConversationHistory"
+      >
+        <ConversationHistoryBody
+          conversations={conversations}
+          value={value}
+          label={label}
+          emptyMessage={emptyMessage}
+          rowActions={rowActions}
+          onRowAction={onRowAction}
+          onValueChange={onValueChange}
+          searchRef={searchRef}
+        />
+      </SwipeRowGroup>
     </div>
   )
 }

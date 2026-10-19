@@ -61,6 +61,7 @@ type FocusComponent =
   | "code-editor"
   | "conversation-rail"
   | "conversation-history"
+  | "swipe-row"
   | "event-calendar"
   | "gantt-chart/gantt-chart-grid"
   | "radar-chart/radar-chart"
@@ -197,15 +198,26 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   } as const)),
-  // The conversation row, each row action it reveals, and the empty state
-  // that takes focus when the last row goes. The search field is an Input
-  // and draws its own ring.
+  // The conversation row and the empty state that takes focus when the last
+  // row goes. The search field is an Input and draws its own ring; the row
+  // actions are SwipeRow's.
   {
     component: "conversation-history",
     layer: "outline",
     state: "focus-visible",
     className: "focus-visible:outline-ring",
-    count: 3,
+    count: 2,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // Each action a swipe row reveals. The row's content is the host's and
+  // draws the host's own outline.
+  {
+    component: "swipe-row",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -690,9 +702,13 @@ export const focusGeometryClasses = Object.freeze([
   // The row and its actions share one outset outline; the tray's inner layer
   // pads the actions so it clears the tray's clipping edge. A row slid open is clipped at its own
   // edges, so there its outline draws inset instead.
-  { component: "conversation-history", className: "focus-visible:outline-2", count: 3 },
-  { component: "conversation-history", className: "focus-visible:outline-offset-2", count: 3 },
-  { component: "conversation-history", className: "focus-visible:-outline-offset-2", count: 1 },
+  { component: "conversation-history", className: "focus-visible:outline-2", count: 2 },
+  { component: "conversation-history", className: "focus-visible:outline-offset-2", count: 2 },
+  // Each revealed action keeps the outset offset; the content, slid open and
+  // clipped at the row's edges, has its outline drawn inset.
+  { component: "swipe-row", className: "focus-visible:outline-2", count: 1 },
+  { component: "swipe-row", className: "focus-visible:outline-offset-2", count: 1 },
+  { component: "swipe-row", className: "focus-visible:-outline-offset-2", count: 1 },
   // The scrollable list region draws its outline inset so the card's
   // overflow clipping cannot swallow it; the row action and toggle buttons
   // sit inside padded rows and keep the standard outset offset.

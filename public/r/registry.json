@@ -1078,6 +1078,32 @@
       ]
     },
     {
+      "name": "swipe-row",
+      "type": "registry:ui",
+      "title": "Swipe Row",
+      "description": "Mail-style row actions for any list: swipe a row toward its leading edge (touch, pen, mouse, or a two-finger trackpad swipe) or open it from the keyboard to reveal actions such as Archive and Delete. SwipeRowGroup keeps one row open at a time and speaks confirmation prompts; a destructive action never runs from a swipe.",
+      "dependencies": [
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/compose",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/swipe-row.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/swipe-row.tsx"
+        },
+        {
+          "path": "packages/react/src/components/conversation-history-swipe.ts",
+          "type": "registry:ui",
+          "target": "components/ui/conversation-history-swipe.ts"
+        }
+      ]
+    },
+    {
       "name": "conversation-history",
       "type": "registry:ui",
       "title": "Conversation History",
@@ -1086,9 +1112,11 @@
         "lucide-react"
       ],
       "registryDependencies": [
+        "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/input",
         "nessalabs/nessa_ui/random-avatar",
+        "nessalabs/nessa_ui/swipe-row",
         "nessalabs/nessa_ui/utils"
       ],
       "files": [
@@ -1096,11 +1124,6 @@
           "path": "packages/react/src/components/conversation-history.tsx",
           "type": "registry:ui",
           "target": "components/ui/conversation-history.tsx"
-        },
-        {
-          "path": "packages/react/src/components/conversation-history-swipe.ts",
-          "type": "registry:ui",
-          "target": "components/ui/conversation-history-swipe.ts"
         }
       ]
     },

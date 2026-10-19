@@ -1,0 +1,289 @@
+import * as React from "react"
+import type { Meta, StoryObj } from "@storybook/react-vite"
+import { Archive, Trash2 } from "lucide-react"
+import { expect, fireEvent, userEvent, waitFor, within } from "storybook/test"
+import { SwipeRow, SwipeRowGroup, type SwipeRowAction } from "@nessalabs/ui"
+
+import { storyDocumentation } from "./story-documentation"
+
+interface Item {
+  id: string
+  title: string
+  detail: string
+}
+
+const inbox: readonly Item[] = [
+  { id: "notes", title: "Release notes", detail: "Draft for Thursday" },
+  { id: "audit", title: "Repo audit", detail: "Composer call sites mapped" },
+  { id: "tokens", title: "Motion token audit", detail: "Every settle reads the token" },
+  { id: "panel", title: "Panel layout", detail: "Messages under the tab strip" },
+]
+
+// Archive is the primary action: a full swipe commits it. Delete is
+// destructive, so it only ever runs from a deliberate, confirmed press.
+const actions: readonly SwipeRowAction[] = [
+  { id: "archive", label: "Archive", icon: <Archive /> },
+  { id: "delete", label: "Delete", icon: <Trash2 />, tone: "destructive" },
+]
+
+interface ListExampleProps {
+  /** The desktop host's configuration: mouse drags and right-clicks are its own. */
+  host?: boolean
+}
+
+function ListExample({ host = false }: ListExampleProps) {
+  const [items, setItems] = React.useState(inbox)
+  const [log, setLog] = React.useState<readonly string[]>([])
+  const record = (entry: string) => setLog((entries) => [...entries, entry])
+  const onAction = (item: Item) => (actionId: string) => {
+    record(`${actionId}:${item.id}`)
+    setItems((current) => current.filter((entry) => entry.id !== item.id))
+  }
+  const rowClassName =
+    "flex w-full min-w-0 flex-col items-start gap-0.5 rounded-xl border-0 bg-transparent px-3 py-2.5 text-start hover:bg-accent transition-colors outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+  const content = (item: Item) => (
+    <>
+      <span className="font-sans nessa-text-4 font-semibold text-foreground">
+        {item.title}
+      </span>
+      <span className="font-sans nessa-text-2 text-muted-foreground">{item.detail}</span>
+    </>
+  )
+  return (
+    <div className="flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-3">
+      <div className="rounded-[2rem] bg-background p-4">
+        {host ? (
+          <SwipeRowGroup asChild debug>
+            <div
+              role="listbox"
+              aria-label="Inbox"
+              className="flex max-h-80 flex-col overflow-y-auto"
+            >
+              {items.map((item) => (
+                <SwipeRow
+                  key={item.id}
+                  value={item.id}
+                  name={item.title}
+                  actions={actions}
+                  mouseDrag={false}
+                  openOnContextMenu={false}
+                  onAction={onAction(item)}
+                >
+                  <div
+                    role="option"
+                    aria-selected="false"
+                    tabIndex={0}
+                    onContextMenu={(event) => {
+                      event.preventDefault()
+                      record(`menu:${item.id}`)
+                    }}
+                    className={rowClassName}
+                  >
+                    {content(item)}
+                  </div>
+                </SwipeRow>
+              ))}
+            </div>
+          </SwipeRowGroup>
+        ) : (
+          <SwipeRowGroup asChild debug>
+            <ul
+              aria-label="Inbox"
+              className="m-0 flex max-h-80 list-none flex-col overflow-y-auto p-0"
+            >
+              {items.map((item) => (
+                <SwipeRow
+                  key={item.id}
+                  as="li"
+                  value={item.id}
+                  name={item.title}
+                  actions={actions}
+                  onAction={onAction(item)}
+                >
+                  <button
+                    type="button"
+                    onClick={() => record(`open:${item.id}`)}
+                    className={rowClassName}
+                  >
+                    {content(item)}
+                  </button>
+                </SwipeRow>
+              ))}
+            </ul>
+          </SwipeRowGroup>
+        )}
+      </div>
+      <output
+        aria-label="Events"
+        className="min-h-5 px-4 font-sans nessa-text-1 text-muted-foreground"
+      >
+        {log.join(", ")}
+      </output>
+    </div>
+  )
+}
+
+const meta = {
+  title: "Primitives/SwipeRow",
+  component: SwipeRow,
+  tags: ["autodocs", "test"],
+  args: {
+    value: "notes",
+    name: "Release notes",
+    actions,
+    children: <button type="button">Release notes</button>,
+  },
+  parameters: {
+    layout: "centered",
+    docs: {
+      description: {
+        component:
+          "A list row whose actions reveal the way Mail's do: swipe it toward its leading edge with touch, pen, a mouse, or a two-finger trackpad swipe, or open them from the keyboard. SwipeRowGroup around the list keeps one row open at a time and speaks confirmation prompts. The row's own focusable element is its child and keeps its own semantics.",
+      },
+    },
+  },
+} satisfies Meta<typeof SwipeRow>
+
+export default meta
+type Story = StoryObj<typeof meta>
+
+/** Sends horizontal wheel deltas to an element, as a trackpad would. */
+function wheel(target: HTMLElement, deltas: readonly number[]) {
+  return deltas.map((deltaX) => {
+    const event = new WheelEvent("wheel", { deltaX, bubbles: true, cancelable: true })
+    target.dispatchEvent(event)
+    return event
+  })
+}
+
+function rowOf(content: HTMLElement) {
+  return content.closest<HTMLElement>("[data-slot=swipe-row]")!
+}
+
+/** The row has settled closed and carries no transform. */
+async function expectClosed(content: HTMLElement) {
+  await waitFor(() => expect(rowOf(content)).not.toHaveAttribute("data-swipe"))
+  await expect(content.style.translate).toBe("")
+  await waitFor(() => expect(getComputedStyle(content).translate).toBe("none"))
+}
+
+export const ArchiveAndDelete: Story = {
+  parameters: storyDocumentation(
+    "A plain list whose rows reveal Archive and Delete. A two-finger trackpad swipe, a drag, or ContextMenu / Shift+F10 opens a row; a long deliberate swipe past 60% of the row archives it as it slides out. Delete is destructive: it never runs from a swipe, and pressing it asks to be confirmed first.",
+  ),
+  render: () => <ListExample />,
+  play: async ({ canvasElement }) => {
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
+    const canvas = within(canvasElement)
+    const log = canvas.getByRole("status", { name: "Events" })
+    const notes = canvas.getByRole("button", { name: /^release notes/i })
+
+    // A two-finger swipe opens the row: every sideways event is claimed, and
+    // the row rests open once the fingers stop.
+    const opening = wheel(notes, [40, 40, 40])
+    await expect(opening.every((event) => event.defaultPrevented)).toBe(true)
+    await waitFor(() => expect(rowOf(notes)).toHaveAttribute("data-swipe", "open"))
+    await expect(
+      canvas.getByRole("group", { name: "Actions for Release notes" }),
+    ).toBeVisible()
+    await expect(notes.style.translate).not.toBe("")
+    // The swipe did not open the item underneath.
+    await expect(log).toHaveTextContent("")
+
+    // Delete asks for confirmation, and the prompt is spoken.
+    await userEvent.click(canvas.getByRole("button", { name: "Delete Release notes" }))
+    const confirm = canvas.getByRole("button", { name: "Confirm: Delete Release notes" })
+    await expect(confirm).toHaveTextContent("Confirm")
+    await expect(
+      canvasElement.querySelector("[data-slot=swipe-row-group-status]"),
+    ).toHaveTextContent("Confirm: Delete Release notes")
+    await expect(log).toHaveTextContent("")
+    await userEvent.click(confirm)
+    await waitFor(() =>
+      expect(canvas.queryByRole("button", { name: /^release notes/i })).not.toBeInTheDocument(),
+    )
+    await expect(log).toHaveTextContent("delete:notes")
+
+    // A long, deliberate two-finger drag arms Archive and commits it when
+    // the fingers stop; the host removes the row.
+    const audit = canvas.getByRole("button", { name: /^repo audit/i })
+    wheel(audit, [3, 6, 9, ...Array.from({ length: 30 }, (_, index) => (index % 2 ? 9 : 11))])
+    await waitFor(() => expect(rowOf(audit)).toHaveAttribute("data-armed"))
+    await waitFor(() =>
+      expect(canvas.queryByRole("button", { name: /^repo audit/i })).not.toBeInTheDocument(),
+    )
+    await expect(log).toHaveTextContent("delete:notes, archive:audit")
+
+    // From the keyboard: Shift+F10 opens the actions on the first one, and
+    // Escape closes them and returns focus.
+    const tokens = canvas.getByRole("button", { name: /^motion token audit/i })
+    tokens.focus()
+    await userEvent.keyboard("{Shift>}{F10}{/Shift}")
+    await waitFor(() =>
+      expect(canvas.getByRole("button", { name: "Archive Motion token audit" })).toHaveFocus(),
+    )
+    await userEvent.keyboard("{Escape}")
+    await expect(tokens).toHaveFocus()
+    await expectClosed(tokens)
+
+    // Nothing is left displaced or waiting to settle.
+    for (const item of within(canvas.getByRole("list", { name: "Inbox" })).getAllByRole(
+      "button",
+    )) {
+      await expectClosed(item)
+    }
+  },
+}
+
+export const DesktopHost: Story = {
+  parameters: storyDocumentation(
+    "`mouseDrag={false}` and `openOnContextMenu={false}`, for a host whose rows are listbox options it drags with the mouse and gives its own context menu. A mouse press starts nothing and a right-click reaches the host untouched; a two-finger trackpad swipe still reveals the actions.",
+  ),
+  render: () => <ListExample host />,
+  play: async ({ canvasElement }) => {
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
+    const canvas = within(canvasElement)
+    const log = canvas.getByRole("status", { name: "Events" })
+    const notes = canvas.getByRole("option", { name: /^release notes/i })
+
+    // A mouse drag is the host's: the row does not move, and the press
+    // carries on to the host unprevented.
+    const rect = notes.getBoundingClientRect()
+    const [x, y] = [rect.left + rect.width / 2, rect.top + rect.height / 2]
+    const mouse = { pointerId: 1, pointerType: "mouse", isPrimary: true }
+    const press = new PointerEvent("pointerdown", {
+      ...mouse,
+      button: 0,
+      buttons: 1,
+      clientX: x,
+      clientY: y,
+      bubbles: true,
+      cancelable: true,
+    })
+    notes.dispatchEvent(press)
+    await expect(press.defaultPrevented).toBe(false)
+    fireEvent.pointerMove(notes, { ...mouse, buttons: 1, clientX: x - 200, clientY: y })
+    fireEvent.pointerUp(notes, { ...mouse, button: 0, clientX: x - 200, clientY: y })
+    await expect(rowOf(notes)).not.toHaveAttribute("data-swipe")
+    await expect(notes.style.translate).toBe("")
+
+    // A right-click is the host's context menu, not the row's actions.
+    fireEvent.contextMenu(notes)
+    await expect(log).toHaveTextContent("menu:notes")
+    await expect(
+      canvas.queryByRole("group", { name: "Actions for Release notes" }),
+    ).not.toBeInTheDocument()
+    await expect(rowOf(notes)).not.toHaveAttribute("data-swipe")
+    await expect(notes).not.toHaveAttribute("aria-keyshortcuts")
+
+    // A two-finger trackpad swipe still opens the row.
+    wheel(notes, [40, 40, 40])
+    await waitFor(() => expect(rowOf(notes)).toHaveAttribute("data-swipe", "open"))
+    // Pressing the open row with the mouse closes it.
+    notes.dispatchEvent(
+      new PointerEvent("pointerdown", { ...mouse, button: 0, buttons: 1, bubbles: true }),
+    )
+    await expectClosed(notes)
+    await expect(log).toHaveTextContent(/^menu:notes$/)
+  },
+}
