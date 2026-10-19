@@ -1468,8 +1468,9 @@ function SwipeRow({
     if (confirmingId !== null) announce("");
     setConfirmingId(null);
     onOpenChange(false);
-    // A pointer-only tray never held focus, so there is none to hand back.
-    if (openOnContextMenu) itemRef.current?.focus({ preventScroll: true });
+    // Focus in the row goes back to its content as the tray hides; focus
+    // elsewhere on the page stays where it is.
+    if (holdsFocus()) itemRef.current?.focus({ preventScroll: true });
   };
 
   const rawDisplacement = swipe
@@ -1706,9 +1707,9 @@ function SwipeRow({
                       announce(`${confirmLabel}: ${action.label} ${name}`);
                       return;
                     }
-                    // A keyboard-reachable action was pressed from inside
-                    // the row; a pointer-only one says where focus is.
-                    const hadFocus = openOnContextMenu || holdsFocus();
+                    // Where focus is now: a pointer press need not focus
+                    // the button, so focus may be anywhere on the page.
+                    const hadFocus = holdsFocus();
                     closeActions();
                     act(action.id, { hadFocus, via: "press" });
                   }}

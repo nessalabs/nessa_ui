@@ -411,7 +411,11 @@ function AncestorScrollExample() {
                 name={item.title}
                 actions={shown}
                 openOnContextMenu={keys}
-                onAction={(action) => setActed(`${action} ${item.title}`)}
+                onAction={(action, details) =>
+                  setActed(
+                    `${action} ${item.title}${details.hadFocus ? " with focus" : ""}`,
+                  )
+                }
               >
                 <button
                   type="button"
@@ -639,5 +643,22 @@ export const AncestorScroll: Story = {
       ),
     );
     await expectClosed(audit);
+
+    // A press that does not focus its button, with focus elsewhere on the
+    // page, says the row did not hold focus.
+    wheel(notes, [40, 40, 40]);
+    await waitFor(() =>
+      expect(rowOf(notes)).toHaveAttribute("data-swipe", "open"),
+    );
+    const outside = canvas.getByRole("button", { name: "New ids" });
+    outside.focus();
+    canvas.getByRole("button", { name: /^archive release notes$/i }).click();
+    await waitFor(() =>
+      expect(canvas.getByTestId("acted")).toHaveTextContent(
+        /^archive Release notes$/,
+      ),
+    );
+    await expect(outside).toHaveFocus();
+    await expectClosed(notes);
   },
 };
