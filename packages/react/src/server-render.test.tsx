@@ -30,6 +30,8 @@ import { ProportionBar } from "./components/proportion-bar";
 import { SearchableListbox } from "./components/searchable-listbox";
 import { SectionedListbox } from "./components/sectioned-listbox";
 import { Sparkline } from "./components/sparkline";
+import { SwipeRow, SwipeRowGroup } from "./components/swipe-row";
+import { ConversationHistory } from "./components/conversation-history";
 import { Tooltip } from "./components/tooltip";
 import {
   SegmentedControl,
@@ -301,4 +303,36 @@ test("the render really does happen without a DOM", () => {
     return <span>{String(window.innerWidth)}</span>;
   }
   assert.throws(() => server(<ReadsTheDom />));
+});
+
+test("swipe rows render their content on the server", () => {
+  const markup = server(
+    <SwipeRowGroup asChild>
+      <ul aria-label="Inbox">
+        <SwipeRow
+          as="li"
+          value="notes"
+          name="Release notes"
+          actions={[{ id: "archive", label: "Archive" }]}
+        >
+          <button type="button">Release notes</button>
+        </SwipeRow>
+      </ul>
+    </SwipeRowGroup>,
+  );
+  assert.ok(markup.includes("Release notes"));
+  assert.ok(markup.includes('aria-label="Actions for Release notes"'));
+});
+
+test("a conversation list with row actions keeps its status region while empty", () => {
+  const withActions = server(
+    <ConversationHistory
+      conversations={[]}
+      rowActions={() => [{ id: "archive", label: "Archive" }]}
+    />,
+  );
+  assert.ok(withActions.includes('data-slot="conversation-history-status"'));
+  assert.ok(withActions.includes('role="status"'));
+  const without = server(<ConversationHistory conversations={[]} />);
+  assert.ok(!without.includes('data-slot="conversation-history-status"'));
 });

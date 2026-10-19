@@ -699,6 +699,15 @@ export {
   type ConversationHistoryProps,
 } from "./components/conversation-history"
 export {
+  SwipeRow,
+  SwipeRowGroup,
+  type SwipeRowAction,
+  type SwipeRowActionDetails,
+  type SwipeRowActionState,
+  type SwipeRowGroupProps,
+  type SwipeRowProps,
+} from "./components/swipe-row"
+export {
   ToolCall,
   ToolCallContent,
   ToolCallDiff,

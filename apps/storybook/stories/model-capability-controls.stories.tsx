@@ -445,7 +445,15 @@ export const ComposerControls: Story = {
       if (index > 0) await userEvent.keyboard("{ArrowRight}")
       await expect(slider).toHaveAttribute("aria-valuetext", stage.label)
       await expect(stream).toHaveAttribute("data-energy", stage.energy.toFixed(2))
-      const opacity = Number.parseFloat(getComputedStyle(stream).opacity)
+      // Each step pulses the stream's opacity on its way to the level's
+      // own; compare the levels once the pulse has settled there.
+      const opacity = Number.parseFloat(stream.style.opacity)
+      await waitFor(() =>
+        expect(Number.parseFloat(getComputedStyle(stream).opacity)).toBeCloseTo(
+          opacity,
+          3,
+        ),
+      )
       await expect(opacity).toBeGreaterThan(previousOpacity)
       previousOpacity = opacity
       if (!reducedMotion) {

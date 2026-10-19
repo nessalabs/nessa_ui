@@ -590,6 +590,39 @@ describe("wheel swipes and trackpad inertia", () => {
     }
   })
 
+  test("wheel events 20 to 50 ms apart open, commit, and coast as they do at 60 Hz", () => {
+    for (const frameMs of [20, 33, 50]) {
+      const label = `${frameMs} ms apart`
+      assert.deepEqual(
+        replayWheel([40, 40, 40], { at: panel, frameMs }).release,
+        { kind: "open" },
+        label,
+      )
+      assert.deepEqual(
+        replayWheel([12, 30, 48, 60, 60, 50], { at: panel, frameMs }).release,
+        { kind: "open" },
+        label,
+      )
+      assert.deepEqual(
+        replayWheel(
+          [6, 12, 18, ...Array.from({ length: 30 }, (_, index) => (index % 2 ? 18 : 22))],
+          { at: panel, frameMs },
+        ).release,
+        { kind: "commit", actionId: "archive" },
+        label,
+      )
+      // Inertia keeps about 0.998 of its pace per millisecond, so slower
+      // events each carry a larger share of the decay.
+      const slowFlick = [...fingers, ...momentumTail(22, 0.998 ** frameMs)]
+      const { release, coasted } = replayWheel(slowFlick, { at: panel, frameMs })
+      assert.equal(coasted, true, label)
+      assert.deepEqual(release, { kind: "open" }, label)
+      // Released from the reach the fingers made, not from where inertia took it.
+      const fromOpen = replayWheel(slowFlick, { at: panel, frameMs, start: panel.openWidth })
+      assert.deepEqual(fromOpen.release, { kind: "open" }, label)
+    }
+  })
+
   test("a zero delta moves nothing", () => {
     const track = startWheelSwipe(10, 0)
     assert.equal(stepWheelSwipe(track, 0, 16).track, track)
