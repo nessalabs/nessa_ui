@@ -315,12 +315,16 @@ function SwipeRowGroup({
     };
   }, [debug, debugGlobal, instanceId, store]);
 
-  // A press outside the open row closes it.
+  // A press outside the open row closes it. The group's own document
+  // listens, so a list portalled into another one (an iframe) is heard.
   React.useEffect(() => {
-    if (!active) return;
+    if (!active || !element) return;
+    const ownerDocument = element.ownerDocument;
+    const NodeOfDocument = ownerDocument.defaultView?.Node ?? Node;
     const onPointerDown = (event: PointerEvent) => {
       const openId = store.openId();
-      const target = event.target instanceof Node ? event.target : null;
+      const target =
+        event.target instanceof NodeOfDocument ? event.target : null;
       const openRow = openId === null ? null : store.rows().get(openId)?.row();
       if (openId === null || (target && openRow?.contains(target))) {
         // The open row handles presses on itself: a tap closes it, a drag
@@ -328,13 +332,13 @@ function SwipeRowGroup({
         swallowClickRef.current = false;
         return;
       }
-      swallowClickRef.current = Boolean(target && element?.contains(target));
+      swallowClickRef.current = Boolean(target && element.contains(target));
       traceRef.current?.({ ev: "outside", closed: openId });
       store.close();
     };
-    document.addEventListener("pointerdown", onPointerDown, true);
+    ownerDocument.addEventListener("pointerdown", onPointerDown, true);
     return () =>
-      document.removeEventListener("pointerdown", onPointerDown, true);
+      ownerDocument.removeEventListener("pointerdown", onPointerDown, true);
   }, [active, element, store]);
 
   // A scroll that moves the open row closes it, wherever the scroller is:
@@ -781,6 +785,18 @@ function SwipeRow({
     detachPointerRef.current = null;
     pointerRef.current = null;
   }, []);
+
+  // A row whose actions are taken away mid-gesture lets the gesture go: a
+  // pointer still under the slop, a wheel waiting out its idle time, or a
+  // settle in flight would otherwise open a row the group no longer knows.
+  React.useLayoutEffect(() => {
+    if (hasActions) return;
+    endPointer();
+    clearWheel();
+    clearSettleTimer();
+    pendingCommitRef.current = null;
+    if (swipeRef.current) showSwipe(null);
+  }, [clearSettleTimer, clearWheel, endPointer, hasActions, showSwipe]);
 
   /**
    * Moves the row to `displacement` on the motion token, then runs `done`.

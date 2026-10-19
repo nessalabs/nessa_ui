@@ -366,16 +366,25 @@ export const DesktopHost: Story = {
 };
 
 function AncestorScrollExample() {
-  const [archiveOnly, setArchiveOnly] = React.useState(false);
+  const [held, setHeld] = React.useState<"both" | "archive" | "none">("both");
+  const shown = {
+    both: actions,
+    archive: actions.slice(0, 1),
+    none: [],
+  }[held];
   return (
     <div className="flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-3">
-      <button
-        type="button"
-        className="self-start font-sans nessa-text-2 text-foreground"
-        onClick={() => setArchiveOnly((current) => !current)}
-      >
-        {archiveOnly ? "Both actions" : "Archive only"}
-      </button>
+      <div className="flex gap-3 font-sans nessa-text-2 text-foreground">
+        <button type="button" onClick={() => setHeld("both")}>
+          Both actions
+        </button>
+        <button type="button" onClick={() => setHeld("archive")}>
+          Archive only
+        </button>
+        <button type="button" onClick={() => setHeld("none")}>
+          No actions
+        </button>
+      </div>
       <div
         data-testid="page"
         className="max-h-48 overflow-y-auto rounded-[2rem] bg-background p-4"
@@ -388,7 +397,7 @@ function AncestorScrollExample() {
                 as="li"
                 value={item.id}
                 name={item.title}
-                actions={archiveOnly ? actions.slice(0, 1) : actions}
+                actions={shown}
               >
                 <button
                   type="button"
@@ -452,5 +461,42 @@ export const AncestorScroll: Story = {
     page.scrollTop = 40;
     await waitFor(() => expect(page.scrollTop).toBeGreaterThan(0));
     await expectClosed(notes);
+
+    // Actions taken away mid-press let the press go: a drag that carries on
+    // past the slop afterwards opens nothing, and once the actions are back
+    // the row is still closed.
+    const audit = canvas.getByRole("button", { name: /^repo audit/i });
+    fireEvent.click(canvas.getByRole("button", { name: "Both actions" }));
+    const box = audit.getBoundingClientRect();
+    const [x, y] = [box.left + box.width / 2, box.top + box.height / 2];
+    const mouse = { pointerId: 7, pointerType: "mouse", isPrimary: true };
+    fireEvent.pointerDown(audit, {
+      ...mouse,
+      button: 0,
+      buttons: 1,
+      clientX: x,
+      clientY: y,
+    });
+    fireEvent.pointerMove(audit, {
+      ...mouse,
+      buttons: 1,
+      clientX: x - 2,
+      clientY: y,
+    });
+    fireEvent.click(canvas.getByRole("button", { name: "No actions" }));
+    fireEvent.pointerMove(audit, {
+      ...mouse,
+      buttons: 1,
+      clientX: x - 160,
+      clientY: y,
+    });
+    fireEvent.pointerUp(audit, {
+      ...mouse,
+      button: 0,
+      clientX: x - 160,
+      clientY: y,
+    });
+    fireEvent.click(canvas.getByRole("button", { name: "Both actions" }));
+    await expectClosed(audit);
   },
 };
