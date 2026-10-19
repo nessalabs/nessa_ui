@@ -364,3 +364,85 @@ export const DesktopHost: Story = {
     await expect(log).toHaveTextContent(/^menu:notes$/);
   },
 };
+
+function AncestorScrollExample() {
+  const [archiveOnly, setArchiveOnly] = React.useState(false);
+  return (
+    <div className="flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-3">
+      <button
+        type="button"
+        className="self-start font-sans nessa-text-2 text-foreground"
+        onClick={() => setArchiveOnly((current) => !current)}
+      >
+        {archiveOnly ? "Both actions" : "Archive only"}
+      </button>
+      <div
+        data-testid="page"
+        className="max-h-48 overflow-y-auto rounded-[2rem] bg-background p-4"
+      >
+        <SwipeRowGroup asChild>
+          <ul aria-label="Inbox" className="m-0 flex list-none flex-col p-0">
+            {inbox.map((item) => (
+              <SwipeRow
+                key={item.id}
+                as="li"
+                value={item.id}
+                name={item.title}
+                actions={archiveOnly ? actions.slice(0, 1) : actions}
+              >
+                <button
+                  type="button"
+                  className="w-full rounded-xl border-0 bg-transparent px-3 py-6 text-start font-sans nessa-text-4 text-foreground"
+                >
+                  {item.title}
+                </button>
+              </SwipeRow>
+            ))}
+          </ul>
+        </SwipeRowGroup>
+      </div>
+    </div>
+  );
+}
+
+export const AncestorScroll: Story = {
+  parameters: storyDocumentation(
+    "The list does not scroll itself; the page around it does. Scrolling that ancestor moves the open row, so it closes. An open row whose actions change is measured again, so its tray fits what it now holds.",
+  ),
+  render: () => <AncestorScrollExample />,
+  play: async ({ canvasElement }) => {
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return;
+    const canvas = within(canvasElement);
+    const notes = canvas.getByRole("button", { name: /^release notes/i });
+    const tray = () =>
+      rowOf(notes).querySelector<HTMLElement>("[data-slot=swipe-row-actions]")!;
+
+    wheel(notes, [40, 40, 40]);
+    await waitFor(() =>
+      expect(rowOf(notes)).toHaveAttribute("data-swipe", "open"),
+    );
+    // Each action takes a slot as wide as the row is tall.
+    const slot = rowOf(notes).getBoundingClientRect().height;
+    const trayWidth = () => tray().getBoundingClientRect().width;
+    await waitFor(() =>
+      expect(Math.abs(trayWidth() - 2 * slot)).toBeLessThanOrEqual(1),
+    );
+
+    // Down to one action while open: the tray narrows to fit it. The host
+    // changes them without a press, which would close the row by itself.
+    fireEvent.click(canvas.getByRole("button", { name: "Archive only" }));
+    await waitFor(() =>
+      expect(tray().querySelectorAll("button")).toHaveLength(1),
+    );
+    await waitFor(() =>
+      expect(Math.abs(trayWidth() - slot)).toBeLessThanOrEqual(1),
+    );
+    await expect(rowOf(notes)).toHaveAttribute("data-swipe", "open");
+
+    // Scrolling the page around the list closes the row.
+    const page = canvas.getByTestId("page");
+    page.scrollTop = 40;
+    await waitFor(() => expect(page.scrollTop).toBeGreaterThan(0));
+    await expectClosed(notes);
+  },
+};
