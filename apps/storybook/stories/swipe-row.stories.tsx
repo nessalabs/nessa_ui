@@ -407,7 +407,7 @@ function AncestorScrollExample() {
 
 export const AncestorScroll: Story = {
   parameters: storyDocumentation(
-    "The list does not scroll itself; the page around it does. Scrolling that ancestor moves the open row, so it closes. An open row whose actions change is measured again, so its tray fits what it now holds.",
+    "The list does not scroll itself; the page around it does. Scrolling that ancestor moves the open row, so it closes. An open row whose actions or size change is measured again, so its tray fits what it now holds.",
   ),
   render: () => <AncestorScrollExample />,
   play: async ({ canvasElement }) => {
@@ -438,6 +438,14 @@ export const AncestorScroll: Story = {
       expect(Math.abs(trayWidth() - slot)).toBeLessThanOrEqual(1),
     );
     await expect(rowOf(notes)).toHaveAttribute("data-swipe", "open");
+
+    // The open row grows taller: its one slot, and so the tray, grow with it.
+    notes.style.paddingBlock = "2.5rem";
+    const taller = () => rowOf(notes).getBoundingClientRect().height;
+    await waitFor(() => expect(taller()).toBeGreaterThan(slot + 10));
+    await waitFor(() =>
+      expect(Math.abs(trayWidth() - taller())).toBeLessThanOrEqual(1),
+    );
 
     // Scrolling the page around the list closes the row.
     const page = canvas.getByTestId("page");

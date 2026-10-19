@@ -4,6 +4,7 @@ import * as React from "react";
 import { Slot } from "radix-ui";
 
 import { composeEventHandler, useComposedRefs } from "@/lib/compose";
+import { observeSize } from "@/lib/size-observer";
 import { cn } from "@/lib/utils";
 import {
   actionNeedsConfirm,
@@ -927,18 +928,27 @@ function SwipeRow({
     settle("settling", 0, () => showSwipe(null));
   }, [announce, clearWheel, endPointer, open, settle, showSwipe]);
 
-  // An open row whose actions change is measured again, so its tray fits
-  // the actions it now holds rather than the ones it opened with. A gesture
-  // in flight measures for itself.
+  // An open row is measured again whenever what its tray is sized from
+  // changes: its own size (a narrowed column, a font that loaded) or how
+  // many actions it holds. A gesture in flight measures for itself.
   const actionCount = actions.length;
   React.useLayoutEffect(() => {
     const row = rowRef.current;
-    if (!open || !row || actionCount === 0 || swipeRef.current) return;
-    setGeometry((current) => {
-      if (!current) return current;
+    if (!open || !row || actionCount === 0) return;
+    const refit = () => {
+      if (swipeRef.current) return;
       const next = measureRow(row, actionCount).geometry;
-      return next.openWidth === current.openWidth ? current : next;
-    });
+      setGeometry((current) =>
+        !current ||
+        (current.rowWidth === next.rowWidth &&
+          current.openWidth === next.openWidth &&
+          current.commitWidth === next.commitWidth)
+          ? current
+          : next,
+      );
+    };
+    refit();
+    return observeSize(row, refit);
   }, [actionCount, open]);
 
   // An action taken away while it waited for confirmation takes the
