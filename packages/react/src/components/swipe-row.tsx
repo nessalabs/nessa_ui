@@ -306,7 +306,11 @@ function SwipeRowGroup({
             armed: row.element!.hasAttribute("data-armed"),
             translate: row.content?.style.translate ?? "",
           })),
-          focused: document.activeElement?.getAttribute("aria-label") ?? null,
+          // The rows' own document, which may be an iframe's.
+          focused:
+            (
+              rows[0]?.element?.ownerDocument ?? document
+            ).activeElement?.getAttribute("aria-label") ?? null,
         };
       },
     };
