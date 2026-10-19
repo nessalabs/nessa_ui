@@ -724,6 +724,26 @@ function SwipeRow({
     },
     [id],
   );
+  /**
+   * A full swipe's action, reported later to the row it was chosen on: the
+   * host's callback and the row's value as they are now, whatever the row
+   * shows by the time it slides out.
+   */
+  const owe = React.useCallback(
+    (actionId: string) => {
+      const { onAction: report, trace: traceNow } = latest.current;
+      return (details: SwipeRowActionDetails) => {
+        traceNow?.({
+          ev: "action",
+          row: id,
+          action: actionId,
+          via: details.via,
+        });
+        report?.(actionId, details);
+      };
+    },
+    [id],
+  );
 
   // Native listeners and timers read the newest values through refs, so they
   // attach once rather than on every drag step.
@@ -762,7 +782,9 @@ function SwipeRow({
   const swallowClickRef = React.useRef(false);
   const focusTrayRef = React.useRef(false);
   // A committed action still owed to the host while the row slides out.
-  const pendingCommitRef = React.useRef<string | null>(null);
+  const pendingCommitRef = React.useRef<
+    ((details: SwipeRowActionDetails) => void) | null
+  >(null);
   const closedByBlurRef = React.useRef(false);
 
   // The group learns the row exists only while it has actions, so a list of
@@ -820,17 +842,9 @@ function SwipeRow({
     const committed = pendingCommitRef.current;
     pendingCommitRef.current = null;
     if (committed !== null && hasActions)
-      act(committed, { hadFocus: false, via: "swipe" });
+      committed({ hadFocus: false, via: "swipe" });
     if (swipeRef.current) showSwipe(null);
-  }, [
-    act,
-    clearSettleTimer,
-    clearWheel,
-    endPointer,
-    hasActions,
-    id,
-    showSwipe,
-  ]);
+  }, [clearSettleTimer, clearWheel, endPointer, hasActions, id, showSwipe]);
 
   /**
    * Moves the row to `displacement` on the motion token, then runs `done`.
@@ -898,16 +912,17 @@ function SwipeRow({
         settle("settling", measured.openWidth, () => showSwipe(null));
       } else {
         onOpenChange(true);
-        pendingCommitRef.current = release.actionId;
+        const report = owe(release.actionId);
+        pendingCommitRef.current = report;
         settle("committing", measured.rowWidth, () => {
           pendingCommitRef.current = null;
           showSwipe(null);
           onOpenChange(false);
-          act(release.actionId, { hadFocus: holdsFocus(), via: "swipe" });
+          report({ hadFocus: holdsFocus(), via: "swipe" });
         });
       }
     },
-    [act, holdsFocus, id, onOpenChange, settle, showSwipe],
+    [holdsFocus, id, onOpenChange, owe, settle, showSwipe],
   );
 
   /** Settles a release made at the row's current displacement. */
@@ -980,8 +995,8 @@ function SwipeRow({
 
   // An open row is measured again, size and writing direction both,
   // whenever what its tray is laid out from may have changed: its own size
-  // or content (a narrowed column, a font that loaded, a locale's new text)
-  // or how many actions it holds. A gesture in flight measures for itself.
+  // or content (a narrowed column, a font that loaded, a locale's new text),
+  // a `dir` anywhere in the document, or how many actions it holds. A gesture in flight measures for itself.
   const actionCount = actions.length;
   React.useLayoutEffect(() => {
     const row = rowRef.current;
@@ -1003,7 +1018,19 @@ function SwipeRow({
       );
     };
     refit();
-    return observeSize(row, refit);
+    const stopSize = observeSize(row, refit);
+    // Direction is inherited, so the `dir` that flips it may sit on any
+    // ancestor and change without the row itself changing.
+    const directions = new MutationObserver(refit);
+    directions.observe(row.ownerDocument.documentElement, {
+      attributes: true,
+      attributeFilter: ["dir"],
+      subtree: true,
+    });
+    return () => {
+      stopSize();
+      directions.disconnect();
+    };
   }, [actionCount, open]);
 
   // An action taken away while it waited for confirmation takes the
@@ -1069,7 +1096,7 @@ function SwipeRow({
       if (latest.current.confirming) announce("");
       const committed = pendingCommitRef.current;
       pendingCommitRef.current = null;
-      if (committed !== null) act(committed, { hadFocus: false, via: "swipe" });
+      if (committed !== null) committed({ hadFocus: false, via: "swipe" });
     };
   });
   React.useEffect(() => () => teardownRef.current(), []);

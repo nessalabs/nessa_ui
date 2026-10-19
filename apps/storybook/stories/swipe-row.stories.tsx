@@ -396,6 +396,7 @@ function AncestorScrollExample() {
         </button>
         <output data-testid="pressed">{pressed}</output>
         <output data-testid="acted">{acted}</output>
+        <output data-testid="generation">{suffix.length}</output>
       </div>
       <div
         data-testid="page"
@@ -413,7 +414,7 @@ function AncestorScrollExample() {
                 openOnContextMenu={keys}
                 onAction={(action, details) =>
                   setActed(
-                    `${action} ${item.title}${details.hadFocus ? " with focus" : ""}`,
+                    `${action} ${item.title} @${suffix.length}${details.hadFocus ? " with focus" : ""}`,
                   )
                 }
               >
@@ -475,19 +476,23 @@ export const AncestorScroll: Story = {
       expect(Math.abs(trayWidth() - taller())).toBeLessThanOrEqual(1),
     );
 
-    // A locale that flips the writing direction while the row is open: its
-    // text changes with it, and the content slides toward the new leading
-    // edge, uncovering the tray at the new trailing one.
+    // A locale that flips the writing direction on an ancestor while the
+    // row is open, changing nothing in the row itself: the content slides
+    // toward the new leading edge, uncovering the tray at the new trailing
+    // one.
     const list = canvas.getByRole("list", { name: "Inbox" });
     const before = parseFloat(notes.style.translate);
     await expect(before).toBeLessThan(0);
+    // Once the growth above has finished moving anything, so that nothing
+    // but the flip itself could have the row measured again.
+    await waitFor(() =>
+      expect(rowOf(notes).getAnimations({ subtree: true })).toHaveLength(0),
+    );
     list.dir = "rtl";
-    notes.textContent = "ملاحظات الإصدار";
     await waitFor(() =>
       expect(parseFloat(notes.style.translate)).toBeGreaterThan(0),
     );
     list.dir = "ltr";
-    notes.textContent = "Release notes";
     await waitFor(() =>
       expect(parseFloat(notes.style.translate)).toBeLessThan(0),
     );
@@ -636,10 +641,13 @@ export const AncestorScroll: Story = {
     await waitFor(() =>
       expect(rowOf(audit)).toHaveAttribute("data-swipe", "committing"),
     );
+    // It goes to the callback of the row it was chosen on, not the one the
+    // row's new value brings.
+    const chosenOn = canvas.getByTestId("generation").textContent;
     fireEvent.click(canvas.getByRole("button", { name: "New ids" }));
     await waitFor(() =>
       expect(canvas.getByTestId("acted")).toHaveTextContent(
-        "archive Repo audit",
+        new RegExp(`^archive Repo audit @${chosenOn}$`),
       ),
     );
     await expectClosed(audit);
@@ -668,7 +676,7 @@ export const AncestorScroll: Story = {
     canvas.getByRole("button", { name: /^archive release notes$/i }).click();
     await waitFor(() =>
       expect(canvas.getByTestId("acted")).toHaveTextContent(
-        /^archive Release notes$/,
+        /^archive Release notes @\d+$/,
       ),
     );
     await expect(outside).toHaveFocus();
