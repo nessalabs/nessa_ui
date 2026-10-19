@@ -612,6 +612,15 @@ export const AncestorScroll: Story = {
     await userEvent.keyboard("{Escape}");
     await expectClosed(audit);
 
+    // A row opened from the keyboard whose value changes closes, and the
+    // action that held focus hands it to the content.
+    audit.focus();
+    await userEvent.keyboard("{Shift>}{F10}{/Shift}");
+    await waitFor(() => expect(actionsOf()[0]).toHaveFocus());
+    fireEvent.click(canvas.getByRole("button", { name: "New ids" }));
+    await waitFor(() => expect(audit).toHaveFocus());
+    await expectClosed(audit);
+
     // A full swipe already chosen is owed though the value changes while
     // the row slides out.
     wheel(audit, [

@@ -1031,7 +1031,9 @@ function SwipeRow({
   // The one rule for focus in the tray: an action whose button goes while
   // focus is on it (taken away, confirming or not, or the whole tray with
   // it) hands focus to the content rather than letting it fall out of the
-  // page. Only when nothing else took it meanwhile.
+  // page. Only when nothing else took it meanwhile. After every render, so
+  // whatever took the button (its actions, the row's value, the tray
+  // closing) is covered.
   React.useLayoutEffect(() => {
     const was = trayFocusRef.current;
     if (!was || was.isConnected) return;
@@ -1041,7 +1043,7 @@ function SwipeRow({
     if (!active || active === ownerDocument?.body || !active.isConnected) {
       itemRef.current?.focus({ preventScroll: true });
     }
-  }, [actions]);
+  });
 
   // Opening from the keyboard hands focus to the first action once the tray
   // is visible, which is only true after the render that opened it.
