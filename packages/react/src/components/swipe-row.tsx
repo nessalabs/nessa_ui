@@ -814,9 +814,23 @@ function SwipeRow({
     endPointer();
     clearWheel();
     clearSettleTimer();
+    // An action the viewer already chose (a full swipe sliding out) is still
+    // owed when only the value changed, as it is when the row unmounts; one
+    // whose actions were taken away is not.
+    const committed = pendingCommitRef.current;
     pendingCommitRef.current = null;
+    if (committed !== null && hasActions)
+      act(committed, { hadFocus: false, via: "swipe" });
     if (swipeRef.current) showSwipe(null);
-  }, [clearSettleTimer, clearWheel, endPointer, hasActions, id, showSwipe]);
+  }, [
+    act,
+    clearSettleTimer,
+    clearWheel,
+    endPointer,
+    hasActions,
+    id,
+    showSwipe,
+  ]);
 
   /**
    * Moves the row to `displacement` on the motion token, then runs `done`.

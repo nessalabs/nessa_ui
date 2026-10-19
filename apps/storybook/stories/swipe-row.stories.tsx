@@ -370,6 +370,7 @@ function AncestorScrollExample() {
   const [suffix, setSuffix] = React.useState("");
   const [keys, setKeys] = React.useState(true);
   const [pressed, setPressed] = React.useState("");
+  const [acted, setActed] = React.useState("");
   const shown = {
     both: actions,
     archive: actions.slice(0, 1),
@@ -394,6 +395,7 @@ function AncestorScrollExample() {
           {keys ? "Pointer only" : "Keys too"}
         </button>
         <output data-testid="pressed">{pressed}</output>
+        <output data-testid="acted">{acted}</output>
       </div>
       <div
         data-testid="page"
@@ -409,6 +411,7 @@ function AncestorScrollExample() {
                 name={item.title}
                 actions={shown}
                 openOnContextMenu={keys}
+                onAction={(action) => setActed(`${action} ${item.title}`)}
               >
                 <button
                   type="button"
@@ -607,6 +610,25 @@ export const AncestorScroll: Story = {
     await waitFor(() => expect(audit).toHaveFocus());
     fireEvent.click(canvas.getByRole("button", { name: "Keys too" }));
     await userEvent.keyboard("{Escape}");
+    await expectClosed(audit);
+
+    // A full swipe already chosen is owed though the value changes while
+    // the row slides out.
+    wheel(audit, [
+      3,
+      6,
+      9,
+      ...Array.from({ length: 30 }, (_, at) => (at % 2 ? 9 : 11)),
+    ]);
+    await waitFor(() =>
+      expect(rowOf(audit)).toHaveAttribute("data-swipe", "committing"),
+    );
+    fireEvent.click(canvas.getByRole("button", { name: "New ids" }));
+    await waitFor(() =>
+      expect(canvas.getByTestId("acted")).toHaveTextContent(
+        "archive Repo audit",
+      ),
+    );
     await expectClosed(audit);
   },
 };
