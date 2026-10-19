@@ -681,5 +681,26 @@ export const AncestorScroll: Story = {
     );
     await expect(outside).toHaveFocus();
     await expectClosed(notes);
+
+    // What changes while the row slides open is measured once it rests: a
+    // later look at the row finds nothing left to correct.
+    wheel(notes, [40, 40, 40]);
+    await waitFor(() => expect(rowOf(notes)).toHaveAttribute("data-swipe"));
+    const padding = notes.style.paddingBlock;
+    notes.style.paddingBlock = "3.5rem";
+    await waitFor(() =>
+      expect(rowOf(notes)).toHaveAttribute("data-swipe", "open"),
+    );
+    const rested = notes.style.translate;
+    await expect(parseFloat(rested)).toBeLessThan(0);
+    notes.dataset.looked = "again";
+    await new Promise((done) =>
+      requestAnimationFrame(() => requestAnimationFrame(done)),
+    );
+    await expect(notes.style.translate).toBe(rested);
+    notes.style.paddingBlock = padding;
+    delete notes.dataset.looked;
+    await userEvent.click(canvas.getByRole("button", { name: "Both actions" }));
+    await expectClosed(notes);
   },
 };

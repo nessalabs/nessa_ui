@@ -996,8 +996,11 @@ function SwipeRow({
   // An open row is measured again, size and writing direction both,
   // whenever what its tray is laid out from may have changed: its own size
   // or content (a narrowed column, a font that loaded, a locale's new text),
-  // a `dir` anywhere in the document, or how many actions it holds. A gesture in flight measures for itself.
+  // a `dir` anywhere in the document, or how many actions it holds. A
+  // gesture in flight measures for itself, and the row is measured again
+  // once it comes to rest, for whatever changed while it moved.
   const actionCount = actions.length;
+  const moving = swipe !== null;
   React.useLayoutEffect(() => {
     const row = rowRef.current;
     if (!open || !row || actionCount === 0) return;
@@ -1031,7 +1034,7 @@ function SwipeRow({
       stopSize();
       directions.disconnect();
     };
-  }, [actionCount, open]);
+  }, [actionCount, moving, open]);
 
   // An action taken away while it waited for confirmation takes the
   // confirmation with it; otherwise every remaining action would stay
