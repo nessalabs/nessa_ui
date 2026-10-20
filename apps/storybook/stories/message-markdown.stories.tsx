@@ -329,3 +329,106 @@ export const StreamingMarkdown: StoryObj<StreamingMarkdownArgs> = {
     })
   },
 }
+
+const tableMarkdown = `### Prices & passes
+
+| Option | Price | Includes | Availability |
+| --- | --- | --- | --- |
+| Single ticket | $16.99 CAD | One screening, general admission (unassigned seating) | On sale since Sept 29; no evidence single tickets overall are sold out, but per-screening status unconfirmed |
+| Cine-Maniac Pass | $150 CAD | All Scotiabank screenings, rush priority, social events | |
+
+### Screenings by venue
+
+| Film | Venue | Date | Time | Runtime | Format | Language | Seats left |
+| --- | --- | --- | --- | ---: | --- | --- | ---: |
+| The Last Projectionist | Cineplex Scotiabank Theatre | Sat Oct 17 | 12:30 pm | 104 min | DCP | English | 42 |
+| Night Shift at the Lighthouse | CineCycle | Sat Oct 17 | 11:59 pm | 88 min | 16 mm | French, English subtitles | 9 |
+| Cardboard Kingdoms | Cineplex Scotiabank Theatre | Sun Oct 18 | 3:15 pm | 97 min | DCP | English | 120 |`
+
+/**
+ * A host column that lets any run break anywhere, as a chat transcript does
+ * so a long address cannot push the pane wider. Tables must not inherit it.
+ */
+function BreakAnywhereColumn({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="w-[min(40rem,calc(100vw-2rem))] rounded-3xl border border-border bg-background p-6 [overflow-wrap:anywhere]">
+      {children}
+    </div>
+  )
+}
+
+/** Whether `text` inside `element` was laid out across more than one line. */
+function wraps(element: Element, text: string) {
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const start = node.textContent!.indexOf(text)
+    if (start < 0) continue
+    const range = document.createRange()
+    range.setStart(node, start)
+    range.setEnd(node, start + text.length)
+    const tops = new Set(
+      [...range.getClientRects()].map((rect) => Math.round(rect.top)),
+    )
+    return tops.size > 1
+  }
+  throw new Error(`"${text}" is not in the element`)
+}
+
+export const Tables: Story = {
+  parameters: storyDocumentation(
+    "Markdown tables render through the kit's Table: a hairline panel with a muted header band and row rules only. Cells wrap between words and never inside one, even under a host that sets overflow-wrap: anywhere, so each column is at least as wide as its longest word. A table wider than the reply scrolls sideways in its own panel instead of squeezing its columns, and becomes a focusable region while it does. Numeric columns aligned right in the Markdown stay right-aligned with tabular figures. An edge with columns scrolled past it fades out, since an overlay scrollbar shows nothing until it is used. The copy control sits in the header band and copies the table's Markdown source.",
+  ),
+  render: () => (
+    <BreakAnywhereColumn>
+      <MessageMarkdown>{tableMarkdown}</MessageMarkdown>
+    </BreakAnywhereColumn>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const [prices, screenings] = [
+      ...canvasElement.querySelectorAll('[data-slot="markdown-table"]'),
+    ]
+    await expect(prices).toBeTruthy()
+    await expect(screenings).toBeTruthy()
+    // No word is cut: each of these short runs sits on one line.
+    for (const word of ["Price", "$16.99", "CAD", "Cine-Maniac", "$150"])
+      await expect(wraps(prices!, word)).toBe(false)
+    // The narrow table fits; the wide one scrolls in its own panel.
+    const scrollPort = (table: Element) =>
+      table.querySelector<HTMLElement>('[data-slot="table-container"]')!
+    await expect(scrollPort(prices!).scrollWidth).toBeLessThanOrEqual(
+      scrollPort(prices!).clientWidth + 1,
+    )
+    await waitFor(() =>
+      expect(scrollPort(screenings!)).toHaveAttribute("role", "region"),
+    )
+    await expect(scrollPort(screenings!)).toHaveAccessibleName(
+      "Table: Film, Venue, Date, Time, Runtime, Format, Language, Seats left",
+    )
+    // The side with columns past it fades; scrolled to the end, the fade
+    // moves to the other side.
+    await expect(scrollPort(prices!)).not.toHaveAttribute("data-hidden-right")
+    await waitFor(() =>
+      expect(scrollPort(screenings!)).toHaveAttribute("data-hidden-right"),
+    )
+    await expect(scrollPort(screenings!)).not.toHaveAttribute("data-hidden-left")
+    scrollPort(screenings!).scrollLeft = scrollPort(screenings!).scrollWidth
+    await waitFor(() =>
+      expect(scrollPort(screenings!)).toHaveAttribute("data-hidden-left"),
+    )
+    await expect(scrollPort(screenings!)).not.toHaveAttribute("data-hidden-right")
+    // The copy control keeps clear of the last column's name.
+    const copy = canvas.getAllByRole("button", { name: "Copy table" })[1]!
+    const seatsName = document.createRange()
+    seatsName.selectNodeContents(canvas.getByText("Seats left"))
+    await expect(seatsName.getBoundingClientRect().right).toBeLessThanOrEqual(
+      copy.getBoundingClientRect().left,
+    )
+    // The column the Markdown aligns right stays right-aligned.
+    const seats = canvas.getByRole("columnheader", { name: "Seats left" })
+    await expect(getComputedStyle(seats).textAlign).toBe("right")
+    await expect(
+      canvas.getAllByRole("button", { name: "Copy table" }),
+    ).toHaveLength(2)
+  },
+}

@@ -51,7 +51,24 @@ export interface TableProps extends React.ComponentProps<"table"> {
    * the table can overflow.
    */
   containerLabel?: string
+  /**
+   * Fades the side of the scroll container that has columns scrolled past
+   * it, so a table that scrolls says so even where the platform's overlay
+   * scrollbar shows nothing until it is used. While columns are hidden the
+   * container carries `data-hidden-left` and `data-hidden-right`, by
+   * physical side in either writing direction.
+   */
+  edgeFade?: boolean
 }
+
+/** The fade for each combination of hidden sides, keyed `left-right`. */
+const edgeFadeClassName = {
+  "true-true":
+    "[mask-image:linear-gradient(to_right,transparent,black_2.5rem,black_calc(100%-2.5rem),transparent)]",
+  "true-false": "[mask-image:linear-gradient(to_right,transparent,black_2.5rem)]",
+  "false-true": "[mask-image:linear-gradient(to_right,black_calc(100%-2.5rem),transparent)]",
+  "false-false": undefined,
+} as const
 
 /**
  * The table element inside a scroll container. Establishes the table's
@@ -69,10 +86,12 @@ function Table({
   className,
   containerClassName,
   containerLabel,
+  edgeFade = false,
   ...props
 }: TableProps) {
   const containerRef = React.useRef<HTMLDivElement>(null)
   const [overflows, setOverflows] = React.useState(false)
+  const [hidden, setHidden] = React.useState({ left: false, right: false })
 
   // Only an overflowing region needs a tab stop; adding one to every table
   // would put a focus stop on nothing.
@@ -82,20 +101,41 @@ function Table({
     // Both axes: a host that caps the height with `containerClassName`
     // scrolls vertically even when every column fits, and that region needs
     // the same keyboard reachability.
-    const measure = () =>
+    const measure = () => {
       setOverflows(
         element.scrollWidth > element.clientWidth + 1 ||
           element.scrollHeight > element.clientHeight + 1,
       )
+      if (!edgeFade) return
+      // Physical sides, as the fade draws them. Right to left, scrollLeft
+      // runs from 0 at the right edge down to minus the overflow.
+      const overflow = element.scrollWidth - element.clientWidth
+      const fromLeft =
+        getComputedStyle(element).direction === "rtl"
+          ? overflow + element.scrollLeft
+          : element.scrollLeft
+      const left = fromLeft > 1
+      const right = overflow - fromLeft > 1
+      setHidden((current) =>
+        current.left === left && current.right === right ? current : { left, right },
+      )
+    }
     // Measured once first, so the initial layout is handled before any
     // report arrives. Rows arriving, a cell's text wrapping and a web font
     // landing all change the overflow, and the table can grow inside a
     // container that holds its size, so the table's box is followed too.
     measure()
-    return observeSize(element, measure, {
+    // Scrolling changes only which side is hidden, so only a fading table
+    // follows it.
+    if (edgeFade) element.addEventListener("scroll", measure, { passive: true })
+    const stopObserving = observeSize(element, measure, {
       boxes: (container) => [container.firstElementChild],
     })
-  }, [])
+    return () => {
+      element.removeEventListener("scroll", measure)
+      stopObserving()
+    }
+  }, [edgeFade])
 
   return (
     <div
@@ -123,6 +163,8 @@ function Table({
         // pointer click on cell text focuses the container rather than the
         // body; `:focus-visible` does not match that, so nothing is drawn.
         tabIndex={overflows ? 0 : -1}
+        data-hidden-left={(edgeFade && hidden.left) || undefined}
+        data-hidden-right={(edgeFade && hidden.right) || undefined}
         className={cn(
           // `overflow-y` is deliberately left unset: CSS coerces it to `auto`
           // beside `overflow-x-auto`, which is what lets a host cap the
@@ -130,6 +172,7 @@ function Table({
           // Setting it explicitly to `visible` or `hidden` would clip rows.
           "peer min-h-0 w-full min-w-0 overflow-x-auto outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
           tableScrollbarClassName,
+          edgeFade && edgeFadeClassName[`${hidden.left}-${hidden.right}`],
           containerClassName,
         )}
       >
