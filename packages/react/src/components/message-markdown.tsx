@@ -5,9 +5,19 @@ import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
 
+import { observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 import { CodeBlock, CopyButton } from "./code-block"
 import { Favicon } from "./favicon"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableShell,
+} from "./table"
 // Optional renderers load only when their corresponding node is present.
 const MathBlock = React.lazy(() =>
   import("./math-block").then((module) => ({ default: module.MathBlock })),
@@ -229,27 +239,172 @@ function MarkdownCode({ node: _node, className, children, ...rest }: CodeProps) 
   )
 }
 
-type TableProps = React.ComponentProps<"table"> & {
-  node?: { position?: { start: { offset?: number }; end: { offset?: number } } }
+type MarkdownNode = {
+  position?: { start: { offset?: number }; end: { offset?: number } }
 }
+type TableProps = React.ComponentProps<"table"> & { node?: MarkdownNode }
 
-/** Wraps tables with a copy control that copies their markdown source. */
-function MarkdownTable({ node, children, ...rest }: TableProps) {
+/**
+ * A Markdown table, drawn as the kit's `Table` on a hairline panel: a muted
+ * header band, row rules and no column rules. The panel hugs a small table
+ * and takes the full width for a large one; a table whose columns cannot fit
+ * even at their narrowest scrolls sideways inside its own panel rather than
+ * pushing the reply wider. The copy control sits in the header band and
+ * copies the table's Markdown source.
+ */
+function MarkdownTable({ node, children, className, ...rest }: TableProps) {
   const source = React.useContext(MarkdownSourceContext)
   const start = node?.position?.start.offset
   const end = node?.position?.end.offset
   const markdown =
     start !== undefined && end !== undefined ? source.slice(start, end) : null
-  if (markdown === null) return <table {...rest}>{children}</table>
+  const frame = React.useRef<HTMLDivElement>(null)
+  const hidden = useHiddenColumns(frame)
   return (
-    <span className="group/copy relative block w-fit max-w-full">
-      <table {...rest}>{children}</table>
-      <CopyButton
-        text={markdown}
-        label="Copy table"
-        className="right-0 top-0"
-      />
-    </span>
+    <div
+      ref={frame}
+      data-slot="markdown-table"
+      data-more-left={hidden.left || undefined}
+      data-more-right={hidden.right || undefined}
+      className="group/copy relative my-4 w-fit min-w-0 max-w-full"
+    >
+      <TableShell className="bg-transparent text-inherit">
+        <Table
+          containerLabel="Table"
+          // A scrolling table fades out at each edge that has columns past
+          // it, since an overlay scrollbar shows nothing until it is used.
+          containerClassName={cn(
+            hidden.left &&
+              hidden.right &&
+              "[mask-image:linear-gradient(to_right,transparent,black_2.5rem,black_calc(100%-2.5rem),transparent)]",
+            hidden.left &&
+              !hidden.right &&
+              "[mask-image:linear-gradient(to_right,transparent,black_2.5rem)]",
+            !hidden.left &&
+              hidden.right &&
+              "[mask-image:linear-gradient(to_right,black_calc(100%-2.5rem),transparent)]",
+          )}
+          className={cn("tabular-nums", className)}
+          {...rest}
+        >
+          {children}
+        </Table>
+      </TableShell>
+      {markdown === null ? null : (
+        <CopyButton text={markdown} label="Copy table" className="right-1 top-1" />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Whether the table inside `frame` has columns scrolled out of view past its
+ * left or right edge, followed through scrolling, resizing and the table's
+ * own growth while a reply streams.
+ */
+function useHiddenColumns(frame: React.RefObject<HTMLDivElement | null>) {
+  const [hidden, setHidden] = React.useState({ left: false, right: false })
+  React.useEffect(() => {
+    const port = frame.current?.querySelector<HTMLElement>(
+      '[data-slot="table-container"]',
+    )
+    if (!port) return
+    const measure = () => {
+      // Physical sides, as the mask draws them. In a right-to-left table
+      // scrollLeft runs from 0 at the right edge down to minus the overflow.
+      const overflow = port.scrollWidth - port.clientWidth
+      const fromLeft =
+        getComputedStyle(port).direction === "rtl"
+          ? overflow + port.scrollLeft
+          : port.scrollLeft
+      const next = { left: fromLeft > 1, right: overflow - fromLeft > 1 }
+      setHidden((current) =>
+        current.left === next.left && current.right === next.right
+          ? current
+          : next,
+      )
+    }
+    measure()
+    port.addEventListener("scroll", measure, { passive: true })
+    const stopObserving = observeSize(port, measure, {
+      boxes: (container) => [container.firstElementChild],
+    })
+    return () => {
+      port.removeEventListener("scroll", measure)
+      stopObserving()
+    }
+  }, [frame])
+  return hidden
+}
+
+/** The header band: a quiet wash under the column names, no hover. */
+function MarkdownTableHeader({
+  node: _node,
+  className,
+  ...rest
+}: React.ComponentProps<"thead"> & { node?: unknown }) {
+  return (
+    <TableHeader
+      className={cn("bg-muted/50 [&_tr]:hover:bg-transparent", className)}
+      {...rest}
+    />
+  )
+}
+
+function MarkdownTableBody({
+  node: _node,
+  ...rest
+}: React.ComponentProps<"tbody"> & { node?: unknown }) {
+  return <TableBody {...rest} />
+}
+
+/** A row reads as text, so it carries a rule but no hover wash. */
+function MarkdownTableRow({
+  node: _node,
+  className,
+  ...rest
+}: React.ComponentProps<"tr"> & { node?: unknown }) {
+  return <TableRow className={cn("hover:bg-transparent", className)} {...rest} />
+}
+
+/**
+ * A column name stays on one line, so a column is never narrower than its
+ * name. An alignment the Markdown sets (`:---:`, `---:`) arrives as an inline
+ * `text-align` and wins over the kit's left default.
+ */
+function MarkdownTableHead({
+  node: _node,
+  ...rest
+}: React.ComponentProps<"th"> & { node?: unknown }) {
+  return <TableHead {...rest} />
+}
+
+/**
+ * Cell text wraps between words and never inside one. The cell sets its own
+ * `overflow-wrap` because a host column often sets `anywhere` so a long
+ * address cannot widen the pane, and `anywhere` lets a table column shrink to
+ * one character: every column would fall to a sliver and its words would
+ * split letter by letter. `break-word` still breaks a run too long for any
+ * width, but only once it would overflow, so the table's narrowest width
+ * keeps every word whole and a table that cannot fit scrolls instead.
+ *
+ * A cell is also never narrower than about ten characters, so a table with
+ * many columns scrolls rather than stacking a date or a name one word per
+ * line.
+ */
+function MarkdownTableCell({
+  node: _node,
+  className,
+  ...rest
+}: React.ComponentProps<"td"> & { node?: unknown }) {
+  return (
+    <TableCell
+      className={cn(
+        "min-w-[8em] whitespace-normal align-top [overflow-wrap:break-word] [text-wrap:pretty]",
+        className,
+      )}
+      {...rest}
+    />
   )
 }
 
@@ -279,14 +434,19 @@ const defaultComponents: Components = {
   pre: MarkdownPre,
   code: MarkdownCode,
   table: MarkdownTable,
+  thead: MarkdownTableHeader,
+  tbody: MarkdownTableBody,
+  tr: MarkdownTableRow,
+  th: MarkdownTableHead,
+  td: MarkdownTableCell,
 }
 
 /**
  * Renders assistant markdown inside a message: GitHub-flavored markdown plus
  * TeX math (`$…$` inline, `$$…$$` display) rendered through MathBlock,
  * fenced code highlighted through CodeBlock, ```mermaid fences drawn
- * through MermaidDiagram, and each link to a web page led by its site's
- * Favicon — all styled with Nessa tokens and following the
+ * through MermaidDiagram, tables through the kit's Table, and each link
+ * to a web page led by its site's Favicon — all styled with Nessa tokens and following the
  * nearest CodeBlockProvider, so the host's code theme and color mode apply
  * app-wide. Code, tables, and display math each carry a copy control that
  * copies their original markdown source. Compose it inside a plain
@@ -319,7 +479,6 @@ function MessageMarkdown({
         "[&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:my-3 [&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:overflow-x-auto [&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:rounded-xl [&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:bg-muted [&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:p-3",
         "[&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground",
         "[&_a]:font-medium [&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-2",
-        "[&_table]:my-3 [&_table]:block [&_table]:w-fit [&_table]:max-w-full [&_table]:border-collapse [&_table]:overflow-x-auto [&_th]:border [&_th]:border-border [&_th]:bg-muted [&_th]:px-2.5 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-medium [&_td]:border [&_td]:border-border [&_td]:px-2.5 [&_td]:py-1.5",
         "[&_hr]:my-4 [&_hr]:border-border",
         "[&_img]:max-w-full [&_img]:rounded-xl",
         "[&_.katex-display]:my-0 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:py-1",

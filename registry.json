@@ -1028,7 +1028,9 @@
         "nessalabs/nessa_ui/code-block",
         "nessalabs/nessa_ui/favicon",
         "nessalabs/nessa_ui/math-block",
-        "nessalabs/nessa_ui/mermaid-diagram"
+        "nessalabs/nessa_ui/mermaid-diagram",
+        "nessalabs/nessa_ui/size-observer",
+        "nessalabs/nessa_ui/table"
       ],
       "files": [
         {
