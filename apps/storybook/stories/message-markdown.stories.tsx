@@ -393,6 +393,14 @@ export const Tables: Story = {
     // No word is cut: each of these short runs sits on one line.
     for (const word of ["Price", "$16.99", "CAD", "Cine-Maniac", "$150"])
       await expect(wraps(prices!, word)).toBe(false)
+    // A hairline separates the columns: every cell after a row's first, and
+    // only those, draws a rule on its starting side.
+    for (const row of prices!.querySelectorAll("tr")) {
+      const [first, ...rest] = [...row.children]
+      await expect(getComputedStyle(first!).borderInlineStartWidth).toBe("0px")
+      for (const cell of rest)
+        await expect(getComputedStyle(cell).borderInlineStartWidth).toBe("1px")
+    }
     // The narrow table fits; the wide one scrolls in its own panel.
     const scrollPort = (table: Element) =>
       table.querySelector<HTMLElement>('[data-slot="table-container"]')!

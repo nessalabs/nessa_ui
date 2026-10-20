@@ -271,12 +271,12 @@ function tableLabel(node: MarkdownNode | undefined) {
 
 /**
  * A Markdown table, drawn as the kit's `Table` on a hairline panel: a muted
- * header band, row rules and no column rules. The panel hugs a small table
- * and takes the full width for a large one; a table whose columns cannot fit
- * even at their narrowest scrolls sideways inside its own panel, fading the
- * side with columns past it, rather than pushing the reply wider. The copy
- * control sits at the end of the header band, over room the last column
- * keeps for it, and copies the table's Markdown source.
+ * header band and hairline rules between rows and between columns. The panel
+ * hugs a small table and takes the full width for a large one; a table whose
+ * columns cannot fit even at their narrowest scrolls sideways inside its own
+ * panel, fading the side with columns past it, rather than pushing the reply
+ * wider. The copy control sits at the end of the header band, over room the
+ * last column keeps for it, and copies the table's Markdown source.
  */
 function MarkdownTable({ node, children, className, ...rest }: TableProps) {
   const source = React.useContext(MarkdownSourceContext)
@@ -295,6 +295,9 @@ function MarkdownTable({ node, children, className, ...rest }: TableProps) {
           edgeFade
           className={cn(
             "tabular-nums",
+            // A hairline between columns, on the side each cell starts, so
+            // the rules sit between columns in either text direction.
+            "[&_tr>*+*]:border-s [&_tr>*+*]:border-border",
             // The last column's cells, heading and data alike, so a
             // right-aligned column stays aligned under its name.
             markdown !== null && "[&_tr>*:last-child]:pr-10",
