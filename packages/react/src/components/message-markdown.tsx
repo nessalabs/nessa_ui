@@ -5,7 +5,6 @@ import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
 
-import { observeSize } from "@/lib/size-observer"
 import { cn } from "@/lib/utils"
 import { CodeBlock, CopyButton } from "./code-block"
 import { Favicon } from "./favicon"
@@ -241,16 +240,43 @@ function MarkdownCode({ node: _node, className, children, ...rest }: CodeProps) 
 
 type MarkdownNode = {
   position?: { start: { offset?: number }; end: { offset?: number } }
+  children?: MarkdownNode[]
+  type?: string
+  tagName?: string
+  value?: string
 }
 type TableProps = React.ComponentProps<"table"> & { node?: MarkdownNode }
+
+/** The text of a parsed node, its descendants' text joined. */
+function nodeText(node: MarkdownNode): string {
+  if (node.type === "text") return node.value ?? ""
+  return (node.children ?? []).map(nodeText).join("")
+}
+
+/**
+ * A name for a scrolling table, from its column names: "Table: Film, Venue,
+ * Date". A transcript can hold many tables, and landmarks that all share one
+ * name cannot be told apart.
+ */
+function tableLabel(node: MarkdownNode | undefined) {
+  const names: string[] = []
+  const visit = (each: MarkdownNode) => {
+    if (each.tagName === "th") names.push(nodeText(each).trim())
+    else if (each.tagName !== "tbody") each.children?.forEach(visit)
+  }
+  if (node) visit(node)
+  const named = names.filter(Boolean)
+  return named.length ? `Table: ${named.join(", ")}` : "Table"
+}
 
 /**
  * A Markdown table, drawn as the kit's `Table` on a hairline panel: a muted
  * header band, row rules and no column rules. The panel hugs a small table
  * and takes the full width for a large one; a table whose columns cannot fit
- * even at their narrowest scrolls sideways inside its own panel rather than
- * pushing the reply wider. The copy control sits in the header band and
- * copies the table's Markdown source.
+ * even at their narrowest scrolls sideways inside its own panel, fading the
+ * side with columns past it, rather than pushing the reply wider. The copy
+ * control sits at the end of the header band, over room the last column
+ * keeps for it, and copies the table's Markdown source.
  */
 function MarkdownTable({ node, children, className, ...rest }: TableProps) {
   const source = React.useContext(MarkdownSourceContext)
@@ -258,33 +284,22 @@ function MarkdownTable({ node, children, className, ...rest }: TableProps) {
   const end = node?.position?.end.offset
   const markdown =
     start !== undefined && end !== undefined ? source.slice(start, end) : null
-  const frame = React.useRef<HTMLDivElement>(null)
-  const hidden = useHiddenColumns(frame)
   return (
     <div
-      ref={frame}
       data-slot="markdown-table"
-      data-more-left={hidden.left || undefined}
-      data-more-right={hidden.right || undefined}
       className="group/copy relative my-4 w-fit min-w-0 max-w-full"
     >
       <TableShell className="bg-transparent text-inherit">
         <Table
-          containerLabel="Table"
-          // A scrolling table fades out at each edge that has columns past
-          // it, since an overlay scrollbar shows nothing until it is used.
-          containerClassName={cn(
-            hidden.left &&
-              hidden.right &&
-              "[mask-image:linear-gradient(to_right,transparent,black_2.5rem,black_calc(100%-2.5rem),transparent)]",
-            hidden.left &&
-              !hidden.right &&
-              "[mask-image:linear-gradient(to_right,transparent,black_2.5rem)]",
-            !hidden.left &&
-              hidden.right &&
-              "[mask-image:linear-gradient(to_right,black_calc(100%-2.5rem),transparent)]",
+          containerLabel={tableLabel(node)}
+          edgeFade
+          className={cn(
+            "tabular-nums",
+            // The last column's cells, heading and data alike, so a
+            // right-aligned column stays aligned under its name.
+            markdown !== null && "[&_tr>*:last-child]:pr-10",
+            className,
           )}
-          className={cn("tabular-nums", className)}
           {...rest}
         >
           {children}
@@ -297,46 +312,6 @@ function MarkdownTable({ node, children, className, ...rest }: TableProps) {
   )
 }
 
-/**
- * Whether the table inside `frame` has columns scrolled out of view past its
- * left or right edge, followed through scrolling, resizing and the table's
- * own growth while a reply streams.
- */
-function useHiddenColumns(frame: React.RefObject<HTMLDivElement | null>) {
-  const [hidden, setHidden] = React.useState({ left: false, right: false })
-  React.useEffect(() => {
-    const port = frame.current?.querySelector<HTMLElement>(
-      '[data-slot="table-container"]',
-    )
-    if (!port) return
-    const measure = () => {
-      // Physical sides, as the mask draws them. In a right-to-left table
-      // scrollLeft runs from 0 at the right edge down to minus the overflow.
-      const overflow = port.scrollWidth - port.clientWidth
-      const fromLeft =
-        getComputedStyle(port).direction === "rtl"
-          ? overflow + port.scrollLeft
-          : port.scrollLeft
-      const next = { left: fromLeft > 1, right: overflow - fromLeft > 1 }
-      setHidden((current) =>
-        current.left === next.left && current.right === next.right
-          ? current
-          : next,
-      )
-    }
-    measure()
-    port.addEventListener("scroll", measure, { passive: true })
-    const stopObserving = observeSize(port, measure, {
-      boxes: (container) => [container.firstElementChild],
-    })
-    return () => {
-      port.removeEventListener("scroll", measure)
-      stopObserving()
-    }
-  }, [frame])
-  return hidden
-}
-
 /** The header band: a quiet wash under the column names, no hover. */
 function MarkdownTableHeader({
   node: _node,
@@ -345,7 +320,7 @@ function MarkdownTableHeader({
 }: React.ComponentProps<"thead"> & { node?: unknown }) {
   return (
     <TableHeader
-      className={cn("bg-muted/50 [&_tr]:hover:bg-transparent", className)}
+      className={cn("bg-muted/50", className)}
       {...rest}
     />
   )

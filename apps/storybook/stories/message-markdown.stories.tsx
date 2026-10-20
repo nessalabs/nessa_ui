@@ -402,15 +402,28 @@ export const Tables: Story = {
     await waitFor(() =>
       expect(scrollPort(screenings!)).toHaveAttribute("role", "region"),
     )
-    await expect(scrollPort(screenings!)).toHaveAccessibleName("Table")
-    // The edge with columns past it fades; scrolled to the end, the fade
-    // moves to the other edge.
-    await expect(prices).not.toHaveAttribute("data-more-right")
-    await waitFor(() => expect(screenings).toHaveAttribute("data-more-right"))
-    await expect(screenings).not.toHaveAttribute("data-more-left")
+    await expect(scrollPort(screenings!)).toHaveAccessibleName(
+      "Table: Film, Venue, Date, Time, Runtime, Format, Language, Seats left",
+    )
+    // The side with columns past it fades; scrolled to the end, the fade
+    // moves to the other side.
+    await expect(scrollPort(prices!)).not.toHaveAttribute("data-hidden-right")
+    await waitFor(() =>
+      expect(scrollPort(screenings!)).toHaveAttribute("data-hidden-right"),
+    )
+    await expect(scrollPort(screenings!)).not.toHaveAttribute("data-hidden-left")
     scrollPort(screenings!).scrollLeft = scrollPort(screenings!).scrollWidth
-    await waitFor(() => expect(screenings).toHaveAttribute("data-more-left"))
-    await expect(screenings).not.toHaveAttribute("data-more-right")
+    await waitFor(() =>
+      expect(scrollPort(screenings!)).toHaveAttribute("data-hidden-left"),
+    )
+    await expect(scrollPort(screenings!)).not.toHaveAttribute("data-hidden-right")
+    // The copy control keeps clear of the last column's name.
+    const copy = canvas.getAllByRole("button", { name: "Copy table" })[1]!
+    const seatsName = document.createRange()
+    seatsName.selectNodeContents(canvas.getByText("Seats left"))
+    await expect(seatsName.getBoundingClientRect().right).toBeLessThanOrEqual(
+      copy.getBoundingClientRect().left,
+    )
     // The column the Markdown aligns right stays right-aligned.
     const seats = canvas.getByRole("columnheader", { name: "Seats left" })
     await expect(getComputedStyle(seats).textAlign).toBe("right")
