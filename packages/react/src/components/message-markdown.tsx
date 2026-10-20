@@ -421,8 +421,8 @@ const defaultComponents: Components = {
  * TeX math (`$…$` inline, `$$…$$` display) rendered through MathBlock,
  * fenced code highlighted through CodeBlock, ```mermaid fences drawn
  * through MermaidDiagram, tables through the kit's Table, and each link
- * to a web page led by its site's Favicon — all styled with Nessa tokens and following the
- * nearest CodeBlockProvider, so the host's code theme and color mode apply
+ * to a web page led by its site's Favicon — all styled with Nessa tokens
+ * and following the nearest CodeBlockProvider, so the host's code theme and color mode apply
  * app-wide. Code, tables, and display math each carry a copy control that
  * copies their original markdown source. Compose it inside a plain
  * MessageBubble; while a reply streams, keep passing the partial source with

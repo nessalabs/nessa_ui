@@ -1021,6 +1021,59 @@ export const OverflowingColumns: Story = {
   },
 }
 
+export const EdgeFade: Story = {
+  parameters: storyDocumentation(
+    "`edgeFade` fades the side of the scroll container that has columns past it, so a table that scrolls says so even where an overlay scrollbar shows nothing until it is used. The sides are physical: in this right-to-left table the columns start on the right, so it is the left side that fades until the table is scrolled to its far end, when the fade moves to the right.",
+  ),
+  render: () => (
+    <div dir="rtl" className="w-md max-w-full">
+      <TableShell>
+        <Table containerLabel="Trace details, right to left" edgeFade>
+          <TableHeader>
+            <TableRow>
+              {wideColumns.map((column) => (
+                <TableHead key={column} className="text-start">
+                  {column}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {traces.slice(0, 3).map((trace) => (
+              <TableRow key={trace.id}>
+                <TableCell className="font-semibold text-foreground">
+                  {trace.title}
+                </TableCell>
+                <TableCell className="text-muted-foreground">{trace.agent}</TableCell>
+                <TableCell className="font-mono tabular-nums">{trace.duration}</TableCell>
+                <TableCell className="font-mono tabular-nums text-muted-foreground">
+                  {trace.updated}
+                </TableCell>
+                <TableCell className="text-muted-foreground">nessa-ui</TableCell>
+                <TableCell className="font-mono">main</TableCell>
+                <TableCell className="text-muted-foreground">{trace.agent}</TableCell>
+                <TableCell className="font-mono tabular-nums">12,480</TableCell>
+                <TableCell className="font-mono tabular-nums">$0.42</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableShell>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const region = canvasElement.querySelector<HTMLElement>(
+      '[data-slot="table-container"]',
+    )!
+    await waitFor(() => expect(region).toHaveAttribute("data-hidden-left"))
+    await expect(region).not.toHaveAttribute("data-hidden-right")
+    // Right to left, scrollLeft runs negative toward the far (left) end.
+    region.scrollLeft = -region.scrollWidth
+    await waitFor(() => expect(region).toHaveAttribute("data-hidden-right"))
+    await expect(region).not.toHaveAttribute("data-hidden-left")
+  },
+}
+
 export const CappedHeight: Story = {
   parameters: storyDocumentation(
     "A scrolling body: `containerClassName` caps the scroll container's height, since the table element is not the scroll port, and `TableHeader`'s `sticky` pins the column headers while the rows scroll beneath them. Overflow is measured on both axes, so a table whose columns all fit but whose rows do not still becomes keyboard focusable and reachable.",
