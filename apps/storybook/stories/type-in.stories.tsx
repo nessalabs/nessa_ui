@@ -5,13 +5,17 @@ import { BloomField, TypeIn } from "@nessalabs/ui";
 
 import { storyDocumentation } from "./story-documentation";
 
-/** Waits for every letter to settle and the caret to leave. */
+/**
+ * Waits for every letter to settle and the caret to leave. The welcome takes
+ * about 3.2 s to type and blink out; the wait leaves room for a CI machine
+ * busy drawing other stories, where 5 s ran out.
+ */
 async function typedIn(canvasElement: HTMLElement) {
   const root = canvasElement.querySelector<HTMLElement>(
     '[data-slot="type-in"]',
   )!;
   await waitFor(() => expect(root).toHaveAttribute("data-typed", "true"), {
-    timeout: 5000,
+    timeout: 15000,
   });
   return root;
 }
