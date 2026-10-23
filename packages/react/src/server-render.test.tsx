@@ -25,6 +25,7 @@ import { EmptyState } from "./components/empty-state";
 import { Favicon } from "./components/favicon";
 import { Input } from "./components/input";
 import { LoadingText } from "./components/loading-text";
+import { ToolTrace } from "./components/tool-trace";
 import { Message } from "./components/message";
 import { ProportionBar } from "./components/proportion-bar";
 import { SearchableListbox } from "./components/searchable-listbox";
@@ -75,6 +76,49 @@ test("primitives render without a browser global", () => {
   assert.ok(
     server(<LoadingText>Loading Files</LoadingText>).includes("Loading Files"),
   );
+  assert.ok(
+    server(
+      <ToolTrace
+        now={0}
+        steps={[
+          {
+            id: "a",
+            label: "Read",
+            detail: "README.md",
+            status: "completed",
+            startedAtMs: 0,
+            endedAtMs: 100,
+          },
+        ]}
+      />,
+    ).includes("Ran 1 tool"),
+  );
+  // A running trace without a host clock draws against its own calls' times
+  // on the server, so the server and the first client render agree.
+  const running = () =>
+    server(
+      <ToolTrace
+        status="running"
+        steps={[
+          {
+            id: "a",
+            label: "Ran",
+            status: "running",
+            startedAtMs: 1_000,
+          },
+          {
+            id: "b",
+            label: "Read",
+            status: "completed",
+            startedAtMs: 0,
+            endedAtMs: 1_500,
+          },
+        ]}
+      />,
+    );
+  const first = running();
+  assert.ok(first.includes("Working"));
+  assert.equal(running(), first);
   assert.ok(
     server(<Favicon href="https://example.com/a" />).includes(
       "https://example.com/favicon.ico",

@@ -62,6 +62,7 @@ type FocusComponent =
   | "conversation-rail"
   | "conversation-history"
   | "swipe-row"
+  | "tool-trace"
   | "event-calendar"
   | "gantt-chart/gantt-chart-grid"
   | "radar-chart/radar-chart"
@@ -207,6 +208,17 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     state: "focus-visible",
     className: "focus-visible:outline-ring",
     count: 2,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The run's line, each call's row, and the row the earlier calls fold
+  // into. The details tabs are Tabs'.
+  {
+    component: "tool-trace",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 3,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -704,6 +716,11 @@ export const focusGeometryClasses = Object.freeze([
   // edges, so there its outline draws inset instead.
   { component: "conversation-history", className: "focus-visible:outline-2", count: 2 },
   { component: "conversation-history", className: "focus-visible:outline-offset-2", count: 2 },
+  // The line keeps the outset offset; a row draws inset, because an open
+  // call's card clips at the row's edges.
+  { component: "tool-trace", className: "focus-visible:outline-2", count: 3 },
+  { component: "tool-trace", className: "focus-visible:outline-offset-2", count: 1 },
+  { component: "tool-trace", className: "focus-visible:-outline-offset-2", count: 2 },
   // Each revealed action keeps the outset offset; the content, slid open and
   // clipped at the row's edges, has its outline drawn inset.
   { component: "swipe-row", className: "focus-visible:outline-2", count: 1 },

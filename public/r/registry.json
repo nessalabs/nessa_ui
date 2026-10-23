@@ -503,6 +503,19 @@
       ]
     },
     {
+      "name": "shimmer",
+      "type": "registry:lib",
+      "title": "Shimmer",
+      "description": "The one shimmer: a highlight swept across live text once per ambient motion duration, painted from theme tokens, and still under reduced motion. Every component that shimmers a label uses it.",
+      "files": [
+        {
+          "path": "packages/react/src/lib/shimmer.ts",
+          "type": "registry:lib",
+          "target": "lib/shimmer.ts"
+        }
+      ]
+    },
+    {
       "name": "size-observer",
       "type": "registry:lib",
       "title": "Size observer",
@@ -821,7 +834,8 @@
       "description": "Text with a highlight sweeping across it, the default loader for any frame with nothing to show yet. Plain muted text under reduced motion, announced politely after it mounts and when the label changes.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
-        "nessalabs/nessa_ui/utils"
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/shimmer"
       ],
       "files": [
         {
@@ -1952,7 +1966,8 @@
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
-        "nessalabs/nessa_ui/utils"
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/shimmer"
       ],
       "files": [
         {
@@ -1992,7 +2007,8 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils",
-        "nessalabs/nessa_ui/code-block"
+        "nessalabs/nessa_ui/code-block",
+        "nessalabs/nessa_ui/shimmer"
       ],
       "files": [
         {
@@ -2136,6 +2152,30 @@
           "path": "packages/react/src/components/context-menu.tsx",
           "type": "registry:ui",
           "target": "components/ui/context-menu.tsx"
+        }
+      ]
+    },
+    {
+      "name": "tool-trace",
+      "type": "registry:ui",
+      "title": "Tool Trace",
+      "description": "A run of an agent's tool calls as one quiet line that opens into a waterfall: each call on a shared time axis, earlier calls folded once there are more than a few, and one call's Diff, Input, and Output at a time in a fixed-height card that continues its row.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/tabs",
+        "nessalabs/nessa_ui/tool-call",
+        "nessalabs/nessa_ui/shimmer",
+        "nessalabs/nessa_ui/file-diff-list"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/tool-trace.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/tool-trace.tsx"
         }
       ]
     },

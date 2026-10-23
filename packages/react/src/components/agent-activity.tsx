@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ChevronRight } from "lucide-react";
 
+import { shimmerClasses, useShimmer } from "@/lib/shimmer";
 import { cn } from "@/lib/utils";
 
 /**
@@ -96,31 +97,6 @@ function AgentActivity({
   );
 }
 
-const reducedMotionQuery = "(prefers-reduced-motion: reduce)";
-
-function subscribeToReducedMotion(callback: () => void) {
-  const query = window.matchMedia(reducedMotionQuery);
-  query.addEventListener("change", callback);
-  return () => query.removeEventListener("change", callback);
-}
-
-function useReducedMotion() {
-  return React.useSyncExternalStore(
-    subscribeToReducedMotion,
-    () => window.matchMedia(reducedMotionQuery).matches,
-    () => false,
-  );
-}
-
-function cssDurationInMilliseconds(value: string, fallback: number) {
-  const parsed = Number.parseFloat(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return value.trim().endsWith("ms") ? parsed : parsed * 1000;
-}
-
-const activityShimmerClasses =
-  "data-[shimmer=true]:[background-image:linear-gradient(90deg,var(--muted-foreground)_0%,var(--muted-foreground)_38%,var(--foreground)_50%,var(--muted-foreground)_62%,var(--muted-foreground)_100%)] data-[shimmer=true]:bg-[length:200%_100%] data-[shimmer=true]:bg-[position:150%_0] data-[shimmer=true]:bg-clip-text data-[shimmer=true]:[-webkit-background-clip:text] data-[shimmer=true]:text-transparent";
-
 function ActivityShimmer({
   active,
   children,
@@ -128,31 +104,13 @@ function ActivityShimmer({
   active: boolean;
   children: React.ReactNode;
 }) {
-  const reducedMotion = useReducedMotion();
-  const shimmering = active && !reducedMotion;
-  const ref = React.useRef<HTMLSpanElement>(null);
-  React.useEffect(() => {
-    const node = ref.current;
-    if (!node || !shimmering) return;
-    const duration = cssDurationInMilliseconds(
-      getComputedStyle(node).getPropertyValue(
-        "--nessa-motion-duration-ambient",
-      ),
-      3200,
-    );
-    if (duration === 0) return;
-    const animation = node.animate(
-      [{ backgroundPosition: "150% 0" }, { backgroundPosition: "-50% 0" }],
-      { duration, easing: "linear", iterations: Infinity },
-    );
-    return () => animation.cancel();
-  }, [shimmering]);
+  const { ref, shimmering } = useShimmer<HTMLSpanElement>(active);
   return (
     <span
       ref={ref}
       data-slot="agent-activity-shimmer"
       data-shimmer={shimmering ? "true" : undefined}
-      className={cn("min-w-0 truncate text-left", activityShimmerClasses)}
+      className={cn("min-w-0 truncate text-left", shimmerClasses)}
     >
       {children}
     </span>
