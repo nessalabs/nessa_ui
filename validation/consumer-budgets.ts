@@ -144,6 +144,16 @@
  * new input in the import graph. `button-only` and `file-preview` crossed
  * their minified ceilings by under a kilobyte, inside their gzip ones; all
  * four minified ceilings move up by 5 kB.
+ *
+ * ## Re-recorded for SwipeRow's trackpad fix and ToolTrace `renderText` (#141)
+ *
+ * The rubber band, the once-per-frame paint, the flush tray, the scroll
+ * intent rule and ToolTrace's `renderText` add package code to the barrel.
+ * Diffed against `main` by input, `file-preview` grew 2.6 kB minified, of
+ * which 2.56 kB is `packages/react/dist/index.js` and the rest minifier
+ * reshuffling of tens of bytes; no input is new and none is gone.
+ * `file-preview` crossed its minified ceiling by 0.5 kB, inside its gzip
+ * one; all four minified ceilings move up by 5 kB.
  */
 
 export interface ConsumerBudget {
@@ -173,7 +183,7 @@ export const consumerBudgets: readonly ConsumerBudget[] = Object.freeze([
     name: "button-only",
     rationale:
       "An app that wanted one control. If the barrel leaks, it leaks here first — and it does: the whole rich-content stack, as the note above records.",
-    maximumBytes: 1_655_000,
+    maximumBytes: 1_660_000,
     maximumGzipBytes: 480_000,
     maximumCssBytes: 48_000,
   },
@@ -181,7 +191,7 @@ export const consumerBudgets: readonly ConsumerBudget[] = Object.freeze([
     name: "picker",
     rationale:
       "Radix, a portalled popover and the listbox engine, and — through the barrel, not through anything it imports — the same rich-content stack every other fixture carries.",
-    maximumBytes: 1_675_000,
+    maximumBytes: 1_680_000,
     maximumGzipBytes: 485_000,
     maximumCssBytes: 48_000,
   },
@@ -189,7 +199,7 @@ export const consumerBudgets: readonly ConsumerBudget[] = Object.freeze([
     name: "file-preview",
     rationale:
       "An app that previews one kind of file. It reads within a couple of kilobytes of button-only, which is the finding: what a consumer fetches is the barrel, not the component it named.",
-    maximumBytes: 1_845_000,
+    maximumBytes: 1_850_000,
     maximumGzipBytes: 535_000,
     maximumCssBytes: 48_000,
   },
@@ -197,7 +207,7 @@ export const consumerBudgets: readonly ConsumerBudget[] = Object.freeze([
     name: "rich-transcript",
     rationale:
       "Markdown, highlighting, maths and diagrams — everything the barrel already hands the other three. It reads close to them, and that is the finding rather than the reassurance.",
-    maximumBytes: 1_835_000,
+    maximumBytes: 1_840_000,
     maximumGzipBytes: 535_000,
     maximumCssBytes: 48_000,
   },
