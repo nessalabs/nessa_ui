@@ -931,7 +931,8 @@
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
-        "nessalabs/nessa_ui/utils"
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/compose"
       ],
       "files": [
         {
@@ -953,7 +954,8 @@
       "description": "A WebGL field of soft colour blooms that can gather into one orb, fill a surface, or flood past it, hold up to three pointable lights, take a tint, and send a ring of light through itself \u2014 every value tweened, settled state exposed for tests.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
-        "nessalabs/nessa_ui/utils"
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/compose"
       ],
       "files": [
         {
@@ -970,7 +972,8 @@
       "description": "Text that types itself in a key at a time at a human pace, painted with one gradient across the whole word, each letter landing with a press and a flash that cools, led by a gradient caret that blinks twice and leaves. For a wordmark at a once-only moment.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
-        "nessalabs/nessa_ui/utils"
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/compose"
       ],
       "files": [
         {

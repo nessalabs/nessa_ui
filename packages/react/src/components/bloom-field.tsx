@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import { useComposedRefs } from "@/lib/compose";
 import { cn } from "@/lib/utils";
 
 const reducedMotionQuery = "(prefers-reduced-motion: reduce)";
@@ -369,10 +370,12 @@ function BloomField({
   resolution = 0.7,
   className,
   style,
+  ref,
   ...props
 }: BloomFieldProps) {
   const reducedMotion = useReducedMotion();
   const root = React.useRef<HTMLDivElement>(null);
+  const rootRef = useComposedRefs(root, ref);
   const canvas = React.useRef<HTMLCanvasElement>(null);
   const current = React.useRef<Record<Channel, number>>({ ...DEFAULTS });
   const tweens = React.useRef<Partial<Record<Channel, Tween>>>({});
@@ -475,10 +478,15 @@ function BloomField({
       depth: false,
     });
     // Without WebGL the field is its ground colour, which never moves.
+    // A change that would have moved it is settled the moment it is made.
     if (!gl) {
+      const settle = () => host.setAttribute("data-settled", "true");
       host.setAttribute("data-fallback", "true");
-      host.setAttribute("data-settled", "true");
-      return;
+      settle();
+      wake.current = settle;
+      return () => {
+        wake.current = () => {};
+      };
     }
     const blooms = palette.split("|");
     const fixed = {
@@ -653,7 +661,7 @@ function BloomField({
 
   return (
     <div
-      ref={root}
+      ref={rootRef}
       aria-hidden="true"
       data-slot="bloom-field"
       data-opaque={

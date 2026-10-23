@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { useComposedRefs } from "@/lib/compose"
 import { cn } from "@/lib/utils"
 
 import type { AgentFigureKind, Figure } from "./agent-figure-scenes"
@@ -57,9 +58,10 @@ export interface AgentFigureProps extends Omit<React.ComponentProps<"span">, "ch
  * on. Under reduced motion it is drawn at rest and never moves. Without WebGL
  * it stays empty.
  */
-function AgentFigure({ agent, lively = false, className, ...props }: AgentFigureProps) {
+function AgentFigure({ agent, lively = false, className, ref, ...props }: AgentFigureProps) {
   const reducedMotion = useReducedMotion()
   const root = React.useRef<HTMLSpanElement>(null)
+  const rootRef = useComposedRefs(root, ref)
   const canvas = React.useRef<HTMLCanvasElement>(null)
   const [figure, setFigure] = React.useState<Figure | null>(null)
   // Bumped when the shared renderer is lost, so the figure is built again on
@@ -133,7 +135,7 @@ function AgentFigure({ agent, lively = false, className, ...props }: AgentFigure
 
   return (
     <span
-      ref={root}
+      ref={rootRef}
       aria-hidden="true"
       data-slot="agent-figure"
       data-agent={agent}

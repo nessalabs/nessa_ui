@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import { useComposedRefs } from "@/lib/compose";
 import { cn } from "@/lib/utils";
 
 const reducedMotionQuery = "(prefers-reduced-motion: reduce)";
@@ -104,10 +105,12 @@ function TypeIn({
   plain = 0,
   onTyped,
   className,
+  ref,
   ...props
 }: TypeInProps) {
   const reducedMotion = useReducedMotion();
   const root = React.useRef<HTMLSpanElement>(null);
+  const rootRef = useComposedRefs(root, ref);
   const caretRef = React.useRef<HTMLSpanElement>(null);
   const typed = React.useRef(onTyped);
   typed.current = onTyped;
@@ -284,7 +287,7 @@ function TypeIn({
 
   return (
     <span
-      ref={root}
+      ref={rootRef}
       data-slot="type-in"
       className={cn(
         "relative inline-flex items-baseline whitespace-pre",
