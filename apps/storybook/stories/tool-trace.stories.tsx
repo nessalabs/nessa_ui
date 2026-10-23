@@ -282,9 +282,20 @@ export const LongRun: Story = {
     ).toHaveLength(4);
     await userEvent.click(earlier);
     await expect(earlier).toHaveAccessibleName(/Hide 14 earlier/);
-    await expect(
-      canvasElement.querySelectorAll("[data-slot=tool-trace-step]"),
-    ).toHaveLength(18);
+    const rows = () =>
+      canvasElement.querySelectorAll<HTMLElement>("[data-slot=tool-trace-step]");
+    await expect(rows()).toHaveLength(18);
+    // Opening an earlier call's card leaves the fold as it was ...
+    await userEvent.click(rows()[2]!);
+    await expect(rows()[2]).toHaveAttribute("aria-expanded", "true");
+    await expect(earlier).toHaveAccessibleName(/Hide 14 earlier/);
+    // ... and hiding the earlier calls closes it with them.
+    await userEvent.click(earlier);
+    await expect(rows()).toHaveLength(4);
+    await expect(earlier).toHaveFocus();
+    await userEvent.click(earlier);
+    await expect(rows()).toHaveLength(18);
+    await expect(rows()[2]).toHaveAttribute("aria-expanded", "false");
   },
 };
 

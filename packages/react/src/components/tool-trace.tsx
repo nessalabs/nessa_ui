@@ -106,6 +106,10 @@ export interface ToolTraceProps extends Omit<
 const live = (step: ToolTraceStep) =>
   step.status === "running" || step.status === "pending";
 
+/** A live call in words: a queued call is waiting, not yet running. */
+const liveWord = (step: ToolTraceStep) =>
+  step.status === "pending" ? "waiting" : "running";
+
 /** "0.4s", "12s", "3m 05s". */
 function formatDuration(ms: number) {
   // Round first, then choose the form, so 9.96s reads "10s", not "10.0s",
@@ -322,8 +326,8 @@ function StepDetails({
     : 0;
   const facts = live(step)
     ? span
-      ? `running · ${formatDuration(span.end - span.start)}`
-      : "running"
+      ? `${liveWord(step)} · ${formatDuration(span.end - span.start)}`
+      : liveWord(step)
     : [
         step.status === "failed"
           ? "failed"
@@ -480,6 +484,7 @@ function StepRow({
     <button
       type="button"
       data-slot="tool-trace-step"
+      data-step-id={step.id}
       data-status={step.status}
       aria-expanded={open}
       aria-controls={open ? detailsId : undefined}
@@ -521,7 +526,7 @@ function StepRow({
         {step.status === "failed" || live(step) ? (
           // The glyph and colour say this to the eye; say it to the ear.
           <span className="sr-only">
-            {step.status === "failed" ? ", failed" : ", running"}
+            {step.status === "failed" ? ", failed" : `, ${liveWord(step)}`}
           </span>
         ) : null}
       </span>
@@ -597,18 +602,26 @@ function ToolTrace({
     pane: Pane;
   } | null>(null);
   const [showEarlierChosen, setShowEarlier] = React.useState(false);
+  // The row a keyboard is on. Like the open card, it never folds away under
+  // the person: a run that keeps settling calls would otherwise unmount it
+  // and drop focus to the page.
+  const [focused, setFocused] = React.useState<string | null>(null);
   const bodyId = React.useId();
   const detailsId = React.useId();
 
-  // Running calls always show, and so does the open card's. Settled calls
-  // past the last `keep` fold, from the start of the run up to the first call
-  // that must show, so the fold row only ever sits above calls that came
-  // after it. Folding a single call would hide nothing worth a row.
+  // Running calls always show. Settled calls past the last `keep` fold, from
+  // the start of the run up to the first live call, so the fold row only ever
+  // sits above calls that came after it. Folding a single call would hide
+  // nothing worth a row. While the earlier calls are hidden, the fold also
+  // stops short of a row someone holds — its open card, or keyboard focus —
+  // so a call settling never folds that row away. While they are shown the
+  // fold ignores what is held: opening or leaving a row never changes it.
   const kept = keep ?? (running ? 3 : 4);
   const foldable = steps.filter((step) => !live(step)).length - kept;
   let folded: ToolTraceStep[] = [];
   for (const step of steps) {
-    if (folded.length >= foldable || live(step) || step.id === card) break;
+    if (folded.length >= foldable || live(step)) break;
+    if (!showEarlierChosen && (step.id === card || step.id === focused)) break;
     folded.push(step);
   }
   if (folded.length < 2) folded = [];
@@ -724,13 +737,28 @@ function ToolTrace({
           inert={!open}
           className="-mx-1.5 min-h-0 overflow-hidden px-1.5"
         >
-          <div className="flex flex-col gap-px">
+          <div
+            className="flex flex-col gap-px"
+            onFocus={(event) =>
+              setFocused(
+                event.target.closest<HTMLElement>("[data-step-id]")?.dataset
+                  .stepId ?? null,
+              )
+            }
+            onBlur={() => setFocused(null)}
+          >
             {folded.length ? (
               <button
                 type="button"
                 data-slot="tool-trace-earlier"
                 aria-expanded={showEarlier}
-                onClick={() => setShowEarlier((value) => !value)}
+                onClick={() => {
+                  // Hiding the earlier calls closes a card among them, so the
+                  // fold is the same with or without one open.
+                  if (showEarlier && card !== null && foldedIds.has(card))
+                    setCard(null);
+                  setShowEarlier(!showEarlier);
+                }}
                 className={cn(rowClassName, "flex hover:text-foreground")}
               >
                 <ChevronRight
