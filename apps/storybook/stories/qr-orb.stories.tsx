@@ -60,6 +60,11 @@ async function decode(canvasElement: HTMLElement): Promise<string | null> {
   return jsQR(pixels.data, size, size)?.data ?? null
 }
 
+/**
+ * Waits for the grains to settle: about 2.4 s of a few hundred SVG
+ * animations. The wait leaves room for a CI machine also software-rendering
+ * the WebGL stories, where 5 s ran out.
+ */
 function settled(canvasElement: HTMLElement) {
   return waitFor(
     () =>
@@ -67,7 +72,7 @@ function settled(canvasElement: HTMLElement) {
         "data-state",
         "settled",
       ),
-    { timeout: 5000 },
+    { timeout: 15000 },
   )
 }
 

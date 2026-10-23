@@ -1,0 +1,19 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "step-dots",
+  "title": "Step Dots",
+  "description": "Where a short, fixed sequence is up to, as a row of dots with the current one drawn long. Read as \"Step 2 of 3\"; not a control.",
+  "registryDependencies": [
+    "nessalabs/nessa_ui/nessa-base",
+    "nessalabs/nessa_ui/utils"
+  ],
+  "files": [
+    {
+      "path": "packages/react/src/components/step-dots.tsx",
+      "content": "import * as React from \"react\"\n\nimport { cn } from \"@/lib/utils\"\n\nexport interface StepDotsProps extends Omit<React.ComponentProps<\"div\">, \"children\"> {\n  /** How many steps there are. */\n  count: number\n  /** Which one this is, counted from 0. */\n  current: number\n}\n\n/**\n * Where a short, fixed sequence is up to, as a row of dots with the current\n * one drawn long: the steps of a first run, say. It is a picture of progress,\n * not a control, so it reads as \"Step 2 of 3\" and none of the dots can be\n * pressed. The dots are drawn in the current text colour. It stretches across on\n * the motion tokens, so under reduced motion it changes at once.\n */\nfunction StepDots({ count, current, className, ...props }: StepDotsProps) {\n  const steps = Math.max(0, Math.floor(count))\n  // No steps is no progress to picture, rather than \"Step 1 of 0\".\n  if (steps === 0) return null\n  const at = Math.min(Math.max(0, Math.floor(current)), steps - 1)\n  return (\n    <div\n      role=\"img\"\n      aria-label={`Step ${at + 1} of ${steps}`}\n      {...props}\n      data-slot=\"step-dots\"\n      className={cn(\"flex items-center gap-1.5\", className)}\n    >\n      {Array.from({ length: steps }, (_, index) => (\n        <span\n          key={index}\n          data-current={index === at ? \"true\" : undefined}\n          className=\"block h-1.5 w-1.5 rounded-full bg-current opacity-25 transition-[width,opacity] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] data-[current]:w-4.5 data-[current]:opacity-85\"\n        />\n      ))}\n    </div>\n  )\n}\n\nexport { StepDots }\n",
+      "type": "registry:ui",
+      "target": "components/ui/step-dots.tsx"
+    }
+  ],
+  "type": "registry:ui"
+}

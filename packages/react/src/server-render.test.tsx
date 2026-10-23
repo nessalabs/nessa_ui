@@ -12,8 +12,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 // importing the package needs a bundler that handles CSS side effects) but it
 // is not what this file is testing, and going through it would mean this
 // never ran.
+import { AgentBackdrop, AgentCard } from "./components/agent-card";
+import { AgentFigure } from "./components/agent-figure/agent-figure";
 import { AvatarStack } from "./components/avatar-stack";
 import { Badge } from "./components/badge";
+import { BloomField } from "./components/bloom-field";
 import { Breadcrumb } from "./components/breadcrumb";
 import { Button } from "./components/button";
 import { Card, CardContent } from "./components/card";
@@ -26,6 +29,8 @@ import { Favicon } from "./components/favicon";
 import { Input } from "./components/input";
 import { LoadingText } from "./components/loading-text";
 import { ToolTrace } from "./components/tool-trace";
+import { TypeIn } from "./components/type-in";
+import { StepDots } from "./components/step-dots";
 import { Message } from "./components/message";
 import { ProportionBar } from "./components/proportion-bar";
 import { SearchableListbox } from "./components/searchable-listbox";
@@ -75,6 +80,28 @@ test("primitives render without a browser global", () => {
   assert.ok(server(<Checkbox aria-label="Agree" />).length > 0);
   assert.ok(
     server(<LoadingText>Loading Files</LoadingText>).includes("Loading Files"),
+  );
+  assert.ok(
+    server(
+      <BloomField spread={{ to: 1, duration: 600 }} ripple={1} />,
+    ).includes('data-slot="bloom-field"'),
+  );
+  assert.ok(server(<TypeIn text="Nessa" />).includes("Nessa"));
+  assert.ok(server(<StepDots count={3} current={1} />).includes("Step 2 of 3"));
+  assert.ok(
+    server(<AgentCard agent="clawd" name="Claude" />).includes(
+      'data-agent="clawd"',
+    ),
+  );
+  assert.ok(
+    server(<AgentBackdrop agent="codex" />).includes(
+      'data-slot="agent-backdrop"',
+    ),
+  );
+  assert.ok(
+    server(<AgentFigure agent="codex" lively />).includes(
+      'data-slot="agent-figure"',
+    ),
   );
   assert.ok(
     server(

@@ -370,6 +370,33 @@ export {
   type GradientSurfaceProps,
 } from "./components/gradient-surface"
 export {
+  AgentFigure,
+  agentFigureKinds,
+  type AgentFigureKind,
+  type AgentFigureProps,
+} from "./components/agent-figure/agent-figure"
+export {
+  BloomField,
+  bloomFieldColors,
+  type BloomFieldLight,
+  type BloomFieldProps,
+  type BloomFieldValue,
+} from "./components/bloom-field"
+export {
+  TypeIn,
+  typeInColors,
+  typeInGaps,
+  type TypeInProps,
+} from "./components/type-in"
+export { StepDots, type StepDotsProps } from "./components/step-dots"
+export {
+  AgentBackdrop,
+  AgentCard,
+  agentCardTones,
+  type AgentBackdropProps,
+  type AgentCardProps,
+} from "./components/agent-card"
+export {
   MorphingMeshGradient,
   meshGradientFromRange,
   morphingMeshGradientPresets,

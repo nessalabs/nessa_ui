@@ -1,0 +1,80 @@
+import type { Meta, StoryObj } from "@storybook/react-vite"
+import { expect, waitFor } from "storybook/test"
+import { AgentBackdrop, AgentCard, AgentFigure } from "@nessalabs/ui"
+
+import { storyDocumentation } from "./story-documentation"
+
+const meta = {
+  title: "Primitives/AgentCard",
+  component: AgentCard,
+  tags: ["autodocs", "test"],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "One agent on its own card: the agent's colours, a planet's arc rising from the lower left, and its 3D figure standing in front. For a moment that shows one agent at a time, such as the agent chosen during setup. Claude Code's mascot (`clawd`) stands on Claude's card.",
+      },
+    },
+  },
+  args: { agent: "clawd", name: "Claude" },
+} satisfies Meta<typeof AgentCard>
+
+export default meta
+type Story = StoryObj<typeof meta>
+
+/**
+ * Docs only, like every card: each is a software-rendered 3D scene in CI, and
+ * running one beside the other stories pushed unrelated settle waits (QrOrb,
+ * TypeIn) past their budgets. `AgentFigure / Playing` tests the figure, the
+ * server-render test covers the card's markup, and nessa-agent's setup stress
+ * step drives the card in the real picker.
+ */
+export const Claude: Story = {
+  tags: ["!test"],
+  parameters: storyDocumentation("Claude Code's mascot on Claude's card."),
+  render: (args) => <AgentCard {...args} className="w-64" />,
+  play: async ({ canvasElement }) => {
+    const figure = canvasElement.querySelector<HTMLElement>('[data-slot="agent-figure"]')!
+    await waitFor(
+      () => {
+        expect(figure).toHaveAttribute("data-ready", "true")
+        expect(figure).toHaveAttribute("data-resting")
+      },
+      { timeout: 15000 },
+    )
+  },
+}
+
+export const Codex: Story = {
+  tags: ["!test"],
+  args: { agent: "codex", name: "Codex" },
+  parameters: storyDocumentation("Codex's knot on its light card."),
+  render: (args) => <AgentCard {...args} className="w-64" />,
+}
+
+export const Local: Story = {
+  tags: ["!test"],
+  args: { agent: "local", name: "Local AI" },
+  parameters: storyDocumentation("A local model's glass stack on its dark card."),
+  render: (args) => <AgentCard {...args} className="w-64" />,
+}
+
+/** The background alone, filling a picture column, with a figure laid over it. */
+export const Backdrop: Story = {
+  tags: ["!test"],
+  parameters: storyDocumentation(
+    "`AgentBackdrop` is the card's background on its own, filling whatever box it is given — here the right-hand column of a setup window, with the figure laid over it.",
+  ),
+  render: () => (
+    <div className="grid w-[640px] grid-cols-3 gap-3">
+      {(["clawd", "codex", "local"] as const).map((agent) => (
+        <AgentBackdrop key={agent} agent={agent} className="h-80 rounded-2xl">
+          <AgentFigure
+            agent={agent}
+            className="absolute top-1/2 left-1/2 size-32 -translate-x-1/2 -translate-y-1/2"
+          />
+        </AgentBackdrop>
+      ))}
+    </div>
+  ),
+}
