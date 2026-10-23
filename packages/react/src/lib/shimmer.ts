@@ -49,7 +49,9 @@ function useShimmer<T extends HTMLElement>(active: boolean) {
   const ref = React.useRef<T>(null);
   React.useEffect(() => {
     const node = ref.current;
-    if (!node || !shimmering) return;
+    // Without Web Animations (jsdom, an old engine) the label stays still,
+    // as under reduced motion.
+    if (!node || !shimmering || typeof node.animate !== "function") return;
     const duration = cssDurationInMilliseconds(
       getComputedStyle(node).getPropertyValue(
         "--nessa-motion-duration-ambient",
