@@ -108,10 +108,12 @@ const live = (step: ToolTraceStep) =>
 
 /** "0.4s", "12s", "3m 05s". */
 function formatDuration(ms: number) {
-  const seconds = Math.max(0, ms) / 1000;
-  if (seconds < 10) return `${seconds.toFixed(1)}s`;
-  if (seconds < 60) return `${Math.round(seconds)}s`;
-  const whole = Math.round(seconds);
+  // Round first, then choose the form, so 9.96s reads "10s", not "10.0s",
+  // and 59.6s reads "1m 00s", not "60s".
+  const tenths = Math.round(Math.max(0, ms) / 100) / 10;
+  if (tenths < 10) return `${tenths.toFixed(1)}s`;
+  const whole = Math.round(Math.max(0, ms) / 1000);
+  if (whole < 60) return `${whole}s`;
   return `${Math.floor(whole / 60)}m ${String(whole % 60).padStart(2, "0")}s`;
 }
 
@@ -173,11 +175,15 @@ function Shimmer({
 }
 
 /** A call still working: a small ring with an accent head. Still under reduced motion. */
-function Working() {
+function Working({ paused = false }: { paused?: boolean }) {
   return (
     <span
       aria-hidden="true"
-      className="size-3 shrink-0 animate-spin rounded-full border-[1.5px] border-muted-foreground/30 border-t-(--nessa-chat-accent-ink) [animation-duration:var(--nessa-motion-duration-ambient)] motion-reduce:animate-none"
+      className={cn(
+        "size-3 shrink-0 animate-spin rounded-full border-[1.5px] border-muted-foreground/30 border-t-(--nessa-chat-accent-ink) [animation-duration:var(--nessa-motion-duration-ambient)] motion-reduce:animate-none",
+        // Nothing turns where nobody can see it.
+        paused && "animate-none",
+      )}
     />
   );
 }
@@ -310,7 +316,10 @@ function StepDetails({
           ? "output"
           : "input";
   const span = spanOf(step, now);
-  const lines = step.output ? step.output.split("\n").length : 0;
+  // A trailing newline ends the last line; it does not start another.
+  const lines = step.output
+    ? step.output.replace(/\n$/, "").split("\n").length
+    : 0;
   const facts = live(step)
     ? span
       ? `running · ${formatDuration(span.end - span.start)}`
@@ -424,6 +433,7 @@ function StepRow({
   domain,
   timed,
   open,
+  shown,
   detailsId,
   onToggle,
 }: {
@@ -432,6 +442,8 @@ function StepRow({
   domain: { start: number; end: number };
   timed: boolean;
   open: boolean;
+  /** The trace is open, so the row is on screen; a folded trace's rows keep still. */
+  shown: boolean;
   detailsId: string;
   onToggle: () => void;
 }) {
@@ -444,7 +456,7 @@ function StepRow({
     ) : step.status === "stopped" ? (
       <Minus className="size-3.5" />
     ) : live(step) ? (
-      <Working />
+      <Working paused={!shown} />
     ) : (
       step.icon
     );
@@ -487,7 +499,10 @@ function StepRow({
         {glyph}
       </span>
       <span className="flex min-w-0 items-baseline gap-1.5">
-        <Shimmer active={live(step)} className="shrink-0 whitespace-nowrap">
+        <Shimmer
+          active={live(step) && shown}
+          className="shrink-0 whitespace-nowrap"
+        >
           {step.label}
         </Shimmer>
         {step.detail ? (
@@ -501,6 +516,12 @@ function StepRow({
             )}
           >
             {step.detail}
+          </span>
+        ) : null}
+        {step.status === "failed" || live(step) ? (
+          // The glyph and colour say this to the eye; say it to the ear.
+          <span className="sr-only">
+            {step.status === "failed" ? ", failed" : ", running"}
           </span>
         ) : null}
       </span>
@@ -758,6 +779,7 @@ function ToolTrace({
                     domain={domain}
                     timed={timed}
                     open={isOpen}
+                    shown={open}
                     detailsId={detailsId}
                     // One card at a time: opening one closes the last.
                     onToggle={() => setCard(isOpen ? null : step.id)}

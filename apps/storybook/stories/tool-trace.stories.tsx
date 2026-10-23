@@ -8,23 +8,28 @@ import { storyDocumentation } from "./story-documentation";
 
 /**
  * Cancels the trace's endless motion (the shimmer and the working rings) so
- * a play test leaves nothing running into the rest of the suite. The sweep
- * starts in an effect, after paint, so it waits for it first. No-ops outside
- * the vitest/webdriver runner so the canvas stays live for people watching.
+ * a play test leaves nothing running into the rest of the suite. Each sweep
+ * starts in an effect, after paint, so it first waits until every shimmering
+ * label has its sweep — not merely until something moves, which the rings
+ * satisfy from the first paint — then cancels and waits for stillness. No-ops
+ * outside the vitest/webdriver runner so the canvas stays live for people
+ * watching.
  */
 async function stopMotion(canvasElement: HTMLElement) {
   const view = canvasElement.ownerDocument.defaultView;
   if (!view?.navigator.webdriver) return;
-  if (!view.matchMedia("(prefers-reduced-motion: reduce)").matches)
-    await waitFor(() =>
-      expect(
-        canvasElement.getAnimations({ subtree: true }).length,
-      ).toBeGreaterThan(0),
-    );
+  await waitFor(() => {
+    for (const node of canvasElement.querySelectorAll<HTMLElement>(
+      '[data-shimmer="true"]',
+    ))
+      expect(node.getAnimations().length).toBeGreaterThan(0);
+  });
   canvasElement
     .getAnimations({ subtree: true })
     .forEach((animation) => animation.cancel());
-  await expect(canvasElement.getAnimations({ subtree: true })).toHaveLength(0);
+  await waitFor(() =>
+    expect(canvasElement.getAnimations({ subtree: true })).toHaveLength(0),
+  );
 }
 
 /** A fixed clock: the stories never read the real one, so nothing keeps ticking. */
@@ -291,7 +296,8 @@ export const Failed: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByText("1 failed")).toBeVisible();
-    const bad = canvas.getByRole("button", { name: /Ran codesign/ });
+    // The failure is in the row's name, not only its colour.
+    const bad = canvas.getByRole("button", { name: /Ran codesign.*, failed/ });
     await expect(bad).toHaveAttribute("data-status", "failed");
     await userEvent.click(bad);
     await expect(canvas.getByText(/not signed at all/)).toBeVisible();
@@ -312,6 +318,8 @@ export const Working: Story = {
       "[data-slot=tool-trace-step][data-status=running]",
     );
     await expect(running).toHaveLength(2);
+    for (const row of running)
+      await expect(row).toHaveAccessibleName(/, running/);
     await expect(
       canvas.getByRole("button", { name: /4 earlier/ }),
     ).toBeVisible();
