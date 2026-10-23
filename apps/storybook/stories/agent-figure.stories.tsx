@@ -24,7 +24,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "An agent's mark as a small 3D object under studio light: Claude's burst, Codex's woven knot, and a local model's glass stack. While `lively` it plays its own routine — the burst turns and breathes, the knot twists, the glass fans apart — and it settles back to rest when it stops. Three.js loads the first time one mounts, and every figure shares one WebGL context. Decorative: put the agent's name beside it.",
+          "An agent's mark as a small 3D object under studio light: Claude Code's mascot, Claude's burst, Codex's woven knot, and a local model's glass stack. While `lively` it plays its own routine — the mascot waves and hops, the burst turns and breathes, the knot twists, the glass fans apart — and it settles back to rest when it stops. Three.js loads the first time one mounts, and every figure shares one WebGL context. Decorative: put the agent's name beside it.",
       },
     },
   },
@@ -86,7 +86,7 @@ export const Playing: Story = {
   },
 }
 
-const names = { claude: "Claude", codex: "Codex", local: "Local AI" } as const
+const names = { claude: "Claude", clawd: "Claude Code", codex: "Codex", local: "Local AI" } as const
 
 /**
  * The setup picker's right side: every agent on the light, the one pointed

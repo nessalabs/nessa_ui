@@ -389,6 +389,7 @@ export {
   type TypeInProps,
 } from "./components/type-in"
 export { StepDots, type StepDotsProps } from "./components/step-dots"
+export { AgentCard, agentCardTones, type AgentCardProps } from "./components/agent-card"
 export {
   MorphingMeshGradient,
   meshGradientFromRange,

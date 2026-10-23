@@ -2,10 +2,11 @@
 
 import * as THREE from "three"
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js"
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js"
 import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js"
 
-/** The agents that have a figure. */
-export type AgentFigureKind = "claude" | "codex" | "local"
+/** The agents that have a figure. `clawd` is Claude Code's mascot. */
+export type AgentFigureKind = "claude" | "clawd" | "codex" | "local"
 
 /**
  * A figure's pose at hover progress `p` (0 at rest, 1 fully lively) and `t`
@@ -22,6 +23,8 @@ interface Spec {
   /** Shapes are authored y-down, as in SVG, unless this is false. */
   flip?: boolean
   update: Update
+  /** Called each time the figure comes alive from rest. */
+  begin?: () => void
 }
 
 /** Pixels each side the shared renderer draws at; figures scale it down. */
@@ -105,6 +108,105 @@ function claude(): Spec {
     })
   }
   return { group, tilt: [deg(-8), deg(10)], fill: "#ff8a4a", update }
+}
+
+/**
+ * Claude Code's mascot: a blocky clay body on short legs, with little side
+ * arms and pixel eyes, shown straight on. Each time it comes alive it plays
+ * the next of its routines: a wave, both arms, a wink, a hop.
+ */
+function clawd(): Spec {
+  const clay = phys("#d97757", { roughness: 0.55, clearcoat: 0.15, clearcoatRoughness: 0.5 })
+  const ink = phys("#1b1715", { roughness: 0.4 })
+  const box = (w: number, h: number, d: number, r = 2.2) => new RoundedBoxGeometry(w, h, d, 5, r)
+  const group = new THREE.Group()
+  const body = new THREE.Group()
+  group.add(body)
+  body.add(new THREE.Mesh(box(66, 44, 38, 3.2), clay))
+  // Legs: two pairs in front, two behind.
+  for (const z of [11, -11]) {
+    for (const x of [-25, -15, 15, 25]) {
+      const leg = new THREE.Mesh(box(7.5, 18, 7.5, 1.6), clay)
+      leg.position.set(x, -29, z)
+      group.add(leg)
+    }
+  }
+  // Arms hinged at the top inner edge of the shoulder.
+  const armGeometry = box(11, 13, 16, 2)
+  armGeometry.translate(5.5, -6.5, 0)
+  const right = new THREE.Group()
+  right.position.set(32, 2, 0)
+  right.add(new THREE.Mesh(armGeometry, clay))
+  body.add(right)
+  const left = new THREE.Group()
+  left.position.set(-32, 2, 0)
+  left.scale.x = -1
+  left.add(new THREE.Mesh(armGeometry, clay))
+  body.add(left)
+  // Eyes: tall pixel blocks, and happy "> <" chevrons that swap in.
+  const eyes = [-16, 16].map((x) => {
+    const eye = new THREE.Mesh(box(6, 11, 3, 1), ink)
+    eye.position.set(x, 5, 19.2)
+    body.add(eye)
+    return eye
+  })
+  const bar = box(8.6, 2.6, 2.4, 0.9)
+  const slant = Math.atan2(4, 6)
+  const chevrons = [-16, 16].map((x, index) => {
+    const chevron = new THREE.Group()
+    chevron.position.set(x, 5, 19.4)
+    chevron.scale.x = index === 0 ? 1 : -1
+    const top = new THREE.Mesh(bar, ink)
+    top.position.set(0, 2, 0)
+    top.rotation.z = -slant
+    const bottom = new THREE.Mesh(bar, ink)
+    bottom.position.set(0, -2, 0)
+    bottom.rotation.z = slant
+    chevron.add(top, bottom)
+    chevron.visible = false
+    body.add(chevron)
+    return chevron
+  })
+  const face = (happyLeft: boolean, happyRight: boolean) => {
+    ;[happyLeft, happyRight].forEach((happy, index) => {
+      chevrons[index].visible = happy
+      eyes[index].visible = !happy
+    })
+  }
+  const routines = ["wave", "both", "wink", "hop"] as const
+  let routine = 0
+  const blink = (t: number) => {
+    const phase = t % 2.3
+    return phase > 0.9 && phase < 1.08 ? Math.sin(((phase - 0.9) / 0.18) * Math.PI) : 0
+  }
+  const update: Update = (p, t) => {
+    const on = p > 0.35
+    const now = routines[routine]
+    const waveRight = now === "wave" || now === "both"
+    const waveLeft = now === "both" || now === "wink"
+    right.rotation.z = p * (waveRight ? 1.05 + 0.38 * Math.sin(t * 11) : 0.12 * Math.sin(t * 5.5))
+    left.rotation.z =
+      p *
+      (waveLeft
+        ? 1.05 + 0.38 * Math.sin(t * 11 + (now === "both" ? Math.PI : 0))
+        : 0.12 * Math.sin(t * 5.5))
+    if (!on) face(false, false)
+    else if (now === "wave" || now === "hop") face(true, true)
+    else if (now === "wink") face(false, true)
+    else face(false, false)
+    const closed = now === "both" && on ? blink(t) : 0
+    for (const eye of eyes) eye.scale.y = 1 - 0.85 * closed
+    const hop = now === "hop" ? 7 * Math.abs(Math.sin(t * 6)) : 1.6 * Math.abs(Math.sin(t * 5.5))
+    group.position.y = p * hop
+    // A small squash on landing.
+    body.position.y = now === "hop" ? -p * 1.5 * Math.pow(1 - Math.abs(Math.sin(t * 6)), 4) : 0
+  }
+  // The routine moves on as the figure comes alive, never mid-routine.
+  const begin = () => {
+    routine = (routine + 1) % routines.length
+  }
+  routine = routines.length - 1
+  return { group, tilt: [deg(4), 0], fill: "#ff9a6a", flip: false, update, begin }
 }
 
 /**
@@ -254,7 +356,7 @@ function local(): Spec {
   return { group, tilt: [0, 0], fill: "#ffffff", flip: false, update }
 }
 
-const builders: Record<AgentFigureKind, () => Spec> = { claude, codex, local }
+const builders: Record<AgentFigureKind, () => Spec> = { claude, clawd, codex, local }
 
 let shared: { renderer: THREE.WebGLRenderer; environment: THREE.Texture } | null = null
 
@@ -287,6 +389,8 @@ function renderer() {
 /** A figure ready to draw: pose it, then copy a frame into a 2D canvas. */
 export interface Figure {
   pose: Update
+  /** Tell it it is coming alive from rest, so it can pick its routine. */
+  begin: () => void
   /** False once the renderer it was built on is gone; build it again. */
   draw: (canvas: HTMLCanvasElement) => boolean
   /** Give back what it holds on the GPU. */
@@ -339,6 +443,7 @@ export function createFigure(kind: AgentFigureKind): Figure | null {
   scene.add(key, fill, rim, new THREE.HemisphereLight("#ffffff", spec.fill, 0.25))
   return {
     pose: spec.update,
+    begin: spec.begin ?? (() => {}),
     draw(canvas) {
       if (shared !== context) return false
       context.renderer.setClearColor(0x000000, 0)

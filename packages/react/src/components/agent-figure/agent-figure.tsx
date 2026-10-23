@@ -24,7 +24,12 @@ function useReducedMotion() {
 }
 
 /** The agents with a figure, in the order a picker would list them. */
-const agentFigureKinds: readonly AgentFigureKind[] = Object.freeze(["claude", "codex", "local"])
+const agentFigureKinds: readonly AgentFigureKind[] = Object.freeze([
+  "claude",
+  "clawd",
+  "codex",
+  "local",
+])
 
 /** How quickly a figure comes alive and settles back, per second. */
 const EASE_RATE = 7
@@ -33,8 +38,8 @@ export interface AgentFigureProps extends Omit<React.ComponentProps<"span">, "ch
   /** Which agent's figure to draw. */
   agent: AgentFigureKind
   /**
-   * Whether the figure plays its routine: the burst turns and breathes, the
-   * knot twists, the glass fans apart. It eases in, keeps going while true,
+   * Whether the figure plays its routine: Claude Code's mascot waves and hops,
+   * the burst turns and breathes, the knot twists, the glass fans apart. It eases in, keeps going while true,
    * and settles back to rest when false. Defaults to false.
    */
   lively?: boolean
@@ -103,7 +108,10 @@ function AgentFigure({ agent, lively = false, className, ...props }: AgentFigure
     if (goal === 0 && state.p === 0) return
     let frame = 0
     let last = performance.now()
-    if (goal === 1 && state.p < 0.05) state.t = 0
+    if (goal === 1 && state.p < 0.05) {
+      state.t = 0
+      figure.begin()
+    }
     const tick = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now

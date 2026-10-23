@@ -904,10 +904,28 @@
       ]
     },
     {
+      "name": "agent-card",
+      "type": "registry:ui",
+      "title": "Agent Card",
+      "description": "One agent on its own card: the agent's colours, a planet's arc rising from the lower left, and its 3D figure standing in front.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/agent-figure"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/agent-card.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/agent-card.tsx"
+        }
+      ]
+    },
+    {
       "name": "agent-figure",
       "type": "registry:ui",
       "title": "Agent Figure",
-      "description": "An agent's mark as a small 3D object under studio light \u2014 Claude's burst, Codex's knot, a local model's glass stack \u2014 that plays its own routine while lively. Three.js loads on first use and every figure shares one WebGL context.",
+      "description": "An agent's mark as a small 3D object under studio light \u2014 Claude Code's mascot or Claude's burst, Codex's knot, a local model's glass stack \u2014 that plays its own routine while lively. Three.js loads on first use and every figure shares one WebGL context.",
       "dependencies": [
         "three"
       ],
