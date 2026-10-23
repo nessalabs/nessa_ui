@@ -440,13 +440,16 @@ async function watchArmed(row: HTMLElement, run: () => Promise<void>) {
     observer.disconnect();
   }
   // One gesture runs at a time, so whatever armed meanwhile was this row.
-  return (
-    armed ||
-    traceEvents(row)
-      .slice(before)
-      .some((entry) => entry.ev === "f" && entry.armed === true)
-  );
+  const seen = traceEvents(row).slice(before);
+  lastWatch = JSON.stringify({
+    width: Math.round(row.getBoundingClientRect().width),
+    trace: seen,
+  });
+  return armed || seen.some((entry) => entry.ev === "f" && entry.armed === true);
 }
+
+/** What the last `watchArmed` saw: the row's width and its trace, said when an assertion fails. */
+let lastWatch = "";
 
 /** Closes an open row from its content with Escape and waits for it to rest. */
 async function closeWithEscape(content: HTMLElement) {
@@ -474,7 +477,7 @@ export const TrackpadSwipes: Story = {
         [1, 2, 3, 3, 2, 2, 1].map((delta): TimedWheel => [delta, 16]),
       ),
     );
-    await expect(nudgeArmed).toBe(false);
+    await expect(nudgeArmed, lastWatch).toBe(false);
     await expectClosed(notes);
 
     // Inertia alone — a tail left over from a gesture that ended elsewhere,
@@ -483,7 +486,7 @@ export const TrackpadSwipes: Story = {
     const tailArmed = await watchArmed(rowOf(notes), () =>
       wheelTimed(notes, inertia(22).slice(6)),
     );
-    await expect(tailArmed).toBe(false);
+    await expect(tailArmed, lastWatch).toBe(false);
     await expectClosed(notes);
     await expect(log).toHaveTextContent("");
 
@@ -492,7 +495,7 @@ export const TrackpadSwipes: Story = {
     const flickArmed = await watchArmed(rowOf(notes), () =>
       wheelTimed(notes, [...lightFlick, ...inertia()]),
     );
-    await expect(flickArmed).toBe(false);
+    await expect(flickArmed, lastWatch).toBe(false);
     await waitFor(() =>
       expect(rowOf(notes)).toHaveAttribute("data-swipe", "open"),
     );
@@ -511,7 +514,7 @@ export const TrackpadSwipes: Story = {
         ...inertia(),
       ]),
     );
-    await expect(backToBackArmed).toBe(false);
+    await expect(backToBackArmed, lastWatch).toBe(false);
     await waitFor(() =>
       expect(rowOf(audit)).toHaveAttribute("data-swipe", "open"),
     );
