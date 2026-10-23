@@ -963,6 +963,23 @@
       ]
     },
     {
+      "name": "step-dots",
+      "type": "registry:ui",
+      "title": "Step Dots",
+      "description": "Where a short, fixed sequence is up to, as a row of dots with the current one drawn long. Read as \"Step 2 of 3\"; not a control.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/step-dots.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/step-dots.tsx"
+        }
+      ]
+    },
+    {
       "name": "morphing-mesh-gradient",
       "type": "registry:ui",
       "title": "Morphing Mesh Gradient",

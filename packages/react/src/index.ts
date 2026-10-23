@@ -388,6 +388,7 @@ export {
   typeInGaps,
   type TypeInProps,
 } from "./components/type-in"
+export { StepDots, type StepDotsProps } from "./components/step-dots"
 export {
   MorphingMeshGradient,
   meshGradientFromRange,

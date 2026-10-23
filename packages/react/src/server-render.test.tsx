@@ -29,6 +29,7 @@ import { Input } from "./components/input";
 import { LoadingText } from "./components/loading-text";
 import { ToolTrace } from "./components/tool-trace";
 import { TypeIn } from "./components/type-in";
+import { StepDots } from "./components/step-dots";
 import { Message } from "./components/message";
 import { ProportionBar } from "./components/proportion-bar";
 import { SearchableListbox } from "./components/searchable-listbox";
@@ -85,6 +86,7 @@ test("primitives render without a browser global", () => {
     ).includes('data-slot="bloom-field"'),
   );
   assert.ok(server(<TypeIn text="Nessa" />).includes("Nessa"));
+  assert.ok(server(<StepDots count={3} current={1} />).includes("Step 2 of 3"));
   assert.ok(
     server(<AgentFigure agent="codex" lively />).includes(
       'data-slot="agent-figure"',
