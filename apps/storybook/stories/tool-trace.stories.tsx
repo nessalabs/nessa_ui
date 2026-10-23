@@ -407,3 +407,69 @@ export const WithoutTimes: Story = {
     ).toBeNull();
   },
 };
+
+/** A host's own names in a row: an id drawn as a quiet, non-interactive tag. */
+const namedSteps: ToolTraceStep[] = [
+  {
+    id: "send",
+    label: "Messaged",
+    detail: "thread 7f3a2c10",
+    icon: <SquareTerminal />,
+    status: "completed",
+  },
+  {
+    id: "read",
+    label: "Read",
+    detail: "src/app.ts",
+    icon: <FileText />,
+    status: "completed",
+  },
+];
+
+const withTags = (text: string) => {
+  const match = /thread (\w+)/.exec(text);
+  if (!match) return text;
+  return (
+    <>
+      thread{" "}
+      <span data-story-tag={match[1]} className="rounded-sm bg-muted px-1">
+        {match[1]}
+      </span>
+    </>
+  );
+};
+
+export const RichText: Story = {
+  args: {
+    steps: namedSteps,
+    defaultOpen: true,
+    renderText: (text) => withTags(text),
+  },
+  parameters: storyDocumentation(
+    "A host draws a row's label or detail its own way — a chat as a pill, say — through `renderText`; the row stays one button, so what it draws is not interactive. Without it, the text is drawn as it is.",
+  ),
+  play: async ({ canvasElement }) => {
+    const row = await waitFor(() => {
+      const found = canvasElement.querySelector<HTMLElement>(
+        '[data-slot=tool-trace-step][data-step-id="send"]',
+      );
+      expect(found).not.toBeNull();
+      return found!;
+    });
+    // The host's drawing, inside the row's one button, with nothing interactive in it.
+    await expect(row.querySelector('[data-story-tag="7f3a2c10"]')).not.toBeNull();
+    await expect(row.querySelectorAll("button, a, [tabindex]")).toHaveLength(0);
+    // A row the host leaves alone keeps its text as it is.
+    const plain = canvasElement.querySelector<HTMLElement>(
+      '[data-slot=tool-trace-step][data-step-id="read"]',
+    );
+    await expect(plain?.textContent).toContain("src/app.ts");
+    // Its card is still named by the plain label.
+    await userEvent.click(row);
+    await waitFor(() =>
+      expect(
+        canvasElement.querySelector('[aria-label="Messaged details"]'),
+      ).not.toBeNull(),
+    );
+  },
+};

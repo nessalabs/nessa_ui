@@ -107,7 +107,23 @@ export interface ToolTraceProps extends Omit<
    * one does not read it at all.
    */
   now?: number;
+  /**
+   * Draws a call's label or detail in a row. Defaults to the text as it is.
+   * A host that names things in its own way — a chat as a pill, say — draws
+   * them here. The row is a button, so what this returns must not be
+   * interactive: phrasing content only, no buttons or links.
+   */
+  renderText?: ToolTraceRenderText;
 }
+
+/** Draws a row's `label` or `detail`; see `ToolTraceProps.renderText`. */
+export type ToolTraceRenderText = (
+  text: string,
+  part: "label" | "detail",
+  step: ToolTraceStep,
+) => React.ReactNode;
+
+const plainText: ToolTraceRenderText = (text) => text;
 
 const live = (step: ToolTraceStep) =>
   step.status === "running" || step.status === "pending";
@@ -462,6 +478,7 @@ function StepRow({
   shown,
   detailsId,
   onToggle,
+  renderText,
 }: {
   step: ToolTraceStep;
   now: number;
@@ -472,6 +489,7 @@ function StepRow({
   shown: boolean;
   detailsId: string;
   onToggle: () => void;
+  renderText: ToolTraceRenderText;
 }) {
   const span = spanOf(step, now);
   const width = Math.max(1, domain.end - domain.start);
@@ -530,7 +548,7 @@ function StepRow({
           active={live(step) && shown}
           className="shrink-0 whitespace-nowrap"
         >
-          {step.label}
+          {renderText(step.label, "label", step)}
         </Shimmer>
         {step.detail ? (
           <span
@@ -542,7 +560,7 @@ function StepRow({
               step.status === "stopped" && "line-through",
             )}
           >
-            {step.detail}
+            {renderText(step.detail, "detail", step)}
           </span>
         ) : null}
         {step.status === "failed" || live(step) ? (
@@ -599,6 +617,7 @@ function ToolTrace({
   summary,
   keep,
   now: nowProp,
+  renderText = plainText,
   className,
   ...props
 }: ToolTraceProps) {
@@ -841,6 +860,7 @@ function ToolTrace({
                     detailsId={detailsId}
                     // One card at a time: opening one closes the last.
                     onToggle={() => setCard(isOpen ? null : step.id)}
+                    renderText={renderText}
                   />
                   {isOpen ? (
                     <StepDetails
