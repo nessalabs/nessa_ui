@@ -488,6 +488,8 @@ function BloomField({
       ),
     };
     let program = createProgram(gl);
+    // A field that cannot draw is its ground colour, as without WebGL.
+    host.toggleAttribute("data-fallback", !program);
     let frame = 0;
     let lastDraw = 0;
     let visible = true;
@@ -566,6 +568,7 @@ function BloomField({
         age < RIPPLE_SECONDS ? 1 : 0,
       );
       gl.drawArrays(gl.TRIANGLES, 0, 3);
+      host.setAttribute("data-drawn", "");
     };
 
     const tick = (now: number) => {
@@ -619,9 +622,11 @@ function BloomField({
     const onLost = (event: Event) => {
       event.preventDefault();
       program = null;
+      host.setAttribute("data-fallback", "true");
     };
     const onRestored = () => {
       program = createProgram(gl);
+      host.toggleAttribute("data-fallback", !program);
       colorKey = "";
       start();
     };
@@ -649,8 +654,14 @@ function BloomField({
       ref={root}
       aria-hidden="true"
       data-slot="bloom-field"
+      data-opaque={
+        (typeof clear === "number" ? clear : clear.to) === 0 ? "" : undefined
+      }
       className={cn(
-        "pointer-events-none relative overflow-hidden data-[fallback]:bg-[var(--nessa-bloom-field-ground)]",
+        // The ground shows behind an opaque field until its first frame, so a
+        // server render or a slow first draw is never see-through, and for
+        // good whenever the field cannot draw.
+        "pointer-events-none relative overflow-hidden data-[fallback]:bg-[var(--nessa-bloom-field-ground)] [&[data-opaque]:not([data-drawn])]:bg-[var(--nessa-bloom-field-ground)]",
         className,
       )}
       style={

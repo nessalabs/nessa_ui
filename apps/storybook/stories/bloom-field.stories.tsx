@@ -232,5 +232,30 @@ export const Glow: Story = {
     const field = await settled(canvasElement);
     // The field paints nothing of its own behind the canvas.
     await expect(getComputedStyle(field).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+    // And what the canvas draws lets the page through: read its next frame
+    // straight after the draw, before the browser clears the buffer.
+    const canvas = field.querySelector("canvas")!;
+    const gl = canvas.getContext("webgl")!;
+    const draw = gl.drawArrays.bind(gl);
+    const frame = new Promise<{ corner: number; middle: number }>((resolve) => {
+      gl.drawArrays = (mode, first, count) => {
+        draw(mode, first, count);
+        gl.drawArrays = draw;
+        const alpha = (x: number, y: number) => {
+          const pixel = new Uint8Array(4);
+          gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+          return pixel[3];
+        };
+        resolve({
+          corner: alpha(0, 0),
+          middle: alpha(gl.drawingBufferWidth >> 1, gl.drawingBufferHeight >> 1),
+        });
+      };
+    });
+    // A new size is what makes a settled field draw again.
+    field.parentElement!.style.width = "639px";
+    const { corner, middle } = await frame;
+    await expect(corner).toBeLessThan(64);
+    await expect(middle).toBeGreaterThan(corner);
   },
 };

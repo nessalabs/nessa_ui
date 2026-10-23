@@ -72,18 +72,6 @@ export interface TypeInProps extends Omit<
   onTyped?: () => void;
 }
 
-/**
- * Text that types itself in, a key at a time, painted with one gradient that
- * runs across the whole text (or, with `plain`, across all but its opening). Each letter lands with a small press and a
- * flash of light that cools into its colour, and a gradient caret leads the
- * way, then blinks twice and leaves. Made for a wordmark at a moment that
- * happens once, such as a first run; it is not for running copy.
- *
- * Nothing loops: every animation ends, and `data-typed` is set once they
- * have, which is what a test should wait on. Under reduced motion the text is
- * there at once, with no caret. The letters are hidden from assistive
- * technology, which reads `text` once.
- */
 /** User-perceived characters, so an emoji or an accent stays one letter. */
 function graphemes(text: string) {
   if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
@@ -93,6 +81,19 @@ function graphemes(text: string) {
   return [...text];
 }
 
+/**
+ * Text that types itself in, a key at a time, painted with one gradient that
+ * runs across the whole text (or, with `plain`, across all but its opening).
+ * Each letter lands with a small press and a flash of light that cools into
+ * its colour, and a gradient caret leads the way, then blinks twice and
+ * leaves. Made for a wordmark at a moment that happens once, such as a first
+ * run; it is not for running copy.
+ *
+ * Nothing loops: every animation ends, and `data-typed` is set once they
+ * have, which is what a test should wait on. Under reduced motion the text is
+ * there at once, with no caret. The letters are hidden from assistive
+ * technology, which reads `text` once.
+ */
 function TypeIn({
   text,
   play = true,

@@ -63,22 +63,21 @@ function AgentFigure({ agent, lively = false, className, ...props }: AgentFigure
 
   React.useEffect(() => {
     let live = true
-    let built: Figure | null = null
     setFigure(null)
     root.current?.removeAttribute("data-ready")
     import("./agent-figure-scenes").then(
       ({ createFigure }) => {
-        if (!live) return
-        built = createFigure(agent)
-        setFigure(built)
+        if (live) setFigure(createFigure(agent))
       },
       () => {},
     )
     return () => {
       live = false
-      built?.dispose()
     }
   }, [agent, generation])
+
+  // Released only once it has been replaced, so nothing can draw it after.
+  React.useEffect(() => () => figure?.dispose(), [figure])
 
   // Progress toward lively, kept across renders so a change mid-way eases
   // from where the figure is rather than jumping.
