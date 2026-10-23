@@ -502,6 +502,21 @@ export const TrackpadSwipes: Story = {
     await expect(log).toHaveTextContent("");
     await closeWithEscape(notes);
 
+    // The same flick, its inertia delivered unevenly 30 to 40 ms apart, as a
+    // slow machine delivers it: still inertia, still never arms.
+    const slowArmed = await watchArmed(rowOf(notes), () =>
+      wheelTimed(notes, [
+        ...lightFlick,
+        ...inertia().map(([delta], index): TimedWheel => [delta, 30 + ((index * 7) % 11)]),
+      ]),
+    );
+    await expect(slowArmed, lastWatch).toBe(false);
+    await waitFor(() =>
+      expect(rowOf(notes)).toHaveAttribute("data-swipe", "open"),
+    );
+    await expect(log).toHaveTextContent("");
+    await closeWithEscape(notes);
+
     // Two flicks back to back, the second landing while the first's inertia
     // is still arriving: they do not merge into a full swipe.
     const audit = canvas.getByRole("button", { name: /^repo audit/i });

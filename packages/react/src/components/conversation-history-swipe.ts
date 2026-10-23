@@ -615,10 +615,14 @@ export interface WheelTrendEntry {
  * Whether the latest deltas have held their pace: the last
  * `wheelHoldWindowMs` of them, cut into four equal stretches of time, never
  * differ in pace by more than `wheelHoldSpread`, and the later half keeps
- * `wheelHoldDrift` of the earlier half's pace. Fingers holding a speed,
- * however unsteadily from one event to the next, always do. Inertia cannot,
- * however flat its first frames look — it loses about a quarter of its pace
- * over that long — and neither can fingers accelerating into inertia.
+ * `wheelHoldDrift` of the earlier half's pace — and, by the deltas' own
+ * sizes in the order they came, of their size: inertia's sizes keep falling
+ * however unevenly it is delivered, and a pace read through uneven gaps can
+ * look steady when it is not (a slow runner delivered a plateau 8 to 42 ms
+ * apart, nessa_ui#141). Fingers holding a speed, however unsteadily from
+ * one event to the next, keep both. Inertia cannot, however flat its first
+ * frames look — it loses about a quarter of its pace over that long — and
+ * neither can fingers accelerating into inertia.
  *
  * @param recent - The latest deltas, oldest first.
  * @returns The index the held stretch starts at, else `null`.
@@ -650,7 +654,16 @@ function wheelPaceHeld(recent: readonly WheelTrendEntry[]): number | null {
   const later = quarters[2]!.size + quarters[3]!.size
   const earlierTime = quarters[0]!.time + quarters[1]!.time
   const laterTime = quarters[2]!.time + quarters[3]!.time
-  return later / laterTime < (earlier / earlierTime) * wheelHoldDrift ? null : start
+  if (later / laterTime < (earlier / earlierTime) * wheelHoldDrift) return null
+  // The same by the deltas' sizes, half the events against half: no gap,
+  // however late or early, makes a shrinking run look held.
+  const held = recent.slice(start)
+  const half = Math.floor(held.length / 2)
+  const mean = (entries: readonly WheelTrendEntry[]) =>
+    entries.reduce((sum, entry) => sum + entry.size, 0) / Math.max(entries.length, 1)
+  return mean(held.slice(held.length - half)) < mean(held.slice(0, half)) * wheelHoldDrift
+    ? null
+    : start
 }
 
 /**

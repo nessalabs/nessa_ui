@@ -701,6 +701,43 @@ describe("wheel swipes and trackpad inertia", () => {
     )
   })
 
+  // CI's Linux runner (nessa_ui#141): the same light flick, its inertia
+  // delivered unevenly, 8 to 42 ms apart. Measured by pace, the plateau's
+  // late, quick events looked as fast as its early, slow ones, and the
+  // stretch passed for fingers holding a speed.
+  const ciTrace: (readonly [number, number])[] = [
+    [3, 0], [7, 19], [12, 12], [18, 8], [22, 14], [24, 8], [26, 27], [26, 17], [25, 20],
+    [26, 17], [25, 17], [25, 27], [24, 20], [25, 32], [24, 36], [23, 16], [24, 16],
+    [23, 19], [22, 31], [22, 18], [21, 17], [22, 17], [21, 20], [20, 19], [20, 26],
+    [18, 18], [16, 17], [15, 22], [14, 35], [13, 27], [12, 42], [11, 19], [10, 22],
+    [9, 16], [8, 26], [7, 29], [6, 21], [5, 18], [4, 16], [3, 17], [2, 18], [1, 16],
+  ]
+
+  test("inertia delivered unevenly, as on a slow runner, never arms", () => {
+    const { track, armedEver } = replayTimed(ciTrace)
+    assert.equal(armedEver, false)
+    assert.ok(track.credited < panel.commitWidth, `${track.credited}`)
+  })
+
+  test("inertia whose events arrive 30 to 40 ms apart never arms", () => {
+    const { track, armedEver } = replayTimed([
+      ...lightFingers.map((delta) => [delta, 8.33] as const),
+      ...plateau.map((delta, index) => [delta, 30 + ((index * 7) % 11)] as const),
+      ...momentumTail(20, 0.94).map((delta, index) => [Math.round(delta), 30 + ((index * 5) % 11)] as const),
+    ])
+    assert.equal(armedEver, false)
+    assert.ok(track.credited < panel.commitWidth, `${track.credited}`)
+  })
+
+  test("fingers holding a speed, delivered unevenly, still arm", () => {
+    const held: (readonly [number, number])[] = [
+      ...[2, 4, 6, 9].map((delta) => [delta, 16] as const),
+      ...Array.from({ length: 60 }, (_, index) => [index % 2 ? 9 : 7, 12 + ((index * 7) % 25)] as const),
+    ]
+    const { armedEver } = replayTimed(held)
+    assert.equal(armedEver, true)
+  })
+
   test("whole-pixel inertia that repeats its deltas at 120 Hz never arms", () => {
     const tail: (readonly [number, number])[] = []
     for (let pace = 27 / 16; pace * 8.33 >= 0.5; pace *= 0.998 ** 8.33) {
