@@ -12,6 +12,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 // importing the package needs a bundler that handles CSS side effects) but it
 // is not what this file is testing, and going through it would mean this
 // never ran.
+import { AgentFigure } from "./components/agent-figure/agent-figure";
 import { AvatarStack } from "./components/avatar-stack";
 import { Badge } from "./components/badge";
 import { BloomField } from "./components/bloom-field";
@@ -84,6 +85,11 @@ test("primitives render without a browser global", () => {
     ).includes('data-slot="bloom-field"'),
   );
   assert.ok(server(<TypeIn text="Nessa" />).includes("Nessa"));
+  assert.ok(
+    server(<AgentFigure agent="codex" lively />).includes(
+      'data-slot="agent-figure"',
+    ),
+  );
   assert.ok(
     server(
       <ToolTrace

@@ -370,6 +370,12 @@ export {
   type GradientSurfaceProps,
 } from "./components/gradient-surface"
 export {
+  AgentFigure,
+  agentFigureKinds,
+  type AgentFigureKind,
+  type AgentFigureProps,
+} from "./components/agent-figure/agent-figure"
+export {
   BloomField,
   bloomFieldColors,
   type BloomFieldLight,

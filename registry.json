@@ -904,6 +904,31 @@
       ]
     },
     {
+      "name": "agent-figure",
+      "type": "registry:ui",
+      "title": "Agent Figure",
+      "description": "An agent's mark as a small 3D object under studio light \u2014 Claude's burst, Codex's knot, a local model's glass stack \u2014 that plays its own routine while lively. Three.js loads on first use and every figure shares one WebGL context.",
+      "dependencies": [
+        "three"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/agent-figure/agent-figure.tsx",
+          "type": "registry:ui",
+          "target": "components/agent-figure/agent-figure.tsx"
+        },
+        {
+          "path": "packages/react/src/components/agent-figure/agent-figure-scenes.ts",
+          "type": "registry:ui",
+          "target": "components/agent-figure/agent-figure-scenes.ts"
+        }
+      ]
+    },
+    {
       "name": "bloom-field",
       "type": "registry:ui",
       "title": "Bloom Field",
