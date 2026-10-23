@@ -36,11 +36,12 @@ type Story = StoryObj<typeof meta>
 
 export const Lively: Story = {
   args: { lively: false },
+  // Docs only: On the light below runs the same figure through its routine
+  // and back to rest. Every figure drawn under a software renderer costs CI
+  // seconds of main-thread time that other stories pay for.
+  tags: ["!test"],
   parameters: storyDocumentation("Toggle `lively` to play the routine."),
   render: (args) => <AgentFigure {...args} className="size-48" />,
-  play: async ({ canvasElement }) => {
-    await rested(canvasElement.querySelector<HTMLElement>('[data-slot="agent-figure"]')!)
-  },
 }
 
 const names = { claude: "Claude", codex: "Codex", local: "Local AI" } as const
@@ -100,13 +101,17 @@ export const OnTheLight: Story = {
     await expect(figures).toHaveLength(3)
     for (const figure of figures) await rested(figure)
     const codex = figures.find((figure) => figure.dataset.agent === "codex")!
-    await userEvent.hover(canvas.getByRole("radio", { name: "Codex" }))
+    const name = canvas.getByRole("radio", { name: "Codex" })
+    await userEvent.hover(name)
     // Under reduced motion it never leaves rest.
     if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
       await waitFor(() => expect(codex).not.toHaveAttribute("data-resting"), { timeout: 5000 })
     }
-    await userEvent.click(canvas.getByRole("radio", { name: "Codex" }))
-    await userEvent.unhover(canvas.getByRole("radio", { name: "Codex" }))
+    // A click points at the name again, so leave after it: the end state is
+    // that the figure settles back once nothing points at it.
+    await userEvent.click(name)
+    await expect(name).toHaveAttribute("aria-checked", "true")
+    await userEvent.unhover(name)
     await rested(codex)
   },
 }

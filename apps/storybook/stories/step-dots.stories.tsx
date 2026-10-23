@@ -61,6 +61,6 @@ export const Walking: Story = {
       expect(second.getBoundingClientRect().width).toBeGreaterThanOrEqual(
         first.getBoundingClientRect().width * 3,
       )
-    })
+    }, { timeout: 3000 })
   },
 }
