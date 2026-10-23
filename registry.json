@@ -2140,6 +2140,28 @@
       ]
     },
     {
+      "name": "tool-trace",
+      "type": "registry:ui",
+      "title": "Tool Trace",
+      "description": "A run of an agent's tool calls as one quiet line that opens into a waterfall: each call on a shared time axis, earlier calls folded once there are more than a few, and one call's Diff, Input, and Output at a time in a fixed-height card that continues its row.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/tabs",
+        "nessalabs/nessa_ui/tool-call"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/tool-trace.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/tool-trace.tsx"
+        }
+      ]
+    },
+    {
       "name": "tabs",
       "type": "registry:ui",
       "title": "Tabs",

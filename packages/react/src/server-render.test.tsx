@@ -25,6 +25,7 @@ import { EmptyState } from "./components/empty-state";
 import { Favicon } from "./components/favicon";
 import { Input } from "./components/input";
 import { LoadingText } from "./components/loading-text";
+import { ToolTrace } from "./components/tool-trace";
 import { Message } from "./components/message";
 import { ProportionBar } from "./components/proportion-bar";
 import { SearchableListbox } from "./components/searchable-listbox";
@@ -74,6 +75,23 @@ test("primitives render without a browser global", () => {
   assert.ok(server(<Checkbox aria-label="Agree" />).length > 0);
   assert.ok(
     server(<LoadingText>Loading Files</LoadingText>).includes("Loading Files"),
+  );
+  assert.ok(
+    server(
+      <ToolTrace
+        now={0}
+        steps={[
+          {
+            id: "a",
+            label: "Read",
+            detail: "README.md",
+            status: "completed",
+            startedAtMs: 0,
+            endedAtMs: 100,
+          },
+        ]}
+      />,
+    ).includes("Ran 1 tool"),
   );
   assert.ok(
     server(<Favicon href="https://example.com/a" />).includes(

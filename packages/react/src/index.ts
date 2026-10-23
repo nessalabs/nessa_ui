@@ -722,6 +722,15 @@ export {
   type ToolCallTabsProps,
   type ToolCallTriggerProps,
 } from "./components/tool-call"
+export {
+  ToolTrace,
+  formatToolTraceDuration,
+  type ToolTraceDiff,
+  type ToolTraceProps,
+  type ToolTraceStatus,
+  type ToolTraceStep,
+  type ToolTraceStepStatus,
+} from "./components/tool-trace"
 export { JsonTree, type JsonTreeProps } from "./components/json-tree"
 export {
   ToolApproval,
