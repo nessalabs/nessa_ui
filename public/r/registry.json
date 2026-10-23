@@ -904,6 +904,23 @@
       ]
     },
     {
+      "name": "bloom-field",
+      "type": "registry:ui",
+      "title": "Bloom Field",
+      "description": "A WebGL field of soft colour blooms that can gather into one orb, fill a surface, or flood past it, hold up to three pointable lights, take a tint, and send a ring of light through itself \u2014 every value tweened, settled state exposed for tests.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/bloom-field.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/bloom-field.tsx"
+        }
+      ]
+    },
+    {
       "name": "morphing-mesh-gradient",
       "type": "registry:ui",
       "title": "Morphing Mesh Gradient",

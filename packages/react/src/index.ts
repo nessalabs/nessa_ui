@@ -370,6 +370,13 @@ export {
   type GradientSurfaceProps,
 } from "./components/gradient-surface"
 export {
+  BloomField,
+  bloomFieldColors,
+  type BloomFieldLight,
+  type BloomFieldProps,
+  type BloomFieldValue,
+} from "./components/bloom-field"
+export {
   MorphingMeshGradient,
   meshGradientFromRange,
   morphingMeshGradientPresets,

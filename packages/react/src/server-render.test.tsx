@@ -14,6 +14,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 // never ran.
 import { AvatarStack } from "./components/avatar-stack";
 import { Badge } from "./components/badge";
+import { BloomField } from "./components/bloom-field";
 import { Breadcrumb } from "./components/breadcrumb";
 import { Button } from "./components/button";
 import { Card, CardContent } from "./components/card";
@@ -75,6 +76,11 @@ test("primitives render without a browser global", () => {
   assert.ok(server(<Checkbox aria-label="Agree" />).length > 0);
   assert.ok(
     server(<LoadingText>Loading Files</LoadingText>).includes("Loading Files"),
+  );
+  assert.ok(
+    server(
+      <BloomField spread={{ to: 1, duration: 600 }} ripple={1} />,
+    ).includes('data-slot="bloom-field"'),
   );
   assert.ok(
     server(
