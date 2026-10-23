@@ -252,9 +252,27 @@ export const Glow: Story = {
         });
       };
     });
-    // A new size is what makes a settled field draw again.
-    field.parentElement!.style.width = "639px";
-    const { corner, middle } = await frame;
+    const wrapper = field.parentElement!;
+    let timer = 0;
+    let read: { corner: number; middle: number };
+    try {
+      // A new size is what makes a settled field draw again.
+      wrapper.style.width = "480px";
+      read = await Promise.race([
+        frame,
+        new Promise<never>((_, reject) => {
+          timer = window.setTimeout(
+            () => reject(new Error("The field did not draw again after a resize.")),
+            3000,
+          );
+        }),
+      ]);
+    } finally {
+      window.clearTimeout(timer);
+      gl.drawArrays = draw;
+      wrapper.style.width = "";
+    }
+    const { corner, middle } = read;
     await expect(corner).toBeLessThan(64);
     await expect(middle).toBeGreaterThan(corner);
   },

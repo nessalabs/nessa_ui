@@ -646,6 +646,8 @@ function BloomField({
       // The context itself lives until the canvas is collected; shrinking the
       // canvas gives its drawing memory back now. A later run sizes it again.
       element.width = element.height = 1;
+      // Which clears it, so the ground covers the gap until the next run draws.
+      host.removeAttribute("data-drawn");
     };
   }, [palette, ground, speed, ambient, resolution, reducedMotion]);
 
