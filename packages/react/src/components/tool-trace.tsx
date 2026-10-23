@@ -745,7 +745,13 @@ function ToolTrace({
                   .stepId ?? null,
               )
             }
-            onBlur={() => setFocused(null)}
+            onBlur={(event) => {
+              // A window going to the background keeps its focused row: the
+              // person comes back to it. Only focus leaving the rows lets go.
+              if (!event.currentTarget.ownerDocument.hasFocus()) return;
+              if (event.currentTarget.contains(event.relatedTarget)) return;
+              setFocused(null);
+            }}
           >
             {folded.length ? (
               <button
