@@ -131,8 +131,63 @@ export const wheelTrendRetention = 0.999
 export const wheelTrendSpan = 3
 export const wheelTrendFloor = 0.97
 
+/**
+ * How long, in milliseconds, a wheel delta keeps proving that fingers are on
+ * the trackpad. Only travel inside such a window counts toward a full
+ * swipe. Fingers prove themselves by speeding up or turning around —
+ * inertia does neither — or by holding one pace for `wheelHoldWindowMs`,
+ * which backfills that whole stretch. Repeated deltas prove nothing by
+ * themselves: inertia rounded to whole pixels repeats too. Inertia that
+ * plateaus is credited for at most this long after the fingers' last proof.
+ */
+export const wheelFingerProofMs = 50
+
+/**
+ * How many deltas, at most, one proof of the fingers credits — so events
+ * that arrive together, too close to time, cannot carry inertia in.
+ */
+export const wheelFingerProofEvents = 4
+
+/**
+ * How strongly the row resists travel past its resting width, as the share
+ * of the remaining row the first pixels of overdrag cover. Smaller resists
+ * more. The open tray reads as a detent: the row slows sharply past it.
+ */
+export const swipeRubberBand = 0.55
+
+/**
+ * The share of the row a row whose full swipe is armed is drawn at, at
+ * least: crossing the commit point makes the row jump on, so the commit is
+ * visible before the release that makes it.
+ */
+export const swipeArmedShare = 0.85
+
+/**
+ * How long, in milliseconds, deltas must hold one pace to prove fingers
+ * without speeding up. Inertia loses about a third of its pace over this
+ * long; fingers holding a speed lose none.
+ */
+export const wheelHoldWindowMs = 300
+
+/** The least share of the fastest quarter's pace every quarter of a held stretch keeps. */
+export const wheelHoldSpread = 0.9
+
+/**
+ * The share of its earlier half's pace a held stretch's later half must
+ * keep; below it, the stretch is a slow decay.
+ */
+export const wheelHoldDrift = 0.97
+
+/**
+ * A wheel delta smaller than this share of the one before, from one at
+ * least `wheelLandingFloor` pixels, is a new contact: fingers landing stop a
+ * trackpad's inertia dead, while inertia and fingers easing off only taper.
+ */
+export const wheelLandingDrop = 0.25
+export const wheelLandingFloor = 8
+
 /** How many recent deltas a wheel swipe keeps for reading its trend. */
-const wheelTrendLimit = 48
+const wheelTrendLimit = 160
 
 /** How many recent positions a wheel swipe keeps for its release speed. */
 const wheelSampleLimit = 8
@@ -401,6 +456,42 @@ export function presentedSwipeDisplacement(
 }
 
 /**
+ * Where a commit-capable row is drawn for a displacement, while it is being
+ * dragged. Up to the resting width it follows exactly; past it the row is
+ * rubber-banded — it keeps answering the fingers but slows sharply, so the
+ * open tray is felt as a detent and a commit is never reached by drifting.
+ * Once a release would commit, the row jumps on to `swipeArmedShare` of the
+ * row and follows from there, so the armed state is plain before it is let go.
+ *
+ * Rows that cannot commit are already resisted by `clampSwipeDisplacement`
+ * and are drawn as they are.
+ *
+ * @param displacement - The gesture's displacement toward the leading edge.
+ * @param geometry - The row's swipe geometry.
+ * @param state - Whether the row can commit and whether a release would.
+ * @param state.canCommit - Whether a full swipe commits an action on this row.
+ * @param state.armed - Whether a release here commits.
+ * @returns The displacement to draw.
+ */
+export function rubberBandSwipeDisplacement(
+  displacement: number,
+  geometry: SwipeGeometry,
+  { canCommit, armed }: { canCommit: boolean; armed: boolean },
+): number {
+  if (!canCommit || displacement <= geometry.openWidth) return Math.max(displacement, 0)
+  const limit = geometry.rowWidth - geometry.openWidth
+  if (!(limit > 0)) return geometry.openWidth
+  const excess = displacement - geometry.openWidth
+  const banded =
+    geometry.openWidth + limit * (1 - 1 / ((excess * swipeRubberBand) / limit + 1))
+  if (!armed) return banded
+  return Math.min(
+    Math.max(banded, displacement, geometry.rowWidth * swipeArmedShare),
+    geometry.rowWidth,
+  )
+}
+
+/**
  * How visible an action's icon and label are at this displacement. They
  * stay clear until the row has uncovered a good share of the tray, then
  * fade in to full by the resting width, so an action is never seen as a
@@ -451,6 +542,25 @@ export interface WheelSwipeTrack {
    * be inertia. Only this decides whether a release commits.
    */
   reach: number
+  /**
+   * How far the fingers provably moved the row in this gesture alone: only
+   * travel inside a window opened by the fingers speeding up or turning
+   * around (see `wheelFingerProofMs`), plus any stretch whose pace held as
+   * inertia's cannot (`wheelHoldWindowMs`), with every move back toward the
+   * trailing edge counted at once. Only this arms or commits a full swipe, whatever the
+   * row's position when the gesture began.
+   */
+  credited: number
+  /**
+   * Whether the gesture ended because its deltas collapsed, as fingers
+   * landing on inertia make them — or fingers stopping dead. Such an end
+   * never commits: it may not have been a lift at all.
+   */
+  landed?: boolean
+  /** Until when, in milliseconds, deltas count toward `credited`. */
+  creditUntil: number
+  /** How many more deltas count toward `credited` before the fingers prove themselves again. */
+  creditLeft: number
   /** Release speed toward the leading edge once coasting, in px/ms. */
   velocity: number
   /**
@@ -466,7 +576,7 @@ export interface WheelSwipeTrack {
   previous: number
   previousGap: number
   /** The latest deltas' sizes and gaps, for telling a decay from a wobble. */
-  recent: readonly { size: number; gap: number }[]
+  recent: readonly WheelTrendEntry[]
   /**
    * The delta the current shrinking run started from, the time it took to
    * arrive, and the release speed there.
@@ -483,12 +593,64 @@ export interface WheelSwipeTrack {
 export interface WheelSwipeStep {
   track: WheelSwipeTrack
   /**
-   * `move`: the row follows. `coast`: the deltas turned out to be inertia;
-   * release the row now, from `track.reach`. `ignore`: more inertia, which
+   * `move`: the row follows. `coast`: the deltas turned out to be inertia,
+   * or new fingers landed on it; release the row now, from `track.reach`. `ignore`: more inertia, which
    * moves nothing. `resume`: fingers are back on the trackpad; `track` is a
    * fresh gesture starting from wherever the row is.
    */
   event: "move" | "coast" | "ignore" | "resume"
+}
+
+/** One recent wheel delta, as a gesture's trend reads it. */
+export interface WheelTrendEntry {
+  size: number
+  gap: number
+  /** Whether the fingers sped up (or turned around) at this delta. */
+  grew: boolean
+  /** Whether this delta counts toward the gesture's `credited` travel. */
+  credited: boolean
+}
+
+/**
+ * Whether the latest deltas have held their pace: the last
+ * `wheelHoldWindowMs` of them, cut into four equal stretches of time, never
+ * differ in pace by more than `wheelHoldSpread`, and the later half keeps
+ * `wheelHoldDrift` of the earlier half's pace. Fingers holding a speed,
+ * however unsteadily from one event to the next, always do. Inertia cannot,
+ * however flat its first frames look — it loses about a quarter of its pace
+ * over that long — and neither can fingers accelerating into inertia.
+ *
+ * @param recent - The latest deltas, oldest first.
+ * @returns The index the held stretch starts at, else `null`.
+ */
+function wheelPaceHeld(recent: readonly WheelTrendEntry[]): number | null {
+  let time = 0
+  let index = recent.length - 1
+  for (; index >= 0 && time < wheelHoldWindowMs; index -= 1) {
+    time += recent[index]!.gap
+  }
+  if (time < wheelHoldWindowMs) return null
+  const start = index + 1
+  const quarters = [0, 0, 0, 0].map(() => ({ size: 0, time: 0 }))
+  let elapsed = 0
+  for (const entry of recent.slice(start)) {
+    // Each delta belongs to the quarter its arrival falls in.
+    elapsed += entry.gap
+    const quarter = quarters[Math.min(3, Math.floor((elapsed / time) * 4 - 1e-9))]!
+    quarter.size += entry.size
+    quarter.time += entry.gap
+  }
+  if (quarters.some((quarter) => !(quarter.time > 0))) return null
+  const paces = quarters.map((quarter) => quarter.size / quarter.time)
+  if (Math.min(...paces) < Math.max(...paces) * wheelHoldSpread) return null
+  // A pace that keeps falling is inertia, however gently: fingers holding
+  // a speed rise and fall around it, so their later half keeps up with
+  // their earlier one.
+  const earlier = quarters[0]!.size + quarters[1]!.size
+  const later = quarters[2]!.size + quarters[3]!.size
+  const earlierTime = quarters[0]!.time + quarters[1]!.time
+  const laterTime = quarters[2]!.time + quarters[3]!.time
+  return later / laterTime < (earlier / earlierTime) * wheelHoldDrift ? null : start
 }
 
 /**
@@ -511,6 +673,9 @@ export function startWheelSwipe(
     phase: "fingers",
     travel,
     reach: travel,
+    credited: travel,
+    creditUntil: time + wheelFingerProofMs,
+    creditLeft: wheelFingerProofEvents,
     velocity: 0,
     grew,
     shrinking: 0,
@@ -564,7 +729,7 @@ function wheelDeltaRatios(
  * @returns `true` when the deltas are no longer decaying.
  */
 function wheelTrendHolds(
-  recent: readonly { size: number; gap: number }[],
+  recent: readonly WheelTrendEntry[],
   runLength: number,
 ) {
   const inRun = recent.slice(-runLength)
@@ -644,15 +809,71 @@ export function stepWheelSwipe(
     }
   }
 
+  // Fingers landing on a trackpad that is still coasting stop the inertia
+  // dead: the deltas collapse in one event, as inertia never does. Whatever
+  // came before was its own gesture, released where its fingers left it;
+  // the new contact resumes from there as its deltas grow.
+  // Only once the deltas may already be inertia — past the fingers' last
+  // proof — so fingers that stop sharply mid-drag are not taken for a
+  // landing.
+  if (
+    track.previous !== 0 &&
+    !reversed &&
+    (time > track.creditUntil || track.creditLeft <= 0) &&
+    Math.abs(track.previous) >= wheelLandingFloor &&
+    Math.abs(delta) < Math.abs(track.previous) * wheelLandingDrop
+  ) {
+    return {
+      track: {
+        ...track,
+        phase: "coasting",
+        velocity: 0,
+        landed: true,
+        previous: delta,
+        previousGap: gap,
+        time,
+      },
+      event: "coast",
+    }
+  }
+
   const travel = track.travel + delta
   const samples = [...track.samples, { time, displacement: travel }].slice(
     -wheelSampleLimit,
   )
   let { reach, shrinking, runLength, peak, peakGap, peakVelocity } = track
-  const recent = [
-    ...(reversed ? [] : track.recent),
-    { size: Math.abs(delta), gap },
-  ].slice(-wheelTrendLimit)
+  // Fingers prove they are down by speeding up or turning around. Inertia
+  // only decays, so it is credited at most `wheelFingerProofMs` past the
+  // fingers' last proof — unless the pace since then has held for long
+  // enough that it cannot be inertia, and then that whole stretch is the
+  // fingers'. Repeated deltas prove nothing by themselves: inertia rounded
+  // to whole pixels repeats too.
+  const proven = grew || reversed
+  let creditUntil = proven ? time + wheelFingerProofMs : track.creditUntil
+  let creditLeft = proven ? wheelFingerProofEvents : track.creditLeft
+  let credited = track.credited
+  const inWindow = time <= creditUntil && creditLeft > 0
+  if (inWindow) creditLeft -= 1
+  const current: WheelTrendEntry = {
+    size: Math.abs(delta),
+    gap,
+    grew: grew || reversed,
+    credited: delta < 0 || inWindow,
+  }
+  if (current.credited) credited += delta
+  let recent: WheelTrendEntry[] = [...(reversed ? [] : track.recent), current].slice(
+    -wheelTrendLimit,
+  )
+  const held = wheelPaceHeld(recent)
+  if (held !== null) {
+    creditUntil = time + wheelFingerProofMs
+    creditLeft = wheelFingerProofEvents
+    recent = recent.map((entry, index) => {
+      if (index < held || entry.credited) return entry
+      credited += Math.sign(delta) * entry.size
+      return { ...entry, credited: true }
+    })
+  }
   if (track.previous === 0 || reversed || grew) {
     shrinking = 0
     runLength = 0
@@ -690,6 +911,9 @@ export function stepWheelSwipe(
     ...track,
     travel,
     reach,
+    credited,
+    creditUntil,
+    creditLeft,
     grew: track.grew || grew,
     shrinking,
     runLength,
@@ -720,10 +944,14 @@ export function stepWheelSwipe(
 }
 
 /**
- * Decides what a released wheel gesture does. The release is judged at the
- * fingers' reach, so inertia can carry a row open but never into a commit;
- * and it is thrown only when inertia followed it, since fingers that stopped
- * before lifting leave none.
+ * Decides what a released wheel gesture does. A full swipe commits only from
+ * the travel the fingers provably made in this one gesture (`credited`), so
+ * inertia — however it decays — and a second flick landing on an open row
+ * never commit. Resting open or closed is judged at the fingers' reach, so
+ * inertia can carry a row open; and the release is thrown only when inertia
+ * followed it, since fingers that stopped before lifting leave none. A
+ * gesture that was only ever inertia, left over from an earlier one, leaves
+ * the row where it found it.
  *
  * @param release - The gesture and the row it moved.
  * @param release.track - The gesture.
@@ -743,14 +971,33 @@ export function settleWheelSwipe({
   geometry: SwipeGeometry
   committable: string | null
 }): SwipeRelease {
+  if (committable !== null && !track.landed && wheelSwipeArmed(track, geometry)) {
+    return { kind: "commit", actionId: committable }
+  }
+  const stale = track.phase === "coasting" && !track.grew
   return settleSwipe({
     displacement: clampSwipeDisplacement(
-      start + track.reach,
+      stale ? start : start + track.reach,
       geometry,
       committable !== null,
     ),
-    velocity: track.phase === "coasting" ? track.velocity : 0,
+    velocity: track.phase === "coasting" && !stale ? track.velocity : 0,
     geometry,
-    committable,
+    committable: null,
   })
+}
+
+/**
+ * Whether letting go of a wheel gesture now would commit: the fingers' own
+ * provable travel in this gesture has crossed the commit point.
+ *
+ * @param track - The gesture.
+ * @param geometry - The row's swipe geometry.
+ * @returns `true` when a release now commits a committable action.
+ */
+export function wheelSwipeArmed(
+  track: WheelSwipeTrack,
+  geometry: SwipeGeometry,
+): boolean {
+  return swipeArmed(Math.min(track.credited, geometry.rowWidth), geometry, true)
 }

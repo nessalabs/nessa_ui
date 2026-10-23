@@ -217,6 +217,20 @@ function trackpadFlick(fingers: readonly number[]) {
   return deltas
 }
 
+/**
+ * The viewer scrolling the list with a wheel, as scrolling a longer list
+ * would: the rows shift by more than a swipe's slop as the scroll event
+ * arrives, then return once it has been handled.
+ */
+async function scrollMovingRows(list: HTMLElement) {
+  const padding = list.style.paddingTop
+  list.dispatchEvent(new WheelEvent("wheel", { deltaY: 40, bubbles: true }))
+  list.style.paddingTop = "40px"
+  list.dispatchEvent(new Event("scroll"))
+  await nextFrames()
+  list.style.paddingTop = padding
+}
+
 /** Sends horizontal wheel deltas to a row, as a trackpad would. */
 function wheelRow(item: HTMLElement, deltas: readonly number[]) {
   for (const deltaX of deltas) {
@@ -412,8 +426,8 @@ export const SwipeActions: Story = {
     for (const event of horizontal) tokens.dispatchEvent(event)
     await expect(horizontal.every((event) => event.defaultPrevented)).toBe(true)
     await waitFor(() => expect(rowOf(tokens)).toHaveAttribute("data-swipe", "open"))
-    // Scrolling the list closes it.
-    canvas.getByRole("list", { name: "Conversations" }).dispatchEvent(new Event("scroll"))
+    // A scroll that moves the open row closes it.
+    await scrollMovingRows(canvas.getByRole("list", { name: "Conversations" }))
     await expectClosed(tokens)
 
     // A short two-finger flick reveals the actions and no more, however far
@@ -425,7 +439,7 @@ export const SwipeActions: Story = {
     await expect(rowOf(tokens)).not.toHaveAttribute("data-armed")
     await waitFor(() => expect(rowOf(tokens)).toHaveAttribute("data-swipe", "open"))
     await expect(log).not.toHaveTextContent("archive")
-    canvas.getByRole("list", { name: "Conversations" }).dispatchEvent(new Event("scroll"))
+    await scrollMovingRows(canvas.getByRole("list", { name: "Conversations" }))
     await expectClosed(tokens)
 
     // A still touch press opens the actions without a swipe, and lifting the
@@ -532,8 +546,9 @@ export const SwipeActionsReducedMotion: Story = {
     const tray = canvas.getByRole("group", { name: "Actions for Repo audit" })
     // Compared as set, not as measured: with motion on, the tray's width
     // transition may still be landing.
+    const strip = tray.firstElementChild as HTMLElement
     await expect(Number.parseFloat(audit.style.translate)).toBe(
-      -Number.parseFloat(tray.style.width),
+      Number.parseFloat(strip.style.transform.replace("translateX(", "")),
     )
     if (reduced) {
       await expect(getComputedStyle(audit).transitionDuration).toBe("0s")

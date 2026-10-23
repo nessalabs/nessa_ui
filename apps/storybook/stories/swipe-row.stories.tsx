@@ -365,6 +365,218 @@ export const DesktopHost: Story = {
   },
 };
 
+/** One timed wheel event: its horizontal delta and the gap before it, in ms. */
+type TimedWheel = readonly [deltaX: number, gapMs: number];
+
+/**
+ * Sends horizontal wheel deltas to an element at the pace a trackpad does,
+ * so the row reads them with their real timestamps. A trackpad's events
+ * carry the time the hardware made them; a synthetic event carries the time
+ * it was sent. So each gap is measured from the previous event: a timer
+ * takes most of it and a short wait in place the rest, so a busy machine
+ * firing timers late only stretches a gap, never bunches events together.
+ */
+async function wheelTimed(target: HTMLElement, events: readonly TimedWheel[]) {
+  let last = performance.now();
+  for (const [deltaX, gap] of events) {
+    await new Promise((done) => setTimeout(done, Math.max(0, gap - 4)));
+    while (performance.now() < last + gap) {
+      // At most a few milliseconds.
+    }
+    target.dispatchEvent(
+      new WheelEvent("wheel", { deltaX, bubbles: true, cancelable: true }),
+    );
+    last = performance.now();
+  }
+}
+
+/** Fingers on the trackpad, one delta per 120 Hz frame. */
+const fingers = (deltas: readonly number[]): TimedWheel[] =>
+  deltas.map((delta) => [delta, 8]);
+
+/** A light two-finger flick: about 90 px of accelerating finger travel. */
+const lightFlick = fingers([1, 3, 7, 12, 18, 22, 24]);
+
+/**
+ * macOS inertia as WebKit delivers it: whole pixels at 60 Hz, holding a
+ * near-flat pace for its first frames and then decaying to nothing.
+ */
+function inertia(from = 26): TimedWheel[] {
+  const plateau = [0, 0, 1, 0, 1, 1, 2, 1, 2, 3, 2, 3, 4, 4, 5, 4, 5, 6];
+  const tail: TimedWheel[] = plateau.map((drop, index) => [
+    from - drop,
+    index ? 16 : 24,
+  ]);
+  for (let delta = from - 6; delta >= 1; delta = Math.floor(delta * 0.94)) {
+    tail.push([delta, 16]);
+  }
+  return tail;
+}
+
+/** The rows' debug trace (the story's group runs in `debug`). */
+function traceEvents(row: HTMLElement): Record<string, unknown>[] {
+  const registry = (
+    row.ownerDocument.defaultView as unknown as {
+      __nessaSwipeRows?: Record<string, { events: Record<string, unknown>[] }>;
+    }
+  ).__nessaSwipeRows;
+  return Object.values(registry ?? {}).flatMap((handle) => handle.events);
+}
+
+/**
+ * Records whether the row ever armed a full swipe while `run` went on: drawn
+ * armed, or traced armed by any wheel event, however briefly.
+ */
+async function watchArmed(row: HTMLElement, run: () => Promise<void>) {
+  let armed = row.hasAttribute("data-armed");
+  const observer = new MutationObserver(() => {
+    armed ||= row.hasAttribute("data-armed");
+  });
+  observer.observe(row, { attributes: true, attributeFilter: ["data-armed"] });
+  const before = traceEvents(row).length;
+  try {
+    await run();
+  } finally {
+    observer.disconnect();
+  }
+  // One gesture runs at a time, so whatever armed meanwhile was this row.
+  return (
+    armed ||
+    traceEvents(row)
+      .slice(before)
+      .some((entry) => entry.ev === "f" && entry.armed === true)
+  );
+}
+
+/** Closes an open row from its content with Escape and waits for it to rest. */
+async function closeWithEscape(content: HTMLElement) {
+  content.focus();
+  await userEvent.keyboard("{Escape}");
+  await expectClosed(content);
+}
+
+export const TrackpadSwipes: Story = {
+  tags: ["cross-engine", "reduced-motion"],
+  parameters: storyDocumentation(
+    "Two-finger trackpad swipes, sent at a trackpad's pace. A short swipe springs back; a medium one rests open with the tray attached to the row; a light flick — whose inertia carries on long after the fingers lift — and a second flick landing on an open row never arm or archive. Only a long, deliberate drag past 60% of the row arms Archive, which stretches across the tray, and commits it.",
+  ),
+  render: () => <ListExample />,
+  play: async ({ canvasElement }) => {
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return;
+    const canvas = within(canvasElement);
+    const log = canvas.getByRole("status", { name: "Events" });
+    const notes = canvas.getByRole("button", { name: /^release notes/i });
+
+    // A short, slow nudge springs back and does nothing.
+    const nudgeArmed = await watchArmed(rowOf(notes), () =>
+      wheelTimed(
+        notes,
+        [1, 2, 3, 3, 2, 2, 1].map((delta): TimedWheel => [delta, 16]),
+      ),
+    );
+    await expect(nudgeArmed).toBe(false);
+    await expectClosed(notes);
+
+    // Inertia alone — a tail left over from a gesture that ended elsewhere,
+    // arriving after a pause — never opens, arms, or commits the row.
+    await new Promise((done) => setTimeout(done, 200));
+    const tailArmed = await watchArmed(rowOf(notes), () =>
+      wheelTimed(notes, inertia(22).slice(6)),
+    );
+    await expect(tailArmed).toBe(false);
+    await expectClosed(notes);
+    await expect(log).toHaveTextContent("");
+
+    // A light flick: its inertia travels several times the row, yet the
+    // row never arms and rests open once the deltas turn out to be inertia.
+    const flickArmed = await watchArmed(rowOf(notes), () =>
+      wheelTimed(notes, [...lightFlick, ...inertia()]),
+    );
+    await expect(flickArmed).toBe(false);
+    await waitFor(() =>
+      expect(rowOf(notes)).toHaveAttribute("data-swipe", "open"),
+    );
+    await expect(log).toHaveTextContent("");
+    await closeWithEscape(notes);
+
+    // Two flicks back to back, the second landing while the first's inertia
+    // is still arriving: they do not merge into a full swipe.
+    const audit = canvas.getByRole("button", { name: /^repo audit/i });
+    const backToBackArmed = await watchArmed(rowOf(audit), () =>
+      wheelTimed(audit, [
+        ...lightFlick,
+        ...inertia().slice(0, 10),
+        [1, 40],
+        ...lightFlick.slice(1),
+        ...inertia(),
+      ]),
+    );
+    await expect(backToBackArmed).toBe(false);
+    await waitFor(() =>
+      expect(rowOf(audit)).toHaveAttribute("data-swipe", "open"),
+    );
+    await expect(log).toHaveTextContent("");
+    await closeWithEscape(audit);
+
+    // A medium, steady swipe rests open, and the tray rides attached to the
+    // content's trailing edge: no gap between the row and its actions.
+    const tokens = canvas.getByRole("button", { name: /^motion token audit/i });
+    await wheelTimed(tokens, fingers([2, 4, 6, 9, 7, 9, 7, 9, 7, 9, 7, 9, 7, 9, 7]));
+    await waitFor(() =>
+      expect(rowOf(tokens)).toHaveAttribute("data-swipe", "open"),
+    );
+    const tray = rowOf(tokens).querySelector<HTMLElement>(
+      "[data-slot=swipe-row-actions]",
+    )!;
+    const tiles = Array.from(tray.querySelectorAll("button"));
+    await waitFor(() => {
+      const contentEdge = tokens.getBoundingClientRect().right;
+      const tileEdges = tiles.map((tile) => tile.getBoundingClientRect());
+      const leading = Math.min(...tileEdges.map((tile) => tile.left));
+      expect(Math.abs(leading - contentEdge)).toBeLessThanOrEqual(1);
+      // The tiles meet one another, and reach the row's own edge, where the
+      // row clips them.
+      const sorted = [...tileEdges].sort((a, b) => a.left - b.left);
+      for (const [index, tile] of sorted.slice(1).entries()) {
+        expect(Math.abs(tile.left - sorted[index]!.right)).toBeLessThanOrEqual(1);
+      }
+      expect(sorted.at(-1)!.right).toBeGreaterThanOrEqual(
+        rowOf(tokens).getBoundingClientRect().right - 1,
+      );
+    });
+    await expect(log).toHaveTextContent("");
+    await closeWithEscape(tokens);
+
+    // A long, deliberate drag past 60% of the row arms Archive — it takes
+    // the whole tray — and the release commits it.
+    const panel = canvas.getByRole("button", { name: /^panel layout/i });
+    const panelRow = rowOf(panel);
+    const deliberateArmed = await watchArmed(panelRow, () =>
+      wheelTimed(panel, [
+        ...fingers([3, 6, 9]),
+        ...Array.from({ length: 44 }, (_, index): TimedWheel => [
+          index % 2 ? 9 : 11,
+          8,
+        ]),
+      ]),
+    );
+    await expect(deliberateArmed).toBe(true);
+    await waitFor(() =>
+      expect(
+        canvas.queryByRole("button", { name: /^panel layout/i }),
+      ).not.toBeInTheDocument(),
+    );
+    await expect(log).toHaveTextContent("archive:panel");
+
+    // Nothing is left displaced or waiting to settle.
+    for (const item of within(
+      canvas.getByRole("list", { name: "Inbox" }),
+    ).getAllByRole("button")) {
+      await expectClosed(item);
+    }
+  },
+};
+
 function AncestorScrollExample() {
   const [held, setHeld] = React.useState<"both" | "archive" | "none">("both");
   const [suffix, setSuffix] = React.useState("");
@@ -452,7 +664,13 @@ export const AncestorScroll: Story = {
     );
     // Each action takes a slot as wide as the row is tall.
     const slot = rowOf(notes).getBoundingClientRect().height;
-    const trayWidth = () => tray().getBoundingClientRect().width;
+    // The tray's uncovered strip: how far the content has slid from the
+    // row's own edge, in either writing direction.
+    const trayWidth = () =>
+      Math.abs(
+        notes.getBoundingClientRect().left -
+          rowOf(notes).getBoundingClientRect().left,
+      );
     await waitFor(() =>
       expect(Math.abs(trayWidth() - 2 * slot)).toBeLessThanOrEqual(1),
     );
@@ -497,11 +715,53 @@ export const AncestorScroll: Story = {
       expect(parseFloat(notes.style.translate)).toBeLessThan(0),
     );
 
-    // Scrolling the page around the list closes the row.
+    // A scroll the page makes by itself — here, revealing the tray's
+    // confirm button the way WebKit and automation do just before pressing
+    // it — leaves the row open and its confirmation standing. The host
+    // gives Delete back without a press, which would close the row.
+    fireEvent.click(canvas.getByRole("button", { name: "Both actions" }));
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Delete Release notes" }),
+    );
+    const confirm = canvas.getByRole("button", {
+      name: "Confirm: Delete Release notes",
+    });
+    // Well after the swipe and the press, so nothing the viewer did is
+    // still scrolling.
+    await new Promise((done) => setTimeout(done, 1100));
     const page = canvas.getByTestId("page");
     page.scrollTop = 40;
     await waitFor(() => expect(page.scrollTop).toBeGreaterThan(0));
+    await new Promise((done) =>
+      requestAnimationFrame(() => requestAnimationFrame(done)),
+    );
+    await expect(rowOf(notes)).toHaveAttribute("data-swipe", "open");
+    await expect(confirm).toBeInTheDocument();
+    await expect(confirm).toHaveAccessibleName("Confirm: Delete Release notes");
+    // Escape backs out of the confirmation without closing the row.
+    confirm.focus();
+    await userEvent.keyboard("{Escape}");
+    await expect(rowOf(notes)).toHaveAttribute("data-swipe", "open");
+
+    // The viewer scrolling the page around the list from the keyboard, with
+    // focus on the row's content, moves the row and closes it.
+    notes.focus();
+    await userEvent.keyboard("{PageUp}");
+    page.scrollTop = 0;
+    await waitFor(() => expect(page.scrollTop).toBe(0));
     await expectClosed(notes);
+
+    // So does a wheel.
+    wheel(notes, [40, 40, 40]);
+    await waitFor(() =>
+      expect(rowOf(notes)).toHaveAttribute("data-swipe", "open"),
+    );
+    await new Promise((done) => setTimeout(done, 1100));
+    page.dispatchEvent(new WheelEvent("wheel", { deltaY: 40, bubbles: true }));
+    page.scrollTop = 40;
+    await waitFor(() => expect(page.scrollTop).toBeGreaterThan(0));
+    await expectClosed(notes);
+    page.scrollTop = 0;
 
     // Actions taken away mid-press let the press go: a drag that carries on
     // past the slop afterwards opens nothing, and once the actions are back
@@ -560,6 +820,8 @@ export const AncestorScroll: Story = {
     await expect(actionsOf()[0]).toHaveFocus();
     fireEvent.click(canvas.getByRole("button", { name: "No actions" }));
     await waitFor(() => expect(audit).toHaveFocus());
+    // The row it was open on renders its content untouched: no slide left.
+    await waitFor(() => expect(audit.style.translate).toBe(""));
     fireEvent.click(canvas.getByRole("button", { name: "Both actions" }));
     await expectClosed(audit);
 
