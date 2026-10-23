@@ -27,6 +27,7 @@ import { Favicon } from "./components/favicon";
 import { Input } from "./components/input";
 import { LoadingText } from "./components/loading-text";
 import { ToolTrace } from "./components/tool-trace";
+import { TypeIn } from "./components/type-in";
 import { Message } from "./components/message";
 import { ProportionBar } from "./components/proportion-bar";
 import { SearchableListbox } from "./components/searchable-listbox";
@@ -82,6 +83,7 @@ test("primitives render without a browser global", () => {
       <BloomField spread={{ to: 1, duration: 600 }} ripple={1} />,
     ).includes('data-slot="bloom-field"'),
   );
+  assert.ok(server(<TypeIn text="Nessa" />).includes("Nessa"));
   assert.ok(
     server(
       <ToolTrace

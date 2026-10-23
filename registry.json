@@ -921,6 +921,23 @@
       ]
     },
     {
+      "name": "type-in",
+      "type": "registry:ui",
+      "title": "Type In",
+      "description": "Text that types itself in a key at a time at a human pace, painted with one gradient across the whole word, each letter landing with a press and a flash that cools, led by a gradient caret that blinks twice and leaves. For a wordmark at a once-only moment.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/type-in.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/type-in.tsx"
+        }
+      ]
+    },
+    {
       "name": "morphing-mesh-gradient",
       "type": "registry:ui",
       "title": "Morphing Mesh Gradient",

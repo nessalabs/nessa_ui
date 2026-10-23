@@ -377,6 +377,12 @@ export {
   type BloomFieldValue,
 } from "./components/bloom-field"
 export {
+  TypeIn,
+  typeInColors,
+  typeInGaps,
+  type TypeInProps,
+} from "./components/type-in"
+export {
   MorphingMeshGradient,
   meshGradientFromRange,
   morphingMeshGradientPresets,
