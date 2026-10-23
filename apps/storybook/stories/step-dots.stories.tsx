@@ -56,9 +56,11 @@ export const Walking: Story = {
     await expect(second).toHaveAttribute("data-current", "true")
     await expect(first).not.toHaveAttribute("data-current")
     // The end state: nothing still stretching, and the long dot at full length.
-    await waitFor(() => expect(dots.getAnimations({ subtree: true })).toHaveLength(0))
-    await expect(second.getBoundingClientRect().width).toBeGreaterThanOrEqual(
-      first.getBoundingClientRect().width * 3,
-    )
+    await waitFor(() => {
+      expect(dots.getAnimations({ subtree: true })).toHaveLength(0)
+      expect(second.getBoundingClientRect().width).toBeGreaterThanOrEqual(
+        first.getBoundingClientRect().width * 3,
+      )
+    })
   },
 }
