@@ -36,12 +36,54 @@ type Story = StoryObj<typeof meta>
 
 export const Lively: Story = {
   args: { lively: false },
-  // Docs only: On the light below runs the same figure through its routine
-  // and back to rest. Every figure drawn under a software renderer costs CI
-  // seconds of main-thread time that other stories pay for.
+  // Docs only: Playing below runs one figure through its routine and back.
   tags: ["!test"],
   parameters: storyDocumentation("Toggle `lively` to play the routine."),
   render: (args) => <AgentFigure {...args} className="size-48" />,
+}
+
+/** One figure and a button that plays its routine, as a picker row does. */
+function PlayOne() {
+  const [lively, setLively] = React.useState(false)
+  return (
+    <div className="flex flex-col items-start gap-3">
+      <AgentFigure agent="claude" lively={lively} className="size-40" />
+      <button
+        type="button"
+        aria-pressed={lively}
+        className="rounded-full border border-neutral-300 px-3 py-1 text-sm"
+        onClick={() => setLively((on) => !on)}
+      >
+        Play
+      </button>
+    </div>
+  )
+}
+
+/**
+ * The tested path: one figure, so a software renderer in CI draws one scene
+ * per frame rather than every figure and the light behind them. On the light
+ * shows the same behaviour in a picker, for docs.
+ */
+export const Playing: Story = {
+  parameters: storyDocumentation(
+    "Press Play to start the routine and again to stop it; the figure settles back to rest.",
+  ),
+  render: () => <PlayOne />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const figure = canvasElement.querySelector<HTMLElement>('[data-slot="agent-figure"]')!
+    await rested(figure)
+    const play = canvas.getByRole("button", { name: "Play" })
+    await userEvent.click(play)
+    // Under reduced motion it never leaves rest.
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      await waitFor(() => expect(figure).not.toHaveAttribute("data-resting"), { timeout: 5000 })
+    }
+    await userEvent.click(play)
+    await expect(play).toHaveAttribute("aria-pressed", "false")
+    await rested(figure)
+  },
 }
 
 const names = { claude: "Claude", codex: "Codex", local: "Local AI" } as const
@@ -91,27 +133,11 @@ function Picker() {
 }
 
 export const OnTheLight: Story = {
+  // Docs only: three figures and the light under a software renderer took
+  // most of a 30 s test budget in CI. Playing tests the same routine.
+  tags: ["!test"],
   parameters: storyDocumentation(
     "Point at a name to play that agent's routine; choose one to bring it forward.",
   ),
   render: () => <Picker />,
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement)
-    const figures = [...canvasElement.querySelectorAll<HTMLElement>('[data-slot="agent-figure"]')]
-    await expect(figures).toHaveLength(3)
-    for (const figure of figures) await rested(figure)
-    const codex = figures.find((figure) => figure.dataset.agent === "codex")!
-    const name = canvas.getByRole("radio", { name: "Codex" })
-    await userEvent.hover(name)
-    // Under reduced motion it never leaves rest.
-    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      await waitFor(() => expect(codex).not.toHaveAttribute("data-resting"), { timeout: 5000 })
-    }
-    // A click points at the name again, so leave after it: the end state is
-    // that the figure settles back once nothing points at it.
-    await userEvent.click(name)
-    await expect(name).toHaveAttribute("aria-checked", "true")
-    await userEvent.unhover(name)
-    await rested(codex)
-  },
 }
