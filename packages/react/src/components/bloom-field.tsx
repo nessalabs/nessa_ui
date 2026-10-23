@@ -1,15 +1,15 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
-const reducedMotionQuery = "(prefers-reduced-motion: reduce)"
+const reducedMotionQuery = "(prefers-reduced-motion: reduce)";
 
 function subscribeToReducedMotion(callback: () => void) {
-  const query = window.matchMedia(reducedMotionQuery)
-  query.addEventListener("change", callback)
-  return () => query.removeEventListener("change", callback)
+  const query = window.matchMedia(reducedMotionQuery);
+  query.addEventListener("change", callback);
+  return () => query.removeEventListener("change", callback);
 }
 
 /** Returns the live, server-safe reduced-motion preference. */
@@ -18,7 +18,7 @@ function useReducedMotion() {
     subscribeToReducedMotion,
     () => window.matchMedia(reducedMotionQuery).matches,
     () => false,
-  )
+  );
 }
 
 /**
@@ -30,29 +30,29 @@ function useReducedMotion() {
 export type BloomFieldValue =
   | number
   | {
-      to: number
-      from?: number
+      to: number;
+      from?: number;
       /** Milliseconds before it starts moving. Defaults to 0. */
-      delay?: number
+      delay?: number;
       /** Milliseconds it takes. Defaults to 0, which is a jump. */
-      duration?: number
+      duration?: number;
       /** `"out"` decelerates; `"in-out"` eases both ends. Defaults to `"in-out"`. */
-      easing?: "out" | "in-out"
-    }
+      easing?: "out" | "in-out";
+    };
 
 /** A point of light inside the field, such as one per choice on offer. */
 export interface BloomFieldLight {
   /** Across the field, 0 (left) to 1 (right). */
-  x: number
+  x: number;
   /** Down the field, 0 (top) to 1 (bottom). */
-  y: number
+  y: number;
   /** Any CSS colour a canvas understands. */
-  color: string
+  color: string;
   /**
    * How much it stands out: 0 is resting, 1 is pointed at, 2 is chosen. It
    * travels there over 300 ms, so a host only says which.
    */
-  emphasis?: number
+  emphasis?: number;
 }
 
 /** The default palette: magenta, violet, amber, blue and lilac. */
@@ -62,65 +62,77 @@ const bloomFieldColors = Object.freeze([
   "#f09a4a",
   "#4b6cf0",
   "#b06ad8",
-] as const)
+] as const);
 
-export interface BloomFieldProps extends Omit<React.ComponentProps<"div">, "children"> {
+export interface BloomFieldProps extends Omit<
+  React.ComponentProps<"div">,
+  "children"
+> {
   /**
    * How far the colour reaches: about 0.1 is a small orb, 1 fills the field
    * and more floods past its edges. Defaults to 1.
    */
-  spread?: BloomFieldValue
+  spread?: BloomFieldValue;
   /** How much of the light is let through, 0 (black) to 1. Defaults to 1. */
-  fade?: BloomFieldValue
+  fade?: BloomFieldValue;
   /** Where the colour is centred across the field, 0 to 1. Defaults to 0.5. */
-  x?: BloomFieldValue
+  x?: BloomFieldValue;
   /** Where the colour is centred down the field, 0 to 1. Defaults to 0.5. */
-  y?: BloomFieldValue
+  y?: BloomFieldValue;
   /** A colour every bloom leans toward, by `tintAmount`. */
-  tint?: string
+  tint?: string;
   /** How far the blooms lean toward `tint`, 0 to 1. Defaults to 0. */
-  tintAmount?: BloomFieldValue
+  tintAmount?: BloomFieldValue;
   /** Up to three points of light drawn over the wash. */
-  lights?: readonly BloomFieldLight[]
+  lights?: readonly BloomFieldLight[];
   /**
    * Fires a ring of light from (`rippleX`, `rippleY`) each time it changes.
    * Pass a counter. Nothing is drawn under reduced motion.
    */
-  ripple?: number
+  ripple?: number;
   /** Where a ripple starts across the field, 0 to 1. Defaults to 0.5. */
-  rippleX?: number
+  rippleX?: number;
   /** Where a ripple starts down the field, 0 to 1. Defaults to 0.5. */
-  rippleY?: number
+  rippleY?: number;
   /** Up to five CSS colours for the blooms. */
-  colors?: readonly string[]
+  colors?: readonly string[];
   /** The colour behind the blooms. Defaults to a near-black violet. */
-  ground?: string
+  ground?: string;
   /** How fast the blooms drift. Defaults to 0.3. */
-  speed?: number
+  speed?: number;
   /**
    * Whether the blooms keep drifting once every value has arrived. Defaults
    * to true. Off, the field stops drawing as soon as it settles, which is what
    * a test that must leave nothing running wants.
    */
-  ambient?: boolean
+  ambient?: boolean;
   /** Drawing resolution as a share of the CSS size. Defaults to 0.7. */
-  resolution?: number
+  resolution?: number;
 }
 
 type Tween = {
-  key: string
-  from: number
-  to: number
-  start: number
-  duration: number
-  easing: "out" | "in-out"
+  key: string;
+  from: number;
+  to: number;
+  start: number;
+  duration: number;
+  easing: "out" | "in-out";
   /** Taken from the current value when the tween first runs. */
-  fromCurrent: boolean
-}
+  fromCurrent: boolean;
+};
 
-type Channel = "spread" | "fade" | "x" | "y" | "tint" | "l0" | "l1" | "l2"
-const CHANNELS: readonly Channel[] = ["spread", "fade", "x", "y", "tint", "l0", "l1", "l2"]
-const LIGHT_CHANNELS = ["l0", "l1", "l2"] as const
+type Channel = "spread" | "fade" | "x" | "y" | "tint" | "l0" | "l1" | "l2";
+const CHANNELS: readonly Channel[] = [
+  "spread",
+  "fade",
+  "x",
+  "y",
+  "tint",
+  "l0",
+  "l1",
+  "l2",
+];
+const LIGHT_CHANNELS = ["l0", "l1", "l2"] as const;
 const DEFAULTS: Record<Channel, number> = {
   spread: 1,
   fade: 1,
@@ -130,34 +142,37 @@ const DEFAULTS: Record<Channel, number> = {
   l0: 0,
   l1: 0,
   l2: 0,
-}
-const EMPHASIS_MS = 300
-const RIPPLE_SECONDS = 2
+};
+const EMPHASIS_MS = 300;
+const RIPPLE_SECONDS = 2;
 
 function valueKey(value: BloomFieldValue | undefined) {
-  return value === undefined ? "" : JSON.stringify(value)
+  return value === undefined ? "" : JSON.stringify(value);
 }
 
 function ease(easing: "out" | "in-out", x: number) {
-  if (easing === "out") return 1 - (1 - x) ** 3
-  return x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2
+  if (easing === "out") return 1 - (1 - x) ** 3;
+  return x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2;
 }
 
 /** Where a tween is at `now`, and whether it has arrived. */
 function sample(tween: Tween, current: number, now: number) {
   if (tween.fromCurrent) {
-    tween.from = current
-    tween.fromCurrent = false
+    tween.from = current;
+    tween.fromCurrent = false;
   }
   if (tween.duration <= 0) {
-    const arrived = now >= tween.start
-    return { value: arrived ? tween.to : tween.from, done: arrived }
+    const arrived = now >= tween.start;
+    return { value: arrived ? tween.to : tween.from, done: arrived };
   }
-  const x = Math.min(1, Math.max(0, (now - tween.start) / tween.duration))
-  return { value: tween.from + (tween.to - tween.from) * ease(tween.easing, x), done: x >= 1 }
+  const x = Math.min(1, Math.max(0, (now - tween.start) / tween.duration));
+  return {
+    value: tween.from + (tween.to - tween.from) * ease(tween.easing, x),
+    done: x >= 1,
+  };
 }
 
-const VERTEX = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}"
+const VERTEX = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
 
 /*
  * Five soft blooms drift about a centre and are blended by weight, so where
@@ -212,66 +227,88 @@ void main(){
   }
   col+=(hash(gl_FragCoord.xy+fract(uT)*91.)-.5)*.035;
   gl_FragColor=vec4(col,1.);
-}`
+}`;
 
 /** A CSS colour as 0–1 RGB, read back through a 1×1 canvas. */
-function rgb(color: string | undefined, fallback: [number, number, number]): [number, number, number] {
-  if (!color) return fallback
-  const canvas = document.createElement("canvas")
-  canvas.width = canvas.height = 1
-  const context = canvas.getContext("2d", { willReadFrequently: true })
-  if (!context) return fallback
-  context.fillStyle = "#000"
-  context.fillStyle = color
-  context.fillRect(0, 0, 1, 1)
-  const [r, g, b] = context.getImageData(0, 0, 1, 1).data
-  return [r / 255, g / 255, b / 255]
+function rgb(
+  color: string | undefined,
+  fallback: [number, number, number],
+): [number, number, number] {
+  if (!color) return fallback;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 1;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) return fallback;
+  context.fillStyle = "#000";
+  context.fillStyle = color;
+  context.fillRect(0, 0, 1, 1);
+  const [r, g, b] = context.getImageData(0, 0, 1, 1).data;
+  return [r / 255, g / 255, b / 255];
 }
 
-type Uniforms = Record<string, WebGLUniformLocation | null>
+type Uniforms = Record<string, WebGLUniformLocation | null>;
 
 function createProgram(gl: WebGLRenderingContext) {
   const compile = (type: number, source: string) => {
-    const shader = gl.createShader(type)
-    if (!shader) return null
-    gl.shaderSource(shader, source)
-    gl.compileShader(shader)
-    return gl.getShaderParameter(shader, gl.COMPILE_STATUS) ? shader : null
-  }
-  const vertex = compile(gl.VERTEX_SHADER, VERTEX)
-  const fragment = compile(gl.FRAGMENT_SHADER, FRAGMENT)
-  const program = gl.createProgram()
-  if (!vertex || !fragment || !program) return null
-  gl.attachShader(program, vertex)
-  gl.attachShader(program, fragment)
-  gl.linkProgram(program)
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return null
-  gl.useProgram(program)
-  const buffer = gl.createBuffer()
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
-  const position = gl.getAttribLocation(program, "p")
-  gl.enableVertexAttribArray(position)
-  gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0)
-  const uniforms: Uniforms = {}
+    const shader = gl.createShader(type);
+    if (!shader) return null;
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    return gl.getShaderParameter(shader, gl.COMPILE_STATUS) ? shader : null;
+  };
+  const vertex = compile(gl.VERTEX_SHADER, VERTEX);
+  const fragment = compile(gl.FRAGMENT_SHADER, FRAGMENT);
+  const program = gl.createProgram();
+  if (!vertex || !fragment || !program) return null;
+  gl.attachShader(program, vertex);
+  gl.attachShader(program, fragment);
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return null;
+  gl.useProgram(program);
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array([-1, -1, 3, -1, -1, 3]),
+    gl.STATIC_DRAW,
+  );
+  const position = gl.getAttribLocation(program, "p");
+  gl.enableVertexAttribArray(position);
+  gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+  const uniforms: Uniforms = {};
   for (const name of [
-    "uRes", "uT", "uWash", "uTint", "uGround", "uC0", "uC1", "uC2", "uC3", "uC4",
-    "uL0", "uL1", "uL2", "uLc0", "uLc1", "uLc2", "uRip",
+    "uRes",
+    "uT",
+    "uWash",
+    "uTint",
+    "uGround",
+    "uC0",
+    "uC1",
+    "uC2",
+    "uC3",
+    "uC4",
+    "uL0",
+    "uL1",
+    "uL2",
+    "uLc0",
+    "uLc1",
+    "uLc2",
+    "uRip",
   ])
-    uniforms[name] = gl.getUniformLocation(program, name)
+    uniforms[name] = gl.getUniformLocation(program, name);
   return {
     uniforms,
     dispose() {
-      gl.deleteProgram(program)
-      gl.deleteShader(vertex)
-      gl.deleteShader(fragment)
-      gl.deleteBuffer(buffer)
+      gl.deleteProgram(program);
+      gl.deleteShader(vertex);
+      gl.deleteShader(fragment);
+      gl.deleteBuffer(buffer);
     },
-  }
+  };
 }
 
 /** While a value is moving, every frame; once only the blooms drift, 30 a second. */
-const AMBIENT_FRAME_MS = 1000 / 30
+const AMBIENT_FRAME_MS = 1000 / 30;
 
 /**
  * A living wash of colour drawn in WebGL: soft blooms that drift and blend,
@@ -307,15 +344,15 @@ function BloomField({
   style,
   ...props
 }: BloomFieldProps) {
-  const reducedMotion = useReducedMotion()
-  const root = React.useRef<HTMLDivElement>(null)
-  const canvas = React.useRef<HTMLCanvasElement>(null)
-  const current = React.useRef<Record<Channel, number>>({ ...DEFAULTS })
-  const tweens = React.useRef<Partial<Record<Channel, Tween>>>({})
-  const wake = React.useRef<() => void>(() => {})
-  const rippleAt = React.useRef<number | undefined>(undefined)
-  const firstRipple = React.useRef(ripple)
-  const shown = (lights ?? []).slice(0, 3)
+  const reducedMotion = useReducedMotion();
+  const root = React.useRef<HTMLDivElement>(null);
+  const canvas = React.useRef<HTMLCanvasElement>(null);
+  const current = React.useRef<Record<Channel, number>>({ ...DEFAULTS });
+  const tweens = React.useRef<Partial<Record<Channel, Tween>>>({});
+  const wake = React.useRef<() => void>(() => {});
+  const rippleAt = React.useRef<number | undefined>(undefined);
+  const firstRipple = React.useRef(ripple);
+  const shown = (lights ?? []).slice(0, 3);
   const given: Record<Channel, BloomFieldValue> = {
     spread,
     fade,
@@ -325,30 +362,38 @@ function BloomField({
     l0: { to: shown[0]?.emphasis ?? 0, duration: EMPHASIS_MS, easing: "out" },
     l1: { to: shown[1]?.emphasis ?? 0, duration: EMPHASIS_MS, easing: "out" },
     l2: { to: shown[2]?.emphasis ?? 0, duration: EMPHASIS_MS, easing: "out" },
-  }
-  const keys = CHANNELS.map((channel) => valueKey(given[channel])).join("|")
+  };
+  const keys = CHANNELS.map((channel) => valueKey(given[channel])).join("|");
   // What the draw loop reads that is not a tween. Kept in a ref so a change
   // to any of it redraws without tearing the renderer down.
-  const scene = React.useRef({ tint, lights: shown, rippleX, rippleY })
-  scene.current = { tint, lights: shown, rippleX, rippleY }
-  const lightKey = JSON.stringify(shown.map((light) => [light.x, light.y, light.color]))
+  const scene = React.useRef({ tint, lights: shown, rippleX, rippleY });
+  scene.current = { tint, lights: shown, rippleX, rippleY };
+  const lightKey = JSON.stringify(
+    shown.map((light) => [light.x, light.y, light.color]),
+  );
 
   // A changed value becomes a new tween, started now. A value that has not
   // changed keeps the tween it already has, so a re-render mid-flight does
   // not restart it.
   React.useLayoutEffect(() => {
-    const now = performance.now()
+    const now = performance.now();
     for (const channel of CHANNELS) {
-      const value = given[channel]
-      const key = valueKey(value)
-      if (tweens.current[channel]?.key === key) continue
+      const value = given[channel];
+      const key = valueKey(value);
+      if (tweens.current[channel]?.key === key) continue;
       if (typeof value === "number") {
         tweens.current[channel] = {
-          key, from: value, to: value, start: now, duration: 0, easing: "in-out", fromCurrent: false,
-        }
-        current.current[channel] = value
+          key,
+          from: value,
+          to: value,
+          start: now,
+          duration: 0,
+          easing: "in-out",
+          fromCurrent: false,
+        };
+        current.current[channel] = value;
       } else {
-        const moving = !reducedMotion
+        const moving = !reducedMotion;
         tweens.current[channel] = {
           key,
           from: value.from ?? current.current[channel],
@@ -357,177 +402,225 @@ function BloomField({
           duration: moving ? Math.max(0, value.duration ?? 0) : 0,
           easing: value.easing ?? "in-out",
           fromCurrent: value.from === undefined,
-        }
+        };
       }
     }
-    root.current?.removeAttribute("data-settled")
-    wake.current()
+    root.current?.removeAttribute("data-settled");
+    wake.current();
     // `keys` stands for every value; `given` is rebuilt every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [keys, reducedMotion])
+  }, [keys, reducedMotion]);
 
   // A new ripple count fires a ring; the count it mounted with does not.
   React.useLayoutEffect(() => {
-    if (ripple === undefined || ripple === firstRipple.current) return
-    firstRipple.current = undefined
-    if (reducedMotion) return
-    rippleAt.current = performance.now()
-    root.current?.removeAttribute("data-settled")
-    wake.current()
-  }, [ripple, reducedMotion])
+    if (ripple === undefined || ripple === firstRipple.current) return;
+    firstRipple.current = undefined;
+    if (reducedMotion) return;
+    rippleAt.current = performance.now();
+    root.current?.removeAttribute("data-settled");
+    wake.current();
+  }, [ripple, reducedMotion]);
 
   // Anything else that changes the picture redraws it.
   React.useLayoutEffect(() => {
-    wake.current()
-  }, [tint, lightKey, rippleX, rippleY])
+    wake.current();
+  }, [tint, lightKey, rippleX, rippleY]);
 
-  const palette = colors.slice(0, 5).join("|")
+  const palette = colors.slice(0, 5).join("|");
   React.useEffect(() => {
-    const element = canvas.current
-    const host = root.current
-    if (!element || !host) return
-    const gl = element.getContext("webgl", { antialias: false, alpha: false, depth: false })
+    const element = canvas.current;
+    const host = root.current;
+    if (!element || !host) return;
+    const gl = element.getContext("webgl", {
+      antialias: false,
+      alpha: false,
+      depth: false,
+    });
     // Without WebGL the field is its ground colour, which never moves.
     if (!gl) {
-      host.setAttribute("data-settled", "true")
-      return
+      host.setAttribute("data-settled", "true");
+      return;
     }
-    const blooms = palette.split("|")
+    const blooms = palette.split("|");
     const fixed = {
       ground: rgb(ground, [0.02, 0.02, 0.05]),
       colors: [0, 1, 2, 3, 4].map((index) =>
         rgb(blooms[index % blooms.length], [0.55, 0.35, 0.85]),
       ),
-    }
-    let program = createProgram(gl)
-    let frame = 0
-    let lastDraw = 0
-    let visible = true
-    let pageShown = document.visibilityState !== "hidden"
-    const born = performance.now()
-    let colorKey = ""
-    let resolved = { tint: [0, 0, 0] as number[], lights: [] as number[][] }
+    };
+    let program = createProgram(gl);
+    let frame = 0;
+    let lastDraw = 0;
+    let visible = true;
+    let pageShown = document.visibilityState !== "hidden";
+    const born = performance.now();
+    let colorKey = "";
+    let resolved = { tint: [0, 0, 0] as number[], lights: [] as number[][] };
 
     const size = () => {
-      const scale = Math.max(0.1, Math.min(2, resolution)) * Math.min(window.devicePixelRatio || 1, 1.5)
-      const width = Math.max(1, Math.round(host.clientWidth * scale))
-      const height = Math.max(1, Math.round(host.clientHeight * scale))
-      if (element.width === width && element.height === height) return false
-      element.width = width
-      element.height = height
-      return true
-    }
+      const scale =
+        Math.max(0.1, Math.min(2, resolution)) *
+        Math.min(window.devicePixelRatio || 1, 1.5);
+      const width = Math.max(1, Math.round(host.clientWidth * scale));
+      const height = Math.max(1, Math.round(host.clientHeight * scale));
+      if (element.width === width && element.height === height) return false;
+      element.width = width;
+      element.height = height;
+      return true;
+    };
 
     const draw = (now: number, drifting: boolean) => {
-      if (!program) return
-      const u = program.uniforms
-      const live = scene.current
-      const nextColorKey = JSON.stringify([live.tint, live.lights.map((light) => light.color)])
+      if (!program) return;
+      const u = program.uniforms;
+      const live = scene.current;
+      const nextColorKey = JSON.stringify([
+        live.tint,
+        live.lights.map((light) => light.color),
+      ]);
       if (nextColorKey !== colorKey) {
-        colorKey = nextColorKey
+        colorKey = nextColorKey;
         resolved = {
           tint: rgb(live.tint, [1, 1, 1]),
           lights: live.lights.map((light) => rgb(light.color, [1, 1, 1])),
-        }
+        };
       }
-      const values = current.current
-      gl.viewport(0, 0, element.width, element.height)
-      gl.uniform2f(u.uRes, element.width, element.height)
-      gl.uniform1f(u.uT, drifting ? ((now - born) / 1000) * speed : 0)
+      const values = current.current;
+      gl.viewport(0, 0, element.width, element.height);
+      gl.uniform2f(u.uRes, element.width, element.height);
+      gl.uniform1f(u.uT, drifting ? ((now - born) / 1000) * speed : 0);
       // The API reads y down the field; the drawing reads it up.
-      gl.uniform4f(u.uWash, values.x, 1 - values.y, values.spread, values.fade)
-      gl.uniform4f(u.uTint, resolved.tint[0], resolved.tint[1], resolved.tint[2], live.tint ? values.tint : 0)
-      gl.uniform3fv(u.uGround, fixed.ground)
-      fixed.colors.forEach((color, index) => gl.uniform3fv(u[`uC${index}`], color))
+      gl.uniform4f(u.uWash, values.x, 1 - values.y, values.spread, values.fade);
+      gl.uniform4f(
+        u.uTint,
+        resolved.tint[0],
+        resolved.tint[1],
+        resolved.tint[2],
+        live.tint ? values.tint : 0,
+      );
+      gl.uniform3fv(u.uGround, fixed.ground);
+      fixed.colors.forEach((color, index) =>
+        gl.uniform3fv(u[`uC${index}`], color),
+      );
       LIGHT_CHANNELS.forEach((channel, index) => {
-        const light = live.lights[index]
-        if (light) gl.uniform4f(u[`uL${index}`], light.x, 1 - light.y, values[channel], 1)
-        else gl.uniform4f(u[`uL${index}`], 0, 0, 0, -1)
-        gl.uniform3fv(u[`uLc${index}`], resolved.lights[index] ?? [1, 1, 1])
-      })
-      const age = rippleAt.current === undefined ? RIPPLE_SECONDS : (now - rippleAt.current) / 1000
-      gl.uniform4f(u.uRip, live.rippleX, 1 - live.rippleY, age, age < RIPPLE_SECONDS ? 1 : 0)
-      gl.drawArrays(gl.TRIANGLES, 0, 3)
-    }
+        const light = live.lights[index];
+        if (light)
+          gl.uniform4f(
+            u[`uL${index}`],
+            light.x,
+            1 - light.y,
+            values[channel],
+            1,
+          );
+        else gl.uniform4f(u[`uL${index}`], 0, 0, 0, -1);
+        gl.uniform3fv(u[`uLc${index}`], resolved.lights[index] ?? [1, 1, 1]);
+      });
+      const age =
+        rippleAt.current === undefined
+          ? RIPPLE_SECONDS
+          : (now - rippleAt.current) / 1000;
+      gl.uniform4f(
+        u.uRip,
+        live.rippleX,
+        1 - live.rippleY,
+        age,
+        age < RIPPLE_SECONDS ? 1 : 0,
+      );
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    };
 
     const tick = (now: number) => {
-      frame = 0
-      let moving = false
+      frame = 0;
+      let moving = false;
       for (const channel of CHANNELS) {
-        const tween = tweens.current[channel]
-        if (!tween) continue
-        const { value, done } = sample(tween, current.current[channel], now)
-        current.current[channel] = value
-        if (!done) moving = true
+        const tween = tweens.current[channel];
+        if (!tween) continue;
+        const { value, done } = sample(tween, current.current[channel], now);
+        current.current[channel] = value;
+        if (!done) moving = true;
       }
       const rippling =
-        rippleAt.current !== undefined && (now - rippleAt.current) / 1000 < RIPPLE_SECONDS
-      if (!moving && !rippling) host.setAttribute("data-settled", "true")
-      const drifting = ambient && !reducedMotion
-      if (moving || rippling || lastDraw === 0 || now - lastDraw >= AMBIENT_FRAME_MS) {
-        draw(now, drifting)
-        lastDraw = now
+        rippleAt.current !== undefined &&
+        (now - rippleAt.current) / 1000 < RIPPLE_SECONDS;
+      if (!moving && !rippling) host.setAttribute("data-settled", "true");
+      const drifting = ambient && !reducedMotion;
+      if (
+        moving ||
+        rippling ||
+        lastDraw === 0 ||
+        now - lastDraw >= AMBIENT_FRAME_MS
+      ) {
+        draw(now, drifting);
+        lastDraw = now;
       }
-      if ((moving || rippling || drifting) && visible && pageShown) frame = requestAnimationFrame(tick)
-    }
+      if ((moving || rippling || drifting) && visible && pageShown)
+        frame = requestAnimationFrame(tick);
+    };
     const start = () => {
-      if (frame || !visible || !pageShown) return
-      lastDraw = 0
-      frame = requestAnimationFrame(tick)
-    }
-    wake.current = start
+      if (frame || !visible || !pageShown) return;
+      lastDraw = 0;
+      frame = requestAnimationFrame(tick);
+    };
+    wake.current = start;
 
     const resize = new ResizeObserver(() => {
-      if (size()) start()
-    })
-    resize.observe(host)
+      if (size()) start();
+    });
+    resize.observe(host);
     const seen = new IntersectionObserver((entries) => {
-      visible = entries.some((entry) => entry.isIntersecting)
-      if (visible) start()
-    })
-    seen.observe(host)
+      visible = entries.some((entry) => entry.isIntersecting);
+      if (visible) start();
+    });
+    seen.observe(host);
     const onVisibility = () => {
-      pageShown = document.visibilityState !== "hidden"
-      if (pageShown) start()
-    }
-    document.addEventListener("visibilitychange", onVisibility)
+      pageShown = document.visibilityState !== "hidden";
+      if (pageShown) start();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
     const onLost = (event: Event) => {
-      event.preventDefault()
-      program = null
-    }
+      event.preventDefault();
+      program = null;
+    };
     const onRestored = () => {
-      program = createProgram(gl)
-      colorKey = ""
-      start()
-    }
-    element.addEventListener("webglcontextlost", onLost)
-    element.addEventListener("webglcontextrestored", onRestored)
-    size()
-    start()
+      program = createProgram(gl);
+      colorKey = "";
+      start();
+    };
+    element.addEventListener("webglcontextlost", onLost);
+    element.addEventListener("webglcontextrestored", onRestored);
+    size();
+    start();
     return () => {
-      cancelAnimationFrame(frame)
-      wake.current = () => {}
-      resize.disconnect()
-      seen.disconnect()
-      document.removeEventListener("visibilitychange", onVisibility)
-      element.removeEventListener("webglcontextlost", onLost)
-      element.removeEventListener("webglcontextrestored", onRestored)
-      program?.dispose()
-    }
-  }, [palette, ground, speed, ambient, resolution, reducedMotion])
+      cancelAnimationFrame(frame);
+      wake.current = () => {};
+      resize.disconnect();
+      seen.disconnect();
+      document.removeEventListener("visibilitychange", onVisibility);
+      element.removeEventListener("webglcontextlost", onLost);
+      element.removeEventListener("webglcontextrestored", onRestored);
+      program?.dispose();
+    };
+  }, [palette, ground, speed, ambient, resolution, reducedMotion]);
 
   return (
     <div
       ref={root}
       aria-hidden="true"
       data-slot="bloom-field"
-      className={cn("pointer-events-none relative overflow-hidden", className)}
-      style={{ background: ground, ...style }}
+      className={cn(
+        "pointer-events-none relative overflow-hidden bg-[var(--nessa-bloom-field-ground)]",
+        className,
+      )}
+      style={
+        {
+          "--nessa-bloom-field-ground": ground,
+          ...style,
+        } as React.CSSProperties
+      }
       {...props}
     >
       <canvas ref={canvas} className="absolute inset-0 block size-full" />
     </div>
-  )
+  );
 }
 
-export { BloomField, bloomFieldColors }
+export { BloomField, bloomFieldColors };

@@ -1,9 +1,9 @@
-import * as React from "react"
-import type { Meta, StoryObj } from "@storybook/react-vite"
-import { expect, userEvent, waitFor, within } from "storybook/test"
-import { BloomField, type BloomFieldLight } from "@nessalabs/ui"
+import * as React from "react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent, waitFor, within } from "storybook/test";
+import { BloomField, type BloomFieldLight } from "@nessalabs/ui";
 
-import { storyDocumentation } from "./story-documentation"
+import { storyDocumentation } from "./story-documentation";
 
 /**
  * True under the test runner. The field drifts forever by design, so a play
@@ -11,16 +11,18 @@ import { storyDocumentation } from "./story-documentation"
  * nothing is left running for the next story.
  */
 function underTest() {
-  return typeof navigator !== "undefined" && Boolean(navigator.webdriver)
+  return typeof navigator !== "undefined" && Boolean(navigator.webdriver);
 }
 
 /** Waits for the field to report that every value has arrived. */
 async function settled(canvasElement: HTMLElement) {
-  const field = canvasElement.querySelector<HTMLElement>('[data-slot="bloom-field"]')!
+  const field = canvasElement.querySelector<HTMLElement>(
+    '[data-slot="bloom-field"]',
+  )!;
   await waitFor(() => expect(field).toHaveAttribute("data-settled", "true"), {
     timeout: 5000,
-  })
-  return field
+  });
+  return field;
 }
 
 const meta = {
@@ -38,12 +40,12 @@ const meta = {
   args: {
     ambient: !underTest(),
   },
-} satisfies Meta<typeof BloomField>
+} satisfies Meta<typeof BloomField>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
-const frame = "h-[360px] w-full max-w-[640px] rounded-2xl"
+const frame = "h-[360px] w-full max-w-[640px] rounded-2xl";
 
 export const Default: Story = {
   argTypes: {
@@ -56,13 +58,13 @@ export const Default: Story = {
   ),
   render: (args) => <BloomField {...args} className={frame} />,
   play: async ({ canvasElement }) => {
-    const field = await settled(canvasElement)
-    await expect(field).toHaveAttribute("aria-hidden", "true")
-    await expect(field.querySelector("canvas")).not.toBeNull()
+    const field = await settled(canvasElement);
+    await expect(field).toHaveAttribute("aria-hidden", "true");
+    await expect(field.querySelector("canvas")).not.toBeNull();
   },
-}
+};
 
-type Phase = "waiting" | "flood" | "gather"
+type Phase = "waiting" | "flood" | "gather";
 
 const opening: Record<Phase, React.ComponentProps<typeof BloomField>> = {
   waiting: { spread: 0.12, fade: 0.9 },
@@ -71,19 +73,32 @@ const opening: Record<Phase, React.ComponentProps<typeof BloomField>> = {
     spread: 1.3,
     fade: { to: 0.32, duration: 1300 },
   },
-}
+};
 
 /**
  * The first-run opening it was made for: a small orb waits, floods the screen
  * when woken, then dims back so a window can stand in front of it.
  */
 function Opening(props: React.ComponentProps<typeof BloomField>) {
-  const [phase, setPhase] = React.useState<Phase>("waiting")
-  const next: Record<Phase, Phase> = { waiting: "flood", flood: "gather", gather: "waiting" }
-  const label: Record<Phase, string> = { waiting: "Wake", flood: "Gather", gather: "Again" }
+  const [phase, setPhase] = React.useState<Phase>("waiting");
+  const next: Record<Phase, Phase> = {
+    waiting: "flood",
+    flood: "gather",
+    gather: "waiting",
+  };
+  const label: Record<Phase, string> = {
+    waiting: "Wake",
+    flood: "Gather",
+    gather: "Again",
+  };
   return (
     <div className="flex flex-col items-start gap-3">
-      <BloomField {...props} {...opening[phase]} className={frame} data-phase={phase} />
+      <BloomField
+        {...props}
+        {...opening[phase]}
+        className={frame}
+        data-phase={phase}
+      />
       <button
         type="button"
         className="rounded-full bg-neutral-900 px-4 py-1.5 text-sm text-white"
@@ -92,7 +107,7 @@ function Opening(props: React.ComponentProps<typeof BloomField>) {
         {label[phase]}
       </button>
     </div>
-  )
+  );
 }
 
 export const WakeAndFlood: Story = {
@@ -101,39 +116,39 @@ export const WakeAndFlood: Story = {
   ),
   render: (args) => <Opening {...args} />,
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement)
-    const field = await settled(canvasElement)
-    await expect(field).toHaveAttribute("data-phase", "waiting")
-    await userEvent.click(canvas.getByRole("button", { name: "Wake" }))
-    await expect(field).toHaveAttribute("data-phase", "flood")
-    await settled(canvasElement)
-    await userEvent.click(canvas.getByRole("button", { name: "Gather" }))
-    await settled(canvasElement)
-    await expect(field).toHaveAttribute("data-phase", "gather")
+    const canvas = within(canvasElement);
+    const field = await settled(canvasElement);
+    await expect(field).toHaveAttribute("data-phase", "waiting");
+    await userEvent.click(canvas.getByRole("button", { name: "Wake" }));
+    await expect(field).toHaveAttribute("data-phase", "flood");
+    await settled(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Gather" }));
+    await settled(canvasElement);
+    await expect(field).toHaveAttribute("data-phase", "gather");
   },
-}
+};
 
 const agents = [
   { name: "Claude", x: 0.64, y: 0.34, color: "#f09a4a" },
   { name: "Codex", x: 0.82, y: 0.54, color: "#4b6cf0" },
   { name: "OpenCode", x: 0.68, y: 0.73, color: "#e2457a" },
-] as const
+] as const;
 
 /**
  * One light per agent. Pointing at a choice lifts its light; choosing it
  * lifts it further and tints the wash; Summon sends a ring from it.
  */
 function AgentLights(props: React.ComponentProps<typeof BloomField>) {
-  const [hovered, setHovered] = React.useState<number | null>(null)
-  const [chosen, setChosen] = React.useState<number | null>(null)
-  const [ripple, setRipple] = React.useState(0)
+  const [hovered, setHovered] = React.useState<number | null>(null);
+  const [chosen, setChosen] = React.useState<number | null>(null);
+  const [ripple, setRipple] = React.useState(0);
   const lights: BloomFieldLight[] = agents.map((agent, index) => ({
     x: agent.x,
     y: agent.y,
     color: agent.color,
     emphasis: chosen === index ? 2 : hovered === index ? 1 : 0,
-  }))
-  const picked = chosen === null ? undefined : agents[chosen]
+  }));
+  const picked = chosen === null ? undefined : agents[chosen];
   return (
     <div className="flex flex-col items-start gap-3">
       <BloomField
@@ -172,7 +187,7 @@ function AgentLights(props: React.ComponentProps<typeof BloomField>) {
         </button>
       </div>
     </div>
-  )
+  );
 }
 
 export const Lights: Story = {
@@ -182,18 +197,18 @@ export const Lights: Story = {
   ),
   render: (args) => <AgentLights {...args} />,
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement)
-    const field = await settled(canvasElement)
-    await userEvent.hover(canvas.getByRole("radio", { name: "Codex" }))
-    await settled(canvasElement)
-    await userEvent.click(canvas.getByRole("radio", { name: "Codex" }))
-    await expect(field).toHaveAttribute("data-chosen", "Codex")
-    await settled(canvasElement)
-    await userEvent.click(canvas.getByRole("button", { name: "Summon" }))
+    const canvas = within(canvasElement);
+    const field = await settled(canvasElement);
+    await userEvent.hover(canvas.getByRole("radio", { name: "Codex" }));
+    await settled(canvasElement);
+    await userEvent.click(canvas.getByRole("radio", { name: "Codex" }));
+    await expect(field).toHaveAttribute("data-chosen", "Codex");
+    await settled(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Summon" }));
     // The ring runs for two seconds; settling again means it finished and
     // nothing is left drawing.
-    await settled(canvasElement)
-    await userEvent.unhover(canvas.getByRole("radio", { name: "Codex" }))
-    await settled(canvasElement)
+    await settled(canvasElement);
+    await userEvent.unhover(canvas.getByRole("radio", { name: "Codex" }));
+    await settled(canvasElement);
   },
-}
+};
