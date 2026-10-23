@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { expect, waitFor } from "storybook/test"
-import { AgentCard } from "@nessalabs/ui"
+import { AgentBackdrop, AgentCard, AgentFigure } from "@nessalabs/ui"
 
 import { storyDocumentation } from "./story-documentation"
 
@@ -57,4 +57,24 @@ export const Local: Story = {
   args: { agent: "local", name: "Local AI" },
   parameters: storyDocumentation("A local model's glass stack on its dark card."),
   render: (args) => <AgentCard {...args} className="w-64" />,
+}
+
+/** The background alone, filling a picture column, with a figure laid over it. */
+export const Backdrop: Story = {
+  tags: ["!test"],
+  parameters: storyDocumentation(
+    "`AgentBackdrop` is the card's background on its own, filling whatever box it is given — here the right-hand column of a setup window, with the figure laid over it.",
+  ),
+  render: () => (
+    <div className="grid w-[640px] grid-cols-3 gap-3">
+      {(["clawd", "codex", "local"] as const).map((agent) => (
+        <AgentBackdrop key={agent} agent={agent} className="h-80 rounded-2xl">
+          <AgentFigure
+            agent={agent}
+            className="absolute top-1/2 left-1/2 size-32 -translate-x-1/2 -translate-y-1/2"
+          />
+        </AgentBackdrop>
+      ))}
+    </div>
+  ),
 }

@@ -907,7 +907,7 @@
       "name": "agent-card",
       "type": "registry:ui",
       "title": "Agent Card",
-      "description": "One agent on its own card: the agent's colours, a planet's arc rising from the lower left, and its 3D figure standing in front.",
+      "description": "One agent on its own card: the agent's colours, a planet's arc rising from the lower left, and its 3D figure standing in front. AgentBackdrop is the same background on its own, to fill any surface.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils",

@@ -13,26 +13,26 @@ import { AgentFigure, type AgentFigureKind } from "./agent-figure/agent-figure"
  */
 const agentCardTones = Object.freeze({
   claude: Object.freeze({
-    top: "#b4501f",
-    bottom: "#2a0e04",
-    glow: "#e0692a",
-    planet: "#7a3312",
-    lit: "#ff9a5a",
-    rim: "rgb(255 210 180 / 0.16)",
-    ink: "#fff1e8",
-    halo: "rgb(255 140 80 / 0.22)",
-    shade: "rgb(40 10 0 / 0.55)",
+    top: "#9a5a3d",
+    bottom: "#2b140b",
+    glow: "#c27a56",
+    planet: "#6e3b24",
+    lit: "#f0a57c",
+    rim: "rgb(255 220 200 / 0.14)",
+    ink: "#fbefe8",
+    halo: "rgb(240 160 120 / 0.18)",
+    shade: "rgb(40 14 4 / 0.5)",
   }),
   codex: Object.freeze({
-    top: "#f7f3ec",
-    bottom: "#d8cfc1",
-    glow: "#ffffff",
-    planet: "#e9e2d7",
-    lit: "#ffffff",
-    rim: "rgb(60 45 25 / 0.1)",
+    top: "#d6d0c6",
+    bottom: "#8f897f",
+    glow: "#ece6dc",
+    planet: "#bdb6aa",
+    lit: "#f7f3ec",
+    rim: "rgb(60 45 25 / 0.12)",
     ink: "#1d1b18",
-    halo: "rgb(255 255 255 / 0.55)",
-    shade: "rgb(90 70 45 / 0.35)",
+    halo: "rgb(255 252 245 / 0.35)",
+    shade: "rgb(60 48 32 / 0.4)",
   }),
   local: Object.freeze({
     top: "#1e1e21",
@@ -57,50 +57,46 @@ const toneOf: Readonly<Record<AgentFigureKind, AgentCardTone>> = Object.freeze({
   local: "local",
 })
 
-export interface AgentCardProps extends Omit<React.ComponentProps<"div">, "children"> {
-  /** Whose figure stands on the card, which also picks its colours. */
+/** The custom properties that carry one agent's card colours. */
+function toneStyle(agent: AgentFigureKind, style: React.CSSProperties | undefined) {
+  const tone = agentCardTones[toneOf[agent]]
+  return {
+    "--nessa-agent-card-top": tone.top,
+    "--nessa-agent-card-bottom": tone.bottom,
+    "--nessa-agent-card-glow": tone.glow,
+    "--nessa-agent-card-planet": tone.planet,
+    "--nessa-agent-card-lit": tone.lit,
+    "--nessa-agent-card-rim": tone.rim,
+    "--nessa-agent-card-ink": tone.ink,
+    "--nessa-agent-card-halo": tone.halo,
+    "--nessa-agent-card-shade": tone.shade,
+    ...style,
+  } as React.CSSProperties
+}
+
+export interface AgentBackdropProps extends React.ComponentProps<"div"> {
+  /** Whose colours to draw. */
   agent: AgentFigureKind
-  /** Written in the card's top left corner. Omit for a card with no words. */
-  name?: string
-  /** Whether the figure plays its routine. See `AgentFigure`. */
-  lively?: boolean
 }
 
 /**
- * An agent on its own card: the agent's colours, a planet's arc rising from
- * the lower left with an orbit line behind it, a soft halo, and the agent's
- * 3D figure standing in front. For a moment that shows one agent at a time,
- * such as the one chosen during setup.
- *
- * The figure is `AgentFigure`, so it reports `data-ready` and `data-resting`
- * the same way, and the card adds nothing that moves.
+ * An agent's card background on its own, filling whatever box it is given:
+ * the agent's lit gradient, a planet's arc rising from the lower left with an
+ * orbit line behind it, and a soft halo where a figure would stand. For a
+ * surface that takes on an agent's colours whole, such as the picture beside
+ * a picker; children draw over it. Nothing on it moves.
  */
-function AgentCard({ agent, name, lively = false, className, style, ...props }: AgentCardProps) {
-  const tone = agentCardTones[toneOf[agent]]
+function AgentBackdrop({ agent, className, style, children, ...props }: AgentBackdropProps) {
   return (
     <div
-      data-slot="agent-card"
+      data-slot="agent-backdrop"
       data-agent={agent}
       className={cn(
-        "relative isolate aspect-[4/5] overflow-hidden rounded-3xl text-[var(--nessa-agent-card-ink)]",
+        "relative isolate overflow-hidden text-[var(--nessa-agent-card-ink)]",
         "bg-[radial-gradient(120%_70%_at_18%_0%,color-mix(in_oklab,var(--nessa-agent-card-glow)_55%,transparent),transparent_60%),linear-gradient(170deg,var(--nessa-agent-card-top)_0%,var(--nessa-agent-card-bottom)_78%)]",
-        "shadow-[inset_0_0_0_1px_var(--nessa-agent-card-rim),inset_0_1px_0_0_color-mix(in_oklab,var(--nessa-agent-card-lit)_45%,transparent),0_12px_28px_-18px_color-mix(in_oklab,var(--nessa-agent-card-glow)_40%,transparent)]",
         className,
       )}
-      style={
-        {
-          "--nessa-agent-card-top": tone.top,
-          "--nessa-agent-card-bottom": tone.bottom,
-          "--nessa-agent-card-glow": tone.glow,
-          "--nessa-agent-card-planet": tone.planet,
-          "--nessa-agent-card-lit": tone.lit,
-          "--nessa-agent-card-rim": tone.rim,
-          "--nessa-agent-card-ink": tone.ink,
-          "--nessa-agent-card-halo": tone.halo,
-          "--nessa-agent-card-shade": tone.shade,
-          ...style,
-        } as React.CSSProperties
-      }
+      style={toneStyle(agent, style)}
       {...props}
     >
       <span
@@ -115,6 +111,40 @@ function AgentCard({ agent, name, lively = false, className, style, ...props }: 
         aria-hidden="true"
         className="pointer-events-none absolute inset-[18%_8%_10%] bg-[radial-gradient(closest-side,var(--nessa-agent-card-halo),transparent)] opacity-80"
       />
+      {children}
+    </div>
+  )
+}
+
+export interface AgentCardProps extends Omit<React.ComponentProps<"div">, "children"> {
+  /** Whose figure stands on the card, which also picks its colours. */
+  agent: AgentFigureKind
+  /** Written in the card's top left corner. Omit for a card with no words. */
+  name?: string
+  /** Whether the figure plays its routine. See `AgentFigure`. */
+  lively?: boolean
+}
+
+/**
+ * An agent on its own card: `AgentBackdrop` in a rounded card, with the
+ * agent's 3D figure standing in front. For a moment that shows one agent at a
+ * time, such as the one chosen during setup.
+ *
+ * The figure is `AgentFigure`, so it reports `data-ready` and `data-resting`
+ * the same way, and the card adds nothing that moves.
+ */
+function AgentCard({ agent, name, lively = false, className, ...props }: AgentCardProps) {
+  return (
+    <AgentBackdrop
+      data-slot="agent-card"
+      agent={agent}
+      className={cn(
+        "aspect-[4/5] rounded-3xl",
+        "shadow-[inset_0_0_0_1px_var(--nessa-agent-card-rim),inset_0_1px_0_0_color-mix(in_oklab,var(--nessa-agent-card-lit)_45%,transparent),0_12px_28px_-18px_color-mix(in_oklab,var(--nessa-agent-card-glow)_40%,transparent)]",
+        className,
+      )}
+      {...props}
+    >
       {name ? (
         <span className="absolute top-5 right-6 left-6 z-10 nessa-text-5 font-medium tracking-tight">
           {name}
@@ -125,8 +155,8 @@ function AgentCard({ agent, name, lively = false, className, style, ...props }: 
         lively={lively}
         className="absolute top-[56%] left-1/2 z-10 size-auto w-[72%] aspect-square -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_14px_18px_var(--nessa-agent-card-shade)]"
       />
-    </div>
+    </AgentBackdrop>
   )
 }
 
-export { AgentCard, agentCardTones }
+export { AgentBackdrop, AgentCard, agentCardTones }

@@ -12,7 +12,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 // importing the package needs a bundler that handles CSS side effects) but it
 // is not what this file is testing, and going through it would mean this
 // never ran.
-import { AgentCard } from "./components/agent-card";
+import { AgentBackdrop, AgentCard } from "./components/agent-card";
 import { AgentFigure } from "./components/agent-figure/agent-figure";
 import { AvatarStack } from "./components/avatar-stack";
 import { Badge } from "./components/badge";
@@ -91,6 +91,11 @@ test("primitives render without a browser global", () => {
   assert.ok(
     server(<AgentCard agent="clawd" name="Claude" />).includes(
       'data-agent="clawd"',
+    ),
+  );
+  assert.ok(
+    server(<AgentBackdrop agent="codex" />).includes(
+      'data-slot="agent-backdrop"',
     ),
   );
   assert.ok(
