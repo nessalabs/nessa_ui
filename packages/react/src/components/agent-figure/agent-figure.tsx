@@ -57,21 +57,28 @@ function AgentFigure({ agent, lively = false, className, ...props }: AgentFigure
   const root = React.useRef<HTMLSpanElement>(null)
   const canvas = React.useRef<HTMLCanvasElement>(null)
   const [figure, setFigure] = React.useState<Figure | null>(null)
+  // Bumped when the shared renderer is lost, so the figure is built again on
+  // the one that replaces it.
+  const [generation, rebuild] = React.useReducer((count: number) => count + 1, 0)
 
   React.useEffect(() => {
     let live = true
+    let built: Figure | null = null
     setFigure(null)
     root.current?.removeAttribute("data-ready")
     import("./agent-figure-scenes").then(
       ({ createFigure }) => {
-        if (live) setFigure(createFigure(agent))
+        if (!live) return
+        built = createFigure(agent)
+        setFigure(built)
       },
       () => {},
     )
     return () => {
       live = false
+      built?.dispose()
     }
-  }, [agent])
+  }, [agent, generation])
 
   // Progress toward lively, kept across renders so a change mid-way eases
   // from where the figure is rather than jumping.
@@ -88,7 +95,10 @@ function AgentFigure({ agent, lively = false, className, ...props }: AgentFigure
       host.toggleAttribute("data-resting", state.p === 0)
     }
     figure.pose(state.p, state.t, 0)
-    figure.draw(target)
+    if (!figure.draw(target)) {
+      rebuild()
+      return
+    }
     host.setAttribute("data-ready", "true")
     settle()
     if (goal === 0 && state.p === 0) return
@@ -102,7 +112,10 @@ function AgentFigure({ agent, lively = false, className, ...props }: AgentFigure
       state.t += dt
       if (goal === 0 && state.p < 0.003) state.p = 0
       figure.pose(state.p, state.t, dt)
-      figure.draw(target)
+      if (!figure.draw(target)) {
+        rebuild()
+        return
+      }
       settle()
       if (goal === 0 && state.p === 0) return
       frame = requestAnimationFrame(tick)

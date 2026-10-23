@@ -141,3 +141,28 @@ async function playWaiting({ canvasElement }: { canvasElement: HTMLElement }) {
   await typedIn(canvasElement);
   await expect(getComputedStyle(first).opacity).toBe("1");
 }
+
+export const PlainLeadIn: Story = {
+  args: {
+    text: "Welcome to Nessa",
+    plain: 11,
+    delay: 0,
+    colors: ["#e2457a", "#8d5ad8", "#4b6cf0"],
+  },
+  parameters: storyDocumentation(
+    "`plain` keeps the opening in the text's own colour so the gradient lands on the name alone — the first-run welcome on its light pane. With `delay` at 0 the first key goes at once and the caret never blinks back to the start.",
+  ),
+  render: (args) => (
+    <div className="rounded-2xl bg-white p-10 text-neutral-900">
+      <TypeIn {...args} className="text-[40px] leading-none font-semibold tracking-[-0.035em]" />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const root = await typedIn(canvasElement);
+    const letters = [...root.querySelectorAll<HTMLElement>('[data-slot="type-in-letter"]')];
+    await expect(letters).toHaveLength(16);
+    await expect(letters.filter((letter) => letter.hasAttribute("data-painted"))).toHaveLength(5);
+    await expect(letters[0]).not.toHaveAttribute("data-painted");
+    await expect(root.getAnimations({ subtree: true })).toHaveLength(0);
+  },
+};

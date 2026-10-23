@@ -96,6 +96,12 @@ export interface BloomFieldProps extends Omit<
   rippleY?: number;
   /** Up to five CSS colours for the blooms. */
   colors?: readonly string[];
+  /**
+   * How much of the ground is see-through, 0 (all ground) to 1 (only the
+   * blooms are drawn, over whatever is behind the field). At 1 the field is a
+   * glow lying on the page rather than a surface. Defaults to 0.
+   */
+  clear?: BloomFieldValue;
   /** The colour behind the blooms. Defaults to a near-black violet. */
   ground?: string;
   /** How fast the blooms drift. Defaults to 0.3. */
@@ -121,13 +127,23 @@ type Tween = {
   fromCurrent: boolean;
 };
 
-type Channel = "spread" | "fade" | "x" | "y" | "tint" | "l0" | "l1" | "l2";
+type Channel =
+  | "spread"
+  | "fade"
+  | "x"
+  | "y"
+  | "tint"
+  | "clear"
+  | "l0"
+  | "l1"
+  | "l2";
 const CHANNELS: readonly Channel[] = [
   "spread",
   "fade",
   "x",
   "y",
   "tint",
+  "clear",
   "l0",
   "l1",
   "l2",
@@ -139,6 +155,7 @@ const DEFAULTS: Record<Channel, number> = {
   x: 0.5,
   y: 0.5,
   tint: 0,
+  clear: 0,
   l0: 0,
   l1: 0,
   l2: 0,
@@ -187,7 +204,7 @@ uniform vec4 uWash; uniform vec4 uTint; uniform vec3 uGround;
 uniform vec3 uC0; uniform vec3 uC1; uniform vec3 uC2; uniform vec3 uC3; uniform vec3 uC4;
 uniform vec4 uL0; uniform vec4 uL1; uniform vec4 uL2;
 uniform vec3 uLc0; uniform vec3 uLc1; uniform vec3 uLc2;
-uniform vec4 uRip;
+uniform vec4 uRip; uniform float uClear;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.-2.*f);
   return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);}
@@ -217,16 +234,20 @@ void main(){
   }
   vec3 mesh=acc/max(ws,1e-3);
   float cover=clamp(ws*mix(1.8,1.1,clamp(g,0.,1.)),0.,1.);
-  vec3 col=mix(uGround,mesh,cover);
-  col+=.05*smoothstep(.55,1.,noise(uv*3.+uT*.15));
+  // Premultiplied: where no bloom covers it, a clear ground lets through
+  // whatever is behind the field.
+  float alpha=mix(1.-uClear,1.,cover);
+  vec3 col=mix(uGround*(1.-uClear),mesh,cover);
+  col+=.05*smoothstep(.55,1.,noise(uv*3.+uT*.15))*alpha;
   col*=uWash.w;
   col+=light(uv,asp,uL0,uLc0)+light(uv,asp,uL1,uLc1)+light(uv,asp,uL2,uLc2);
   if(uRip.w>0.){
     vec2 d=vec2((uv.x-uRip.x)*asp,uv.y-uRip.y);
     col+=vec3(1.,.96,1.)*exp(-pow((length(d)-uRip.z*.75)/.045,2.))*exp(-uRip.z*1.5)*uRip.w*.6;
   }
-  col+=(hash(gl_FragCoord.xy+fract(uT)*91.)-.5)*.035;
-  gl_FragColor=vec4(col,1.);
+  col+=(hash(gl_FragCoord.xy+fract(uT)*91.)-.5)*.035*alpha;
+  col=max(col,0.);
+  gl_FragColor=vec4(col,max(alpha,min(1.,max(col.r,max(col.g,col.b)))));
 }`;
 
 /** A CSS colour as 0–1 RGB, read back through a 1×1 canvas. */
@@ -294,6 +315,7 @@ function createProgram(gl: WebGLRenderingContext) {
     "uLc1",
     "uLc2",
     "uRip",
+    "uClear",
   ])
     uniforms[name] = gl.getUniformLocation(program, name);
   return {
@@ -323,6 +345,10 @@ const AMBIENT_FRAME_MS = 1000 / 30;
  * test should wait on. It stops drawing while off screen or in a hidden page.
  * Under reduced motion every value jumps and nothing drifts: one still frame
  * per change, and no ripple. Without WebGL it is the ground colour.
+ *
+ * With `clear` the ground turns see-through, so the blooms lie on whatever is
+ * behind the field as a glow; tween it back to 0 and the field becomes a
+ * surface again.
  */
 function BloomField({
   spread = DEFAULTS.spread,
@@ -333,6 +359,7 @@ function BloomField({
   tintAmount = DEFAULTS.tint,
   lights,
   ripple,
+  clear = DEFAULTS.clear,
   rippleX = 0.5,
   rippleY = 0.5,
   colors = bloomFieldColors,
@@ -351,7 +378,7 @@ function BloomField({
   const tweens = React.useRef<Partial<Record<Channel, Tween>>>({});
   const wake = React.useRef<() => void>(() => {});
   const rippleAt = React.useRef<number | undefined>(undefined);
-  const firstRipple = React.useRef(ripple);
+  const lastRipple = React.useRef(ripple);
   const shown = (lights ?? []).slice(0, 3);
   const given: Record<Channel, BloomFieldValue> = {
     spread,
@@ -359,6 +386,7 @@ function BloomField({
     x,
     y,
     tint: tintAmount,
+    clear,
     l0: { to: shown[0]?.emphasis ?? 0, duration: EMPHASIS_MS, easing: "out" },
     l1: { to: shown[1]?.emphasis ?? 0, duration: EMPHASIS_MS, easing: "out" },
     l2: { to: shown[2]?.emphasis ?? 0, duration: EMPHASIS_MS, easing: "out" },
@@ -380,7 +408,15 @@ function BloomField({
     for (const channel of CHANNELS) {
       const value = given[channel];
       const key = valueKey(value);
-      if (tweens.current[channel]?.key === key) continue;
+      const running = tweens.current[channel];
+      if (running?.key === key) {
+        // Asked to stop moving mid-flight: what is still travelling arrives now.
+        if (reducedMotion) {
+          running.start = Math.min(running.start, now);
+          running.duration = 0;
+        }
+        continue;
+      }
       if (typeof value === "number") {
         tweens.current[channel] = {
           key,
@@ -411,10 +447,11 @@ function BloomField({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keys, reducedMotion]);
 
-  // A new ripple count fires a ring; the count it mounted with does not.
+  // A new ripple count fires a ring; the count it mounted with does not, and
+  // neither does a count it has already seen.
   React.useLayoutEffect(() => {
-    if (ripple === undefined || ripple === firstRipple.current) return;
-    firstRipple.current = undefined;
+    if (ripple === undefined || ripple === lastRipple.current) return;
+    lastRipple.current = ripple;
     if (reducedMotion) return;
     rippleAt.current = performance.now();
     root.current?.removeAttribute("data-settled");
@@ -433,11 +470,13 @@ function BloomField({
     if (!element || !host) return;
     const gl = element.getContext("webgl", {
       antialias: false,
-      alpha: false,
+      alpha: true,
+      premultipliedAlpha: true,
       depth: false,
     });
     // Without WebGL the field is its ground colour, which never moves.
     if (!gl) {
+      host.setAttribute("data-fallback", "true");
       host.setAttribute("data-settled", "true");
       return;
     }
@@ -498,6 +537,7 @@ function BloomField({
         live.tint ? values.tint : 0,
       );
       gl.uniform3fv(u.uGround, fixed.ground);
+      gl.uniform1f(u.uClear, Math.min(1, Math.max(0, values.clear)));
       fixed.colors.forEach((color, index) =>
         gl.uniform3fv(u[`uC${index}`], color),
       );
@@ -598,6 +638,9 @@ function BloomField({
       element.removeEventListener("webglcontextlost", onLost);
       element.removeEventListener("webglcontextrestored", onRestored);
       program?.dispose();
+      // The context itself lives until the canvas is collected; shrinking the
+      // canvas gives its drawing memory back now. A later run sizes it again.
+      element.width = element.height = 1;
     };
   }, [palette, ground, speed, ambient, resolution, reducedMotion]);
 
@@ -607,7 +650,7 @@ function BloomField({
       aria-hidden="true"
       data-slot="bloom-field"
       className={cn(
-        "pointer-events-none relative overflow-hidden bg-[var(--nessa-bloom-field-ground)]",
+        "pointer-events-none relative overflow-hidden data-[fallback]:bg-[var(--nessa-bloom-field-ground)]",
         className,
       )}
       style={

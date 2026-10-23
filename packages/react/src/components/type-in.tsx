@@ -60,6 +60,12 @@ export interface TypeInProps extends Omit<
   gaps?: readonly number[];
   /** CSS colours spread across the whole text, left to right. */
   colors?: readonly string[];
+  /**
+   * How many leading characters are drawn in the text's own colour, with the
+   * gradient running across only the rest — "Welcome to " plain and the name
+   * in colour. Defaults to 0.
+   */
+  plain?: number;
   /** Whether a caret leads the typing, then blinks twice and leaves. Defaults to true. */
   caret?: boolean;
   /** Called once the last letter has settled and the caret has gone. */
@@ -68,7 +74,7 @@ export interface TypeInProps extends Omit<
 
 /**
  * Text that types itself in, a key at a time, painted with one gradient that
- * runs across the whole text. Each letter lands with a small press and a
+ * runs across the whole text (or, with `plain`, across all but its opening). Each letter lands with a small press and a
  * flash of light that cools into its colour, and a gradient caret leads the
  * way, then blinks twice and leaves. Made for a wordmark at a moment that
  * happens once, such as a first run; it is not for running copy.
@@ -78,6 +84,15 @@ export interface TypeInProps extends Omit<
  * there at once, with no caret. The letters are hidden from assistive
  * technology, which reads `text` once.
  */
+/** User-perceived characters, so an emoji or an accent stays one letter. */
+function graphemes(text: string) {
+  if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
+    const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+    return [...segmenter.segment(text)].map((part) => part.segment);
+  }
+  return [...text];
+}
+
 function TypeIn({
   text,
   play = true,
@@ -85,6 +100,7 @@ function TypeIn({
   gaps = typeInGaps,
   colors = typeInColors,
   caret = true,
+  plain = 0,
   onTyped,
   className,
   ...props
@@ -94,7 +110,10 @@ function TypeIn({
   const caretRef = React.useRef<HTMLSpanElement>(null);
   const typed = React.useRef(onTyped);
   typed.current = onTyped;
-  const letters = React.useMemo(() => [...text], [text]);
+  const letters = React.useMemo(() => graphemes(text), [text]);
+  // The run that has already typed in. A later change to how it types — the
+  // caret, the pace — does not type it again or report it again.
+  const typedRun = React.useRef<string | null>(null);
   const gapKey = gaps.join(",");
   const gradient = `linear-gradient(90deg, ${colors.join(", ")})`;
 
@@ -106,7 +125,9 @@ function TypeIn({
     if (!host) return;
     const paint = () => {
       const spans = [
-        ...host.querySelectorAll<HTMLElement>("[data-slot=type-in-letter]"),
+        ...host.querySelectorAll<HTMLElement>(
+          "[data-slot=type-in-letter][data-painted]",
+        ),
       ];
       const first = spans[0]?.offsetLeft ?? 0;
       const last = spans.at(-1);
@@ -121,7 +142,7 @@ function TypeIn({
     const resize = new ResizeObserver(paint);
     resize.observe(host);
     return () => resize.disconnect();
-  }, [letters, gradient]);
+  }, [letters, gradient, plain]);
 
   React.useLayoutEffect(() => {
     const host = root.current;
@@ -130,24 +151,41 @@ function TypeIn({
       ...host.querySelectorAll<HTMLElement>("[data-slot=type-in-letter]"),
     ];
     const bar = caretRef.current;
-    host.removeAttribute("data-typed");
+    const run = `${play}|${text}`;
+    let live = true;
+    // Reported after the commit rather than inside it, so a run that Strict
+    // Mode or a quick change undoes is never reported at all.
     const finish = () => {
-      host.setAttribute("data-typed", "true");
-      typed.current?.();
+      queueMicrotask(() => {
+        if (!live) return;
+        host.setAttribute("data-typed", "true");
+        if (typedRun.current === run) return;
+        typedRun.current = run;
+        typed.current?.();
+      });
     };
     if (!play) {
+      host.removeAttribute("data-typed");
+      typedRun.current = null;
       for (const span of spans) span.style.opacity = "0";
       if (bar) bar.style.opacity = "0";
       return;
     }
-    // Without Web Animations (an old engine), or asked to stay still, the
-    // text is simply there.
-    if (reducedMotion || typeof host.animate !== "function") {
+    // Already typed, or without Web Animations (an old engine), or asked to
+    // stay still: the text is simply there.
+    if (
+      typedRun.current === run ||
+      reducedMotion ||
+      typeof host.animate !== "function"
+    ) {
       for (const span of spans) span.style.opacity = "";
       if (bar) bar.style.opacity = "0";
       finish();
-      return;
+      return () => {
+        live = false;
+      };
     }
+    host.removeAttribute("data-typed");
 
     const steps = gapKey
       .split(",")
@@ -214,9 +252,12 @@ function TypeIn({
           opacity,
           easing: "step-end",
         });
-      mark(0, first, 1);
-      mark(BLINK_MS, first, 0);
+      // Only the blinks that fit before the first key; one that did not would
+      // pull the caret back to the start in the middle of the typing.
+      if (delay > 0) mark(0, first, 1);
+      if (delay > BLINK_MS) mark(BLINK_MS, first, 0);
       if (delay > BLINK_MS * 2) mark(BLINK_MS * 2, first, 1);
+      if (delay === 0) mark(0, edge(0), 1);
       spans.forEach((_, index) => mark(at[index], edge(index), 1));
       const end = edge(spans.length - 1);
       mark(typedAt, end, 0);
@@ -228,7 +269,6 @@ function TypeIn({
       running.push(bar.animate(frames, { duration: total }));
     }
 
-    let live = true;
     Promise.all(running.map((animation) => animation.finished)).then(
       () => {
         if (live) finish();
@@ -264,7 +304,8 @@ function TypeIn({
           key={index}
           aria-hidden="true"
           data-slot="type-in-letter"
-          className="inline-block bg-clip-text bg-no-repeat text-transparent [-webkit-background-clip:text] [background-image:var(--nessa-type-in-paint)]"
+          data-painted={index >= plain ? "" : undefined}
+          className="inline-block data-[painted]:bg-clip-text data-[painted]:bg-no-repeat data-[painted]:text-transparent data-[painted]:[-webkit-background-clip:text] data-[painted]:[background-image:var(--nessa-type-in-paint)]"
           style={{ opacity: play ? undefined : 0 }}
         >
           {letter}

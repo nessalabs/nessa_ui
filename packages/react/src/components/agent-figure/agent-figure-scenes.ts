@@ -114,6 +114,26 @@ function claude(): Spec {
  */
 function codex(): Spec {
   const material = phys("#f6f4f0", { roughness: 0.34, clearcoat: 0.55, clearcoatRoughness: 0.25 })
+  const group = new THREE.Group()
+  codexTubes ??= weaveCodex()
+  for (const tube of codexTubes) group.add(new THREE.Mesh(tube, material))
+  let spin = 0
+  const update: Update = (p, t, dt) => {
+    spin += dt * p * 0.9
+    group.rotation.z = spin
+    group.rotation.x = p * 0.12 * Math.sin(t * 2)
+  }
+  return { group, tilt: [deg(6), deg(-8)], fill: "#ffffff", flip: false, update }
+}
+
+/**
+ * The knot's three tubes, built once per page: finding every crossing is the
+ * costly part of any figure, and its answer never changes. Marked shared so a
+ * figure's teardown leaves them for the next one.
+ */
+let codexTubes: THREE.TubeGeometry[] | null = null
+
+function weaveCodex(): THREE.TubeGeometry[] {
   const radius = 7.6
   const count = 720
   const base = roundedRect(-17, -42, 34, 84, 16.99).getSpacedPoints(count).slice(0, count)
@@ -173,8 +193,7 @@ function codex(): Spec {
       queue.push([other, marks[other].findIndex((m) => m.x === mark.x), !want])
     }
   }
-  const group = new THREE.Group()
-  loops.forEach((points, loop) => {
+  return loops.map((points, loop) => {
     const depths = points.map((_, a) => {
       const s0 = a / count
       let z = 0
@@ -189,15 +208,10 @@ function codex(): Spec {
       points.map(([x, y], a) => new THREE.Vector3(x, y, depths[a])),
       true,
     )
-    group.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 720, radius, 48, true), material))
+    const tube = new THREE.TubeGeometry(curve, 720, radius, 48, true)
+    tube.userData.shared = true
+    return tube
   })
-  let spin = 0
-  const update: Update = (p, t, dt) => {
-    spin += dt * p * 0.9
-    group.rotation.z = spin
-    group.rotation.x = p * 0.12 * Math.sin(t * 2)
-  }
-  return { group, tilt: [deg(6), deg(-8)], fill: "#ffffff", flip: false, update }
 }
 
 /** Local AI: three glass slabs, close at rest, fanned apart when lively. */
@@ -258,7 +272,12 @@ function renderer() {
     instance.toneMapping = THREE.NeutralToneMapping
     instance.outputColorSpace = THREE.SRGBColorSpace
     const environment = new THREE.PMREMGenerator(instance).fromScene(new RoomEnvironment(), 0.04).texture
-    shared = { renderer: instance, environment }
+    const context = { renderer: instance, environment }
+    // A lost context is gone for good here: the next figure builds a new one.
+    instance.domElement.addEventListener("webglcontextlost", () => {
+      if (shared === context) shared = null
+    })
+    shared = context
     return shared
   } catch {
     return null
@@ -268,7 +287,10 @@ function renderer() {
 /** A figure ready to draw: pose it, then copy a frame into a 2D canvas. */
 export interface Figure {
   pose: Update
-  draw: (canvas: HTMLCanvasElement) => void
+  /** False once the renderer it was built on is gone; build it again. */
+  draw: (canvas: HTMLCanvasElement) => boolean
+  /** Give back what it holds on the GPU. */
+  dispose: () => void
 }
 
 /** Builds the figure for an agent, framed so no pose clips. Null without WebGL. */
@@ -318,12 +340,22 @@ export function createFigure(kind: AgentFigureKind): Figure | null {
   return {
     pose: spec.update,
     draw(canvas) {
+      if (shared !== context) return false
       context.renderer.setClearColor(0x000000, 0)
       context.renderer.render(scene, camera)
       const target = canvas.getContext("2d")
-      if (!target) return
+      if (!target) return true
       target.clearRect(0, 0, canvas.width, canvas.height)
       target.drawImage(context.renderer.domElement, 0, 0, canvas.width, canvas.height)
+      return true
+    },
+    dispose() {
+      scene.traverse((node) => {
+        if (!(node instanceof THREE.Mesh)) return
+        if (!node.geometry.userData.shared) node.geometry.dispose()
+        const materials = Array.isArray(node.material) ? node.material : [node.material]
+        for (const material of materials) material.dispose()
+      })
     },
   }
 }

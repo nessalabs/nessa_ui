@@ -161,6 +161,7 @@ function AgentLights(props: React.ComponentProps<typeof BloomField>) {
         rippleX={picked?.x}
         rippleY={picked?.y}
         data-chosen={picked?.name ?? ""}
+        data-hovered={hovered === null ? "" : agents[hovered].name}
       />
       <div className="flex gap-2" role="radiogroup" aria-label="Agent">
         {agents.map((agent, index) => (
@@ -200,6 +201,9 @@ export const Lights: Story = {
     const canvas = within(canvasElement);
     const field = await settled(canvasElement);
     await userEvent.hover(canvas.getByRole("radio", { name: "Codex" }));
+    // Hover commits at its own priority; wait for it before waiting on the
+    // field, or the earlier "settled" passes for this one.
+    await waitFor(() => expect(field).toHaveAttribute("data-hovered", "Codex"));
     await settled(canvasElement);
     await userEvent.click(canvas.getByRole("radio", { name: "Codex" }));
     await expect(field).toHaveAttribute("data-chosen", "Codex");
@@ -209,6 +213,24 @@ export const Lights: Story = {
     // nothing is left drawing.
     await settled(canvasElement);
     await userEvent.unhover(canvas.getByRole("radio", { name: "Codex" }));
+    await waitFor(() => expect(field).toHaveAttribute("data-hovered", ""));
     await settled(canvasElement);
+  },
+};
+
+export const Glow: Story = {
+  args: { clear: 1, spread: 0.35 },
+  parameters: storyDocumentation(
+    "With `clear` at 1 the ground is see-through, so the blooms lie on the page behind as a glow. Tween it back to 0 and the field becomes a surface again — the first-run opening does both.",
+  ),
+  render: (args) => (
+    <div className="grid h-[360px] w-full max-w-[640px] place-items-center rounded-2xl bg-[linear-gradient(160deg,#dfeee9,#90a3b8)]">
+      <BloomField {...args} className="size-full" />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const field = await settled(canvasElement);
+    // The field paints nothing of its own behind the canvas.
+    await expect(getComputedStyle(field).backgroundColor).toBe("rgba(0, 0, 0, 0)");
   },
 };

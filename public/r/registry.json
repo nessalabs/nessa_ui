@@ -919,12 +919,12 @@
         {
           "path": "packages/react/src/components/agent-figure/agent-figure.tsx",
           "type": "registry:ui",
-          "target": "components/agent-figure/agent-figure.tsx"
+          "target": "components/ui/agent-figure/agent-figure.tsx"
         },
         {
           "path": "packages/react/src/components/agent-figure/agent-figure-scenes.ts",
           "type": "registry:ui",
-          "target": "components/agent-figure/agent-figure-scenes.ts"
+          "target": "components/ui/agent-figure/agent-figure-scenes.ts"
         }
       ]
     },
