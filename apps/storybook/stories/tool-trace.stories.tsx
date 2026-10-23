@@ -269,6 +269,29 @@ export const OpenedWithDetails: Story = {
   },
 };
 
+export const LongFile: Story = {
+  args: {
+    defaultOpen: true,
+    steps: [
+      step("edit", "ci/sign.sh", 0, 0.2, {
+        diff: { filename: "ci/sign.sh", from: before, to: after, cut: true },
+      }),
+    ],
+  },
+  parameters: storyDocumentation(
+    "An edit to a file too long to keep whole: the diff shows the kept start, and says so under it.",
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      canvas.getByRole("button", { name: /Edited ci\/sign\.sh/ }),
+    );
+    await expect(
+      canvas.getByText("Only the start of this file is shown."),
+    ).toBeVisible();
+  },
+};
+
 export const LongRun: Story = {
   args: { steps: long, defaultOpen: true },
   parameters: storyDocumentation(

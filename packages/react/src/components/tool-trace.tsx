@@ -35,6 +35,12 @@ export interface ToolTraceDiff {
   /** The file after the call. */
   to: string;
   language?: string;
+  /**
+   * Only the start of the file was kept, on either side. The card says so
+   * under the diff, whose last lines may then differ only because one side
+   * was cut sooner.
+   */
+  cut?: boolean;
 }
 
 export interface ToolTraceStep {
@@ -385,13 +391,23 @@ function StepDetails({
               // No file header: the call's own row names the file just
               // above, and in a pane this short the header would only take
               // a line from the edit.
-              <ToolCallDiff
-                from={step.diff.from}
-                to={step.diff.to}
-                filename={step.diff.filename}
-                fileHeader={false}
-                language={step.diff.language}
-              />
+              <>
+                <ToolCallDiff
+                  from={step.diff.from}
+                  to={step.diff.to}
+                  filename={step.diff.filename}
+                  fileHeader={false}
+                  language={step.diff.language}
+                />
+                {step.diff.cut ? (
+                  <p
+                    data-slot="tool-trace-diff-cut"
+                    className="m-0 pt-1 nessa-text-1 text-muted-foreground"
+                  >
+                    Only the start of this file is shown.
+                  </p>
+                ) : null}
+              </>
             ) : name === "input" ? (
               <Input text={step.input ?? ""} />
             ) : step.output ? (
