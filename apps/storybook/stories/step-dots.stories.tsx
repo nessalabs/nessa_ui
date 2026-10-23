@@ -52,11 +52,13 @@ export const Walking: Story = {
     const canvas = within(canvasElement)
     await userEvent.click(canvas.getByRole("button", { name: "Next" }))
     const dots = canvas.getByRole("img", { name: "Step 2 of 3" })
-    const second = dots.children[1] as HTMLElement
-    await waitFor(() =>
-      expect(second.getBoundingClientRect().width).toBeGreaterThan(
-        (dots.children[0] as HTMLElement).getBoundingClientRect().width * 2,
-      ),
+    const [first, second] = Array.from(dots.children) as HTMLElement[]
+    await expect(second).toHaveAttribute("data-current", "true")
+    await expect(first).not.toHaveAttribute("data-current")
+    // The end state: nothing still stretching, and the long dot at full length.
+    await waitFor(() => expect(dots.getAnimations({ subtree: true })).toHaveLength(0))
+    await expect(second.getBoundingClientRect().width).toBeGreaterThanOrEqual(
+      first.getBoundingClientRect().width * 3,
     )
   },
 }
