@@ -246,11 +246,13 @@ function MiniBar({
           <span
             key={step.id}
             className={cn(
-              "absolute inset-y-0 min-w-px rounded-full",
+              "absolute inset-y-0 min-w-[5px] rounded-full",
               barTone(step),
             )}
             style={{
-              left: `${((span.start - start) / total) * 100}%`,
+              // An instant call is a dot as wide as the bar is tall, kept
+              // inside the bar's end.
+              left: `min(${((span.start - start) / total) * 100}%, calc(100% - 5px))`,
               width: `${((span.end - span.start) / total) * 100}%`,
             }}
           />
@@ -561,11 +563,14 @@ function StepRow({
             <span
               data-slot="tool-trace-bar"
               className={cn(
-                "absolute top-1 h-1.5 min-w-[3px] rounded-full",
+                "absolute top-1 h-1.5 min-w-1.5 rounded-full",
                 barTone(step),
               )}
               style={{
-                left: `${((left - domain.start) / width) * 100}%`,
+                // An instant call is a round dot, not a hairline: no bar is
+                // narrower than it is tall, and a dot at the axis end stays
+                // inside it.
+                left: `min(${((left - domain.start) / width) * 100}%, calc(100% - var(--spacing) * 1.5))`,
                 width: `${(Math.max(0, Math.min(span.end, domain.end) - left) / width) * 100}%`,
               }}
             />
