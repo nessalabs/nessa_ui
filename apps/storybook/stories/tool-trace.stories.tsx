@@ -6,6 +6,27 @@ import { FileText, Globe, Pencil, Search, SquareTerminal } from "lucide-react";
 
 import { storyDocumentation } from "./story-documentation";
 
+/**
+ * Cancels the trace's endless motion (the shimmer and the working rings) so
+ * a play test leaves nothing running into the rest of the suite. The sweep
+ * starts in an effect, after paint, so it waits for it first. No-ops outside
+ * the vitest/webdriver runner so the canvas stays live for people watching.
+ */
+async function stopMotion(canvasElement: HTMLElement) {
+  const view = canvasElement.ownerDocument.defaultView;
+  if (!view?.navigator.webdriver) return;
+  if (!view.matchMedia("(prefers-reduced-motion: reduce)").matches)
+    await waitFor(() =>
+      expect(
+        canvasElement.getAnimations({ subtree: true }).length,
+      ).toBeGreaterThan(0),
+    );
+  canvasElement
+    .getAnimations({ subtree: true })
+    .forEach((animation) => animation.cancel());
+  await expect(canvasElement.getAnimations({ subtree: true })).toHaveLength(0);
+}
+
 /** A fixed clock: the stories never read the real one, so nothing keeps ticking. */
 const T0 = Date.UTC(2026, 9, 23, 9, 0, 0);
 const at = (seconds: number) => T0 + seconds * 1000;
@@ -230,6 +251,16 @@ export const OpenedWithDetails: Story = {
       "true",
     );
     await expect(canvas.getAllByRole("tabpanel")).toHaveLength(1);
+    // The diff is drawn once Pierre's engine arrives; wait for its lines.
+    const diff = canvasElement.querySelector('[data-slot="tool-call-diff"]');
+    await expect(diff).not.toBeNull();
+    await waitFor(
+      () =>
+        expect(diff!.firstElementChild?.shadowRoot?.textContent).toContain(
+          "set-key-partition-list",
+        ),
+      { timeout: 15000 },
+    );
   },
 };
 
@@ -284,6 +315,7 @@ export const Working: Story = {
     await expect(
       canvas.getByRole("button", { name: /4 earlier/ }),
     ).toBeVisible();
+    await stopMotion(canvasElement);
   },
 };
 

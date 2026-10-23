@@ -93,6 +93,32 @@ test("primitives render without a browser global", () => {
       />,
     ).includes("Ran 1 tool"),
   );
+  // A running trace without a host clock draws against its own calls' times
+  // on the server, so the server and the first client render agree.
+  const running = () =>
+    server(
+      <ToolTrace
+        status="running"
+        steps={[
+          {
+            id: "a",
+            label: "Ran",
+            status: "running",
+            startedAtMs: 1_000,
+          },
+          {
+            id: "b",
+            label: "Read",
+            status: "completed",
+            startedAtMs: 0,
+            endedAtMs: 1_500,
+          },
+        ]}
+      />,
+    );
+  const first = running();
+  assert.ok(first.includes("Working"));
+  assert.equal(running(), first);
   assert.ok(
     server(<Favicon href="https://example.com/a" />).includes(
       "https://example.com/favicon.ico",

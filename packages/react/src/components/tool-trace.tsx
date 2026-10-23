@@ -3,8 +3,10 @@
 import * as React from "react";
 import { ChevronRight, Layers, Minus, X } from "lucide-react";
 
+import { shimmerClasses, useShimmer } from "@/lib/shimmer";
 import { cn } from "@/lib/utils";
 
+import { DiffStat } from "./file-diff-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./tabs";
 import { ToolCallDiff } from "./tool-call";
 
@@ -26,7 +28,7 @@ export type ToolTraceStepStatus =
 export type ToolTraceStatus = "running" | "complete" | "error";
 
 export interface ToolTraceDiff {
-  /** The file's path, shown in the diff's header and used to pick a language. */
+  /** The file's path; picks the diff's language. The call's row names the file, so the diff shows no header. */
   filename: string;
   /** The file before the call. Empty for a file the call created. */
   from: string;
@@ -131,41 +133,22 @@ function spanOf(step: ToolTraceStep, now: number) {
   return { start, end: Math.max(start, end) };
 }
 
-function useClock(running: boolean, fixed: number | undefined) {
-  const [now, setNow] = React.useState(() => fixed ?? Date.now());
+/**
+ * The time a trace draws against. A host's `fixed` time wins. Otherwise a
+ * running trace reads the clock about four times a second once it has
+ * mounted; before that, and on the server, it draws against the latest time
+ * its own calls name, which the server and the first client render agree on.
+ */
+function useClock(running: boolean, fixed: number | undefined, latest: number) {
+  const [now, setNow] = React.useState<number | null>(null);
   React.useEffect(() => {
     if (fixed !== undefined || !running) return;
     setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(timer);
   }, [fixed, running]);
-  return fixed ?? now;
+  return fixed ?? (running && now !== null ? Math.max(now, latest) : latest);
 }
-
-const reducedMotionQuery = "(prefers-reduced-motion: reduce)";
-
-function subscribeToReducedMotion(callback: () => void) {
-  const query = window.matchMedia(reducedMotionQuery);
-  query.addEventListener("change", callback);
-  return () => query.removeEventListener("change", callback);
-}
-
-function useReducedMotion() {
-  return React.useSyncExternalStore(
-    subscribeToReducedMotion,
-    () => window.matchMedia(reducedMotionQuery).matches,
-    () => false,
-  );
-}
-
-function cssDurationInMilliseconds(value: string, fallback: number) {
-  const parsed = Number.parseFloat(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return value.trim().endsWith("ms") ? parsed : parsed * 1000;
-}
-
-const shimmerClasses =
-  "data-[shimmer=true]:[background-image:linear-gradient(90deg,var(--muted-foreground)_0%,var(--muted-foreground)_38%,var(--foreground)_50%,var(--muted-foreground)_62%,var(--muted-foreground)_100%)] data-[shimmer=true]:bg-[length:200%_100%] data-[shimmer=true]:bg-[position:150%_0] data-[shimmer=true]:bg-clip-text data-[shimmer=true]:[-webkit-background-clip:text] data-[shimmer=true]:text-transparent";
 
 /** Text with a highlight sweeping across it while `active`; plain under reduced motion. */
 function Shimmer({
@@ -177,25 +160,7 @@ function Shimmer({
   className?: string;
   children: React.ReactNode;
 }) {
-  const reducedMotion = useReducedMotion();
-  const shimmering = active && !reducedMotion;
-  const ref = React.useRef<HTMLSpanElement>(null);
-  React.useEffect(() => {
-    const node = ref.current;
-    if (!node || !shimmering) return;
-    const duration = cssDurationInMilliseconds(
-      getComputedStyle(node).getPropertyValue(
-        "--nessa-motion-duration-ambient",
-      ),
-      3200,
-    );
-    if (duration === 0) return;
-    const animation = node.animate(
-      [{ backgroundPosition: "150% 0" }, { backgroundPosition: "-50% 0" }],
-      { duration, easing: "linear", iterations: Infinity },
-    );
-    return () => animation.cancel();
-  }, [shimmering]);
+  const { ref, shimmering } = useShimmer<HTMLSpanElement>(active);
   return (
     <span
       ref={ref}
@@ -212,7 +177,7 @@ function Working() {
   return (
     <span
       aria-hidden="true"
-      className="size-3 shrink-0 animate-spin rounded-full border-[1.5px] border-muted-foreground/30 border-t-(--nessa-chat-accent-ink) [animation-duration:800ms] motion-reduce:animate-none"
+      className="size-3 shrink-0 animate-spin rounded-full border-[1.5px] border-muted-foreground/30 border-t-(--nessa-chat-accent-ink) [animation-duration:var(--nessa-motion-duration-ambient)] motion-reduce:animate-none"
     />
   );
 }
@@ -229,8 +194,9 @@ const barTone = (step: ToolTraceStep) =>
           : "bg-muted-foreground/35";
 
 /**
- * The whole run in 64px: one sliver per call, as wide as it took. A call
- * shorter than half a percent of the run still gets a sliver.
+ * The whole run in 64px: each call a sliver where it fell on the run's time,
+ * as wide as it took, at least a pixel. Positioned rather than laid side by
+ * side, so a run of hundreds of calls still spans the whole bar.
  */
 function MiniBar({
   steps,
@@ -243,21 +209,28 @@ function MiniBar({
   const starts = spans.flatMap((span) => (span ? [span.start] : []));
   const ends = spans.flatMap((span) => (span ? [span.end] : []));
   if (starts.length === 0) return null;
-  const total = Math.max(1, Math.max(...ends) - Math.min(...starts));
+  const start = Math.min(...starts);
+  const total = Math.max(1, Math.max(...ends) - start);
   return (
     <span
       aria-hidden="true"
       data-slot="tool-trace-mini-bar"
-      className="flex h-[5px] w-16 shrink-0 items-stretch gap-px overflow-hidden"
+      className="relative h-[5px] w-16 shrink-0 overflow-hidden"
     >
       {steps.map((step, index) => {
         const span = spans[index];
-        const length = span ? span.end - span.start : 0;
+        if (!span) return null;
         return (
           <span
             key={step.id}
-            className={cn("min-w-px rounded-[1px]", barTone(step))}
-            style={{ flexGrow: Math.max(length, total / 200), flexBasis: 0 }}
+            className={cn(
+              "absolute inset-y-0 min-w-px rounded-full",
+              barTone(step),
+            )}
+            style={{
+              left: `${((span.start - start) / total) * 100}%`,
+              width: `${((span.end - span.start) / total) * 100}%`,
+            }}
           />
         );
       })}
@@ -304,7 +277,8 @@ function panesOf(step: ToolTraceStep): Pane[] {
   return [
     ...(step.diff ? (["diff"] as const) : []),
     ...(step.input !== undefined ? (["input"] as const) : []),
-    ...(step.output !== undefined || live(step) ? (["output"] as const) : []),
+    // Every call can say what it gave back, if only that it gave nothing.
+    "output",
   ];
 }
 
@@ -314,11 +288,13 @@ function panesOf(step: ToolTraceStep): Pane[] {
  * never moves the transcript.
  */
 function StepDetails({
+  id,
   step,
   now,
   pane,
   onPaneChange,
 }: {
+  id: string;
   step: ToolTraceStep;
   now: number;
   pane: Pane | undefined;
@@ -330,9 +306,9 @@ function StepDetails({
       ? pane
       : step.diff && !live(step)
         ? "diff"
-        : panes.includes("output") && step.output
+        : step.output || live(step) || step.input === undefined
           ? "output"
-          : panes[0];
+          : "input";
   const span = spanOf(step, now);
   const lines = step.output ? step.output.split("\n").length : 0;
   const facts = live(step)
@@ -359,6 +335,7 @@ function StepDetails({
   };
   return (
     <div
+      id={id}
       data-slot="tool-trace-details"
       className="flex min-w-0 flex-col gap-2.5 border-t border-border px-2.5 pt-2 pb-2.5"
     >
@@ -386,10 +363,14 @@ function StepDetails({
             className="h-38 flex-none overflow-auto overscroll-contain [scrollbar-width:thin] motion-safe:animate-in motion-safe:fade-in-0 motion-safe:[animation-duration:var(--nessa-motion-duration-fast)]"
           >
             {name === "diff" && step.diff ? (
+              // No file header: the call's own row names the file just
+              // above, and in a pane this short the header would only take
+              // a line from the edit.
               <ToolCallDiff
                 from={step.diff.from}
                 to={step.diff.to}
                 filename={step.diff.filename}
+                fileHeader={false}
                 language={step.diff.language}
               />
             ) : name === "input" ? (
@@ -415,7 +396,11 @@ function StepDetails({
         <p className="m-0 flex flex-wrap items-center gap-2 font-mono nessa-text-1 text-muted-foreground tabular-nums">
           {chosen === "diff" &&
           (step.added !== undefined || step.removed !== undefined) ? (
-            <Delta added={step.added} removed={step.removed} />
+            <DiffStat
+              additions={step.added ?? 0}
+              deletions={step.removed ?? 0}
+              className="nessa-text-1"
+            />
           ) : null}
           <span>{facts}</span>
         </p>
@@ -424,25 +409,8 @@ function StepDetails({
   );
 }
 
-function Delta({ added, removed }: { added?: number; removed?: number }) {
-  return (
-    <span className="inline-flex gap-1 font-mono nessa-text-1 font-medium tabular-nums whitespace-nowrap">
-      {added !== undefined ? (
-        <ins className="text-(--nessa-diff-addition) no-underline">
-          +{added}
-        </ins>
-      ) : null}
-      {removed ? (
-        <del className="text-(--nessa-diff-deletion) no-underline">
-          −{removed}
-        </del>
-      ) : null}
-    </span>
-  );
-}
-
 const rowClassName =
-  "grid w-full min-h-7 cursor-pointer items-center gap-2.5 rounded-[7px] border-0 bg-transparent px-1.5 text-start font-sans nessa-text-2 text-muted-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-foreground/(--nessa-state-hover) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none disabled:cursor-default disabled:hover:bg-transparent";
+  "grid w-full min-h-7 cursor-pointer items-center gap-2.5 rounded-md border-0 bg-transparent px-1.5 text-start font-sans nessa-text-2 text-muted-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-foreground/(--nessa-state-hover) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none";
 
 /** The columns every row and the axis share: glyph, what, bar, time. */
 const columns = (timed: boolean) =>
@@ -482,7 +450,7 @@ function StepRow({
     );
   const meta =
     step.status === "stopped" ? (
-      <span className="rounded-[5px] bg-muted px-1.5 py-0.5 font-mono nessa-text-1 text-muted-foreground">
+      <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono nessa-text-1 text-muted-foreground">
         stopped
       </span>
     ) : span && (timed || live(step)) ? (
@@ -490,17 +458,19 @@ function StepRow({
         {formatDuration(span.end - span.start)}
       </span>
     ) : step.added !== undefined || step.removed !== undefined ? (
-      <Delta added={step.added} removed={step.removed} />
+      <DiffStat
+        additions={step.added ?? 0}
+        deletions={step.removed ?? 0}
+        className="nessa-text-1"
+      />
     ) : null;
-  const disclosable = panesOf(step).length > 0;
   return (
     <button
       type="button"
       data-slot="tool-trace-step"
       data-status={step.status}
-      aria-expanded={disclosable ? open : undefined}
-      aria-controls={disclosable && open ? detailsId : undefined}
-      disabled={!disclosable}
+      aria-expanded={open}
+      aria-controls={open ? detailsId : undefined}
       onClick={onToggle}
       className={cn(
         rowClassName,
@@ -543,12 +513,12 @@ function StepRow({
             <span
               data-slot="tool-trace-bar"
               className={cn(
-                "absolute top-1 h-1.5 min-w-[3px] rounded-[3px]",
+                "absolute top-1 h-1.5 min-w-[3px] rounded-full",
                 barTone(step),
               )}
               style={{
                 left: `${((left - domain.start) / width) * 100}%`,
-                width: `${(Math.max(0, span.end - left) / width) * 100}%`,
+                width: `${(Math.max(0, Math.min(span.end, domain.end) - left) / width) * 100}%`,
               }}
             />
           ) : null}
@@ -585,28 +555,46 @@ function ToolTrace({
   ...props
 }: ToolTraceProps) {
   const running = status === "running";
-  const now = useClock(running, nowProp);
+  const latest = Math.max(
+    0,
+    ...steps.flatMap((step) => [step.startedAtMs ?? 0, step.endedAtMs ?? 0]),
+  );
+  const now = useClock(running, nowProp, latest);
   const [uncontrolledOpen, setUncontrolledOpen] = React.useState(defaultOpen);
   const open = openProp ?? uncontrolledOpen;
   const setOpen = (next: boolean) => {
     if (openProp === undefined) setUncontrolledOpen(next);
     onOpenChange?.(next);
   };
-  const [card, setCard] = React.useState<string | null>(null);
-  const [panes, setPanes] = React.useState<ReadonlyMap<string, Pane>>(
-    () => new Map(),
-  );
-  const [showEarlier, setShowEarlier] = React.useState(false);
+  const [chosenCard, setCard] = React.useState<string | null>(null);
+  // A card stays open only while its call is still in the run: a host that
+  // reuses the trace for another run does not find a card already open.
+  const card = steps.some((step) => step.id === chosenCard) ? chosenCard : null;
+  // The tab chosen in the open card; another card opens on its own default.
+  const [chosenPane, setPane] = React.useState<{
+    id: string;
+    pane: Pane;
+  } | null>(null);
+  const [showEarlierChosen, setShowEarlier] = React.useState(false);
   const bodyId = React.useId();
   const detailsId = React.useId();
 
-  // Running calls always show; the settled ones before the last `keep` fold,
-  // unless that would hide only one.
+  // Running calls always show, and so does the open card's. Settled calls
+  // past the last `keep` fold, from the start of the run up to the first call
+  // that must show, so the fold row only ever sits above calls that came
+  // after it. Folding a single call would hide nothing worth a row.
   const kept = keep ?? (running ? 3 : 4);
-  const settled = steps.filter((step) => !live(step));
-  let folded = settled.slice(0, Math.max(0, settled.length - kept));
+  const foldable = steps.filter((step) => !live(step)).length - kept;
+  let folded: ToolTraceStep[] = [];
+  for (const step of steps) {
+    if (folded.length >= foldable || live(step) || step.id === card) break;
+    folded.push(step);
+  }
   if (folded.length < 2) folded = [];
   const foldedIds = new Set(folded.map((step) => step.id));
+  // With nothing folded there is nothing to show; the next fold starts closed.
+  const showEarlier = showEarlierChosen && folded.length > 0;
+  if (showEarlierChosen && folded.length === 0) setShowEarlier(false);
   const shown = showEarlier
     ? steps
     : steps.filter((step) => !foldedIds.has(step.id));
@@ -616,9 +604,12 @@ function ToolTrace({
   const runStart = Math.min(
     ...spans.flatMap((span) => (span ? [span.start] : [])),
   );
-  const runEnd = running
-    ? now
-    : Math.max(...spans.flatMap((span) => (span ? [span.end] : [])));
+  // Wall-clock times from another machine can run ahead of this one's: an end
+  // past `now` widens the run rather than spilling out of it.
+  const runEnd = Math.max(
+    running ? now : 0,
+    ...spans.flatMap((span) => (span ? [span.end] : [])),
+  );
   const shownSpans = shown.flatMap((step) => {
     const span = spanOf(step, now);
     return span ? [span] : [];
@@ -626,12 +617,13 @@ function ToolTrace({
   const domain = shownSpans.length
     ? {
         start: Math.min(...shownSpans.map((span) => span.start)),
-        end: running
-          ? Math.max(
-              now,
-              Math.min(...shownSpans.map((span) => span.start)) + 1000,
-            )
-          : Math.max(...shownSpans.map((span) => span.end)),
+        end: Math.max(
+          running ? now : 0,
+          running
+            ? Math.min(...shownSpans.map((span) => span.start)) + 1000
+            : 0,
+          ...shownSpans.map((span) => span.end),
+        ),
       }
     : { start: 0, end: 1 };
   const foldedSpans = folded.flatMap((step) => {
@@ -754,7 +746,6 @@ function ToolTrace({
               return (
                 <div
                   key={step.id}
-                  id={isOpen ? detailsId : undefined}
                   data-slot={isOpen ? "tool-trace-card" : undefined}
                   className={cn(
                     isOpen &&
@@ -773,14 +764,13 @@ function ToolTrace({
                   />
                   {isOpen ? (
                     <StepDetails
+                      id={detailsId}
                       step={step}
                       now={now}
-                      pane={panes.get(step.id)}
-                      onPaneChange={(pane) =>
-                        setPanes((current) =>
-                          new Map(current).set(step.id, pane),
-                        )
+                      pane={
+                        chosenPane?.id === step.id ? chosenPane.pane : undefined
                       }
+                      onPaneChange={(pane) => setPane({ id: step.id, pane })}
                     />
                   ) : null}
                 </div>

@@ -503,6 +503,19 @@
       ]
     },
     {
+      "name": "shimmer",
+      "type": "registry:lib",
+      "title": "Shimmer",
+      "description": "The one shimmer: a highlight swept across live text once per ambient motion duration, painted from theme tokens, and still under reduced motion. Every component that shimmers a label uses it.",
+      "files": [
+        {
+          "path": "packages/react/src/lib/shimmer.ts",
+          "type": "registry:lib",
+          "target": "lib/shimmer.ts"
+        }
+      ]
+    },
+    {
       "name": "size-observer",
       "type": "registry:lib",
       "title": "Size observer",
@@ -821,7 +834,8 @@
       "description": "Text with a highlight sweeping across it, the default loader for any frame with nothing to show yet. Plain muted text under reduced motion, announced politely after it mounts and when the label changes.",
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
-        "nessalabs/nessa_ui/utils"
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/shimmer"
       ],
       "files": [
         {
@@ -1952,7 +1966,8 @@
       ],
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
-        "nessalabs/nessa_ui/utils"
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/shimmer"
       ],
       "files": [
         {
@@ -1992,7 +2007,8 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils",
-        "nessalabs/nessa_ui/code-block"
+        "nessalabs/nessa_ui/code-block",
+        "nessalabs/nessa_ui/shimmer"
       ],
       "files": [
         {
@@ -2151,7 +2167,9 @@
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils",
         "nessalabs/nessa_ui/tabs",
-        "nessalabs/nessa_ui/tool-call"
+        "nessalabs/nessa_ui/tool-call",
+        "nessalabs/nessa_ui/shimmer",
+        "nessalabs/nessa_ui/file-diff-list"
       ],
       "files": [
         {

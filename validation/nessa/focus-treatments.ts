@@ -716,13 +716,13 @@ export const focusGeometryClasses = Object.freeze([
   // edges, so there its outline draws inset instead.
   { component: "conversation-history", className: "focus-visible:outline-2", count: 2 },
   { component: "conversation-history", className: "focus-visible:outline-offset-2", count: 2 },
-  // Each revealed action keeps the outset offset; the content, slid open and
-  // clipped at the row's edges, has its outline drawn inset.
   // The line keeps the outset offset; a row draws inset, because an open
   // call's card clips at the row's edges.
   { component: "tool-trace", className: "focus-visible:outline-2", count: 3 },
   { component: "tool-trace", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "tool-trace", className: "focus-visible:-outline-offset-2", count: 2 },
+  // Each revealed action keeps the outset offset; the content, slid open and
+  // clipped at the row's edges, has its outline drawn inset.
   { component: "swipe-row", className: "focus-visible:outline-2", count: 1 },
   { component: "swipe-row", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "swipe-row", className: "focus-visible:-outline-offset-2", count: 1 },
