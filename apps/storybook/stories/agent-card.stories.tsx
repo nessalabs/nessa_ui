@@ -22,8 +22,15 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-/** The tested path: one card, drawn and at rest, so nothing is left running. */
+/**
+ * Docs only, like every card: each is a software-rendered 3D scene in CI, and
+ * running one beside the other stories pushed unrelated settle waits (QrOrb,
+ * TypeIn) past their budgets. `AgentFigure / Playing` tests the figure, the
+ * server-render test covers the card's markup, and nessa-agent's setup stress
+ * step drives the card in the real picker.
+ */
 export const Claude: Story = {
+  tags: ["!test"],
   parameters: storyDocumentation("Claude Code's mascot on Claude's card."),
   render: (args) => <AgentCard {...args} className="w-64" />,
   play: async ({ canvasElement }) => {
@@ -39,7 +46,6 @@ export const Claude: Story = {
 }
 
 export const Codex: Story = {
-  // Docs only: Claude covers the drawing path; each card is a 3D scene.
   tags: ["!test"],
   args: { agent: "codex", name: "Codex" },
   parameters: storyDocumentation("Codex's knot on its light card."),
