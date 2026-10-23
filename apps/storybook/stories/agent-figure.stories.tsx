@@ -97,7 +97,7 @@ function Picker() {
   const [chosen, setChosen] = React.useState<string>("claude")
   return (
     <div className="flex flex-col items-start gap-3">
-      <div className="relative grid h-[320px] w-full max-w-[560px] grid-cols-3 place-items-center overflow-hidden rounded-2xl">
+      <div className="relative grid h-[320px] w-full max-w-[560px] grid-cols-4 place-items-center overflow-hidden rounded-2xl">
         <BloomField className="absolute inset-0" ambient={!navigator.webdriver} />
         {agentFigureKinds.map((agent) => (
           <AgentFigure
@@ -133,7 +133,7 @@ function Picker() {
 }
 
 export const OnTheLight: Story = {
-  // Docs only: three figures and the light under a software renderer took
+  // Docs only: every figure and the light under a software renderer took
   // most of a 30 s test budget in CI. Playing tests the same routine.
   tags: ["!test"],
   parameters: storyDocumentation(

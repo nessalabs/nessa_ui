@@ -115,6 +115,15 @@ function claude(): Spec {
  * arms and pixel eyes, shown straight on. Each time it comes alive it plays
  * the next of its routines: a wave, both arms, a wink, a hop.
  */
+const CLAWD_ROUTINES = Object.freeze(["wave", "both", "wink", "hop"] as const)
+
+/**
+ * Which routine the mascot plays, kept for every figure of it rather than per
+ * figure, so a figure built afresh (a card shown again) plays the next one
+ * instead of starting over at the wave.
+ */
+let clawdRoutine = CLAWD_ROUTINES.length - 1
+
 function clawd(): Spec {
   const clay = phys("#d97757", { roughness: 0.55, clearcoat: 0.15, clearcoatRoughness: 0.5 })
   const ink = phys("#1b1715", { roughness: 0.4 })
@@ -173,20 +182,20 @@ function clawd(): Spec {
       eyes[index].visible = !happy
     })
   }
-  const routines = ["wave", "both", "wink", "hop"] as const
-  let routine = 0
+  const routines = CLAWD_ROUTINES
   const blink = (t: number) => {
     const phase = t % 2.3
     return phase > 0.9 && phase < 1.08 ? Math.sin(((phase - 0.9) / 0.18) * Math.PI) : 0
   }
   const update: Update = (p, t) => {
     const on = p > 0.35
-    const now = routines[routine]
+    const now = routines[clawdRoutine]
     const waveRight = now === "wave" || now === "both"
     const waveLeft = now === "both" || now === "wink"
     right.rotation.z = p * (waveRight ? 1.05 + 0.38 * Math.sin(t * 11) : 0.12 * Math.sin(t * 5.5))
+    // Mirrored, so the same lift turns the other way.
     left.rotation.z =
-      p *
+      -p *
       (waveLeft
         ? 1.05 + 0.38 * Math.sin(t * 11 + (now === "both" ? Math.PI : 0))
         : 0.12 * Math.sin(t * 5.5))
@@ -203,9 +212,8 @@ function clawd(): Spec {
   }
   // The routine moves on as the figure comes alive, never mid-routine.
   const begin = () => {
-    routine = (routine + 1) % routines.length
+    clawdRoutine = (clawdRoutine + 1) % routines.length
   }
-  routine = routines.length - 1
   return { group, tilt: [deg(4), 0], fill: "#ff9a6a", flip: false, update, begin }
 }
 
