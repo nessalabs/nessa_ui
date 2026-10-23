@@ -349,6 +349,19 @@ export const Instant: Story = {
       ),
     ].map((mark) => mark.textContent);
     await expect(marks).toEqual(["0s", "0.4s", "0.8s"]);
+    // Each call is a round dot, no narrower than it is tall, and the last
+    // one stays inside the axis.
+    const bars = [
+      ...canvasElement.querySelectorAll("[data-slot=tool-trace-bar]"),
+    ].map((bar) => ({
+      bar: bar.getBoundingClientRect(),
+      track: bar.parentElement!.getBoundingClientRect(),
+    }));
+    await expect(bars).toHaveLength(3);
+    for (const { bar, track } of bars) {
+      await expect(bar.width).toBeGreaterThanOrEqual(bar.height);
+      await expect(bar.right).toBeLessThanOrEqual(track.right + 0.5);
+    }
   },
 };
 
