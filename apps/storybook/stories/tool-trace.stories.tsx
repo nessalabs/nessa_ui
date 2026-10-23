@@ -276,6 +276,10 @@ export const LongRun: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    // Past a minute, the axis counts minutes.
+    await expect(
+      canvasElement.querySelector("[data-slot=tool-trace-axis]")?.textContent,
+    ).toMatch(/^\d+:\d\d/);
     const earlier = canvas.getByRole("button", { name: /14 earlier/ });
     await expect(
       canvasElement.querySelectorAll("[data-slot=tool-trace-step]"),
@@ -283,7 +287,9 @@ export const LongRun: Story = {
     await userEvent.click(earlier);
     await expect(earlier).toHaveAccessibleName(/Hide 14 earlier/);
     const rows = () =>
-      canvasElement.querySelectorAll<HTMLElement>("[data-slot=tool-trace-step]");
+      canvasElement.querySelectorAll<HTMLElement>(
+        "[data-slot=tool-trace-step]",
+      );
     await expect(rows()).toHaveLength(18);
     // Opening an earlier call's card leaves the fold as it was ...
     await userEvent.click(rows()[2]!);
@@ -296,6 +302,30 @@ export const LongRun: Story = {
     await userEvent.click(earlier);
     await expect(rows()).toHaveLength(18);
     await expect(rows()[2]).toHaveAttribute("aria-expanded", "false");
+  },
+};
+
+export const Instant: Story = {
+  args: {
+    steps: [
+      step("read", "package.json", 0, 0.02),
+      step("search", "TODO in src/", 0.4, 0.01),
+      step("read", "src/main.ts", 0.8, 0.03),
+    ],
+    defaultOpen: true,
+  },
+  parameters: storyDocumentation(
+    "A second-long run of calls that each took a few milliseconds. Each reads under a tenth of a second rather than none, and the axis counts seconds, since minutes would read 0:00 at every mark.",
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByText("<0.1s")).toHaveLength(3);
+    const marks = [
+      ...canvasElement.querySelectorAll(
+        "[data-slot=tool-trace-axis] span span",
+      ),
+    ].map((mark) => mark.textContent);
+    await expect(marks).toEqual(["0s", "0.4s", "0.8s"]);
   },
 };
 

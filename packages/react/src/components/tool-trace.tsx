@@ -110,19 +110,25 @@ const live = (step: ToolTraceStep) =>
 const liveWord = (step: ToolTraceStep) =>
   step.status === "pending" ? "waiting" : "running";
 
-/** "0.4s", "12s", "3m 05s". */
+/** "<0.1s", "0.4s", "12s", "3m 05s". */
 function formatDuration(ms: number) {
   // Round first, then choose the form, so 9.96s reads "10s", not "10.0s",
   // and 59.6s reads "1m 00s", not "60s".
   const tenths = Math.round(Math.max(0, ms) / 100) / 10;
+  if (tenths === 0) return "<0.1s";
   if (tenths < 10) return `${tenths.toFixed(1)}s`;
   const whole = Math.round(Math.max(0, ms) / 1000);
   if (whole < 60) return `${whole}s`;
   return `${Math.floor(whole / 60)}m ${String(whole % 60).padStart(2, "0")}s`;
 }
 
-/** "0:00", "12:07": a point on the axis, from the run's start. */
-function formatOffset(ms: number) {
+/**
+ * A point on the axis, from the run's start: in seconds ("0s", "0.4s",
+ * "12s") while the whole run lasts under a minute, where minutes would read
+ * "0:00" at every mark, and "0:00", "12:07" past that.
+ */
+function formatOffset(ms: number, run: number) {
+  if (run < 60_000) return ms < 50 ? "0s" : formatDuration(ms);
   const seconds = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
@@ -784,11 +790,13 @@ function ToolTrace({
                     {formatOffset(
                       Math.min(...foldedSpans.map((span) => span.start)) -
                         runStart,
+                      runEnd - runStart,
                     )}
                     –
                     {formatOffset(
                       Math.max(...foldedSpans.map((span) => span.end)) -
                         runStart,
+                      runEnd - runStart,
                     )}
                   </span>
                 ) : null}
@@ -845,11 +853,18 @@ function ToolTrace({
               <span />
               <span />
               <span className="flex justify-between">
-                <span>{formatOffset(domain.start - runStart)}</span>
                 <span>
-                  {formatOffset((domain.start + domain.end) / 2 - runStart)}
+                  {formatOffset(domain.start - runStart, runEnd - runStart)}
                 </span>
-                <span>{formatOffset(domain.end - runStart)}</span>
+                <span>
+                  {formatOffset(
+                    (domain.start + domain.end) / 2 - runStart,
+                    runEnd - runStart,
+                  )}
+                </span>
+                <span>
+                  {formatOffset(domain.end - runStart, runEnd - runStart)}
+                </span>
               </span>
               <span />
             </div>
