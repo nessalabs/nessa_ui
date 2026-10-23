@@ -1,4 +1,4 @@
-/** @responsibility Verifies the ConversationHistory swipe rules: axis lock, thresholds, which action a full swipe commits, that a destructive action never fires from a gesture, and that trackpad inertia never commits a row. */
+/** @responsibility Verifies the ConversationHistory swipe rules: axis lock, thresholds, which action a full swipe commits, that a destructive action never fires from a gesture, and that a trackpad swipe never commits a row. */
 
 import assert from "node:assert/strict"
 import { describe, test } from "node:test"
@@ -21,11 +21,11 @@ import {
   swipeGeometry,
   swipeVelocity,
   wheelDeltaInPixels,
-  wheelSwipeArmed,
   wheelSwipeDisplacement,
   type SwipeCommitCandidate,
   type SwipeGeometry,
   type SwipeRelease,
+  type WheelSwipeTrack,
 } from "./conversation-history-swipe"
 
 const archive = { id: "archive" }
@@ -306,8 +306,7 @@ function replayWheel(
     at = geometry,
     start = 0,
     frameMs = 16,
-    committable = "archive" as string | null,
-  }: { at?: SwipeGeometry; start?: number; frameMs?: number; committable?: string | null } = {},
+  }: { at?: SwipeGeometry; start?: number; frameMs?: number } = {},
 ): { release: SwipeRelease; coasted: boolean } {
   const [first = 0, ...rest] = deltas
   let track = startWheelSwipe(first, 0)
@@ -316,13 +315,13 @@ function replayWheel(
     track = step.track
     if (step.event === "coast") {
       return {
-        release: settleWheelSwipe({ track, start, geometry: at, committable }),
+        release: settleWheelSwipe({ track, start, geometry: at }),
         coasted: true,
       }
     }
   }
   return {
-    release: settleWheelSwipe({ track, start, geometry: at, committable }),
+    release: settleWheelSwipe({ track, start, geometry: at }),
     coasted: false,
   }
 }
@@ -388,30 +387,28 @@ describe("wheel swipes and trackpad inertia", () => {
     // The reach stops where the fingers lifted, not at the merged frame.
     assert.equal(track.reach, 60)
     assert.deepEqual(
-      settleWheelSwipe({ track, start: 0, geometry: panel, committable: "archive" }),
+      settleWheelSwipe({ track, start: 0, geometry: panel }),
       { kind: "open" },
     )
   })
 
-  test("a deliberate long drag commits once the fingers themselves cross the threshold", () => {
-    // Steady, wobbling finger travel well past 336, then a pause.
+  test("a deliberate long drag never commits: a wheel swipe rests open at most", () => {
+    // Steady, wobbling finger travel well past 336, then a pause: browsers
+    // cannot tell these fingers from inertia, so nothing a wheel sends commits.
     const drag = [3, 6, 9, ...Array.from({ length: 36 }, (_, index) => (index % 2 ? 9 : 11))]
     assert.ok(drag.reduce((sum, delta) => sum + delta, 0) > panel.commitWidth)
     const { release, coasted } = replayWheel(drag, { at: panel })
     assert.equal(coasted, false)
-    assert.deepEqual(release, { kind: "commit", actionId: "archive" })
+    assert.deepEqual(release, { kind: "open" })
   })
 
-  test("a deliberate drag past the threshold still commits when the fingers ease off and lift", () => {
+  test("a deliberate drag past the threshold that eases off and lifts rests open", () => {
     const drag = [
       3, 6, 9,
       ...Array.from({ length: 36 }, (_, index) => (index % 2 ? 9 : 11)),
       8, 6, 4, 2, ...momentumTail(2),
     ]
-    assert.deepEqual(replayWheel(drag, { at: panel }).release, {
-      kind: "commit",
-      actionId: "archive",
-    })
+    assert.deepEqual(replayWheel(drag, { at: panel }).release, { kind: "open" })
   })
 
   test("a drag that stops short of the threshold rests open", () => {
@@ -484,7 +481,7 @@ describe("wheel swipes and trackpad inertia", () => {
     assert.equal(coasted, true)
     assert.equal(track.reach, 45)
     assert.notEqual(
-      settleWheelSwipe({ track, start: 0, geometry: panel, committable: "archive" }).kind,
+      settleWheelSwipe({ track, start: 0, geometry: panel }).kind,
       "commit",
     )
   })
@@ -598,10 +595,9 @@ describe("wheel swipes and trackpad inertia", () => {
       // At most a trend's two stretches of deltas lag: a drag can end
       // partway into a dip that has not yet shown itself to be a wobble.
       assert.ok(track.travel - track.reach < 100, `${track.travel} vs ${track.reach}`)
-      assert.equal(
-        settleWheelSwipe({ track, start: 0, geometry: panel, committable: "archive" }).kind,
-        "commit",
-      )
+      assert.deepEqual(settleWheelSwipe({ track, start: 0, geometry: panel }), {
+        kind: "open",
+      })
     }
   })
 
@@ -628,7 +624,7 @@ describe("wheel swipes and trackpad inertia", () => {
     }
   })
 
-  test("wheel events 20 to 50 ms apart open, commit, and coast as they do at 60 Hz", () => {
+  test("wheel events 20 to 50 ms apart open and coast as they do at 60 Hz, and never commit", () => {
     for (const frameMs of [20, 33, 50]) {
       const label = `${frameMs} ms apart`
       assert.deepEqual(
@@ -646,7 +642,7 @@ describe("wheel swipes and trackpad inertia", () => {
           [6, 12, 18, ...Array.from({ length: 30 }, (_, index) => (index % 2 ? 18 : 22))],
           { at: panel, frameMs },
         ).release,
-        { kind: "commit", actionId: "archive" },
+        { kind: "open" },
         label,
       )
       // Inertia keeps about 0.998 of its pace per millisecond, so slower
@@ -661,200 +657,102 @@ describe("wheel swipes and trackpad inertia", () => {
     }
   })
 
-  // SwipeRow #137 follow-up: a light flick on a Mac trackpad archived rows.
-  // Traces of the row (`window.__nessaSwipeRows`) showed WebKit's inertia
-  // holding a near-flat pace for its first frames, and rounding to whole
-  // pixels at 120 Hz repeating deltas, which the decay test read as fingers.
+  // SwipeRow #137 and nessa_ui#141: a light flick on a Mac trackpad archived
+  // rows, and on CI's runners inertia delivered as a near-even plateau
+  // passed for fingers held on the trackpad six different ways. Wheel events
+  // carry no phase, so no reading of them tells fingers from inertia: a
+  // wheel swipe never commits, and these traces stay as regressions.
   const lightFingers = [1, 3, 7, 12, 18, 22, 24]
   // WebKit-paced inertia whose first frames plateau before decaying.
   const plateau = [26, 26, 25, 26, 25, 25, 24, 25, 24, 23, 24, 23, 22, 22, 21, 22, 21, 20]
 
-  /** Replays timed deltas: `[delta, gap before it]`, the first seeding the gesture. */
-  function replayTimed(events: readonly (readonly [number, number])[]) {
+  /** Replays timed deltas, `[delta, gap before it]`, and settles where the row would. */
+  function replayTimed(
+    events: readonly (readonly [number, number])[],
+    start = 0,
+  ): { track: WheelSwipeTrack; release: SwipeRelease } {
     const [[first = 0] = [0, 0], ...rest] = events
     let track = startWheelSwipe(first, 0)
     let time = 0
-    let armedEver = false
     for (const [delta, gap] of rest) {
       const step = stepWheelSwipe(track, delta, (time += gap))
       track = step.track
-      armedEver ||= wheelSwipeArmed(track, panel)
       if (step.event === "coast") break
     }
-    return { track, armedEver }
+    return { track, release: settleWheelSwipe({ track, start, geometry: panel }) }
   }
 
-  test("inertia that plateaus after a light flick never arms or commits", () => {
-    const events = [
-      ...lightFingers.map((delta) => [delta, 8.33] as const),
-      ...plateau.map((delta, index) => [delta, index ? 16.67 : 24] as const),
-      ...momentumTail(20, 0.97).map((delta) => [Math.round(delta), 16.67] as const),
-    ]
-    const total = events.reduce((sum, [delta]) => sum + delta, 0)
-    assert.ok(total > panel.rowWidth, `${total}`)
-    const { track, armedEver } = replayTimed(events)
-    assert.equal(armedEver, false)
-    assert.ok(track.credited < panel.commitWidth, `${track.credited}`)
-    assert.notEqual(
-      settleWheelSwipe({ track, start: 0, geometry: panel, committable: "archive" }).kind,
-      "commit",
-    )
-  })
-
-  // CI's Linux runner (nessa_ui#141): the same light flick, its inertia
-  // delivered unevenly, 8 to 42 ms apart. Measured by pace, the plateau's
-  // late, quick events looked as fast as its early, slow ones, and the
-  // stretch passed for fingers holding a speed.
-  const ciTrace: (readonly [number, number])[] = [
-    [3, 0], [7, 19], [12, 12], [18, 8], [22, 14], [24, 8], [26, 27], [26, 17], [25, 20],
-    [26, 17], [25, 17], [25, 27], [24, 20], [25, 32], [24, 36], [23, 16], [24, 16],
-    [23, 19], [22, 31], [22, 18], [21, 17], [22, 17], [21, 20], [20, 19], [20, 26],
-    [18, 18], [16, 17], [15, 22], [14, 35], [13, 27], [12, 42], [11, 19], [10, 22],
-    [9, 16], [8, 26], [7, 29], [6, 21], [5, 18], [4, 16], [3, 17], [2, 18], [1, 16],
+  // The two light flicks CI's runners delivered (Linux, then WebKit),
+  // exactly as the row saw them.
+  const ciTraces: (readonly (readonly [number, number])[])[] = [
+    [
+      [3, 0], [7, 19], [12, 12], [18, 8], [22, 14], [24, 8], [26, 27], [26, 17], [25, 20],
+      [26, 17], [25, 17], [25, 27], [24, 20], [25, 32], [24, 36], [23, 16], [24, 16],
+      [23, 19], [22, 31], [22, 18], [21, 17], [22, 17], [21, 20], [20, 19], [20, 26],
+      [18, 18], [16, 17], [15, 22], [14, 35], [13, 27], [12, 42], [11, 19], [10, 22],
+      [9, 16], [8, 26], [7, 29], [6, 21], [5, 18], [4, 16], [3, 17], [2, 18], [1, 16],
+    ],
+    [
+      [3, 0], [7, 19], [12, 8], [18, 14], [22, 9], [24, 8], [26, 24], [26, 16], [25, 16],
+      [26, 18], [25, 21], [25, 19], [24, 17], [25, 16], [24, 16], [23, 16], [24, 16],
+      [23, 16], [22, 18], [22, 17], [21, 16], [22, 18], [21, 20], [20, 16], [20, 16],
+      [18, 16], [16, 18], [15, 17],
+    ],
   ]
 
-  test("inertia delivered unevenly, as on a slow runner, never arms", () => {
-    const { track, armedEver } = replayTimed(ciTrace)
-    assert.equal(armedEver, false)
-    assert.ok(track.credited < panel.commitWidth, `${track.credited}`)
+  test("the light flicks CI's runners delivered open the row and never commit", () => {
+    for (const [index, trace] of ciTraces.entries()) {
+      for (const start of [0, panel.openWidth]) {
+        const { track, release } = replayTimed(trace, start)
+        // Summed, each travels well past the commit point.
+        assert.ok(start + track.travel > panel.commitWidth, `trace ${index}`)
+        assert.deepEqual(release, { kind: "open" }, `trace ${index} from ${start}`)
+      }
+    }
   })
 
-  test("inertia whose events arrive 30 to 40 ms apart never arms", () => {
-    const { track, armedEver } = replayTimed([
-      ...lightFingers.map((delta) => [delta, 8.33] as const),
-      ...plateau.map((delta, index) => [delta, 30 + ((index * 7) % 11)] as const),
-      ...momentumTail(20, 0.94).map((delta, index) => [Math.round(delta), 30 + ((index * 5) % 11)] as const),
-    ])
-    assert.equal(armedEver, false)
-    assert.ok(track.credited < panel.commitWidth, `${track.credited}`)
+  test("inertia that plateaus after a light flick opens the row and never commits", () => {
+    for (const gaps of [
+      (index: number) => (index ? 16.67 : 24),
+      (index: number) => 30 + ((index * 7) % 11),
+    ]) {
+      const events = [
+        ...lightFingers.map((delta) => [delta, 8.33] as const),
+        ...plateau.map((delta, index) => [delta, gaps(index)] as const),
+        ...momentumTail(20, 0.97).map((delta, index) => [Math.round(delta), gaps(index + 1)] as const),
+      ]
+      const total = events.reduce((sum, [delta]) => sum + delta, 0)
+      assert.ok(total > panel.rowWidth, `${total}`)
+      assert.deepEqual(replayTimed(events).release, { kind: "open" })
+    }
   })
 
-  test("fingers holding a speed, delivered unevenly, still arm", () => {
+  test("fingers holding a speed, a quick throw, and a mouse's notches rest open, never commit", () => {
     const held: (readonly [number, number])[] = [
       ...[2, 4, 6, 9].map((delta) => [delta, 16] as const),
       ...Array.from({ length: 60 }, (_, index) => [index % 2 ? 9 : 7, 12 + ((index * 7) % 25)] as const),
     ]
-    const { armedEver } = replayTimed(held)
-    assert.equal(armedEver, true)
-  })
-
-  test("whole-pixel inertia that repeats its deltas at 120 Hz never arms", () => {
-    const tail: (readonly [number, number])[] = []
-    for (let pace = 27 / 16; pace * 8.33 >= 0.5; pace *= 0.998 ** 8.33) {
-      tail.push([Math.max(1, Math.round(pace * 8.33)), 8.33])
+    const throwAcross: (readonly [number, number])[] = [
+      [2, 0],
+      ...[6, 12, 18, ...Array.from({ length: 16 }, () => 25)].map((delta) => [delta, 8.33] as const),
+    ]
+    const notches: (readonly [number, number])[] = Array.from({ length: 10 }, () => [40, 60] as const)
+    for (const events of [held, throwAcross, notches]) {
+      const { track, release } = replayTimed(events)
+      assert.ok(track.travel > panel.commitWidth)
+      assert.deepEqual(release, { kind: "open" })
     }
-    assert.ok(tail.some(([delta], index) => index > 0 && delta === tail[index - 1]![0]))
-    const { track, armedEver } = replayTimed([
-      ...lightFingers.map((delta) => [delta, 8.33] as const),
-      [27, 16],
-      ...tail,
-    ])
-    assert.equal(armedEver, false)
-    assert.ok(track.credited < panel.commitWidth)
-  })
-
-  test("a light flick on an already open row never commits: only one gesture's own travel counts", () => {
-    const { track } = replayTimed([
-      ...lightFingers.map((delta) => [delta, 8.33] as const),
-      ...plateau.map((delta, index) => [delta, index ? 16.67 : 24] as const),
-    ])
-    // Summed onto where the row rested, the deltas reach well past the commit point.
-    assert.ok(panel.openWidth + track.travel > panel.commitWidth)
-    assert.notEqual(
-      settleWheelSwipe({ track, start: panel.openWidth, geometry: panel, committable: "archive" })
-        .kind,
-      "commit",
-    )
   })
 
   test("a gesture that is only inertia leaves the row where it found it", () => {
     for (const start of [0, panel.openWidth]) {
-      const { track } = replayTimed(momentumTail(22).map((delta) => [Math.round(delta), 16.67] as const))
-      assert.equal(track.phase, "coasting")
-      assert.deepEqual(
-        settleWheelSwipe({ track, start, geometry: panel, committable: "archive" }),
-        start === 0 ? { kind: "closed" } : { kind: "open" },
+      const { track, release } = replayTimed(
+        momentumTail(22).map((delta) => [Math.round(delta), 16.67] as const),
+        start,
       )
+      assert.equal(track.phase, "coasting")
+      assert.deepEqual(release, start === 0 ? { kind: "closed" } : { kind: "open" })
     }
-  })
-
-  test("a slow deliberate drag at an even pace is the fingers' travel and commits", () => {
-    // 60 Hz, a steady 9–11 px per frame: no single delta proves fingers
-    // after the first few, but the pace holds as inertia's never does.
-    const events = [
-      [3, 16.67] as const,
-      [6, 16.67] as const,
-      ...Array.from({ length: 40 }, (_, index) => [index % 3 ? 10 : 9.5, 16.67] as const),
-    ]
-    const { track, armedEver } = replayTimed(events)
-    assert.equal(armedEver, true)
-    assert.deepEqual(
-      settleWheelSwipe({ track, start: 0, geometry: panel, committable: "archive" }),
-      { kind: "commit", actionId: "archive" },
-    )
-  })
-
-  test("deltas collapsing on inertia are fingers landing: the old gesture ends, the new one resumes", () => {
-    let track = startWheelSwipe(1, 0)
-    let time = 0
-    for (const delta of [3, 7, 12, 18, 22, 24]) track = stepWheelSwipe(track, delta, (time += 8)).track
-    // Inertia, past the fingers' last proof.
-    for (const delta of [26, 25, 25, 24]) {
-      const step = stepWheelSwipe(track, delta, (time += 16))
-      assert.equal(step.event, "move")
-      track = step.track
-    }
-    const landing = stepWheelSwipe(track, 1, (time += 30))
-    assert.equal(landing.event, "coast")
-    assert.equal(landing.track.landed, true)
-    const resumed = stepWheelSwipe(landing.track, 3, (time += 8))
-    assert.equal(resumed.event, "resume")
-    assert.equal(resumed.track.travel, 3)
-  })
-
-  test("fingers stopping sharply on an armed drag do not commit while still down", () => {
-    let track = startWheelSwipe(3, 0)
-    let time = 0
-    for (const delta of [6, 9, ...Array.from({ length: 36 }, (_, index) => (index % 2 ? 9 : 11))]) {
-      track = stepWheelSwipe(track, delta, (time += 8)).track
-    }
-    assert.equal(wheelSwipeArmed(track, panel), true)
-    // Stopping dead, or starting back to disarm, collapses the deltas.
-    const step = stepWheelSwipe(track, 2, (time += 8))
-    assert.notEqual(step.event, "coast")
-    // Even a collapse read as a landing never commits.
-    assert.notEqual(
-      settleWheelSwipe({
-        track: { ...step.track, phase: "coasting", landed: true },
-        start: 0,
-        geometry: panel,
-        committable: "archive",
-      }).kind,
-      "commit",
-    )
-  })
-
-  test("a quick throw across the row opens it but does not commit: only a held drag does", () => {
-    // 120 Hz, a ramp then 25 px per event for about 130 ms: the deltas sum
-    // past the commit point, but nothing in them is a pace inertia could not
-    // also make.
-    let track = startWheelSwipe(2, 0)
-    let time = 0
-    for (const delta of [6, 12, 18, ...Array.from({ length: 16 }, () => 25)]) {
-      track = stepWheelSwipe(track, delta, (time += 8.33)).track
-    }
-    assert.ok(track.travel > panel.commitWidth)
-    assert.equal(wheelSwipeArmed(track, panel), false)
-  })
-
-  test("a mouse wheel's evenly spaced notches are credited and can commit", () => {
-    let track = startWheelSwipe(40, 0)
-    let time = 0
-    for (let index = 0; index < 9; index += 1) {
-      track = stepWheelSwipe(track, 40, (time += 60)).track
-    }
-    assert.equal(track.credited, track.travel)
-    assert.equal(wheelSwipeArmed(track, panel), true)
   })
 
   test("a zero delta moves nothing", () => {

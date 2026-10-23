@@ -25,7 +25,6 @@ import {
   swipeVelocity,
   wheelDeltaInPixels,
   wheelSwipeDisplacement,
-  wheelSwipeArmed,
   wheelSwipeIdleMs,
   type SwipeAxis,
   type SwipeCommitCandidate,
@@ -612,12 +611,10 @@ interface SwipeState {
   /** Displacement toward the leading edge, in pixels. */
   displacement: number;
   /**
-   * The displacement arming is judged at, when that is not where the row
-   * is: a wheel swipe moves where its deltas put it but arms only on the
-   * travel its fingers provably made in that one gesture, so inertia never
-   * arms or commits a row.
+   * A wheel swipe: it never arms or commits, and is resisted past the tray
+   * as a row that cannot commit is (`settleWheelSwipe`).
    */
-  reach?: number;
+  wheel?: boolean;
 }
 
 interface PointerSwipe {
@@ -751,11 +748,12 @@ export interface SwipeRowProps extends Omit<
  * detent. Swipe on past at least 60% of the row (further when the tray is
  * wide) and the row jumps on as the primary (first) action stretches across
  * the tray; letting go there commits it as the row slides out, and moving
- * back first disarms it. On a trackpad only the travel the fingers provably
- * made, within that one gesture, counts toward that: the inertia that
- * follows a flick can carry a row open, never into a commit, and a second
- * flick on an open row starts from nothing — a quick throw opens, and only
- * a long, held drag commits. A touch or pen long-press opens the actions
+ * back first disarms it. That full swipe belongs to drags, which end with
+ * a real release. A two-finger trackpad swipe never commits: browsers give
+ * wheel events no phase, so the fingers cannot be told from the inertia
+ * that follows them. It opens the tray at most, resisted past it as a row
+ * that cannot commit is, and rests open or closed; the primary action is
+ * then one press away. A touch or pen long-press opens the actions
  * without a swipe. A tap on the open row closes it without selecting
  * anything, and a swipe never clicks the content it moves. A gesture that
  * sets off vertically stays a scroll.
@@ -972,16 +970,14 @@ function SwipeRow({
         : 0;
     let shown = raw;
     if (measured && current?.phase === "tracking") {
-      const canCommit = committableSwipeAction(latest.current.actions) !== null;
+      const canCommit =
+        !current.wheel &&
+        committableSwipeAction(latest.current.actions) !== null;
       shown = reducedMotionRef.current
         ? presentedSwipeDisplacement(raw, measured, true)
         : rubberBandSwipeDisplacement(raw, measured, {
             canCommit,
-            armed: swipeArmed(
-              current.reach ?? current.displacement,
-              measured,
-              canCommit,
-            ),
+            armed: swipeArmed(current.displacement, measured, canCommit),
           });
     }
     const rtl = directionRef.current === "rtl";
@@ -999,9 +995,9 @@ function SwipeRow({
     const measured = geometryRef.current;
     if (state?.phase !== "tracking" || !measured) return false;
     return swipeArmed(
-      state.reach ?? state.displacement,
+      state.displacement,
       measured,
-      committableSwipeAction(latest.current.actions) !== null,
+      !state.wheel && committableSwipeAction(latest.current.actions) !== null,
     );
   }, []);
 
@@ -1370,7 +1366,7 @@ function SwipeRow({
   React.useEffect(() => {
     const row = rowRef.current;
     if (!row || !hasActions) return;
-    /** Settles a wheel gesture, judged where the fingers left the row. */
+    /** Settles a wheel gesture open or closed, where the fingers left the row. */
     const releaseWheel = (gesture: WheelSwipe) => {
       if (!gesture.geometry || !gesture.track) return;
       applyRelease(
@@ -1378,7 +1374,6 @@ function SwipeRow({
           track: gesture.track,
           start: gesture.start,
           geometry: gesture.geometry,
-          committable: committableSwipeAction(latest.current.actions),
         }),
         gesture.geometry,
       );
@@ -1538,32 +1533,22 @@ function SwipeRow({
       }
       if (!gesture.geometry || !gesture.track) return;
       event.preventDefault();
-      const canCommit = committableSwipeAction(latest.current.actions) !== null;
+      // A wheel swipe never commits: past the tray it is resisted as a row
+      // that cannot commit is, and it rests open or closed.
       const displacement = clampSwipeDisplacement(
         gesture.start + gesture.track.travel,
         gesture.geometry,
-        canCommit,
+        false,
       );
-      // Arming reads only what the fingers provably did in this gesture;
-      // short of the commit point, the row is not armed whatever it shows.
-      const armedByFingers = wheelSwipeArmed(gesture.track, gesture.geometry);
       latest.current.trace?.({
         ev: "f",
         row: id,
         via: "wheel",
         dx: Math.round(deltaX * 10) / 10,
         travel: Math.round(gesture.track.travel),
-        fingers: Math.round(gesture.track.credited),
         d: Math.round(displacement),
-        armed: canCommit && armedByFingers,
       });
-      showSwipe({
-        phase: "tracking",
-        displacement,
-        reach: armedByFingers
-          ? Math.max(displacement, gesture.geometry.commitWidth)
-          : Math.min(displacement, gesture.geometry.commitWidth - 1),
-      });
+      showSwipe({ phase: "tracking", displacement, wheel: true });
     };
     row.addEventListener("wheel", onWheel, { passive: false });
     return () => row.removeEventListener("wheel", onWheel);
@@ -1806,9 +1791,9 @@ function SwipeRow({
     (tracking &&
       geometry !== null &&
       swipeArmed(
-        swipe.reach ?? swipe.displacement,
+        swipe.displacement,
         geometry,
-        committable !== null,
+        !swipe.wheel && committable !== null,
       ));
   const trayVisible = hasActions && (open || swipe !== null);
   // While confirming, the confirming action takes the tray the way the

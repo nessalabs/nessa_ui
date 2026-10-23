@@ -175,6 +175,27 @@ function rowOf(content: HTMLElement) {
 }
 
 /** The row has settled closed and carries no transform. */
+/**
+ * Drags an element sideways with the mouse, `dx` pixels in 10 px moves,
+ * and lets go: a drag ends with a real release, so it may commit.
+ */
+function drag(target: HTMLElement, dx: number, pointerId = 21) {
+  const box = target.getBoundingClientRect();
+  const [x, y] = [box.left + box.width / 2, box.top + box.height / 2];
+  const mouse = { pointerId, pointerType: "mouse", isPrimary: true };
+  fireEvent.pointerDown(target, { ...mouse, button: 0, buttons: 1, clientX: x, clientY: y });
+  const steps = Math.ceil(Math.abs(dx) / 10);
+  for (let step = 1; step <= steps; step += 1) {
+    fireEvent.pointerMove(target, {
+      ...mouse,
+      buttons: 1,
+      clientX: x + (dx * step) / steps,
+      clientY: y,
+    });
+  }
+  fireEvent.pointerUp(target, { ...mouse, button: 0, clientX: x + dx, clientY: y });
+}
+
 async function expectClosed(content: HTMLElement) {
   await waitFor(() => expect(rowOf(content)).not.toHaveAttribute("data-swipe"));
   await expect(content.style.translate).toBe("");
@@ -183,7 +204,7 @@ async function expectClosed(content: HTMLElement) {
 
 export const ArchiveAndDelete: Story = {
   parameters: storyDocumentation(
-    "A plain list whose rows reveal Archive and Delete. A two-finger trackpad swipe, a drag, or ContextMenu / Shift+F10 opens a row; a long deliberate swipe past 60% of the row archives it as it slides out. Delete is destructive: it never runs from a swipe, and pressing it asks to be confirmed first.",
+    "A plain list whose rows reveal Archive and Delete. A two-finger trackpad swipe, a drag, or ContextMenu / Shift+F10 opens a row; a drag past 60% of the row archives it as it slides out. A trackpad swipe never archives: it opens the row at most. Delete is destructive: it never runs from a swipe, and pressing it asks to be confirmed first.",
   ),
   render: () => <ListExample />,
   play: async ({ canvasElement }) => {
@@ -226,8 +247,8 @@ export const ArchiveAndDelete: Story = {
     );
     await expect(log).toHaveTextContent("delete:notes");
 
-    // A long, deliberate two-finger drag arms Archive and commits it when
-    // the fingers stop; the host removes the row.
+    // A long two-finger swipe opens the row and no more; a drag past 60% of
+    // the row archives it as it slides out, and the host removes the row.
     const audit = canvas.getByRole("button", { name: /^repo audit/i });
     wheel(audit, [
       3,
@@ -235,7 +256,13 @@ export const ArchiveAndDelete: Story = {
       9,
       ...Array.from({ length: 30 }, (_, index) => (index % 2 ? 9 : 11)),
     ]);
-    await waitFor(() => expect(rowOf(audit)).toHaveAttribute("data-armed"));
+    await waitFor(() =>
+      expect(rowOf(audit)).toHaveAttribute("data-swipe", "open"),
+    );
+    await expect(rowOf(audit)).not.toHaveAttribute("data-armed");
+    await expect(log).toHaveTextContent("delete:notes");
+    await closeWithEscape(audit);
+    drag(audit, -Math.round(rowOf(audit).getBoundingClientRect().width * 0.9));
     await waitFor(() =>
       expect(
         canvas.queryByRole("button", { name: /^repo audit/i }),
@@ -413,6 +440,29 @@ function inertia(from = 26): TimedWheel[] {
   return tail;
 }
 
+/**
+ * Two light flicks as CI runners delivered them to the row, replayed
+ * exactly: deltas and the gaps between them, in ms. Their inertia arrived
+ * as a long, nearly even plateau, which no reading of the deltas can tell
+ * from fingers held on the trackpad (nessa_ui#141, Linux and WebKit).
+ */
+const ciFlicks: readonly (readonly TimedWheel[])[] = [
+  [
+  [1, 8], [3, 8], [7, 19], [12, 12], [18, 8], [22, 14], [24, 8], [26, 27],
+  [26, 17], [25, 20], [26, 17], [25, 17], [25, 27], [24, 20], [25, 32], [24,
+  36], [23, 16], [24, 16], [23, 19], [22, 31], [22, 18], [21, 17], [22, 17],
+  [21, 20], [20, 19], [20, 26], [18, 18], [16, 17], [15, 22], [14, 35], [13,
+  27], [12, 42], [11, 19], [10, 22], [9, 16], [8, 26], [7, 29], [6, 21], [5,
+  18], [4, 16], [3, 17], [2, 18], [1, 16]
+  ],
+  [
+  [1, 8], [3, 8], [7, 19], [12, 8], [18, 14], [22, 9], [24, 8], [26, 24],
+  [26, 16], [25, 16], [26, 18], [25, 21], [25, 19], [24, 17], [25, 16], [24,
+  16], [23, 16], [24, 16], [23, 16], [22, 18], [22, 17], [21, 16], [22, 18],
+  [21, 20], [20, 16], [20, 16], [18, 16], [16, 18], [15, 17]
+  ],
+];
+
 /** The rows' debug trace (the story's group runs in `debug`). */
 function traceEvents(row: HTMLElement): Record<string, unknown>[] {
   const registry = (
@@ -424,8 +474,8 @@ function traceEvents(row: HTMLElement): Record<string, unknown>[] {
 }
 
 /**
- * Records whether the row ever armed a full swipe while `run` went on: drawn
- * armed, or traced armed by any wheel event, however briefly.
+ * Records whether the row ever armed or committed a full swipe while `run`
+ * went on: drawn armed, however briefly, or traced releasing into a commit.
  */
 async function watchArmed(row: HTMLElement, run: () => Promise<void>) {
   let armed = row.hasAttribute("data-armed");
@@ -445,7 +495,10 @@ async function watchArmed(row: HTMLElement, run: () => Promise<void>) {
     width: Math.round(row.getBoundingClientRect().width),
     trace: seen,
   });
-  return armed || seen.some((entry) => entry.ev === "f" && entry.armed === true);
+  return (
+    armed ||
+    seen.some((entry) => entry.ev === "release" && entry.kind === "commit")
+  );
 }
 
 /** What the last `watchArmed` saw: the row's width and its trace, said when an assertion fails. */
@@ -461,7 +514,7 @@ async function closeWithEscape(content: HTMLElement) {
 export const TrackpadSwipes: Story = {
   tags: ["cross-engine", "reduced-motion"],
   parameters: storyDocumentation(
-    "Two-finger trackpad swipes, sent at a trackpad's pace. A short swipe springs back; a medium one rests open with the tray attached to the row; a light flick — whose inertia carries on long after the fingers lift — and a second flick landing on an open row never arm or archive. Only a long, deliberate drag past 60% of the row arms Archive, which stretches across the tray, and commits it.",
+    "Two-finger trackpad swipes, sent at a trackpad's pace. A short swipe springs back; a medium one rests open with the tray attached to the row. No trackpad swipe arms or archives — not a light flick whose inertia carries on long after the fingers lift, not the flicks CI runners delivered as a near-even plateau, not a second flick landing on an open row, not a long deliberate drag: browsers cannot tell fingers from inertia, so a trackpad swipe opens the tray at most, and Archive is one press away.",
   ),
   render: () => <ListExample />,
   play: async ({ canvasElement }) => {
@@ -517,6 +570,17 @@ export const TrackpadSwipes: Story = {
     await expect(log).toHaveTextContent("");
     await closeWithEscape(notes);
 
+    // The flicks CI runners delivered, replayed as they arrived: never armed.
+    for (const flick of ciFlicks) {
+      const ciArmed = await watchArmed(rowOf(notes), () => wheelTimed(notes, flick));
+      await expect(ciArmed, lastWatch).toBe(false);
+      await waitFor(() =>
+        expect(rowOf(notes)).toHaveAttribute("data-swipe", "open"),
+      );
+      await expect(log).toHaveTextContent("");
+      await closeWithEscape(notes);
+    }
+
     // Two flicks back to back, the second landing while the first's inertia
     // is still arriving: they do not merge into a full swipe.
     const audit = canvas.getByRole("button", { name: /^repo audit/i });
@@ -565,8 +629,8 @@ export const TrackpadSwipes: Story = {
     await expect(log).toHaveTextContent("");
     await closeWithEscape(tokens);
 
-    // A long, deliberate drag past 60% of the row arms Archive — it takes
-    // the whole tray — and the release commits it.
+    // Not even a long, deliberate two-finger drag arms Archive: it rests
+    // open, held at the tray, and Archive is one press away.
     const panel = canvas.getByRole("button", { name: /^panel layout/i });
     const panelRow = rowOf(panel);
     const deliberateArmed = await watchArmed(panelRow, () =>
@@ -578,7 +642,14 @@ export const TrackpadSwipes: Story = {
         ]),
       ]),
     );
-    await expect(deliberateArmed).toBe(true);
+    await expect(deliberateArmed, lastWatch).toBe(false);
+    await waitFor(() =>
+      expect(panelRow).toHaveAttribute("data-swipe", "open"),
+    );
+    await expect(log).toHaveTextContent("");
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Archive Panel layout" }),
+    );
     await waitFor(() =>
       expect(
         canvas.queryByRole("button", { name: /^panel layout/i }),
@@ -912,12 +983,7 @@ export const AncestorScroll: Story = {
 
     // A full swipe already chosen is owed though the value changes while
     // the row slides out.
-    wheel(audit, [
-      3,
-      6,
-      9,
-      ...Array.from({ length: 30 }, (_, at) => (at % 2 ? 9 : 11)),
-    ]);
+    drag(audit, -Math.round(rowOf(audit).getBoundingClientRect().width * 0.9));
     await waitFor(() =>
       expect(rowOf(audit)).toHaveAttribute("data-swipe", "committing"),
     );
