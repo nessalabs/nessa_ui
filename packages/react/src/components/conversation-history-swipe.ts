@@ -131,8 +131,22 @@ export const wheelTrendRetention = 0.999
 export const wheelTrendSpan = 3
 export const wheelTrendFloor = 0.97
 
+/**
+ * How strongly the row resists travel past its resting width, as the share
+ * of the remaining row the first pixels of overdrag cover. Smaller resists
+ * more. The open tray reads as a detent: the row slows sharply past it.
+ */
+export const swipeRubberBand = 0.55
+
+/**
+ * The share of the row a row whose full swipe is armed is drawn at, at
+ * least: crossing the commit point makes the row jump on, so the commit is
+ * visible before the release that makes it.
+ */
+export const swipeArmedShare = 0.85
+
 /** How many recent deltas a wheel swipe keeps for reading its trend. */
-const wheelTrendLimit = 48
+const wheelTrendLimit = 160
 
 /** How many recent positions a wheel swipe keeps for its release speed. */
 const wheelSampleLimit = 8
@@ -401,6 +415,42 @@ export function presentedSwipeDisplacement(
 }
 
 /**
+ * Where a commit-capable row is drawn for a displacement, while it is being
+ * dragged. Up to the resting width it follows exactly; past it the row is
+ * rubber-banded — it keeps answering the fingers but slows sharply, so the
+ * open tray is felt as a detent and a commit is never reached by drifting.
+ * Once a release would commit, the row jumps on to `swipeArmedShare` of the
+ * row and follows from there, so the armed state is plain before it is let go.
+ *
+ * Rows that cannot commit are already resisted by `clampSwipeDisplacement`
+ * and are drawn as they are.
+ *
+ * @param displacement - The gesture's displacement toward the leading edge.
+ * @param geometry - The row's swipe geometry.
+ * @param state - Whether the row can commit and whether a release would.
+ * @param state.canCommit - Whether a full swipe commits an action on this row.
+ * @param state.armed - Whether a release here commits.
+ * @returns The displacement to draw.
+ */
+export function rubberBandSwipeDisplacement(
+  displacement: number,
+  geometry: SwipeGeometry,
+  { canCommit, armed }: { canCommit: boolean; armed: boolean },
+): number {
+  if (!canCommit || displacement <= geometry.openWidth) return Math.max(displacement, 0)
+  const limit = geometry.rowWidth - geometry.openWidth
+  if (!(limit > 0)) return geometry.openWidth
+  const excess = displacement - geometry.openWidth
+  const banded =
+    geometry.openWidth + limit * (1 - 1 / ((excess * swipeRubberBand) / limit + 1))
+  if (!armed) return banded
+  return Math.min(
+    Math.max(banded, displacement, geometry.rowWidth * swipeArmedShare),
+    geometry.rowWidth,
+  )
+}
+
+/**
  * How visible an action's icon and label are at this displacement. They
  * stay clear until the row has uncovered a good share of the tray, then
  * fade in to full by the resting width, so an action is never seen as a
@@ -429,8 +479,9 @@ export function swipeContentOpacity(
  * Browsers do not say when fingers leave a trackpad: macOS keeps sending
  * wheel events for a second or more after a flick, decaying smoothly, and
  * they arrive exactly as the fingers' own did. Summed together, a short
- * flick travels several hundred pixels and a row commits that was only
- * nudged. So the travel is read the way the fingers made it. Fingers wobble
+ * flick travels several hundred pixels. So a wheel swipe never commits
+ * (`settleWheelSwipe`), and where it rests is read the way the fingers made
+ * it. Fingers wobble
  * — their deltas rise and fall around a speed — while inertia only ever
  * decays, so a run of shrinking deltas that keeps losing pace over time and
  * has fallen well below where it started is inertia, and the row is
@@ -448,7 +499,7 @@ export interface WheelSwipeTrack {
   travel: number
   /**
    * How far the fingers moved it: `travel` less any shrinking run that may
-   * be inertia. Only this decides whether a release commits.
+   * be inertia. A release rests open or closed by this.
    */
   reach: number
   /** Release speed toward the leading edge once coasting, in px/ms. */
@@ -466,7 +517,7 @@ export interface WheelSwipeTrack {
   previous: number
   previousGap: number
   /** The latest deltas' sizes and gaps, for telling a decay from a wobble. */
-  recent: readonly { size: number; gap: number }[]
+  recent: readonly WheelTrendEntry[]
   /**
    * The delta the current shrinking run started from, the time it took to
    * arrive, and the release speed there.
@@ -489,6 +540,12 @@ export interface WheelSwipeStep {
    * fresh gesture starting from wherever the row is.
    */
   event: "move" | "coast" | "ignore" | "resume"
+}
+
+/** One recent wheel delta, as a gesture's trend reads it. */
+export interface WheelTrendEntry {
+  size: number
+  gap: number
 }
 
 /**
@@ -564,7 +621,7 @@ function wheelDeltaRatios(
  * @returns `true` when the deltas are no longer decaying.
  */
 function wheelTrendHolds(
-  recent: readonly { size: number; gap: number }[],
+  recent: readonly WheelTrendEntry[],
   runLength: number,
 ) {
   const inRun = recent.slice(-runLength)
@@ -649,7 +706,7 @@ export function stepWheelSwipe(
     -wheelSampleLimit,
   )
   let { reach, shrinking, runLength, peak, peakGap, peakVelocity } = track
-  const recent = [
+  const recent: WheelTrendEntry[] = [
     ...(reversed ? [] : track.recent),
     { size: Math.abs(delta), gap },
   ].slice(-wheelTrendLimit)
@@ -720,37 +777,36 @@ export function stepWheelSwipe(
 }
 
 /**
- * Decides what a released wheel gesture does. The release is judged at the
- * fingers' reach, so inertia can carry a row open but never into a commit;
- * and it is thrown only when inertia followed it, since fingers that stopped
- * before lifting leave none.
+ * Decides what a released wheel gesture does: it rests open or closed, and
+ * never commits. Browsers give wheel events no phase, so nothing tells
+ * fingers still on a trackpad from the inertia that follows them; a full
+ * swipe that commits is left to pointer and touch drags, which end with a
+ * real release. The row rests open or closed at the fingers' reach, so
+ * inertia can carry it open, and the release is thrown only when inertia
+ * followed it, since fingers that stopped before lifting leave none. A
+ * gesture that was only ever inertia, left over from an earlier one, leaves
+ * the row where it found it.
  *
  * @param release - The gesture and the row it moved.
  * @param release.track - The gesture.
  * @param release.start - The row's displacement when the gesture began.
  * @param release.geometry - The row's swipe geometry.
- * @param release.committable - The action a full swipe commits, or `null`.
- * @returns What the row settles into.
+ * @returns Whether the row rests open or closed.
  */
 export function settleWheelSwipe({
   track,
   start,
   geometry,
-  committable,
 }: {
   track: WheelSwipeTrack
   start: number
   geometry: SwipeGeometry
-  committable: string | null
 }): SwipeRelease {
+  const stale = track.phase === "coasting" && !track.grew
   return settleSwipe({
-    displacement: clampSwipeDisplacement(
-      start + track.reach,
-      geometry,
-      committable !== null,
-    ),
-    velocity: track.phase === "coasting" ? track.velocity : 0,
+    displacement: clampSwipeDisplacement(stale ? start : start + track.reach, geometry, false),
+    velocity: track.phase === "coasting" && !stale ? track.velocity : 0,
     geometry,
-    committable,
+    committable: null,
   })
 }

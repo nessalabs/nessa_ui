@@ -36,12 +36,22 @@ SwipeRowGroup's row swipe follows the same shape at
 `window.__nessaSwipeRows[<instance id>]` (the `debugGlobal` prop renames it;
 ConversationHistory, built on it, publishes at
 `window.__nessaConversationHistory[<instance id>]`): presses, axis
-decisions (`via` pointer type or `wheel`), per-move samples (`ev: "f"`),
-trackpad inertia (`ev: "coast"` with the fingers' `reach` and release
-speed `v` when a wheel swipe's deltas turn into decaying inertia, and
-`ev: "resume"` when fingers land again), releases, settles, confirmations,
-actions (and, in ConversationHistory, focus rescues), with a `snapshot()` of
-each row's swipe state.
+decisions (`via` pointer type or `wheel`), per-move samples (`ev: "f"`;
+for a wheel, one per event with its `dx`, the gesture's summed `travel`
+and the displacement `d`; a wheel swipe never arms or commits), trackpad
+inertia (`ev: "coast"` with the fingers' `reach` and release speed `v` when
+a wheel swipe's deltas turn into decaying inertia, and `ev: "resume"` when
+fingers drive it again), releases, settles,
+confirmations, actions, scrolls that closed the open row
+(`ev: "scroll-close"`; scrolls the page makes by itself never do), and in
+ConversationHistory, focus rescues, with a `snapshot()` of each row's swipe
+state.
+
+To check a trackpad report without the trackpad, replay its wheel deltas at
+their real pace (a `setTimeout` per event, not a synchronous loop, so the
+row sees real timestamps) and read the `f` entries: `d` holds near the
+tray's width however far `travel` climbs, and the `coast` entry's `reach`
+is where the row was judged open or closed.
 
 ## Workflow
 

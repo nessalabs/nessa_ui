@@ -754,6 +754,7 @@ export {
   formatToolTraceDuration,
   type ToolTraceDiff,
   type ToolTraceProps,
+  type ToolTraceRenderText,
   type ToolTraceStatus,
   type ToolTraceStep,
   type ToolTraceStepStatus,
