@@ -904,6 +904,103 @@
       ]
     },
     {
+      "name": "agent-card",
+      "type": "registry:ui",
+      "title": "Agent Card",
+      "description": "One agent on its own card: the agent's colours, a planet's arc rising from the lower left, and its 3D figure standing in front. AgentBackdrop is the same background on its own, to fill any surface.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/agent-figure"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/agent-card.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/agent-card.tsx"
+        }
+      ]
+    },
+    {
+      "name": "agent-figure",
+      "type": "registry:ui",
+      "title": "Agent Figure",
+      "description": "An agent's mark as a small 3D object under studio light \u2014 Claude Code's mascot or Claude's burst, Codex's knot, a local model's glass stack \u2014 that plays its own routine while lively. Three.js loads on first use and every figure shares one WebGL context.",
+      "dependencies": [
+        "three"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/compose"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/agent-figure/agent-figure.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/agent-figure/agent-figure.tsx"
+        },
+        {
+          "path": "packages/react/src/components/agent-figure/agent-figure-scenes.ts",
+          "type": "registry:ui",
+          "target": "components/ui/agent-figure/agent-figure-scenes.ts"
+        }
+      ]
+    },
+    {
+      "name": "bloom-field",
+      "type": "registry:ui",
+      "title": "Bloom Field",
+      "description": "A WebGL field of soft colour blooms that can gather into one orb, fill a surface, or flood past it, hold up to three pointable lights, take a tint, and send a ring of light through itself \u2014 every value tweened, settled state exposed for tests.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/compose"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/bloom-field.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/bloom-field.tsx"
+        }
+      ]
+    },
+    {
+      "name": "type-in",
+      "type": "registry:ui",
+      "title": "Type In",
+      "description": "Text that types itself in a key at a time at a human pace, painted with one gradient across the whole word, each letter landing with a press and a flash that cools, led by a gradient caret that blinks twice and leaves. For a wordmark at a once-only moment.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/compose"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/type-in.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/type-in.tsx"
+        }
+      ]
+    },
+    {
+      "name": "step-dots",
+      "type": "registry:ui",
+      "title": "Step Dots",
+      "description": "Where a short, fixed sequence is up to, as a row of dots with the current one drawn long. Read as \"Step 2 of 3\"; not a control.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/step-dots.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/step-dots.tsx"
+        }
+      ]
+    },
+    {
       "name": "morphing-mesh-gradient",
       "type": "registry:ui",
       "title": "Morphing Mesh Gradient",
