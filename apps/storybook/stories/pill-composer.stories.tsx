@@ -1433,7 +1433,7 @@ function DemoBubble({
                     className={cn(
                       "flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 font-sans nessa-text-6 data-[highlighted]:bg-accent",
                       message.reaction === option.emoji &&
-                        "bg-(--nessa-chat-accent)",
+                        "bg-(--nessa-chat-accent) shadow-(--nessa-chat-accent-rim)",
                     )}
                   >
                     {option.emoji}
@@ -2870,7 +2870,7 @@ function PlaygroundExample({
                 kind: "pasted-text",
                 label: `Pasted text (${pasted.length} chars)`,
                 textValue: "",
-                className: "font-medium text-(--nessa-chat-accent)",
+                className: "font-medium text-(--nessa-chat-accent-ink)",
               })
             }}
             placeholder={
@@ -3002,7 +3002,7 @@ function PlaygroundExample({
                   kind: item.kind,
                   label: item.label,
                   icon: item.icon,
-                  className: "font-medium text-(--nessa-chat-accent)",
+                  className: "font-medium text-(--nessa-chat-accent-ink)",
                 })
               }}
               listLabel="Commands, skills, and plugins"

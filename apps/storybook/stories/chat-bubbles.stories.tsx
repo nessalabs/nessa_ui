@@ -172,7 +172,7 @@ function ConversationExample() {
                       aria-label={`React with ${option.label}`}
                       className={
                         reactions[entry.id] === option.emoji
-                          ? "flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-(--nessa-chat-accent) p-0 font-sans nessa-text-6 data-[highlighted]:bg-accent"
+                          ? "flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-(--nessa-chat-accent) p-0 shadow-(--nessa-chat-accent-rim) font-sans nessa-text-6 data-[highlighted]:bg-accent"
                           : "flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 font-sans nessa-text-6 data-[highlighted]:bg-accent"
                       }
                     >

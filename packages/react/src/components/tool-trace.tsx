@@ -208,7 +208,7 @@ const barTone = (step: ToolTraceStep) =>
   step.status === "failed"
     ? "bg-destructive"
     : live(step)
-      ? "bg-(--nessa-chat-accent)"
+      ? "bg-(--nessa-chat-accent-ink)"
       : step.status === "stopped"
         ? "bg-[repeating-linear-gradient(135deg,color-mix(in_oklab,var(--muted-foreground)_45%,transparent)_0_2px,transparent_2px_4px)]"
         : step.strong

@@ -114,7 +114,7 @@ export function ContactAvatar({
           data-corner={badge == null ? "bottom" : "top"}
           className={cn(
             markerPosition,
-            "size-2.5 rounded-full border border-card bg-(--nessa-chat-accent)",
+            "size-2.5 rounded-full border border-card bg-(--nessa-chat-accent-ink)",
             // The mark, when there is one, owns the bottom corner it was
             // designed for; the dot steps up rather than stacking on it.
             badge == null ? "top-[85.36%]" : "top-[14.64%]",

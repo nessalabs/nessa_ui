@@ -433,10 +433,11 @@ function MessageApproval({
               type="button"
               disabled={sending}
               onClick={send}
-              // The send blue is the chat identity, the same fixed accent
-              // ChatBubble paints a sent message with — not the theme's
-              // primary, which would drift from the transcript it belongs to.
-              className="flex-1 bg-(--nessa-chat-accent) text-white hover:bg-(--nessa-chat-accent)/90"
+              // The send graphite is the chat identity, the same fixed accent
+              // and rim ChatBubble paints a sent message with — not the
+              // theme's primary, which would drift from the transcript it
+              // belongs to.
+              className="flex-1 bg-(--nessa-chat-accent) text-white shadow-(--nessa-chat-accent-rim) hover:bg-(--nessa-chat-accent)/90"
             >
               {sending ? (
                 <LoaderCircle

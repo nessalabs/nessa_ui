@@ -262,16 +262,17 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
-  // The tab trigger sits inside the horizontally scrolling tablist, so its
-  // outline draws inset to survive the overflow clipping; the new-tab
-  // control shares the treatment for consistency. (The close affordance is
-  // pointer-only and carries no focus treatment.)
+  // The tab trigger — a pill, or a page dot in the dots variant — sits
+  // inside the horizontally scrolling tablist, so its outline draws inset to
+  // survive the overflow clipping; the new-tab control and the dots
+  // variant's back button share the treatment for consistency. (The close
+  // affordance is pointer-only and carries no focus treatment.)
   {
     component: "chat-tabs",
     layer: "outline",
     state: "focus-visible",
     className: "focus-visible:outline-ring",
-    count: 2,
+    count: 4,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -729,8 +730,8 @@ export const focusGeometryClasses = Object.freeze([
   // The scrollable list region draws its outline inset so the card's
   // overflow clipping cannot swallow it; the row action and toggle buttons
   // sit inside padded rows and keep the standard outset offset.
-  { component: "chat-tabs", className: "focus-visible:outline-2", count: 2 },
-  { component: "chat-tabs", className: "focus-visible:-outline-offset-2", count: 2 },
+  { component: "chat-tabs", className: "focus-visible:outline-2", count: 4 },
+  { component: "chat-tabs", className: "focus-visible:-outline-offset-2", count: 4 },
   { component: "file-diff-list", className: "focus-visible:outline-2", count: 4 },
   { component: "file-diff-list", className: "focus-visible:outline-offset-2", count: 2 },
   { component: "file-diff-list", className: "focus-visible:-outline-offset-2", count: 2 },
