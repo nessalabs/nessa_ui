@@ -94,7 +94,15 @@ export const WithoutPicture: Story = {
     await expect(
       canvasElement.querySelector("[data-slot=undo-card-leading]"),
     ).not.toBeInTheDocument()
+    const card = canvasElement.querySelector<HTMLElement>("[data-slot=undo-card]")!
+    // The card stays mounted here, so its rise-in must end before the test.
+    await waitFor(() => expect(getComputedStyle(card).opacity).toBe("1"))
     await userEvent.click(canvas.getByRole("button", { name: /^Undo/ }))
     await expect(args.onUndo).toHaveBeenCalledTimes(1)
+    // The click hovers the control, which starts its colour change; let
+    // that and the rise-in finish so nothing runs past the assertions.
+    await waitFor(() =>
+      expect(card.getAnimations({ subtree: true })).toHaveLength(0),
+    )
   },
 }

@@ -1,6 +1,6 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { expect, userEvent, within } from "storybook/test"
+import { expect, userEvent, waitFor, within } from "storybook/test"
 import {
   ChatTabs,
   ContextMenu,
@@ -232,6 +232,16 @@ export const PageDots: Story = {
     await expect(
       canvas.queryByRole("tab", { name: "Bug triage, 2 new" }),
     ).not.toBeInTheDocument()
+    // The new selection's dot widens into the bar; wait for its full width
+    // so no transition runs past the test.
+    await waitFor(() => {
+      const [bar, ...rest] = dots().sort(
+        (a, b) => b.getBoundingClientRect().width - a.getBoundingClientRect().width,
+      )
+      expect(bar!.closest("[data-active]")).not.toBeNull()
+      expect(bar!.getBoundingClientRect().width).toBe(18)
+      for (const dot of rest) expect(dot.getBoundingClientRect().width).toBe(6)
+    })
     await expect(
       canvasElement.ownerDocument.scrollingElement?.scrollTop ?? 0,
     ).toBe(0)
