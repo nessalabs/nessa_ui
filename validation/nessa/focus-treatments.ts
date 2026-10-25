@@ -62,6 +62,7 @@ type FocusComponent =
   | "conversation-rail"
   | "conversation-history"
   | "swipe-row"
+  | "undo-card"
   | "tool-trace"
   | "event-calendar"
   | "gantt-chart/gantt-chart-grid"
@@ -219,6 +220,16 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     state: "focus-visible",
     className: "focus-visible:outline-ring",
     count: 3,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The undo card's one control, an outset outline around its pill.
+  {
+    component: "undo-card",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -722,6 +733,8 @@ export const focusGeometryClasses = Object.freeze([
   { component: "tool-trace", className: "focus-visible:outline-2", count: 3 },
   { component: "tool-trace", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "tool-trace", className: "focus-visible:-outline-offset-2", count: 2 },
+  { component: "undo-card", className: "focus-visible:outline-2", count: 1 },
+  { component: "undo-card", className: "focus-visible:outline-offset-2", count: 1 },
   // Each revealed action keeps the outset offset; the content, slid open and
   // clipped at the row's edges, has its outline drawn inset.
   { component: "swipe-row", className: "focus-visible:outline-2", count: 1 },

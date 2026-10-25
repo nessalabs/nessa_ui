@@ -28,6 +28,7 @@ import { EmptyState } from "./components/empty-state";
 import { Favicon } from "./components/favicon";
 import { Input } from "./components/input";
 import { LoadingText } from "./components/loading-text";
+import { UndoCard } from "./components/undo-card";
 import { ToolTrace } from "./components/tool-trace";
 import { TypeIn } from "./components/type-in";
 import { StepDots } from "./components/step-dots";
@@ -80,6 +81,11 @@ test("primitives render without a browser global", () => {
   assert.ok(server(<Checkbox aria-label="Agree" />).length > 0);
   assert.ok(
     server(<LoadingText>Loading Files</LoadingText>).includes("Loading Files"),
+  );
+  assert.ok(
+    server(
+      <UndoCard action="Archived" title="Release notes" onUndo={() => {}} />,
+    ).includes("Release notes"),
   );
   assert.ok(
     server(

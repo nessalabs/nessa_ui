@@ -1770,6 +1770,23 @@
       ]
     },
     {
+      "name": "undo-card",
+      "type": "registry:ui",
+      "title": "Undo Card",
+      "description": "A small row card for an action just taken and the way back from it: the item's picture, what was done over what it was done to, and an Undo control. It rises in once; the host owns placement, lifetime, and the announcement.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/undo-card.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/undo-card.tsx"
+        }
+      ]
+    },
+    {
       "name": "chat-tabs",
       "type": "registry:ui",
       "title": "Chat Tabs",

@@ -65,7 +65,14 @@ export interface ConversationHistoryActionState extends SwipeRowActionState {
 }
 
 /** Project path when present, otherwise the conversation id. */
-function conversationAvatarSeed(conversation: ConversationHistoryEntry) {
+/**
+ * The seed a row's avatar is painted from: the project when there is one,
+ * else the id. Exported so a host that draws the same conversation
+ * elsewhere — a card after it is archived — paints the same picture.
+ */
+function conversationAvatarSeed(
+  conversation: Pick<ConversationHistoryEntry, "id" | "project">,
+) {
   const project = conversation.project?.trim()
   return project && project.length > 0 ? project : conversation.id
 }
@@ -563,4 +570,4 @@ function ConversationHistory({
   )
 }
 
-export { ConversationHistory }
+export { ConversationHistory, conversationAvatarSeed }

@@ -585,6 +585,7 @@ export {
   type ChatReactionPickerProps,
   type ChatTypingIndicatorProps,
 } from "./components/chat-bubbles"
+export { UndoCard, type UndoCardProps } from "./components/undo-card"
 export {
   ChatTabs,
   type ChatTabItem,
@@ -720,6 +721,7 @@ export {
 } from "./components/agent-details"
 export {
   ConversationHistory,
+  conversationAvatarSeed,
   type ConversationHistoryAction,
   type ConversationHistoryActionState,
   type ConversationHistoryEntry,
