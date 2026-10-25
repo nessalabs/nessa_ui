@@ -80,6 +80,15 @@ export interface ChatTabsProps
    */
   variant?: "pills" | "dots"
   /**
+   * With `dots`, how many dots show at once (default 4, at least 3). Past
+   * that the dots are a window that slides with the selection, so the dots
+   * either side of the selected one are always there to tap. A dot at an
+   * edge with more beyond it is drawn smaller, and in the destructive
+   * colour when a tab beyond it needs the user. Hidden dots are still
+   * tabs, so the arrow keys, Home, and End reach every one.
+   */
+  visibleDots?: number
+  /**
    * Wraps each rendered tab: a pill, or with `dots` a dot. Use it to hang a
    * context menu on a conversation tab without ChatTabs owning the menu;
    * the wrapper must keep the node a single element so `asChild` triggers
@@ -124,6 +133,7 @@ function ChatTabs({
   trailing,
   wrapTab,
   variant = "pills",
+  visibleDots = 4,
   className,
   ...props
 }: ChatTabsProps) {
@@ -167,6 +177,20 @@ function ChatTabs({
   }
 
   const dots = variant === "dots"
+  // The window of dots on show: the selected dot sits one in from the
+  // start where it can, so a step either way stays inside the window. At
+  // least three, so a pointer can always reach a neighbour on each side.
+  const shownDots = Math.min(Math.max(3, Math.floor(visibleDots)), tabs.length)
+  const selectedIndex = Math.max(
+    0,
+    tabs.findIndex((tab) => tab.id === value),
+  )
+  const windowStart = Math.min(
+    Math.max(0, selectedIndex - Math.floor((shownDots - 1) / 2)),
+    tabs.length - shownDots,
+  )
+  const windowEnd = windowStart + shownDots
+  const needsUser = (tab: ChatTabItem) => (tab.badgeCount ?? 0) > 0
   const current = dots ? tabs.find((tab) => tab.id === value) : undefined
   const currentParent =
     current?.parentId === undefined
@@ -318,13 +342,33 @@ function ChatTabs({
             },
           }
           if (variant === "dots") {
+            const shown = index >= windowStart && index < windowEnd
+            // An edge dot with tabs hidden beyond it is drawn smaller, and
+            // carries their attention so a hidden tab that needs the user
+            // still shows.
+            const beyond =
+              !shown || active
+                ? undefined
+                : index === windowStart && windowStart > 0
+                  ? tabs.slice(0, windowStart)
+                  : index === windowEnd - 1 && windowEnd < tabs.length
+                    ? tabs.slice(windowEnd)
+                    : undefined
+            const attention =
+              badgeCount > 0 || (beyond?.some(needsUser) ?? false)
             const dotNode = (
               <span
                 role="presentation"
                 data-slot="chat-tab"
                 data-kind={tab.kind ?? "conversation"}
                 data-active={active || undefined}
-                className="inline-flex shrink-0"
+                data-dot={shown ? (beyond ? "edge" : "shown") : "hidden"}
+                className={cn(
+                  "inline-flex shrink-0",
+                  // A hidden dot stays a focusable tab, collapsed to
+                  // nothing, so the arrow keys still reach it.
+                  !shown && "w-0 overflow-hidden",
+                )}
               >
                 <button
                   {...tabButton}
@@ -336,12 +380,12 @@ function ChatTabs({
                   <span
                     data-slot="chat-tab-dot"
                     data-busy={tab.loading || undefined}
-                    data-attention={badgeCount > 0 || undefined}
+                    data-attention={attention || undefined}
                     aria-hidden="true"
                     className={cn(
-                      "block h-1.5 rounded-full transition-[width,background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
-                      active ? "w-4.5" : "w-1.5",
-                      badgeCount > 0
+                      "block rounded-full transition-[width,height,background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
+                      active ? "h-1.5 w-4.5" : beyond ? "size-1" : "size-1.5",
+                      attention
                         ? "bg-destructive"
                         : active
                           ? "bg-foreground"

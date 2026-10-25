@@ -251,3 +251,72 @@ export const PageDots: Story = {
     ).toBe(0)
   },
 }
+
+export const ManyPageDots: Story = {
+  tags: ["reduced-motion"],
+  parameters: storyDocumentation(
+    "Dots with more tabs than fit: four show at a time, a window that slides with the selection. An edge dot with more tabs beyond it is drawn smaller, and in the destructive colour when a hidden tab needs the user. The hidden dots are still tabs, so the arrow keys, Home, and End reach every one.",
+  ),
+  render: () => (
+    <TabsExample
+      variant="dots"
+      initialTabs={[
+        { id: "release", title: "Release notes", icon: avatar(300) },
+        { id: "triage", title: "Bug triage", closeable: true, icon: avatar(30) },
+        { id: "scratch", title: "Scratchpad", closeable: true, icon: avatar(150) },
+        { id: "lisbon", title: "Lisbon trip", closeable: true, icon: avatar(90) },
+        { id: "budget", title: "Budget", closeable: true, icon: avatar(200) },
+        { id: "deploy", title: "Deploy check", closeable: true, icon: avatar(250) },
+        { id: "review", title: "Code review", closeable: true, badgeCount: 1, icon: avatar(330) },
+      ]}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
+    const canvas = within(canvasElement)
+    const current = () =>
+      canvasElement.querySelector<HTMLElement>("[data-slot=chat-tabs-current]")!
+    const slots = () =>
+      Array.from(canvasElement.querySelectorAll<HTMLElement>("[data-slot=chat-tab]"))
+    const shown = () =>
+      slots()
+        .filter((slot) => slot.dataset.dot !== "hidden")
+        .map((slot) => slot.querySelector("[role=tab]")!.getAttribute("title"))
+    const firstFour = ["Release notes", "Bug triage", "Scratchpad", "Lisbon trip"]
+    // Every tab is in the tablist; four are on show.
+    await expect(canvas.getAllByRole("tab")).toHaveLength(7)
+    await expect(shown()).toEqual(firstFour)
+    for (const slot of slots().filter((each) => each.dataset.dot === "hidden"))
+      await expect(slot.getBoundingClientRect().width).toBe(0)
+    // The last dot on show has tabs beyond it, one of which needs the user.
+    const edge = slots().find((slot) => slot.dataset.dot === "edge")!
+    await expect(edge.querySelector("[role=tab]")).toHaveAttribute("title", "Lisbon trip")
+    await expect(edge.querySelector("[data-slot=chat-tab-dot]")).toHaveAttribute(
+      "data-attention",
+      "true",
+    )
+    // Stepping right slides the window with the selection.
+    await userEvent.click(canvas.getByRole("tab", { name: "Scratchpad" }))
+    await userEvent.keyboard("{ArrowRight}")
+    await expect(current()).toHaveTextContent("Lisbon trip")
+    await expect(shown()).toEqual(["Scratchpad", "Lisbon trip", "Budget", "Deploy check"])
+    // End reaches a tab that was hidden, and it shows with focus on it.
+    await userEvent.keyboard("{End}")
+    await expect(current()).toHaveTextContent("Code review")
+    await expect(canvas.getByRole("tab", { name: "Code review, 1 new" })).toHaveFocus()
+    await expect(shown()).toEqual(["Lisbon trip", "Budget", "Deploy check", "Code review"])
+    // Home goes back to the first window.
+    await userEvent.keyboard("{Home}")
+    await expect(current()).toHaveTextContent("Release notes")
+    await expect(shown()).toEqual(firstFour)
+    // Wait for the widths to settle so no transition runs past the test.
+    await waitFor(() => {
+      const widths = Array.from(
+        canvasElement.querySelectorAll<HTMLElement>(
+          "[data-dot=shown] [data-slot=chat-tab-dot], [data-dot=edge] [data-slot=chat-tab-dot]",
+        ),
+      ).map((dot) => dot.getBoundingClientRect().width)
+      expect(widths).toEqual([18, 6, 6, 4])
+    })
+  },
+}
