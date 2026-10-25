@@ -276,8 +276,12 @@ function ChatTabs({
         role="tablist"
         aria-label={label}
         className={cn(
-          "flex min-w-0 items-center overflow-x-auto [overscroll-behavior-x:contain] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-          dots ? "max-w-[50%] shrink" : "flex-1 gap-1.5",
+          "flex min-w-0 items-center",
+          // Dots show a few at a time, so their track never scrolls; it
+          // lets the dots' widened targets reach past its edges.
+          dots
+            ? "shrink-0"
+            : "flex-1 gap-1.5 overflow-x-auto [overscroll-behavior-x:contain] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         )}
       >
         {tabs.map((tab, index) => {
@@ -370,10 +374,13 @@ function ChatTabs({
                   !shown && "w-0 overflow-hidden",
                 )}
               >
+                {/* Dots sit a dot's width apart, as page dots do. The
+                    button reaches past its sides to a target a finger can
+                    find, without pushing the dots apart. */}
                 <button
                   {...tabButton}
                   className={cn(
-                    "group/dot inline-flex h-6 min-w-6 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent px-0.75 py-0",
+                    "group/dot relative inline-flex h-6 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent px-0.75 py-0 before:absolute before:inset-y-0 before:-inset-x-1.5 before:content-['']",
                     chatTabsFocusClassName,
                   )}
                 >

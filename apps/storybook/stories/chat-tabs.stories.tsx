@@ -318,5 +318,23 @@ export const ManyPageDots: Story = {
       ).map((dot) => dot.getBoundingClientRect().width)
       expect(widths).toEqual([18, 6, 6, 4])
     })
+    // Dots sit a dot's width apart, as page dots do, not a whole tap
+    // target apart.
+    const [, second, third] = Array.from(
+      canvasElement.querySelectorAll<HTMLElement>(
+        "[data-dot=shown] [data-slot=chat-tab-dot], [data-dot=edge] [data-slot=chat-tab-dot]",
+      ),
+    ).map((dot) => dot.getBoundingClientRect())
+    await expect(third!.left - second!.right).toBe(6)
+    // After the window has slid both ways, no dot on show is cut by the
+    // track's edges.
+    const track = canvasElement
+      .querySelector<HTMLElement>("[data-slot=chat-tabs-track]")!
+      .getBoundingClientRect()
+    for (const slot of slots().filter((each) => each.dataset.dot !== "hidden")) {
+      const rect = slot.getBoundingClientRect()
+      await expect(rect.left).toBeGreaterThanOrEqual(track.left)
+      await expect(rect.right).toBeLessThanOrEqual(track.right)
+    }
   },
 }
