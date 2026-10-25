@@ -561,7 +561,7 @@ const INBOX = [
 
 export const InboxSummary: DigestStory = {
   parameters: storyDocumentation(
-    "Three messages an agent pulled while summarizing a thread. With no `onValueChange` the rows are tiles, not buttons — nothing here claims to open anything. Unread rides the bottom corner of the sender's avatar — the slot a channel mark sits in, where the eye already looks — rather than a leading column of its own, which would cost every row that indent for a mark most rows do not carry. The play test proves the rows are inert, that each unread row carries the word *Unread* in its text rather than leaning on the blue dot (which is hidden from assistive technology), and that the dot is drawn on the avatar of exactly the unread rows.",
+    "Three messages an agent pulled while summarizing a thread. With no `onValueChange` the rows are tiles, not buttons — nothing here claims to open anything. Unread rides the bottom corner of the sender's avatar — the slot a channel mark sits in, where the eye already looks — rather than a leading column of its own, which would cost every row that indent for a mark most rows do not carry. The play test proves the rows are inert, that each unread row carries the word *Unread* in its text rather than leaning on the dot (which is hidden from assistive technology), and that the dot is drawn on the avatar of exactly the unread rows.",
   ),
   args: { title: "Here's what I found about the Watchtower review", messages: INBOX },
   render: (args) => (

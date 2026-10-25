@@ -199,7 +199,7 @@ const clampLineClasses = {
 } as const
 
 /**
- * The message bubble itself: iMessage blue for sent, the theme's accent for
+ * The message bubble itself: rimmed graphite for sent, the theme's accent for
  * received. With `onSelect` the bubble is a real button (the accessible
  * name should come from `aria-label`); it deliberately carries no hover
  * wash — focus-visible keeps keyboard users oriented.
@@ -343,10 +343,11 @@ function ChatBubble({
     // The badge protrudes 12px above the bubble; reserve that room so it
     // never overlaps the previous message.
     reaction != null && "mt-3",
-    // The sent blue is the fixed chat identity: --nessa-chat-accent holds
-    // the same value in both themes, and #0071e3 keeps 4.5:1 with white.
+    // The sent graphite is the chat identity: --nessa-chat-accent holds
+    // white text in both themes, a step lighter than a received bubble in
+    // Dark, and its rim is the edge that keeps it a surface on a dark ground.
     tone === "sent"
-      ? "bg-(--nessa-chat-accent) text-white"
+      ? "bg-(--nessa-chat-accent) text-white shadow-(--nessa-chat-accent-rim)"
       : "bg-accent text-accent-foreground",
     className,
   )
@@ -601,7 +602,7 @@ export interface ChatReactionPickerProps
 
 /**
  * The iMessage tapback row: an accent pill of emoji reactions shown above a
- * focused bubble. The applied reaction sits on the sent-blue circle; hosts
+ * focused bubble. The applied reaction sits on the sent-graphite circle; hosts
  * decide where a chosen reaction lands (typically ChatBubble's `reaction`).
  */
 function ChatReactionPicker({
@@ -676,7 +677,8 @@ function ChatReactionPicker({
           onClick={() => onSelect(option.emoji)}
           className={cn(
             "flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 font-sans nessa-text-6",
-            value === option.emoji && "bg-(--nessa-chat-accent)",
+            value === option.emoji &&
+              "bg-(--nessa-chat-accent) shadow-(--nessa-chat-accent-rim)",
             chatBubblesFocusClassName,
           )}
         >

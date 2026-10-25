@@ -94,7 +94,7 @@ function TakeoverExample({ summary }: { summary?: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="self-start rounded-full border-0 bg-transparent px-1 font-sans nessa-text-2 font-medium text-(--nessa-chat-accent) outline-none hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        className="self-start rounded-full border-0 bg-transparent px-1 font-sans nessa-text-2 font-medium text-(--nessa-chat-accent-ink) outline-none hover:underline focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         Open the skill
       </button>

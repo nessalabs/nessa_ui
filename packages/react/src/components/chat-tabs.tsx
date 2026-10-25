@@ -69,18 +69,36 @@ export interface ChatTabsProps
   /** Pinned after the new-tab control, outside the scrolling track. */
   trailing?: React.ReactNode
   /**
-   * Wraps each rendered tab pill. Use it to hang a context menu on a
-   * conversation tab without ChatTabs owning the menu: the node is the
-   * pill (title, close, badge), and the wrapper must keep it as a single
-   * element so `asChild` triggers still receive a ref.
+   * How the strip draws its tabs. `pills` (the default) gives every tab a
+   * pill with its glyph and title. `dots` names only the selected tab — its
+   * glyph, title, and close sit at the start of the strip — and draws every
+   * tab as a page dot after it: the selected one a short bar, a busy one
+   * glowing, one that needs the user in the destructive colour. A dot is
+   * still the tab: it carries the title as its name and tooltip, takes the
+   * same keys, and `wrapTab` wraps it. It fits a narrow window, where
+   * pills truncate every title they hold.
    */
-  wrapTab?: (tab: ChatTabItem, node: React.ReactElement) => React.ReactNode
+  variant?: "pills" | "dots"
+  /**
+   * Wraps each rendered tab: a pill, or with `dots` a dot. Use it to hang a
+   * context menu on a conversation tab without ChatTabs owning the menu;
+   * the wrapper must keep the node a single element so `asChild` triggers
+   * still receive a ref. With `dots` it also wraps the lead that names the
+   * selected tab, so that tab is wrapped twice — once as `"lead"` — and a
+   * wrapper that keeps state per tab keeps it per call.
+   */
+  wrapTab?: (
+    tab: ChatTabItem,
+    node: React.ReactElement,
+    part: "tab" | "lead",
+  ) => React.ReactNode
 }
 
 /**
  * The floating chat window's tab strip: pill tabs on a horizontally
  * scrolling tablist, the active tab washed and outlined in the chat
- * accent, a glowing dot for busy tabs, an attention badge for tabs that
+ * ink — or page dots after the selected tab's name (`variant`) — a
+ * glowing dot for busy tabs, an attention badge for tabs that
  * need the user, a close control on closeable tabs, and a
  * trailing new-tab button. A history tab holds the conversation roster
  * opened from `/history`. The selected tab is scrolled into the track so a
@@ -105,6 +123,7 @@ function ChatTabs({
   backLabel = (parentTitle: string) => `Back to ${parentTitle}`,
   trailing,
   wrapTab,
+  variant = "pills",
   className,
   ...props
 }: ChatTabsProps) {
@@ -147,17 +166,95 @@ function ChatTabs({
     tabRefs.current.get(next.id)?.focus()
   }
 
+  const dots = variant === "dots"
+  const current = dots ? tabs.find((tab) => tab.id === value) : undefined
+  const currentParent =
+    current?.parentId === undefined
+      ? undefined
+      : tabs.find((candidate) => candidate.id === current.parentId)
+  // With dots only the selected tab is named, so its title, glyph, and
+  // close lead the strip. The way back lives here too: a dot is too small
+  // to swap for a chevron.
+  // Keyed by the tab and its title, so a new name is a new box painted
+  // whole rather than text rewritten in place, which a compositor that
+  // keeps stale tiles can leave showing under it.
+  const currentNode = current ? (
+    <div
+      key={`${current.id}:${current.title}`}
+      data-slot="chat-tabs-current"
+      data-kind={current.kind ?? "conversation"}
+      className="flex min-w-0 flex-1 items-center gap-2 ps-1"
+    >
+      {currentParent ? (
+        <button
+          type="button"
+          data-slot="chat-tabs-back"
+          aria-label={backLabel(currentParent.title)}
+          title={backLabel(currentParent.title)}
+          onClick={() => {
+            onValueChange(currentParent.id)
+            // Going back replaces the lead and this button with it, so focus
+            // moves to the parent's own tab, where the arrow keys still work.
+            setTimeout(() => {
+              tabRefs.current.get(currentParent.id)?.focus()
+            }, 0)
+          }}
+          className={cn(
+            "inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 text-foreground transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-accent motion-reduce:transition-none [&_svg]:size-4",
+            chatTabsFocusClassName,
+          )}
+        >
+          <ChevronLeft aria-hidden="true" />
+        </button>
+      ) : current.icon ? (
+        <span
+          aria-hidden="true"
+          className="flex size-5 shrink-0 items-center justify-center [&_svg]:size-5"
+        >
+          {current.icon}
+        </span>
+      ) : null}
+      <span className="min-w-0 truncate nessa-text-3 font-semibold text-foreground">
+        {current.title}
+      </span>
+      {current.closeable && onClose ? (
+        <button
+          type="button"
+          data-slot="chat-tab-close"
+          aria-hidden="true"
+          tabIndex={-1}
+          title={`Close ${current.title} (Delete)`}
+          onClick={() => onClose(current.id)}
+          className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:text-foreground motion-reduce:transition-none [&_svg]:size-3"
+        >
+          <X aria-hidden="true" />
+        </button>
+      ) : null}
+    </div>
+  ) : null
+
   return (
     <div
       data-slot="chat-tabs"
+      data-variant={variant}
       className={cn("flex min-w-0 items-center gap-2 font-sans", className)}
       {...props}
     >
+      {dots
+        ? current && currentNode
+          ? wrapTab
+            ? wrapTab(current, currentNode, "lead")
+            : currentNode
+          : <div aria-hidden="true" className="flex-1" />
+        : null}
       <div
         data-slot="chat-tabs-track"
         role="tablist"
         aria-label={label}
-        className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto [overscroll-behavior-x:contain] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className={cn(
+          "flex min-w-0 items-center overflow-x-auto [overscroll-behavior-x:contain] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          dots ? "max-w-[50%] shrink" : "flex-1 gap-1.5",
+        )}
       >
         {tabs.map((tab, index) => {
           const active = tab.id === value
@@ -165,12 +262,105 @@ function ChatTabs({
           // A tab opened out of another carries its way back. The gesture
           // only exists on the tab the reader is already inside: selecting a
           // tab you are not in has an obvious meaning, and overloading that
-          // would take it away.
+          // would take it away. With dots the lead holds the way back, so a
+          // dot always selects its own tab.
           const parent =
             tab.parentId === undefined
               ? undefined
               : tabs.find((candidate) => candidate.id === tab.parentId)
-          const goesBack = active && parent !== undefined
+          const goesBack = !dots && active && parent !== undefined
+          const tabButton = {
+            ref: (node: HTMLButtonElement | null) => {
+              if (node) tabRefs.current.set(tab.id, node)
+              else tabRefs.current.delete(tab.id)
+            },
+            type: "button" as const,
+            role: "tab",
+            id: `chat-tab-${tab.id}`,
+            "aria-selected": active,
+            "aria-busy": tab.loading || undefined,
+            "aria-controls": `chat-tab-panel-${tab.id}`,
+            tabIndex: active || (!hasActiveTab && index === 0) ? 0 : -1,
+            // The badge and the dot show attention by sight alone, so the
+            // name says it too.
+            "aria-label": goesBack
+              ? backLabel(parent.title)
+              : badgeCount > 0
+                ? `${tab.title}, ${badgeCount} new`
+                : tab.title,
+            title: goesBack ? backLabel(parent.title) : tab.title,
+            "data-goes-back": goesBack || undefined,
+            onClick: () => onValueChange(goesBack ? parent.id : tab.id),
+            onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => {
+              if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+                event.preventDefault()
+                selectRelativeTab(index, event.key)
+                return
+              }
+              // The close affordance is pointer-only (a tablist may own
+              // nothing but tabs), so Delete is the accessible close.
+              // Focus hands to a successor once the tab is gone, instead
+              // of falling to the document body.
+              if (
+                (event.key === "Delete" || event.key === "Backspace") &&
+                tab.closeable &&
+                onClose
+              ) {
+                event.preventDefault()
+                const successorId = (tabs[index + 1] ?? tabs[index - 1])?.id
+                onClose(tab.id)
+                if (successorId !== undefined) {
+                  setTimeout(() => {
+                    tabRefs.current.get(successorId)?.focus()
+                  }, 0)
+                }
+              }
+            },
+          }
+          if (variant === "dots") {
+            const dotNode = (
+              <span
+                role="presentation"
+                data-slot="chat-tab"
+                data-kind={tab.kind ?? "conversation"}
+                data-active={active || undefined}
+                className="inline-flex shrink-0"
+              >
+                <button
+                  {...tabButton}
+                  className={cn(
+                    "group/dot inline-flex h-6 min-w-6 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent px-0.75 py-0",
+                    chatTabsFocusClassName,
+                  )}
+                >
+                  <span
+                    data-slot="chat-tab-dot"
+                    data-busy={tab.loading || undefined}
+                    data-attention={badgeCount > 0 || undefined}
+                    aria-hidden="true"
+                    className={cn(
+                      "block h-1.5 rounded-full transition-[width,background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
+                      active ? "w-4.5" : "w-1.5",
+                      badgeCount > 0
+                        ? "bg-destructive"
+                        : active
+                          ? "bg-foreground"
+                          : "bg-muted-foreground group-hover/dot:bg-foreground/80",
+                      // Busy is a glow in the ink, not motion: a strip of
+                      // dots that pulse would never sit still.
+                      tab.loading &&
+                        "shadow-[0_0_8px] shadow-(color:--nessa-chat-accent-ink)/70",
+                    )}
+                  />
+                </button>
+              </span>
+            )
+            return (
+              <React.Fragment key={tab.id}>
+                {wrapTab ? wrapTab(tab, dotNode, "tab") : dotNode}
+              </React.Fragment>
+            )
+          }
           const tabNode = (
             <span
               role="presentation"
@@ -180,7 +370,7 @@ function ChatTabs({
               className={cn(
                 "relative inline-flex max-w-56 shrink-0 items-center rounded-full border transition-[background-color,border-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
                 active
-                  ? "border-(--nessa-chat-accent)/45 bg-(--nessa-chat-accent)/10"
+                  ? "border-(--nessa-chat-accent-ink)/45 bg-(--nessa-chat-accent-ink)/10"
                   : cn(
                       // The whole pill — title and close together — takes
                       // the hover wash as one control.
@@ -192,50 +382,7 @@ function ChatTabs({
               )}
             >
               <button
-                ref={(node) => {
-                  if (node) tabRefs.current.set(tab.id, node)
-                  else tabRefs.current.delete(tab.id)
-                }}
-                type="button"
-                role="tab"
-                id={`chat-tab-${tab.id}`}
-                aria-selected={active}
-                aria-busy={tab.loading || undefined}
-                aria-controls={`chat-tab-panel-${tab.id}`}
-                tabIndex={active || (!hasActiveTab && index === 0) ? 0 : -1}
-                aria-label={goesBack ? backLabel(parent.title) : tab.title}
-                title={goesBack ? backLabel(parent.title) : tab.title}
-                data-goes-back={goesBack || undefined}
-                onClick={() => onValueChange(goesBack ? parent.id : tab.id)}
-                onKeyDown={(event) => {
-                  if (
-                    ["ArrowLeft", "ArrowRight", "Home", "End"].includes(
-                      event.key,
-                    )
-                  ) {
-                    event.preventDefault()
-                    selectRelativeTab(index, event.key)
-                    return
-                  }
-                  // The close affordance is pointer-only (a tablist may own
-                  // nothing but tabs), so Delete is the accessible close.
-                  // Focus hands to a successor once the tab is gone, instead
-                  // of falling to the document body.
-                  if (
-                    (event.key === "Delete" || event.key === "Backspace") &&
-                    tab.closeable &&
-                    onClose
-                  ) {
-                    event.preventDefault()
-                    const successorId = (tabs[index + 1] ?? tabs[index - 1])?.id
-                    onClose(tab.id)
-                    if (successorId !== undefined) {
-                      setTimeout(() => {
-                        tabRefs.current.get(successorId)?.focus()
-                      }, 0)
-                    }
-                  }
-                }}
+                {...tabButton}
                 className={cn(
                   "inline-flex min-w-0 cursor-pointer items-center gap-1.5 rounded-full border-0 bg-transparent py-1.5 pl-3 font-sans nessa-text-2 transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
                   tab.closeable && onClose ? "pr-1" : "pr-3",
@@ -281,7 +428,7 @@ function ChatTabs({
                   <span
                     data-slot="chat-tab-loading"
                     aria-hidden="true"
-                    className="size-[7px] shrink-0 rounded-full bg-(--nessa-chat-accent) shadow-[0_0_8px] shadow-(color:--nessa-chat-accent)/50"
+                    className="size-[7px] shrink-0 rounded-full bg-(--nessa-chat-accent-ink) shadow-[0_0_8px] shadow-(color:--nessa-chat-accent-ink)/50"
                   />
                 ) : null}
                 {badgeCount > 0 ? (
@@ -311,7 +458,7 @@ function ChatTabs({
           )
           return (
             <React.Fragment key={tab.id}>
-              {wrapTab ? wrapTab(tab, tabNode) : tabNode}
+              {wrapTab ? wrapTab(tab, tabNode, "tab") : tabNode}
             </React.Fragment>
           )
         })}

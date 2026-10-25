@@ -45,8 +45,8 @@ const titles: Record<AgentNotificationState, string> = {
 const shimmerTints: Record<AgentNotificationState, string> = {
   disconnected: "var(--nessa-notification-error)",
   connected: "var(--nessa-notification-success)",
-  connecting: "var(--nessa-chat-accent)",
-  reconnecting: "var(--nessa-chat-accent)",
+  connecting: "var(--nessa-chat-accent-ink)",
+  reconnecting: "var(--nessa-chat-accent-ink)",
 }
 
 /**

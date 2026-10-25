@@ -46,7 +46,7 @@ export const contrastMatrix = Object.freeze([
   { foreground: "--nessa-market-loss", background: "--popover", minimum: 4.5, role: "normal-text" },
   { foreground: "--nessa-fast-mode-active", background: "--card", minimum: 4.5, role: "normal-text" },
   { foreground: "--nessa-fast-mode-active", background: "--background", minimum: 4.5, role: "normal-text" },
-  // The chat bubble's white text on the fixed chat accent (#0071e3 holds 4.7:1).
+  // The sent bubble's white text on the graphite chat accent, in both themes.
   { foreground: "--nessa-chat-rim-head", background: "--nessa-chat-accent", minimum: 4.5, role: "normal-text" },
   // And the other direction, which is the one that was missing: the accent is
   // also written *as* text — a back link, an annotation action, an activity
@@ -55,4 +55,10 @@ export const contrastMatrix = Object.freeze([
   { foreground: "--nessa-chat-accent-ink", background: "--background", minimum: 4.5, role: "normal-text" },
   { foreground: "--nessa-chat-accent-ink", background: "--card", minimum: 4.5, role: "normal-text" },
   { foreground: "--nessa-chat-accent-ink", background: "--popover", minimum: 4.5, role: "normal-text" },
+  // An undo control writes the ink on the accent wash.
+  { foreground: "--nessa-chat-accent-ink", background: "--accent", minimum: 4.5, role: "normal-text" },
+  // A page dot is a control drawn only in its colour, so it needs the 3:1 of
+  // a boundary against the grounds a tab strip sits on.
+  { foreground: "--muted-foreground", background: "--background", minimum: 3, role: "required-boundary" },
+  { foreground: "--muted-foreground", background: "--card", minimum: 3, role: "required-boundary" },
 ] satisfies readonly ContrastPair[])

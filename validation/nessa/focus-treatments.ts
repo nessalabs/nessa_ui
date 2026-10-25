@@ -62,6 +62,7 @@ type FocusComponent =
   | "conversation-rail"
   | "conversation-history"
   | "swipe-row"
+  | "undo-card"
   | "tool-trace"
   | "event-calendar"
   | "gantt-chart/gantt-chart-grid"
@@ -222,6 +223,16 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
+  // The undo card's one control, an outset outline around its pill.
+  {
+    component: "undo-card",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
   // Each action a swipe row reveals. The row's content is the host's and
   // draws the host's own outline.
   {
@@ -262,16 +273,17 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
-  // The tab trigger sits inside the horizontally scrolling tablist, so its
-  // outline draws inset to survive the overflow clipping; the new-tab
-  // control shares the treatment for consistency. (The close affordance is
-  // pointer-only and carries no focus treatment.)
+  // The tab trigger — a pill, or a page dot in the dots variant — sits
+  // inside the horizontally scrolling tablist, so its outline draws inset to
+  // survive the overflow clipping; the new-tab control and the dots
+  // variant's back button share the treatment for consistency. (The close
+  // affordance is pointer-only and carries no focus treatment.)
   {
     component: "chat-tabs",
     layer: "outline",
     state: "focus-visible",
     className: "focus-visible:outline-ring",
-    count: 2,
+    count: 4,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -721,6 +733,8 @@ export const focusGeometryClasses = Object.freeze([
   { component: "tool-trace", className: "focus-visible:outline-2", count: 3 },
   { component: "tool-trace", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "tool-trace", className: "focus-visible:-outline-offset-2", count: 2 },
+  { component: "undo-card", className: "focus-visible:outline-2", count: 1 },
+  { component: "undo-card", className: "focus-visible:outline-offset-2", count: 1 },
   // The content, slid open and clipped at the row's edges, has its outline
   // drawn inset; so do the revealed actions, flush inside the same clip.
   { component: "swipe-row", className: "focus-visible:outline-2", count: 1 },
@@ -728,8 +742,8 @@ export const focusGeometryClasses = Object.freeze([
   // The scrollable list region draws its outline inset so the card's
   // overflow clipping cannot swallow it; the row action and toggle buttons
   // sit inside padded rows and keep the standard outset offset.
-  { component: "chat-tabs", className: "focus-visible:outline-2", count: 2 },
-  { component: "chat-tabs", className: "focus-visible:-outline-offset-2", count: 2 },
+  { component: "chat-tabs", className: "focus-visible:outline-2", count: 4 },
+  { component: "chat-tabs", className: "focus-visible:-outline-offset-2", count: 4 },
   { component: "file-diff-list", className: "focus-visible:outline-2", count: 4 },
   { component: "file-diff-list", className: "focus-visible:outline-offset-2", count: 2 },
   { component: "file-diff-list", className: "focus-visible:-outline-offset-2", count: 2 },

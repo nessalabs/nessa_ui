@@ -96,7 +96,7 @@ function ChatAnnotationThread({
       <div
         className={cn(
           "flex min-w-0 flex-1 flex-col gap-1 rounded-2xl p-1 transition-colors",
-          selected && "bg-(--nessa-chat-accent)/10",
+          selected && "bg-(--nessa-chat-accent-ink)/10",
         )}
       >
         <ChatMessage tone="received" className="max-w-full">
