@@ -101,8 +101,14 @@ export const WithoutPicture: Story = {
     await expect(args.onUndo).toHaveBeenCalledTimes(1)
     // The click hovers the control, which starts its colour change; let
     // that and the rise-in finish so nothing runs past the assertions.
-    await waitFor(() =>
-      expect(card.getAnimations({ subtree: true })).toHaveLength(0),
+    // Wait on each one's own end rather than polling a short window, which a
+    // slow runner can outlast.
+    await Promise.allSettled(
+      card.getAnimations({ subtree: true }).map((each) => each.finished),
+    )
+    await waitFor(
+      () => expect(card.getAnimations({ subtree: true })).toHaveLength(0),
+      { timeout: 5000 },
     )
   },
 }
