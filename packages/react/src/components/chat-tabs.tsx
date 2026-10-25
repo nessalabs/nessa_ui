@@ -75,17 +75,23 @@ export interface ChatTabsProps
    * tab as a page dot after it: the selected one a short bar, a busy one
    * glowing, one that needs the user in the destructive colour. A dot is
    * still the tab: it carries the title as its name and tooltip, takes the
-   * same keys, and is what `wrapTab` wraps. It fits a narrow window, where
+   * same keys, and `wrapTab` wraps it. It fits a narrow window, where
    * pills truncate every title they hold.
    */
   variant?: "pills" | "dots"
   /**
-   * Wraps each rendered tab pill. Use it to hang a context menu on a
-   * conversation tab without ChatTabs owning the menu: the node is the
-   * pill (title, close, badge), and the wrapper must keep it as a single
-   * element so `asChild` triggers still receive a ref.
+   * Wraps each rendered tab: a pill, or with `dots` a dot. Use it to hang a
+   * context menu on a conversation tab without ChatTabs owning the menu;
+   * the wrapper must keep the node a single element so `asChild` triggers
+   * still receive a ref. With `dots` it also wraps the lead that names the
+   * selected tab, so that tab is wrapped twice — once as `"lead"` — and a
+   * wrapper that keeps state per tab keeps it per call.
    */
-  wrapTab?: (tab: ChatTabItem, node: React.ReactElement) => React.ReactNode
+  wrapTab?: (
+    tab: ChatTabItem,
+    node: React.ReactElement,
+    part: "tab" | "lead",
+  ) => React.ReactNode
 }
 
 /**
@@ -169,8 +175,12 @@ function ChatTabs({
   // With dots only the selected tab is named, so its title, glyph, and
   // close lead the strip. The way back lives here too: a dot is too small
   // to swap for a chevron.
+  // Keyed by the tab and its title, so a new name is a new box painted
+  // whole rather than text rewritten in place, which a compositor that
+  // keeps stale tiles can leave showing under it.
   const currentNode = current ? (
     <div
+      key={`${current.id}:${current.title}`}
       data-slot="chat-tabs-current"
       data-kind={current.kind ?? "conversation"}
       className="flex min-w-0 flex-1 items-center gap-2 ps-1"
@@ -226,7 +236,7 @@ function ChatTabs({
       {dots
         ? current && currentNode
           ? wrapTab
-            ? wrapTab(current, currentNode)
+            ? wrapTab(current, currentNode, "lead")
             : currentNode
           : <div aria-hidden="true" className="flex-1" />
         : null}
@@ -312,7 +322,7 @@ function ChatTabs({
                 <button
                   {...tabButton}
                   className={cn(
-                    "group/dot inline-flex h-6 min-w-6 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent px-[3px] py-0",
+                    "group/dot inline-flex h-6 min-w-6 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent px-0.75 py-0",
                     chatTabsFocusClassName,
                   )}
                 >
@@ -340,7 +350,7 @@ function ChatTabs({
             )
             return (
               <React.Fragment key={tab.id}>
-                {wrapTab ? wrapTab(tab, dotNode) : dotNode}
+                {wrapTab ? wrapTab(tab, dotNode, "tab") : dotNode}
               </React.Fragment>
             )
           }
@@ -441,7 +451,7 @@ function ChatTabs({
           )
           return (
             <React.Fragment key={tab.id}>
-              {wrapTab ? wrapTab(tab, tabNode) : tabNode}
+              {wrapTab ? wrapTab(tab, tabNode, "tab") : tabNode}
             </React.Fragment>
           )
         })}
