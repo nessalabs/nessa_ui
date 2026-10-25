@@ -735,11 +735,10 @@ export const focusGeometryClasses = Object.freeze([
   { component: "tool-trace", className: "focus-visible:-outline-offset-2", count: 2 },
   { component: "undo-card", className: "focus-visible:outline-2", count: 1 },
   { component: "undo-card", className: "focus-visible:outline-offset-2", count: 1 },
-  // Each revealed action keeps the outset offset; the content, slid open and
-  // clipped at the row's edges, has its outline drawn inset.
+  // The content, slid open and clipped at the row's edges, has its outline
+  // drawn inset; so do the revealed actions, flush inside the same clip.
   { component: "swipe-row", className: "focus-visible:outline-2", count: 1 },
-  { component: "swipe-row", className: "focus-visible:outline-offset-2", count: 1 },
-  { component: "swipe-row", className: "focus-visible:-outline-offset-2", count: 1 },
+  { component: "swipe-row", className: "focus-visible:-outline-offset-2", count: 2 },
   // The scrollable list region draws its outline inset so the card's
   // overflow clipping cannot swallow it; the row action and toggle buttons
   // sit inside padded rows and keep the standard outset offset.

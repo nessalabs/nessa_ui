@@ -456,11 +456,11 @@ function ConversationHistoryBody({
  * tray and the row rests open; short of that it springs back. Swipe on past
  * at least 60% of the row (further when the tray is wide) and the primary
  * (first) action fills the tray; letting go there commits it as the row
- * slides out. On a trackpad, only the fingers' own travel counts toward
- * that: the inertia macOS keeps sending after a flick can carry a row open,
- * never into a commit, so a short flick reveals the actions and a commit
- * takes a long, deliberate drag. A host that keeps the row sees it slide
- * back closed. A touch
+ * slides out. That full swipe belongs to drags: a two-finger trackpad swipe
+ * never commits, since browsers cannot tell its fingers from the inertia
+ * that follows them. It opens the actions at most, and the primary action
+ * is then one press away. A host that keeps the row sees it slide back
+ * closed. A touch
  * or pen long-press opens the actions without a swipe. One row is open at
  * a time; a press anywhere else, a scroll, or a tap on the open row closes
  * it without selecting anything, and a swipe never selects the row it

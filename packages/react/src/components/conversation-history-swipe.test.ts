@@ -1,4 +1,4 @@
-/** @responsibility Verifies the ConversationHistory swipe rules: axis lock, thresholds, which action a full swipe commits, that a destructive action never fires from a gesture, and that trackpad inertia never commits a row. */
+/** @responsibility Verifies the ConversationHistory swipe rules: axis lock, thresholds, which action a full swipe commits, that a destructive action never fires from a gesture, and that a trackpad swipe never commits a row. */
 
 import assert from "node:assert/strict"
 import { describe, test } from "node:test"
@@ -9,6 +9,7 @@ import {
   committableSwipeAction,
   presentedSwipeDisplacement,
   resolveSwipeAxis,
+  rubberBandSwipeDisplacement,
   settleSwipe,
   settleWheelSwipe,
   startWheelSwipe,
@@ -24,6 +25,7 @@ import {
   type SwipeCommitCandidate,
   type SwipeGeometry,
   type SwipeRelease,
+  type WheelSwipeTrack,
 } from "./conversation-history-swipe"
 
 const archive = { id: "archive" }
@@ -231,6 +233,42 @@ describe("presentedSwipeDisplacement", () => {
   })
 })
 
+describe("rubberBandSwipeDisplacement", () => {
+  const can = { canCommit: true, armed: false }
+
+  test("follows exactly up to the resting width", () => {
+    assert.equal(rubberBandSwipeDisplacement(0, geometry, can), 0)
+    assert.equal(rubberBandSwipeDisplacement(100, geometry, can), 100)
+    assert.equal(rubberBandSwipeDisplacement(geometry.openWidth, geometry, can), geometry.openWidth)
+  })
+
+  test("resists past the resting width, so the open tray is a detent", () => {
+    const past = rubberBandSwipeDisplacement(geometry.openWidth + 40, geometry, can)
+    assert.ok(past > geometry.openWidth && past < geometry.openWidth + 40 * 0.6, `${past}`)
+    // Reaching the commit point by finger travel draws the row well short of it.
+    const atCommit = rubberBandSwipeDisplacement(geometry.commitWidth, geometry, can)
+    assert.ok(atCommit < geometry.commitWidth - 30, `${atCommit}`)
+    // Still monotonic, and never past the row.
+    let last = 0
+    for (let d = 0; d <= 2000; d += 10) {
+      const shown = rubberBandSwipeDisplacement(d, geometry, can)
+      assert.ok(shown >= last && shown <= geometry.rowWidth)
+      last = shown
+    }
+  })
+
+  test("jumps on into the commit zone once armed, and back when disarmed", () => {
+    const armed = rubberBandSwipeDisplacement(geometry.commitWidth, geometry, { canCommit: true, armed: true })
+    assert.ok(armed >= geometry.rowWidth * 0.85, `${armed}`)
+    assert.ok(armed <= geometry.rowWidth)
+    assert.ok(rubberBandSwipeDisplacement(geometry.commitWidth, geometry, can) < armed)
+  })
+
+  test("leaves rows that cannot commit to their own clamp", () => {
+    assert.equal(rubberBandSwipeDisplacement(150, geometry, { canCommit: false, armed: false }), 150)
+  })
+})
+
 describe("swipeContentOpacity", () => {
   test("keeps an arriving action's label clear until it can be read", () => {
     assert.equal(swipeContentOpacity(0, geometry), 0)
@@ -268,8 +306,7 @@ function replayWheel(
     at = geometry,
     start = 0,
     frameMs = 16,
-    committable = "archive" as string | null,
-  }: { at?: SwipeGeometry; start?: number; frameMs?: number; committable?: string | null } = {},
+  }: { at?: SwipeGeometry; start?: number; frameMs?: number } = {},
 ): { release: SwipeRelease; coasted: boolean } {
   const [first = 0, ...rest] = deltas
   let track = startWheelSwipe(first, 0)
@@ -278,13 +315,13 @@ function replayWheel(
     track = step.track
     if (step.event === "coast") {
       return {
-        release: settleWheelSwipe({ track, start, geometry: at, committable }),
+        release: settleWheelSwipe({ track, start, geometry: at }),
         coasted: true,
       }
     }
   }
   return {
-    release: settleWheelSwipe({ track, start, geometry: at, committable }),
+    release: settleWheelSwipe({ track, start, geometry: at }),
     coasted: false,
   }
 }
@@ -350,30 +387,28 @@ describe("wheel swipes and trackpad inertia", () => {
     // The reach stops where the fingers lifted, not at the merged frame.
     assert.equal(track.reach, 60)
     assert.deepEqual(
-      settleWheelSwipe({ track, start: 0, geometry: panel, committable: "archive" }),
+      settleWheelSwipe({ track, start: 0, geometry: panel }),
       { kind: "open" },
     )
   })
 
-  test("a deliberate long drag commits once the fingers themselves cross the threshold", () => {
-    // Steady, wobbling finger travel well past 336, then a pause.
+  test("a deliberate long drag never commits: a wheel swipe rests open at most", () => {
+    // Steady, wobbling finger travel well past 336, then a pause: browsers
+    // cannot tell these fingers from inertia, so nothing a wheel sends commits.
     const drag = [3, 6, 9, ...Array.from({ length: 36 }, (_, index) => (index % 2 ? 9 : 11))]
     assert.ok(drag.reduce((sum, delta) => sum + delta, 0) > panel.commitWidth)
     const { release, coasted } = replayWheel(drag, { at: panel })
     assert.equal(coasted, false)
-    assert.deepEqual(release, { kind: "commit", actionId: "archive" })
+    assert.deepEqual(release, { kind: "open" })
   })
 
-  test("a deliberate drag past the threshold still commits when the fingers ease off and lift", () => {
+  test("a deliberate drag past the threshold that eases off and lifts rests open", () => {
     const drag = [
       3, 6, 9,
       ...Array.from({ length: 36 }, (_, index) => (index % 2 ? 9 : 11)),
       8, 6, 4, 2, ...momentumTail(2),
     ]
-    assert.deepEqual(replayWheel(drag, { at: panel }).release, {
-      kind: "commit",
-      actionId: "archive",
-    })
+    assert.deepEqual(replayWheel(drag, { at: panel }).release, { kind: "open" })
   })
 
   test("a drag that stops short of the threshold rests open", () => {
@@ -446,7 +481,7 @@ describe("wheel swipes and trackpad inertia", () => {
     assert.equal(coasted, true)
     assert.equal(track.reach, 45)
     assert.notEqual(
-      settleWheelSwipe({ track, start: 0, geometry: panel, committable: "archive" }).kind,
+      settleWheelSwipe({ track, start: 0, geometry: panel }).kind,
       "commit",
     )
   })
@@ -560,10 +595,9 @@ describe("wheel swipes and trackpad inertia", () => {
       // At most a trend's two stretches of deltas lag: a drag can end
       // partway into a dip that has not yet shown itself to be a wobble.
       assert.ok(track.travel - track.reach < 100, `${track.travel} vs ${track.reach}`)
-      assert.equal(
-        settleWheelSwipe({ track, start: 0, geometry: panel, committable: "archive" }).kind,
-        "commit",
-      )
+      assert.deepEqual(settleWheelSwipe({ track, start: 0, geometry: panel }), {
+        kind: "open",
+      })
     }
   })
 
@@ -590,7 +624,7 @@ describe("wheel swipes and trackpad inertia", () => {
     }
   })
 
-  test("wheel events 20 to 50 ms apart open, commit, and coast as they do at 60 Hz", () => {
+  test("wheel events 20 to 50 ms apart open and coast as they do at 60 Hz, and never commit", () => {
     for (const frameMs of [20, 33, 50]) {
       const label = `${frameMs} ms apart`
       assert.deepEqual(
@@ -608,7 +642,7 @@ describe("wheel swipes and trackpad inertia", () => {
           [6, 12, 18, ...Array.from({ length: 30 }, (_, index) => (index % 2 ? 18 : 22))],
           { at: panel, frameMs },
         ).release,
-        { kind: "commit", actionId: "archive" },
+        { kind: "open" },
         label,
       )
       // Inertia keeps about 0.998 of its pace per millisecond, so slower
@@ -620,6 +654,104 @@ describe("wheel swipes and trackpad inertia", () => {
       // Released from the reach the fingers made, not from where inertia took it.
       const fromOpen = replayWheel(slowFlick, { at: panel, frameMs, start: panel.openWidth })
       assert.deepEqual(fromOpen.release, { kind: "open" }, label)
+    }
+  })
+
+  // SwipeRow #137 and nessa_ui#141: a light flick on a Mac trackpad archived
+  // rows, and on CI's runners inertia delivered as a near-even plateau
+  // passed for fingers held on the trackpad six different ways. Wheel events
+  // carry no phase, so no reading of them tells fingers from inertia: a
+  // wheel swipe never commits, and these traces stay as regressions.
+  const lightFingers = [1, 3, 7, 12, 18, 22, 24]
+  // WebKit-paced inertia whose first frames plateau before decaying.
+  const plateau = [26, 26, 25, 26, 25, 25, 24, 25, 24, 23, 24, 23, 22, 22, 21, 22, 21, 20]
+
+  /** Replays timed deltas, `[delta, gap before it]`, and settles where the row would. */
+  function replayTimed(
+    events: readonly (readonly [number, number])[],
+    start = 0,
+  ): { track: WheelSwipeTrack; release: SwipeRelease } {
+    const [[first = 0] = [0, 0], ...rest] = events
+    let track = startWheelSwipe(first, 0)
+    let time = 0
+    for (const [delta, gap] of rest) {
+      const step = stepWheelSwipe(track, delta, (time += gap))
+      track = step.track
+      if (step.event === "coast") break
+    }
+    return { track, release: settleWheelSwipe({ track, start, geometry: panel }) }
+  }
+
+  // The two light flicks CI's runners delivered (Linux, then WebKit),
+  // exactly as the row saw them.
+  const ciTraces: (readonly (readonly [number, number])[])[] = [
+    [
+      [3, 0], [7, 19], [12, 12], [18, 8], [22, 14], [24, 8], [26, 27], [26, 17], [25, 20],
+      [26, 17], [25, 17], [25, 27], [24, 20], [25, 32], [24, 36], [23, 16], [24, 16],
+      [23, 19], [22, 31], [22, 18], [21, 17], [22, 17], [21, 20], [20, 19], [20, 26],
+      [18, 18], [16, 17], [15, 22], [14, 35], [13, 27], [12, 42], [11, 19], [10, 22],
+      [9, 16], [8, 26], [7, 29], [6, 21], [5, 18], [4, 16], [3, 17], [2, 18], [1, 16],
+    ],
+    [
+      [3, 0], [7, 19], [12, 8], [18, 14], [22, 9], [24, 8], [26, 24], [26, 16], [25, 16],
+      [26, 18], [25, 21], [25, 19], [24, 17], [25, 16], [24, 16], [23, 16], [24, 16],
+      [23, 16], [22, 18], [22, 17], [21, 16], [22, 18], [21, 20], [20, 16], [20, 16],
+      [18, 16], [16, 18], [15, 17],
+    ],
+  ]
+
+  test("the light flicks CI's runners delivered open the row and never commit", () => {
+    for (const [index, trace] of ciTraces.entries()) {
+      for (const start of [0, panel.openWidth]) {
+        const { track, release } = replayTimed(trace, start)
+        // Summed, each travels well past the commit point.
+        assert.ok(start + track.travel > panel.commitWidth, `trace ${index}`)
+        assert.deepEqual(release, { kind: "open" }, `trace ${index} from ${start}`)
+      }
+    }
+  })
+
+  test("inertia that plateaus after a light flick opens the row and never commits", () => {
+    for (const gaps of [
+      (index: number) => (index ? 16.67 : 24),
+      (index: number) => 30 + ((index * 7) % 11),
+    ]) {
+      const events = [
+        ...lightFingers.map((delta) => [delta, 8.33] as const),
+        ...plateau.map((delta, index) => [delta, gaps(index)] as const),
+        ...momentumTail(20, 0.97).map((delta, index) => [Math.round(delta), gaps(index + 1)] as const),
+      ]
+      const total = events.reduce((sum, [delta]) => sum + delta, 0)
+      assert.ok(total > panel.rowWidth, `${total}`)
+      assert.deepEqual(replayTimed(events).release, { kind: "open" })
+    }
+  })
+
+  test("fingers holding a speed, a quick throw, and a mouse's notches rest open, never commit", () => {
+    const held: (readonly [number, number])[] = [
+      ...[2, 4, 6, 9].map((delta) => [delta, 16] as const),
+      ...Array.from({ length: 60 }, (_, index) => [index % 2 ? 9 : 7, 12 + ((index * 7) % 25)] as const),
+    ]
+    const throwAcross: (readonly [number, number])[] = [
+      [2, 0],
+      ...[6, 12, 18, ...Array.from({ length: 16 }, () => 25)].map((delta) => [delta, 8.33] as const),
+    ]
+    const notches: (readonly [number, number])[] = Array.from({ length: 10 }, () => [40, 60] as const)
+    for (const events of [held, throwAcross, notches]) {
+      const { track, release } = replayTimed(events)
+      assert.ok(track.travel > panel.commitWidth)
+      assert.deepEqual(release, { kind: "open" })
+    }
+  })
+
+  test("a gesture that is only inertia leaves the row where it found it", () => {
+    for (const start of [0, panel.openWidth]) {
+      const { track, release } = replayTimed(
+        momentumTail(22).map((delta) => [Math.round(delta), 16.67] as const),
+        start,
+      )
+      assert.equal(track.phase, "coasting")
+      assert.deepEqual(release, start === 0 ? { kind: "closed" } : { kind: "open" })
     }
   })
 
