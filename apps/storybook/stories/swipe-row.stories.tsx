@@ -197,7 +197,11 @@ function drag(target: HTMLElement, dx: number, pointerId = 21) {
 }
 
 async function expectClosed(content: HTMLElement) {
-  await waitFor(() => expect(rowOf(content)).not.toHaveAttribute("data-swipe"));
+  // The settle runs on the motion token and ends on its transition, which
+  // a loaded runner can hold past waitFor's default second.
+  await waitFor(() => expect(rowOf(content)).not.toHaveAttribute("data-swipe"), {
+    timeout: 5000,
+  });
   await expect(content.style.translate).toBe("");
   await waitFor(() => expect(getComputedStyle(content).translate).toBe("none"));
 }
