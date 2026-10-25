@@ -1,6 +1,6 @@
-import * as React from "react";
-import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, userEvent, waitFor, within } from "storybook/test";
+import * as React from "react"
+import type { Meta, StoryObj } from "@storybook/react-vite"
+import { expect, userEvent, waitFor, within } from "storybook/test"
 import {
   ChatTabs,
   ContextMenu,
@@ -9,9 +9,9 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
   type ChatTabItem,
-} from "@nessalabs/ui";
+} from "@nessalabs/ui"
 
-import { storyDocumentation } from "./story-documentation";
+import { storyDocumentation } from "./story-documentation"
 
 /** A floating-window host: the tab strip over a stub panel per tab. */
 function TabsExample({
@@ -22,13 +22,13 @@ function TabsExample({
     { id: "scratch", title: "Scratchpad", closeable: true },
   ],
 }: {
-  variant?: "pills" | "dots";
-  initialTabs?: ChatTabItem[];
+  variant?: "pills" | "dots"
+  initialTabs?: ChatTabItem[]
 }) {
-  const [tabs, setTabs] = React.useState<ChatTabItem[]>(initialTabs);
-  const [activeId, setActiveId] = React.useState("release");
-  const nextTab = React.useRef(1);
-  const active = tabs.find((tab) => tab.id === activeId);
+  const [tabs, setTabs] = React.useState<ChatTabItem[]>(initialTabs)
+  const [activeId, setActiveId] = React.useState("release")
+  const nextTab = React.useRef(1)
+  const active = tabs.find((tab) => tab.id === activeId)
   return (
     <div className="flex h-64 min-w-0 w-[min(30rem,calc(100vw-2rem))] flex-col gap-3 rounded-[2rem] bg-background p-3">
       <ChatTabs
@@ -54,18 +54,18 @@ function TabsExample({
         }
         onClose={(id) => {
           setTabs((current) => {
-            const next = current.filter((tab) => tab.id !== id);
-            if (id === activeId && next.length > 0) setActiveId(next[0]!.id);
-            return next;
-          });
+            const next = current.filter((tab) => tab.id !== id)
+            if (id === activeId && next.length > 0) setActiveId(next[0]!.id)
+            return next
+          })
         }}
         onNew={() => {
-          const id = `chat-${nextTab.current++}`;
+          const id = `chat-${nextTab.current++}`
           setTabs((current) => [
             ...current,
             { id, title: "New chat", closeable: true },
-          ]);
-          setActiveId(id);
+          ])
+          setActiveId(id)
         }}
         className="px-1"
       />
@@ -78,7 +78,7 @@ function TabsExample({
         {active?.title ?? "No tab"}
       </div>
     </div>
-  );
+  )
 }
 
 const meta = {
@@ -95,10 +95,10 @@ const meta = {
       },
     },
   },
-} satisfies Meta<typeof ChatTabs>;
+} satisfies Meta<typeof ChatTabs>
 
-export default meta;
-type Story = StoryObj<typeof meta>;
+export default meta
+type Story = StoryObj<typeof meta>
 
 export const Tabs: Story = {
   tags: ["reduced-motion"],
@@ -110,55 +110,53 @@ export const Tabs: Story = {
     // The dev canvas re-runs plays on every load and its un-awaited act
     // scope swallows manual input mid-run; keep plays to the automated
     // runner (vitest drives a webdriver browser) so the canvas stays live.
-    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return;
-    const canvas = within(canvasElement);
-    const release = canvas.getByRole("tab", { name: "Release notes" });
-    await expect(release).toHaveAttribute("aria-selected", "true");
-    await expect(release).toHaveAttribute("aria-busy", "true");
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
+    const canvas = within(canvasElement)
+    const release = canvas.getByRole("tab", { name: "Release notes" })
+    await expect(release).toHaveAttribute("aria-selected", "true")
+    await expect(release).toHaveAttribute("aria-busy", "true")
     await expect(
       canvasElement.querySelector('[data-slot="chat-tab-loading"]'),
-    ).toBeInTheDocument();
+    ).toBeInTheDocument()
     const badge = canvasElement.querySelector<HTMLElement>(
       '[data-slot="chat-tab-badge"]',
-    )!;
-    await expect(badge).toHaveTextContent("2");
-    await userEvent.click(
-      canvas.getByRole("tab", { name: "Bug triage, 2 new" }),
-    );
-    await expect(canvas.getByRole("tabpanel")).toHaveTextContent("Bug triage");
-    await userEvent.keyboard("{ArrowRight}");
+    )!
+    await expect(badge).toHaveTextContent("2")
+    await userEvent.click(canvas.getByRole("tab", { name: "Bug triage, 2 new" }))
+    await expect(canvas.getByRole("tabpanel")).toHaveTextContent("Bug triage")
+    await userEvent.keyboard("{ArrowRight}")
     await expect(
       canvas.getByRole("tab", { name: "Scratchpad" }),
-    ).toHaveAttribute("aria-selected", "true");
-    await userEvent.keyboard("{ArrowRight}");
-    await expect(release).toHaveAttribute("aria-selected", "true");
+    ).toHaveAttribute("aria-selected", "true")
+    await userEvent.keyboard("{ArrowRight}")
+    await expect(release).toHaveAttribute("aria-selected", "true")
     // Delete on the focused tab is the accessible close; the ✕ is
     // pointer-only.
-    await userEvent.keyboard("{ArrowLeft}");
+    await userEvent.keyboard("{ArrowLeft}")
     await expect(
       canvas.getByRole("tab", { name: "Scratchpad" }),
-    ).toHaveAttribute("aria-selected", "true");
-    await userEvent.keyboard("{Delete}");
+    ).toHaveAttribute("aria-selected", "true")
+    await userEvent.keyboard("{Delete}")
     await expect(
       canvas.queryByRole("tab", { name: "Scratchpad" }),
-    ).not.toBeInTheDocument();
-    await userEvent.click(canvas.getByRole("button", { name: "New tab" }));
-    const newChat = canvas.getByRole("tab", { name: "New chat" });
-    await expect(newChat).toHaveAttribute("aria-selected", "true");
-    await expect(canvas.getByRole("tabpanel")).toHaveTextContent("New chat");
+    ).not.toBeInTheDocument()
+    await userEvent.click(canvas.getByRole("button", { name: "New tab" }))
+    const newChat = canvas.getByRole("tab", { name: "New chat" })
+    await expect(newChat).toHaveAttribute("aria-selected", "true")
+    await expect(canvas.getByRole("tabpanel")).toHaveTextContent("New chat")
     const track = canvasElement.querySelector<HTMLElement>(
       "[data-slot=chat-tabs-track]",
-    )!;
-    const pill = newChat.closest<HTMLElement>("[data-slot=chat-tab]")!;
-    const trackRect = track.getBoundingClientRect();
-    const pillRect = pill.getBoundingClientRect();
-    await expect(pillRect.left).toBeGreaterThanOrEqual(trackRect.left - 1);
-    await expect(pillRect.right).toBeLessThanOrEqual(trackRect.right + 1);
+    )!
+    const pill = newChat.closest<HTMLElement>("[data-slot=chat-tab]")!
+    const trackRect = track.getBoundingClientRect()
+    const pillRect = pill.getBoundingClientRect()
+    await expect(pillRect.left).toBeGreaterThanOrEqual(trackRect.left - 1)
+    await expect(pillRect.right).toBeLessThanOrEqual(trackRect.right + 1)
     await expect(
       canvasElement.ownerDocument.scrollingElement?.scrollTop ?? 0,
-    ).toBe(0);
+    ).toBe(0)
   },
-};
+}
 
 const avatar = (hue: number) => (
   <span
@@ -167,7 +165,7 @@ const avatar = (hue: number) => (
       background: `radial-gradient(circle at 40% 35%, oklch(0.8 0.08 ${hue}), oklch(0.5 0.12 ${hue}) 55%, oklch(0.32 0.08 ${hue}))`,
     }}
   />
-);
+)
 
 export const PageDots: Story = {
   tags: ["reduced-motion"],
@@ -178,115 +176,81 @@ export const PageDots: Story = {
     <TabsExample
       variant="dots"
       initialTabs={[
-        {
-          id: "release",
-          title: "Release notes",
-          loading: true,
-          icon: avatar(300),
-        },
-        {
-          id: "triage",
-          title: "Bug triage",
-          closeable: true,
-          badgeCount: 2,
-          icon: avatar(30),
-        },
-        {
-          id: "scratch",
-          title: "Scratchpad",
-          closeable: true,
-          icon: avatar(150),
-        },
-        {
-          id: "helper",
-          title: "Release checker",
-          kind: "subagent",
-          parentId: "release",
-          closeable: true,
-          icon: avatar(220),
-        },
+        { id: "release", title: "Release notes", loading: true, icon: avatar(300) },
+        { id: "triage", title: "Bug triage", closeable: true, badgeCount: 2, icon: avatar(30) },
+        { id: "scratch", title: "Scratchpad", closeable: true, icon: avatar(150) },
+        { id: "helper", title: "Release checker", kind: "subagent", parentId: "release", closeable: true, icon: avatar(220) },
       ]}
     />
   ),
   play: async ({ canvasElement }) => {
-    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return;
-    const canvas = within(canvasElement);
-    const strip = canvasElement.querySelector<HTMLElement>(
-      "[data-slot=chat-tabs]",
-    )!;
-    await expect(strip).toHaveAttribute("data-variant", "dots");
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
+    const canvas = within(canvasElement)
+    const strip = canvasElement.querySelector<HTMLElement>("[data-slot=chat-tabs]")!
+    await expect(strip).toHaveAttribute("data-variant", "dots")
     const current = () =>
-      canvasElement.querySelector<HTMLElement>(
-        "[data-slot=chat-tabs-current]",
-      )!;
-    await expect(current()).toHaveTextContent("Release notes");
+      canvasElement.querySelector<HTMLElement>("[data-slot=chat-tabs-current]")!
+    await expect(current()).toHaveTextContent("Release notes")
     const dots = () =>
-      Array.from(
-        canvasElement.querySelectorAll<HTMLElement>("[data-slot=chat-tab-dot]"),
-      );
-    await expect(dots()).toHaveLength(4);
-    const release = canvas.getByRole("tab", { name: "Release notes" });
-    await expect(release).toHaveAttribute("aria-selected", "true");
-    await expect(release).toHaveAttribute("title", "Release notes");
-    const [releaseDot, triageDot, scratchDot] = dots();
-    await expect(releaseDot).toHaveAttribute("data-busy", "true");
-    await expect(triageDot).toHaveAttribute("data-attention", "true");
+      Array.from(canvasElement.querySelectorAll<HTMLElement>("[data-slot=chat-tab-dot]"))
+    await expect(dots()).toHaveLength(4)
+    const release = canvas.getByRole("tab", { name: "Release notes" })
+    await expect(release).toHaveAttribute("aria-selected", "true")
+    await expect(release).toHaveAttribute("title", "Release notes")
+    const [releaseDot, triageDot, scratchDot] = dots()
+    await expect(releaseDot).toHaveAttribute("data-busy", "true")
+    await expect(triageDot).toHaveAttribute("data-attention", "true")
     // The selected dot is the bar, wider than the dots beside it.
     await expect(releaseDot!.getBoundingClientRect().width).toBeGreaterThan(
       scratchDot!.getBoundingClientRect().width + 6,
-    );
-    await userEvent.click(
-      canvas.getByRole("tab", { name: "Bug triage, 2 new" }),
-    );
-    await expect(current()).toHaveTextContent("Bug triage");
-    await expect(canvas.getByRole("tabpanel")).toHaveTextContent("Bug triage");
-    await userEvent.keyboard("{ArrowRight}");
-    await expect(current()).toHaveTextContent("Scratchpad");
+    )
+    await userEvent.click(canvas.getByRole("tab", { name: "Bug triage, 2 new" }))
+    await expect(current()).toHaveTextContent("Bug triage")
+    await expect(canvas.getByRole("tabpanel")).toHaveTextContent("Bug triage")
+    await userEvent.keyboard("{ArrowRight}")
+    await expect(current()).toHaveTextContent("Scratchpad")
     // Delete on the focused dot closes it, as on a pill.
-    await userEvent.keyboard("{Delete}");
+    await userEvent.keyboard("{Delete}")
     await expect(
       canvas.queryByRole("tab", { name: "Scratchpad" }),
-    ).not.toBeInTheDocument();
+    ).not.toBeInTheDocument()
     // A tab opened out of another leads with its way back.
-    await userEvent.click(canvas.getByRole("tab", { name: "Release checker" }));
-    await expect(current()).toHaveTextContent("Release checker");
+    await userEvent.click(canvas.getByRole("tab", { name: "Release checker" }))
+    await expect(current()).toHaveTextContent("Release checker")
     // Its own dot stays its own: the way back is the lead's, not the dot's.
-    await userEvent.click(canvas.getByRole("tab", { name: "Release checker" }));
-    await expect(current()).toHaveTextContent("Release checker");
+    await userEvent.click(canvas.getByRole("tab", { name: "Release checker" }))
+    await expect(current()).toHaveTextContent("Release checker")
     await userEvent.click(
       canvas.getByRole("button", { name: "Back to Release notes" }),
-    );
-    await expect(current()).toHaveTextContent("Release notes");
+    )
+    await expect(current()).toHaveTextContent("Release notes")
     // The Back button went with the lead; focus lands on the parent's dot.
     await waitFor(() =>
       expect(canvas.getByRole("tab", { name: "Release notes" })).toHaveFocus(),
-    );
+    )
     // The lead's close is the pointer close for the selected tab.
-    await userEvent.click(
-      canvas.getByRole("tab", { name: "Bug triage, 2 new" }),
-    );
+    await userEvent.click(canvas.getByRole("tab", { name: "Bug triage, 2 new" }))
     await userEvent.click(
       current().querySelector<HTMLElement>("[data-slot=chat-tab-close]")!,
-    );
+    )
     await expect(
       canvas.queryByRole("tab", { name: "Bug triage, 2 new" }),
-    ).not.toBeInTheDocument();
+    ).not.toBeInTheDocument()
     // The new selection's dot widens into the bar; wait for its full width
     // so no transition runs past the test.
     await waitFor(() => {
       const [bar, ...rest] = dots().sort(
-        (a, b) =>
-          b.getBoundingClientRect().width - a.getBoundingClientRect().width,
-      );
-      expect(bar!.closest("[data-active]")).not.toBeNull();
-      expect(bar!.getBoundingClientRect().width).toBe(18);
-      for (const dot of rest) expect(dot.getBoundingClientRect().width).toBe(6);
-    });
+        (a, b) => b.getBoundingClientRect().width - a.getBoundingClientRect().width,
+      )
+      expect(bar!.closest("[data-active]")).not.toBeNull()
+      expect(bar!.getBoundingClientRect().width).toBe(18)
+      for (const dot of rest) expect(dot.getBoundingClientRect().width).toBe(6)
+    })
     await expect(
       canvasElement.ownerDocument.scrollingElement?.scrollTop ?? 0,
-    ).toBe(0);
+    ).toBe(0)
   },
-};
+}
 
 export const ManyPageDots: Story = {
   tags: ["reduced-motion"],
@@ -298,115 +262,61 @@ export const ManyPageDots: Story = {
       variant="dots"
       initialTabs={[
         { id: "release", title: "Release notes", icon: avatar(300) },
-        {
-          id: "triage",
-          title: "Bug triage",
-          closeable: true,
-          icon: avatar(30),
-        },
-        {
-          id: "scratch",
-          title: "Scratchpad",
-          closeable: true,
-          icon: avatar(150),
-        },
-        {
-          id: "lisbon",
-          title: "Lisbon trip",
-          closeable: true,
-          icon: avatar(90),
-        },
+        { id: "triage", title: "Bug triage", closeable: true, icon: avatar(30) },
+        { id: "scratch", title: "Scratchpad", closeable: true, icon: avatar(150) },
+        { id: "lisbon", title: "Lisbon trip", closeable: true, icon: avatar(90) },
         { id: "budget", title: "Budget", closeable: true, icon: avatar(200) },
-        {
-          id: "deploy",
-          title: "Deploy check",
-          closeable: true,
-          icon: avatar(250),
-        },
-        {
-          id: "review",
-          title: "Code review",
-          closeable: true,
-          badgeCount: 1,
-          icon: avatar(330),
-        },
+        { id: "deploy", title: "Deploy check", closeable: true, icon: avatar(250) },
+        { id: "review", title: "Code review", closeable: true, badgeCount: 1, icon: avatar(330) },
       ]}
     />
   ),
   play: async ({ canvasElement }) => {
-    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return;
-    const canvas = within(canvasElement);
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
+    const canvas = within(canvasElement)
     const current = () =>
-      canvasElement.querySelector<HTMLElement>(
-        "[data-slot=chat-tabs-current]",
-      )!;
+      canvasElement.querySelector<HTMLElement>("[data-slot=chat-tabs-current]")!
     const slots = () =>
-      Array.from(
-        canvasElement.querySelectorAll<HTMLElement>("[data-slot=chat-tab]"),
-      );
+      Array.from(canvasElement.querySelectorAll<HTMLElement>("[data-slot=chat-tab]"))
     const shown = () =>
       slots()
         .filter((slot) => slot.dataset.dot !== "hidden")
-        .map((slot) => slot.querySelector("[role=tab]")!.getAttribute("title"));
-    const widthOf = (slot: HTMLElement) => slot.getBoundingClientRect().width;
+        .map((slot) => slot.querySelector("[role=tab]")!.getAttribute("title"))
+    const firstFour = ["Release notes", "Bug triage", "Scratchpad", "Lisbon trip"]
     // Every tab is in the tablist; four are on show.
-    await expect(canvas.getAllByRole("tab")).toHaveLength(7);
-    await expect(shown()).toEqual([
-      "Release notes",
-      "Bug triage",
-      "Scratchpad",
-      "Lisbon trip",
-    ]);
+    await expect(canvas.getAllByRole("tab")).toHaveLength(7)
+    await expect(shown()).toEqual(firstFour)
     for (const slot of slots().filter((each) => each.dataset.dot === "hidden"))
-      await expect(widthOf(slot)).toBe(0);
+      await expect(slot.getBoundingClientRect().width).toBe(0)
     // The last dot on show has tabs beyond it, one of which needs the user.
-    const edge = slots().find((slot) => slot.dataset.dot === "edge")!;
-    await expect(edge.querySelector("[role=tab]")).toHaveAttribute(
-      "title",
-      "Lisbon trip",
-    );
-    await expect(
-      edge.querySelector("[data-slot=chat-tab-dot]"),
-    ).toHaveAttribute("data-attention", "true");
+    const edge = slots().find((slot) => slot.dataset.dot === "edge")!
+    await expect(edge.querySelector("[role=tab]")).toHaveAttribute("title", "Lisbon trip")
+    await expect(edge.querySelector("[data-slot=chat-tab-dot]")).toHaveAttribute(
+      "data-attention",
+      "true",
+    )
     // Stepping right slides the window with the selection.
-    await userEvent.click(canvas.getByRole("tab", { name: "Scratchpad" }));
-    await userEvent.keyboard("{ArrowRight}");
-    await expect(current()).toHaveTextContent("Lisbon trip");
-    await expect(shown()).toEqual([
-      "Scratchpad",
-      "Lisbon trip",
-      "Budget",
-      "Deploy check",
-    ]);
+    await userEvent.click(canvas.getByRole("tab", { name: "Scratchpad" }))
+    await userEvent.keyboard("{ArrowRight}")
+    await expect(current()).toHaveTextContent("Lisbon trip")
+    await expect(shown()).toEqual(["Scratchpad", "Lisbon trip", "Budget", "Deploy check"])
     // End reaches a tab that was hidden, and it shows with focus on it.
-    await userEvent.keyboard("{End}");
-    await expect(current()).toHaveTextContent("Code review");
-    await expect(
-      canvas.getByRole("tab", { name: "Code review, 1 new" }),
-    ).toHaveFocus();
-    await expect(shown()).toEqual([
-      "Lisbon trip",
-      "Budget",
-      "Deploy check",
-      "Code review",
-    ]);
-    // Home wraps back to the first window.
-    await userEvent.keyboard("{Home}");
-    await expect(current()).toHaveTextContent("Release notes");
-    await expect(shown()).toEqual([
-      "Release notes",
-      "Bug triage",
-      "Scratchpad",
-      "Lisbon trip",
-    ]);
+    await userEvent.keyboard("{End}")
+    await expect(current()).toHaveTextContent("Code review")
+    await expect(canvas.getByRole("tab", { name: "Code review, 1 new" })).toHaveFocus()
+    await expect(shown()).toEqual(["Lisbon trip", "Budget", "Deploy check", "Code review"])
+    // Home goes back to the first window.
+    await userEvent.keyboard("{Home}")
+    await expect(current()).toHaveTextContent("Release notes")
+    await expect(shown()).toEqual(firstFour)
     // Wait for the widths to settle so no transition runs past the test.
     await waitFor(() => {
-      const dots = Array.from(
+      const widths = Array.from(
         canvasElement.querySelectorAll<HTMLElement>(
           "[data-dot=shown] [data-slot=chat-tab-dot], [data-dot=edge] [data-slot=chat-tab-dot]",
         ),
-      ).map((dot) => dot.getBoundingClientRect().width);
-      expect(dots).toEqual([18, 6, 6, 4]);
-    });
+      ).map((dot) => dot.getBoundingClientRect().width)
+      expect(widths).toEqual([18, 6, 6, 4])
+    })
   },
-};
+}

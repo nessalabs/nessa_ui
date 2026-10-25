@@ -1,25 +1,25 @@
-"use client";
+"use client"
 
-import * as React from "react";
-import { ChevronLeft, Plus, X } from "lucide-react";
+import * as React from "react"
+import { ChevronLeft, Plus, X } from "lucide-react"
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
 const chatTabsFocusClassName =
-  "outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring";
+  "outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
 
-export type ChatTabKind = "conversation" | "subagent" | "file" | "history";
+export type ChatTabKind = "conversation" | "subagent" | "file" | "history"
 
 export interface ChatTabItem {
-  id: string;
-  title: string;
+  id: string
+  title: string
   /**
    * What the tab holds. A chat window's tabs are not all conversations —
    * a subagent's own transcript, an opened document, and the conversation
    * history roster sit in the same strip — and hosts style and test against
    * the exposed `data-kind`. Defaults to `conversation`.
    */
-  kind?: ChatTabKind;
+  kind?: ChatTabKind
   /**
    * The tab this one was opened from — the conversation that spawned a
    * subagent, the chat a document was opened out of. It makes the tab its
@@ -31,42 +31,43 @@ export interface ChatTabItem {
    * no longer in `tabs` withdraws the gesture, so hosts that close tabs
    * should re-point the children of a closed tab at its own parent.
    */
-  parentId?: string;
+  parentId?: string
   /** A leading glyph; the tab owns its size and color. */
-  icon?: React.ReactNode;
+  icon?: React.ReactNode
   /** Shows the close control and lets `onClose` remove the tab. */
-  closeable?: boolean;
+  closeable?: boolean
   /** Shows the glowing activity dot after the title. */
-  loading?: boolean;
+  loading?: boolean
   /**
    * Shows the attention badge after the title — pending approvals, unread
    * replies. Values above 1 render the number; 1 renders a plain dot.
    */
-  badgeCount?: number;
+  badgeCount?: number
 }
 
-export interface ChatTabsProps extends React.ComponentProps<"div"> {
-  tabs: readonly ChatTabItem[];
+export interface ChatTabsProps
+  extends React.ComponentProps<"div"> {
+  tabs: readonly ChatTabItem[]
   /** The selected tab's id. */
   /** The selected tab, or `null` when no tab is selected. */
-  value: string | null;
+  value: string | null
   /** Fires with the newly selected tab id. */
-  onValueChange: (value: string) => void;
+  onValueChange: (value: string) => void
   /** Enables each closeable tab's close control. */
-  onClose?: (id: string) => void;
+  onClose?: (id: string) => void
   /** Renders the trailing new-tab control. */
-  onNew?: () => void;
+  onNew?: () => void
   /** The accessible name of the new-tab control. */
-  newTabLabel?: string;
+  newTabLabel?: string
   /** The accessible name announced for the tab list. */
-  label?: string;
+  label?: string
   /**
    * Names the back gesture in a drilled-into tab's tooltip, given the parent
    * tab's title. Defaults to `Back to <parent title>`.
    */
-  backLabel?: (parentTitle: string) => string;
+  backLabel?: (parentTitle: string) => string
   /** Pinned after the new-tab control, outside the scrolling track. */
-  trailing?: React.ReactNode;
+  trailing?: React.ReactNode
   /**
    * How the strip draws its tabs. `pills` (the default) gives every tab a
    * pill with its glyph and title. `dots` names only the selected tab — its
@@ -77,15 +78,16 @@ export interface ChatTabsProps extends React.ComponentProps<"div"> {
    * same keys, and `wrapTab` wraps it. It fits a narrow window, where
    * pills truncate every title they hold.
    */
-  variant?: "pills" | "dots";
+  variant?: "pills" | "dots"
   /**
-   * With `dots`, how many dots show at once (default 4). Past that the
-   * dots are a window that slides with the selection; a dot at an edge
-   * with more beyond it is drawn smaller, and in the destructive colour
-   * when a tab beyond it needs the user. Hidden dots are still tabs, so
-   * the arrow keys, Home, and End reach every one.
+   * With `dots`, how many dots show at once (default 4, at least 3). Past
+   * that the dots are a window that slides with the selection, so the dots
+   * either side of the selected one are always there to tap. A dot at an
+   * edge with more beyond it is drawn smaller, and in the destructive
+   * colour when a tab beyond it needs the user. Hidden dots are still
+   * tabs, so the arrow keys, Home, and End reach every one.
    */
-  visibleDots?: number;
+  visibleDots?: number
   /**
    * Wraps each rendered tab: a pill, or with `dots` a dot. Use it to hang a
    * context menu on a conversation tab without ChatTabs owning the menu;
@@ -98,7 +100,7 @@ export interface ChatTabsProps extends React.ComponentProps<"div"> {
     tab: ChatTabItem,
     node: React.ReactElement,
     part: "tab" | "lead",
-  ) => React.ReactNode;
+  ) => React.ReactNode
 }
 
 /**
@@ -135,65 +137,65 @@ function ChatTabs({
   className,
   ...props
 }: ChatTabsProps) {
-  const tabRefs = React.useRef(new Map<string, HTMLButtonElement>());
+  const tabRefs = React.useRef(new Map<string, HTMLButtonElement>())
   // Roving tabindex needs one focusable stop even when `value` matches no
   // tab (the type allows null, and hosts may close the active tab without
   // reselecting) — the first tab takes it as a fallback.
-  const hasActiveTab = tabs.some((tab) => tab.id === value);
+  const hasActiveTab = tabs.some((tab) => tab.id === value)
 
   React.useEffect(() => {
-    if (value == null) return;
+    if (value == null) return
     const tab = tabRefs.current
       .get(value)
-      ?.closest<HTMLElement>("[data-slot=chat-tab]");
-    const track = tab?.closest<HTMLElement>("[data-slot=chat-tabs-track]");
-    if (!tab || !track) return;
+      ?.closest<HTMLElement>("[data-slot=chat-tab]")
+    const track = tab?.closest<HTMLElement>("[data-slot=chat-tabs-track]")
+    if (!tab || !track) return
     // Scroll only the overflow track. Element.scrollIntoView walks every
     // ancestor and, on a Storybook docs page, pulls the story canvas into
     // the iframe — sending the documentation heading above the viewport.
-    const tabRect = tab.getBoundingClientRect();
-    const trackRect = track.getBoundingClientRect();
+    const tabRect = tab.getBoundingClientRect()
+    const trackRect = track.getBoundingClientRect()
     if (tabRect.left < trackRect.left) {
-      track.scrollLeft -= trackRect.left - tabRect.left;
+      track.scrollLeft -= trackRect.left - tabRect.left
     } else if (tabRect.right > trackRect.right) {
-      track.scrollLeft += tabRect.right - trackRect.right;
+      track.scrollLeft += tabRect.right - trackRect.right
     }
-  }, [value, tabs]);
+  }, [value, tabs])
 
   const selectRelativeTab = (index: number, key: string) => {
-    if (tabs.length === 0) return;
+    if (tabs.length === 0) return
     const nextIndex =
       key === "Home"
         ? 0
         : key === "End"
           ? tabs.length - 1
-          : (index + (key === "ArrowLeft" ? -1 : 1) + tabs.length) %
-            tabs.length;
-    const next = tabs[nextIndex];
-    if (!next) return;
-    onValueChange(next.id);
-    tabRefs.current.get(next.id)?.focus();
-  };
+          : (index + (key === "ArrowLeft" ? -1 : 1) + tabs.length) % tabs.length
+    const next = tabs[nextIndex]
+    if (!next) return
+    onValueChange(next.id)
+    tabRefs.current.get(next.id)?.focus()
+  }
 
-  const dots = variant === "dots";
+  const dots = variant === "dots"
   // The window of dots on show: the selected dot sits one in from the
-  // start where it can, so a step either way stays inside the window.
-  const shownDots = Math.min(Math.max(1, Math.floor(visibleDots)), tabs.length);
+  // start where it can, so a step either way stays inside the window. At
+  // least three, so a pointer can always reach a neighbour on each side.
+  const shownDots = Math.min(Math.max(3, Math.floor(visibleDots)), tabs.length)
   const selectedIndex = Math.max(
     0,
     tabs.findIndex((tab) => tab.id === value),
-  );
+  )
   const windowStart = Math.min(
     Math.max(0, selectedIndex - Math.floor((shownDots - 1) / 2)),
     tabs.length - shownDots,
-  );
-  const windowEnd = windowStart + shownDots;
-  const needsUser = (tab: ChatTabItem) => (tab.badgeCount ?? 0) > 0;
-  const current = dots ? tabs.find((tab) => tab.id === value) : undefined;
+  )
+  const windowEnd = windowStart + shownDots
+  const needsUser = (tab: ChatTabItem) => (tab.badgeCount ?? 0) > 0
+  const current = dots ? tabs.find((tab) => tab.id === value) : undefined
   const currentParent =
     current?.parentId === undefined
       ? undefined
-      : tabs.find((candidate) => candidate.id === current.parentId);
+      : tabs.find((candidate) => candidate.id === current.parentId)
   // With dots only the selected tab is named, so its title, glyph, and
   // close lead the strip. The way back lives here too: a dot is too small
   // to swap for a chevron.
@@ -214,12 +216,12 @@ function ChatTabs({
           aria-label={backLabel(currentParent.title)}
           title={backLabel(currentParent.title)}
           onClick={() => {
-            onValueChange(currentParent.id);
+            onValueChange(currentParent.id)
             // Going back replaces the lead and this button with it, so focus
             // moves to the parent's own tab, where the arrow keys still work.
             setTimeout(() => {
-              tabRefs.current.get(currentParent.id)?.focus();
-            }, 0);
+              tabRefs.current.get(currentParent.id)?.focus()
+            }, 0)
           }}
           className={cn(
             "inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 text-foreground transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-accent motion-reduce:transition-none [&_svg]:size-4",
@@ -253,7 +255,7 @@ function ChatTabs({
         </button>
       ) : null}
     </div>
-  ) : null;
+  ) : null
 
   return (
     <div
@@ -262,17 +264,13 @@ function ChatTabs({
       className={cn("flex min-w-0 items-center gap-2 font-sans", className)}
       {...props}
     >
-      {dots ? (
-        current && currentNode ? (
-          wrapTab ? (
-            wrapTab(current, currentNode, "lead")
-          ) : (
-            currentNode
-          )
-        ) : (
-          <div aria-hidden="true" className="flex-1" />
-        )
-      ) : null}
+      {dots
+        ? current && currentNode
+          ? wrapTab
+            ? wrapTab(current, currentNode, "lead")
+            : currentNode
+          : <div aria-hidden="true" className="flex-1" />
+        : null}
       <div
         data-slot="chat-tabs-track"
         role="tablist"
@@ -283,8 +281,8 @@ function ChatTabs({
         )}
       >
         {tabs.map((tab, index) => {
-          const active = tab.id === value;
-          const badgeCount = Math.max(0, tab.badgeCount ?? 0);
+          const active = tab.id === value
+          const badgeCount = Math.max(0, tab.badgeCount ?? 0)
           // A tab opened out of another carries its way back. The gesture
           // only exists on the tab the reader is already inside: selecting a
           // tab you are not in has an obvious meaning, and overloading that
@@ -293,12 +291,12 @@ function ChatTabs({
           const parent =
             tab.parentId === undefined
               ? undefined
-              : tabs.find((candidate) => candidate.id === tab.parentId);
-          const goesBack = !dots && active && parent !== undefined;
+              : tabs.find((candidate) => candidate.id === tab.parentId)
+          const goesBack = !dots && active && parent !== undefined
           const tabButton = {
             ref: (node: HTMLButtonElement | null) => {
-              if (node) tabRefs.current.set(tab.id, node);
-              else tabRefs.current.delete(tab.id);
+              if (node) tabRefs.current.set(tab.id, node)
+              else tabRefs.current.delete(tab.id)
             },
             type: "button" as const,
             role: "tab",
@@ -318,12 +316,10 @@ function ChatTabs({
             "data-goes-back": goesBack || undefined,
             onClick: () => onValueChange(goesBack ? parent.id : tab.id),
             onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => {
-              if (
-                ["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
-              ) {
-                event.preventDefault();
-                selectRelativeTab(index, event.key);
-                return;
+              if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+                event.preventDefault()
+                selectRelativeTab(index, event.key)
+                return
               }
               // The close affordance is pointer-only (a tablist may own
               // nothing but tabs), so Delete is the accessible close.
@@ -334,19 +330,19 @@ function ChatTabs({
                 tab.closeable &&
                 onClose
               ) {
-                event.preventDefault();
-                const successorId = (tabs[index + 1] ?? tabs[index - 1])?.id;
-                onClose(tab.id);
+                event.preventDefault()
+                const successorId = (tabs[index + 1] ?? tabs[index - 1])?.id
+                onClose(tab.id)
                 if (successorId !== undefined) {
                   setTimeout(() => {
-                    tabRefs.current.get(successorId)?.focus();
-                  }, 0);
+                    tabRefs.current.get(successorId)?.focus()
+                  }, 0)
                 }
               }
             },
-          };
+          }
           if (variant === "dots") {
-            const shown = index >= windowStart && index < windowEnd;
+            const shown = index >= windowStart && index < windowEnd
             // An edge dot with tabs hidden beyond it is drawn smaller, and
             // carries their attention so a hidden tab that needs the user
             // still shows.
@@ -357,9 +353,9 @@ function ChatTabs({
                   ? tabs.slice(0, windowStart)
                   : index === windowEnd - 1 && windowEnd < tabs.length
                     ? tabs.slice(windowEnd)
-                    : undefined;
+                    : undefined
             const attention =
-              badgeCount > 0 || (beyond?.some(needsUser) ?? false);
+              badgeCount > 0 || (beyond?.some(needsUser) ?? false)
             const dotNode = (
               <span
                 role="presentation"
@@ -402,12 +398,12 @@ function ChatTabs({
                   />
                 </button>
               </span>
-            );
+            )
             return (
               <React.Fragment key={tab.id}>
                 {wrapTab ? wrapTab(tab, dotNode, "tab") : dotNode}
               </React.Fragment>
-            );
+            )
           }
           const tabNode = (
             <span
@@ -503,12 +499,12 @@ function ChatTabs({
                 </button>
               ) : null}
             </span>
-          );
+          )
           return (
             <React.Fragment key={tab.id}>
               {wrapTab ? wrapTab(tab, tabNode, "tab") : tabNode}
             </React.Fragment>
-          );
+          )
         })}
       </div>
       {onNew ? (
@@ -527,15 +523,12 @@ function ChatTabs({
         </button>
       ) : null}
       {trailing ? (
-        <div
-          data-slot="chat-tabs-trailing"
-          className="flex shrink-0 items-center"
-        >
+        <div data-slot="chat-tabs-trailing" className="flex shrink-0 items-center">
           {trailing}
         </div>
       ) : null}
     </div>
-  );
+  )
 }
 
-export { ChatTabs };
+export { ChatTabs }
