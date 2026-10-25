@@ -224,6 +224,10 @@ export const PageDots: Story = {
       canvas.getByRole("button", { name: "Back to Release notes" }),
     )
     await expect(current()).toHaveTextContent("Release notes")
+    // The Back button went with the lead; focus lands on the parent's dot.
+    await waitFor(() =>
+      expect(canvas.getByRole("tab", { name: "Release notes" })).toHaveFocus(),
+    )
     // The lead's close is the pointer close for the selected tab.
     await userEvent.click(canvas.getByRole("tab", { name: "Bug triage, 2 new" }))
     await userEvent.click(

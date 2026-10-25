@@ -191,7 +191,14 @@ function ChatTabs({
           data-slot="chat-tabs-back"
           aria-label={backLabel(currentParent.title)}
           title={backLabel(currentParent.title)}
-          onClick={() => onValueChange(currentParent.id)}
+          onClick={() => {
+            onValueChange(currentParent.id)
+            // Going back replaces the lead and this button with it, so focus
+            // moves to the parent's own tab, where the arrow keys still work.
+            setTimeout(() => {
+              tabRefs.current.get(currentParent.id)?.focus()
+            }, 0)
+          }}
           className={cn(
             "inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 text-foreground transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-accent motion-reduce:transition-none [&_svg]:size-4",
             chatTabsFocusClassName,
