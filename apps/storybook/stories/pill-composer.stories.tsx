@@ -4752,7 +4752,7 @@ export const EditMarkdown: Story = {
 /** Keeps saving and discarding visible for the message-editing example. */
 function EditableMarkdownExample({ pasted = false }: { pasted?: boolean }) {
   const text = "## Heading\n\n- First\n\n```js\nconst value = 1\n```\n\n**Hello "
-  const [message, setMessage] = React.useState<DemoMessage>(pasted ? { id: 1, role: "user", text: "", pasted: { "edit-paste": "Original pasted payload" }, parts: [{ type: "chip", chip: { ...{ className: "font-medium text-(--nessa-chat-accent)" }, id: "edit-paste", kind: "pasted-text", label: "Pasted text (23 chars)", textValue: "" } }] } : { id: 1, role: "user", text: `${text}Skill world**`, parts: [{ type: "text", text }, { type: "chip", chip: { id: "edit-skill", label: "Skill", textValue: "Skill" } }, { type: "text", text: " world**" }] })
+  const [message, setMessage] = React.useState<DemoMessage>(pasted ? { id: 1, role: "user", text: "", pasted: { "edit-paste": "Original pasted payload" }, parts: [{ type: "chip", chip: { ...{ className: "font-medium text-(--nessa-chat-accent-ink)" }, id: "edit-paste", kind: "pasted-text", label: "Pasted text (23 chars)", textValue: "" } }] } : { id: 1, role: "user", text: `${text}Skill world**`, parts: [{ type: "text", text }, { type: "chip", chip: { id: "edit-skill", label: "Skill", textValue: "Skill" } }, { type: "text", text: " world**" }] })
   const [editing, setEditing] = React.useState(false)
   const [saveCount, setSaveCount] = React.useState(0)
   return <div className="w-full max-w-xl">

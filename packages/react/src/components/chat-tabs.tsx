@@ -245,12 +245,13 @@ function ChatTabs({
           // A tab opened out of another carries its way back. The gesture
           // only exists on the tab the reader is already inside: selecting a
           // tab you are not in has an obvious meaning, and overloading that
-          // would take it away.
+          // would take it away. With dots the lead holds the way back, so a
+          // dot always selects its own tab.
           const parent =
             tab.parentId === undefined
               ? undefined
               : tabs.find((candidate) => candidate.id === tab.parentId)
-          const goesBack = active && parent !== undefined
+          const goesBack = !dots && active && parent !== undefined
           const tabButton = {
             ref: (node: HTMLButtonElement | null) => {
               if (node) tabRefs.current.set(tab.id, node)
@@ -263,7 +264,13 @@ function ChatTabs({
             "aria-busy": tab.loading || undefined,
             "aria-controls": `chat-tab-panel-${tab.id}`,
             tabIndex: active || (!hasActiveTab && index === 0) ? 0 : -1,
-            "aria-label": goesBack ? backLabel(parent.title) : tab.title,
+            // The badge and the dot show attention by sight alone, so the
+            // name says it too.
+            "aria-label": goesBack
+              ? backLabel(parent.title)
+              : badgeCount > 0
+                ? `${tab.title}, ${badgeCount} new`
+                : tab.title,
             title: goesBack ? backLabel(parent.title) : tab.title,
             "data-goes-back": goesBack || undefined,
             onClick: () => onValueChange(goesBack ? parent.id : tab.id),
@@ -305,7 +312,7 @@ function ChatTabs({
                 <button
                   {...tabButton}
                   className={cn(
-                    "group/dot inline-flex h-6 min-w-5 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent px-[3px] py-0",
+                    "group/dot inline-flex h-6 min-w-6 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent px-[3px] py-0",
                     chatTabsFocusClassName,
                   )}
                 >
@@ -316,12 +323,12 @@ function ChatTabs({
                     aria-hidden="true"
                     className={cn(
                       "block h-1.5 rounded-full transition-[width,background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
-                      active ? "w-[1.125rem]" : "w-1.5",
+                      active ? "w-4.5" : "w-1.5",
                       badgeCount > 0
                         ? "bg-destructive"
                         : active
                           ? "bg-foreground"
-                          : "bg-muted-foreground/60 group-hover/dot:bg-foreground/80",
+                          : "bg-muted-foreground group-hover/dot:bg-foreground/80",
                       // Busy is a glow in the ink, not motion: a strip of
                       // dots that pulse would never sit still.
                       tab.loading &&

@@ -343,9 +343,9 @@ function ChatBubble({
     // The badge protrudes 12px above the bubble; reserve that room so it
     // never overlaps the previous message.
     reaction != null && "mt-3",
-    // The sent graphite is the fixed chat identity: --nessa-chat-accent
-    // holds the same value in both themes under white text, and its rim is
-    // the edge that keeps it a surface on a dark ground.
+    // The sent graphite is the chat identity: --nessa-chat-accent holds
+    // white text in both themes, a step lighter than a received bubble in
+    // Dark, and its rim is the edge that keeps it a surface on a dark ground.
     tone === "sent"
       ? "bg-(--nessa-chat-accent) text-white shadow-(--nessa-chat-accent-rim)"
       : "bg-accent text-accent-foreground",

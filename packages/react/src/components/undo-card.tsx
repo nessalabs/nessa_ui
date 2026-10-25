@@ -43,7 +43,7 @@ function UndoCard({
     <div
       data-slot="undo-card"
       className={cn(
-        "flex h-[3.375rem] min-w-0 items-center gap-2.5 rounded-[0.9375rem] bg-popover/90 ps-3 pe-2.5 font-sans text-popover-foreground shadow-lg ring-1 ring-border/50 ring-inset backdrop-blur-md",
+        "flex min-h-13.5 min-w-0 items-center gap-2.5 rounded-xl bg-popover/90 ps-3 pe-2.5 font-sans text-popover-foreground shadow-lg ring-1 ring-border/50 ring-inset backdrop-blur-md",
         "animate-in fade-in-0 slide-in-from-bottom-2 [animation-duration:var(--nessa-motion-duration-normal)] [animation-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:animate-none",
         className,
       )}
@@ -67,7 +67,7 @@ function UndoCard({
         data-slot="undo-card-action"
         aria-label={`${undoLabel} ${action.toLowerCase()} ${title}`}
         onClick={onUndo}
-        className="inline-flex h-[1.875rem] shrink-0 cursor-pointer items-center rounded-full border-0 bg-accent px-3 font-sans nessa-text-2 font-semibold text-(--nessa-chat-accent-ink) transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-accent/70 motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        className="inline-flex min-h-7.5 shrink-0 cursor-pointer items-center rounded-full border-0 bg-accent px-3 font-sans nessa-text-2 font-semibold text-(--nessa-chat-accent-ink) transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-accent/70 motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         {undoLabel}
       </button>

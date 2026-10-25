@@ -122,7 +122,7 @@ export const Tabs: Story = {
       '[data-slot="chat-tab-badge"]',
     )!
     await expect(badge).toHaveTextContent("2")
-    await userEvent.click(canvas.getByRole("tab", { name: "Bug triage" }))
+    await userEvent.click(canvas.getByRole("tab", { name: "Bug triage, 2 new" }))
     await expect(canvas.getByRole("tabpanel")).toHaveTextContent("Bug triage")
     await userEvent.keyboard("{ArrowRight}")
     await expect(
@@ -170,7 +170,7 @@ const avatar = (hue: number) => (
 export const PageDots: Story = {
   tags: ["reduced-motion"],
   parameters: storyDocumentation(
-    "The narrow-window variant: only the selected tab is named — its glyph, title, and close lead the strip — and every tab is a page dot after it. The selected dot is a short bar, the busy one glows, and the one that needs the user is drawn in the destructive colour. A dot is still the tab: it carries the title as its name and tooltip, and takes the same arrow keys and Delete. A tab opened out of another shows a back button in place of its glyph.",
+    "The narrow-window variant: only the selected tab is named — its glyph, title, and close lead the strip — and every tab is a page dot after it. The selected dot is a short bar, the busy one glows, and the one that needs the user is drawn in the destructive colour and says so in its name. A dot is still the tab: it carries the title as its name and tooltip, and takes the same arrow keys and Delete. A tab opened out of another shows a back button in place of its glyph.",
   ),
   render: () => (
     <TabsExample
@@ -204,7 +204,7 @@ export const PageDots: Story = {
     await expect(releaseDot!.getBoundingClientRect().width).toBeGreaterThan(
       scratchDot!.getBoundingClientRect().width + 6,
     )
-    await userEvent.click(canvas.getByRole("tab", { name: "Bug triage" }))
+    await userEvent.click(canvas.getByRole("tab", { name: "Bug triage, 2 new" }))
     await expect(current()).toHaveTextContent("Bug triage")
     await expect(canvas.getByRole("tabpanel")).toHaveTextContent("Bug triage")
     await userEvent.keyboard("{ArrowRight}")
@@ -217,17 +217,20 @@ export const PageDots: Story = {
     // A tab opened out of another leads with its way back.
     await userEvent.click(canvas.getByRole("tab", { name: "Release checker" }))
     await expect(current()).toHaveTextContent("Release checker")
+    // Its own dot stays its own: the way back is the lead's, not the dot's.
+    await userEvent.click(canvas.getByRole("tab", { name: "Release checker" }))
+    await expect(current()).toHaveTextContent("Release checker")
     await userEvent.click(
       canvas.getByRole("button", { name: "Back to Release notes" }),
     )
     await expect(current()).toHaveTextContent("Release notes")
     // The lead's close is the pointer close for the selected tab.
-    await userEvent.click(canvas.getByRole("tab", { name: "Bug triage" }))
+    await userEvent.click(canvas.getByRole("tab", { name: "Bug triage, 2 new" }))
     await userEvent.click(
       current().querySelector<HTMLElement>("[data-slot=chat-tab-close]")!,
     )
     await expect(
-      canvas.queryByRole("tab", { name: "Bug triage" }),
+      canvas.queryByRole("tab", { name: "Bug triage, 2 new" }),
     ).not.toBeInTheDocument()
     await expect(
       canvasElement.ownerDocument.scrollingElement?.scrollTop ?? 0,
