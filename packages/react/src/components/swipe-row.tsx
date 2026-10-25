@@ -12,6 +12,8 @@ import {
   committableSwipeAction,
   presentedSwipeDisplacement,
   resolveSwipeAxis,
+  rubberBandSwipeDisplacement,
+  swipeAxisSlop,
   settleSwipe,
   settleWheelSwipe,
   startWheelSwipe,
@@ -99,6 +101,27 @@ export interface SwipeRowActionDetails {
   /** A pressed (and, where asked, confirmed) button, or a full swipe. */
   via: "press" | "swipe";
 }
+
+/**
+ * How long after the viewer's own scrolling input (wheel, touch drag, or a
+ * scrolling key) a scroll is still theirs, in milliseconds. Long enough for
+ * a trackpad's inertia, which keeps sending wheel events, and a touch
+ * fling's first frames.
+ */
+const scrollIntentMs = 1000;
+
+/** Keys that scroll a page or list by default. */
+const scrollKeys = new Set([
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "PageUp",
+  "PageDown",
+  "Home",
+  "End",
+  " ",
+]);
 
 /** How many trace entries the ring buffer keeps. */
 const traceLimit = 4000;
@@ -207,8 +230,10 @@ export interface SwipeRowGroupProps extends React.HTMLAttributes<HTMLElement> {
 /**
  * The list that owns a set of `SwipeRow`s: it decides which single row is
  * open. Opening a row closes the one that was open; a press anywhere outside
- * the open row, or a scroll that moves it, closes it, and a press inside the
- * group that closed a row is spent on closing — its click selects nothing.
+ * the open row, or a scroll the viewer makes that moves it, closes it — a
+ * scroll the page makes by itself, such as revealing the tray's confirm
+ * button, does not — and a press inside the group that closed a row is
+ * spent on closing: its click selects nothing.
  * It also owns the polite status region rows speak their confirmation
  * prompts through, rendered as the group element's next sibling so the
  * element's children stay exactly the host's (a `ul` keeps only `li`s).
@@ -343,14 +368,60 @@ function SwipeRowGroup({
       ownerDocument.removeEventListener("pointerdown", onPointerDown, true);
   }, [active, element, store]);
 
-  // A scroll that moves the open row closes it, wherever the scroller is:
-  // the group itself, an ancestor or the page. Scroll events never reach
-  // the scroller's descendants, so the document listens in the capture
-  // phase. Scrolls inside the row — a browser revealing a focused action in
-  // its clipped tray — do not close it.
+  // A scroll the viewer makes that moves the open row closes it, wherever
+  // the scroller is: the group itself, an ancestor or the page. Scroll
+  // events never reach the scroller's descendants, so the document listens
+  // in the capture phase. Only a scroll that follows the viewer's own
+  // scrolling input — a wheel or trackpad, a touch drag, a scrolling key —
+  // and moves the row past a swipe's slop counts. A scroll the page makes
+  // by itself does not close it: a browser or automation revealing the
+  // tray's confirm button before pressing it (WebKit does, mid-click),
+  // scroll anchoring settling the list as other rows update, or a browser
+  // revealing a focused action inside the row. The row's place is read
+  // when it opens and on scrolls only.
   React.useEffect(() => {
     if (!active || !element) return;
     const ownerDocument = element.ownerDocument;
+    let anchored: { id: string; top: number; left: number } | null = null;
+    let intent = Number.NEGATIVE_INFINITY;
+    const place = (id: string | null) => {
+      const row = id === null ? null : store.rows().get(id)?.row();
+      if (!row || id === null) return null;
+      const { top, left } = row.getBoundingClientRect();
+      return { id, top, left };
+    };
+    const onOpen = () => {
+      const openId = store.openId();
+      if (anchored?.id !== openId) anchored = place(openId);
+    };
+    onOpen();
+    const unsubscribe = store.subscribe(onOpen);
+    // Heard as they bubble, so an event a row claimed — its own sideways
+    // swipe and the inertia after it, which it prevents — is not scrolling.
+    const onWheel = (event: WheelEvent) => {
+      if (!event.defaultPrevented) intent = performance.now();
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      const swiping = eventElement(event, ownerDocument)?.closest(
+        "[data-swipe=tracking]",
+      );
+      if (!event.defaultPrevented && !swiping) intent = performance.now();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || !scrollKeys.has(event.key)) return;
+      // Keys that edit text, and Space on a button (which presses it), do
+      // not scroll.
+      const target = eventElement(event, ownerDocument);
+      if (
+        target?.closest(
+          "input, textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox]",
+        ) ||
+        (event.key === " " && target?.closest("button, [role=button]"))
+      ) {
+        return;
+      }
+      intent = performance.now();
+    };
     const onScroll = (event: Event) => {
       const openId = store.openId();
       if (openId === null) return;
@@ -358,14 +429,37 @@ function SwipeRowGroup({
       const target = eventNode(event, ownerDocument);
       if (!openRow || !target) return;
       if (openRow.contains(target) || !target.contains(openRow)) return;
+      const now = place(openId);
+      // A scroll the page made by itself moves where the row rests; the
+      // viewer's next scroll is measured from there.
+      if (performance.now() - intent > scrollIntentMs) {
+        anchored = now;
+        return;
+      }
+      if (anchored?.id === openId && now) {
+        const moved = Math.max(
+          Math.abs(now.top - anchored.top),
+          Math.abs(now.left - anchored.left),
+        );
+        if (moved < swipeAxisSlop) return;
+      }
+      traceRef.current?.({ ev: "scroll-close", closed: openId });
       store.close();
     };
     ownerDocument.addEventListener("scroll", onScroll, {
       capture: true,
       passive: true,
     });
-    return () =>
+    ownerDocument.addEventListener("wheel", onWheel, { passive: true });
+    ownerDocument.addEventListener("touchmove", onTouchMove, { passive: true });
+    ownerDocument.addEventListener("keydown", onKey);
+    return () => {
+      unsubscribe();
       ownerDocument.removeEventListener("scroll", onScroll, { capture: true });
+      ownerDocument.removeEventListener("wheel", onWheel);
+      ownerDocument.removeEventListener("touchmove", onTouchMove);
+      ownerDocument.removeEventListener("keydown", onKey);
+    };
   }, [active, element, store]);
 
   const Comp = asChild ? Slot.Root : "div";
@@ -429,10 +523,7 @@ function parseCssTime(value: string): number | null {
  * transition invalid, which CSS treats as none, so it reads as zero too.
  */
 function rowSettleDurationMs(row: Element) {
-  const value = getComputedStyle(row).getPropertyValue(
-    "--nessa-motion-duration-normal",
-  );
-  return parseCssTime(value) ?? 0;
+  return motionTokenMs(row, "--nessa-motion-duration-normal");
 }
 
 /**
@@ -445,18 +536,48 @@ function eventNode(event: Event, ownerDocument: Document): Node | null {
   return event.target instanceof NodeOfDocument ? event.target : null;
 }
 
+/** The element an event is aimed at, in its own document's realm. */
+function eventElement(event: Event, ownerDocument: Document): Element | null {
+  const node = eventNode(event, ownerDocument);
+  return node?.nodeType === 1 ? (node as Element) : null;
+}
+
 interface RowMeasurement {
   geometry: SwipeGeometry;
   direction: SwipeDirection;
+  /**
+   * The content's corner radius on its trailing edge, which the revealed row
+   * takes, so content and tray read as one surface.
+   */
+  radius: string;
 }
 
-/** The row's swipe geometry and writing direction, measured now. */
-function measureRow(row: HTMLElement, actionCount: number): RowMeasurement {
+/**
+ * The row's swipe geometry, writing direction, and corner radius, measured
+ * now. Read once when a gesture begins or the row is refit, never per event.
+ */
+function measureRow(
+  row: HTMLElement,
+  actionCount: number,
+  content: HTMLElement | null = null,
+): RowMeasurement {
   const { width, height } = row.getBoundingClientRect();
+  const direction = getComputedStyle(row).direction === "rtl" ? "rtl" : "ltr";
+  const radius = content
+    ? getComputedStyle(content).getPropertyValue(
+        direction === "rtl" ? "border-top-left-radius" : "border-top-right-radius",
+      )
+    : "";
   return {
     geometry: swipeGeometry(width, height, actionCount),
-    direction: getComputedStyle(row).direction === "rtl" ? "rtl" : "ltr",
+    direction,
+    radius: radius && radius !== "0px" ? radius : "",
   };
+}
+
+/** How long the motion token named `token` lasts on `element`, in ms. */
+function motionTokenMs(element: Element, token: string) {
+  return parseCssTime(getComputedStyle(element).getPropertyValue(token)) ?? 0;
 }
 
 /**
@@ -473,10 +594,15 @@ const swipeSampleLimit = 8;
 const settleTransitionClassName =
   "[transition-duration:var(--nessa-motion-duration-normal)] [transition-timing-function:var(--nessa-motion-easing-standard)]";
 
+/** The jump between the rubber band and the armed commit zone. */
+const fastTransitionClassName =
+  "[transition-duration:var(--nessa-motion-duration-fast)]";
+
 // `outline-none` resets Tailwind's outline style to none, which the width
 // utility would otherwise inherit and draw nothing; restore it on focus.
+// Drawn inset: the tiles sit flush against each other and the row's clip.
 const actionFocusClassName =
-  "outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+  "outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring";
 
 type SwipePhase = "tracking" | "settling" | "committing";
 
@@ -485,11 +611,10 @@ interface SwipeState {
   /** Displacement toward the leading edge, in pixels. */
   displacement: number;
   /**
-   * The displacement a release here is judged at, when that is not where the
-   * row is drawn: a wheel swipe is drawn where its deltas put it but judged
-   * where the fingers left it, so inertia never arms or commits a row.
+   * A wheel swipe: it never arms or commits, and is resisted past the tray
+   * as a row that cannot commit is (`settleWheelSwipe`).
    */
-  reach?: number;
+  wheel?: boolean;
 }
 
 interface PointerSwipe {
@@ -616,16 +741,22 @@ export interface SwipeRowProps extends Omit<
  * Swiping the row toward its leading edge — a touch or pen drag, a mouse
  * drag, or a two-finger horizontal trackpad swipe — slides its content and
  * uncovers the actions on the trailing edge; they ride in with the row at
- * full size and their labels fade in as they arrive. Let go past half the
- * tray and the row rests open; short of that it springs back. Swipe on past
- * at least 60% of the row (further when the tray is wide) and the primary
- * (first) action fills the tray; letting go there commits it as the row
- * slides out. On a trackpad only the fingers' own travel counts toward that:
- * the inertia that follows a flick can carry a row open, never into a
- * commit. A touch or pen long-press opens the actions without a swipe. A tap
- * on the open row closes it without selecting anything, and a swipe never
- * clicks the content it moves. A gesture that sets off vertically stays a
- * scroll.
+ * full size, attached to the content's trailing edge as one surface with
+ * the row's corners, and their labels fade in as they arrive. Let go past
+ * half the tray and the row rests open; short of that it springs back. Past
+ * the open tray the row is rubber-banded, so resting open is felt as a
+ * detent. Swipe on past at least 60% of the row (further when the tray is
+ * wide) and the row jumps on as the primary (first) action stretches across
+ * the tray; letting go there commits it as the row slides out, and moving
+ * back first disarms it. That full swipe belongs to drags, which end with
+ * a real release. A two-finger trackpad swipe never commits: browsers give
+ * wheel events no phase, so the fingers cannot be told from the inertia
+ * that follows them. It opens the tray at most, resisted past it as a row
+ * that cannot commit is, and rests open or closed; the primary action is
+ * then one press away. A touch or pen long-press opens the actions
+ * without a swipe. A tap on the open row closes it without selecting
+ * anything, and a swipe never clicks the content it moves. A gesture that
+ * sets off vertically stays a scroll.
  *
  * **Confirmation.** A destructive action — or any action with `confirm` —
  * does not run on its first press: it grows to fill the tray and reads
@@ -641,7 +772,9 @@ export interface SwipeRowProps extends Omit<
  * confirmation, then closes the actions and returns focus to the content;
  * tabbing out of the row closes them too.
  *
- * **Motion.** Settling runs on the motion tokens. Under reduced motion the
+ * **Motion.** A drag moves the row by transform only, drawn once per
+ * animation frame however many events arrive, with no layout read per
+ * event. Settling runs on the motion tokens. Under reduced motion the
  * row does not slide: it jumps between closed and open as the gesture
  * crosses the same thresholds, and every action still works. A closed row
  * carries no transform.
@@ -666,6 +799,7 @@ function SwipeRow({
   onContextMenu: onContextMenuProp,
   onClickCapture: onClickCaptureProp,
   onBlur: onBlurProp,
+  style,
   ...props
 }: SwipeRowProps) {
   const slot = slotProp ?? "swipe-row";
@@ -699,6 +833,19 @@ function SwipeRow({
   const [swipe, setSwipe] = React.useState<SwipeState | null>(null);
   const [geometry, setGeometry] = React.useState<SwipeGeometry | null>(null);
   const [direction, setDirection] = React.useState<SwipeDirection>("ltr");
+  const [radius, setRadius] = React.useState("");
+  // Briefly true after a drag arms or disarms the full swipe, so the jump
+  // between the rubber-banded and the armed position is animated.
+  const [snapping, setSnapping] = React.useState(false);
+  const trayInnerRef = React.useRef<HTMLDivElement>(null);
+  // What the presentation reads between renders, newest first.
+  const geometryRef = React.useRef<SwipeGeometry | null>(null);
+  const directionRef = React.useRef<SwipeDirection>("ltr");
+  const reducedMotionRef = React.useRef(reducedMotion);
+  const frameRef = React.useRef<number | null>(null);
+  const snapTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   // The action waiting for its confirming second press, if any.
   const [confirmingId, setConfirmingId] = React.useState<string | null>(null);
 
@@ -763,6 +910,9 @@ function SwipeRow({
       trace,
       confirming: confirmingId !== null,
     };
+    geometryRef.current = geometry;
+    directionRef.current = direction;
+    reducedMotionRef.current = reducedMotion;
   });
 
   const pointerRef = React.useRef<PointerSwipe | null>(null);
@@ -797,11 +947,108 @@ function SwipeRow({
     });
   }, [hasActions, id, store]);
 
-  /** Sets the swipe state and the ref native handlers read it through. */
-  const showSwipe = React.useCallback((next: SwipeState | null) => {
-    swipeRef.current = next;
-    setSwipe(next);
+  /**
+   * Draws the row where the newest swipe state puts it: the content's
+   * translate, the tray's offset, and how far its labels have faded in.
+   * Transforms and one custom property only — no layout is read or
+   * invalidated — written straight to the elements, so a drag repaints the
+   * row without rendering it (or the host's content) again.
+   */
+  const paint = React.useCallback(() => {
+    if (frameRef.current !== null) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+    const content = itemRef.current;
+    if (!content) return;
+    const current = swipeRef.current;
+    const measured = geometryRef.current;
+    const raw = current
+      ? current.displacement
+      : latest.current.open && measured
+        ? measured.openWidth
+        : 0;
+    let shown = raw;
+    if (measured && current?.phase === "tracking") {
+      const canCommit =
+        !current.wheel &&
+        committableSwipeAction(latest.current.actions) !== null;
+      shown = reducedMotionRef.current
+        ? presentedSwipeDisplacement(raw, measured, true)
+        : rubberBandSwipeDisplacement(raw, measured, {
+            canCommit,
+            armed: swipeArmed(current.displacement, measured, canCommit),
+          });
+    }
+    const rtl = directionRef.current === "rtl";
+    content.style.translate = shown > 0 ? `${rtl ? shown : -shown}px` : "";
+    const inner = trayInnerRef.current;
+    if (inner) inner.style.transform = `translateX(${rtl ? shown : -shown}px)`;
+    trayRef.current?.style.setProperty(
+      "--nessa-swipe-reveal",
+      String(measured ? swipeContentOpacity(shown, measured) : 0),
+    );
   }, []);
+
+  /** Whether a release in this state would commit, as the row draws it. */
+  const armedIn = React.useCallback((state: SwipeState | null) => {
+    const measured = geometryRef.current;
+    if (state?.phase !== "tracking" || !measured) return false;
+    return swipeArmed(
+      state.displacement,
+      measured,
+      !state.wheel && committableSwipeAction(latest.current.actions) !== null,
+    );
+  }, []);
+
+  /**
+   * Sets the swipe state and the ref native handlers read it through. A
+   * drag that only moves the row is drawn on the next animation frame,
+   * however many events arrive before it; only a change in what the row is
+   * — its phase, or whether a release would commit — renders it.
+   */
+  const showSwipe = React.useCallback(
+    (next: SwipeState | null) => {
+      const previous = swipeRef.current;
+      swipeRef.current = next;
+      if (
+        next?.phase === "tracking" &&
+        previous?.phase === "tracking" &&
+        armedIn(next) === armedIn(previous)
+      ) {
+        frameRef.current ??= requestAnimationFrame(() => {
+          frameRef.current = null;
+          paint();
+        });
+        return;
+      }
+      if (next?.phase !== "tracking" && snapTimerRef.current !== null) {
+        // Released mid-snap: the settle runs on its own token.
+        clearTimeout(snapTimerRef.current);
+        snapTimerRef.current = null;
+        setSnapping(false);
+      }
+      if (next?.phase === "tracking" && previous?.phase === "tracking") {
+        // Armed or disarmed: the row jumps between the rubber band and the
+        // commit zone on the fast motion token (at once under reduced motion).
+        const row = rowRef.current;
+        const ms = row
+          ? motionTokenMs(row, "--nessa-motion-duration-fast")
+          : 0;
+        if (snapTimerRef.current !== null) clearTimeout(snapTimerRef.current);
+        snapTimerRef.current = null;
+        if (ms > 0) {
+          setSnapping(true);
+          snapTimerRef.current = setTimeout(() => {
+            snapTimerRef.current = null;
+            setSnapping(false);
+          }, ms);
+        }
+      }
+      setSwipe(next);
+    },
+    [armedIn, paint],
+  );
 
   const clearSettleTimer = React.useCallback(() => {
     if (settleTimerRef.current !== null) clearTimeout(settleTimerRef.current);
@@ -960,8 +1207,11 @@ function SwipeRow({
         dir: measured.direction,
       });
       clearSettleTimer();
+      geometryRef.current = measured.geometry;
+      directionRef.current = measured.direction;
       setGeometry(measured.geometry);
       setDirection(measured.direction);
+      setRadius(measured.radius);
       onOpenChange(true);
     },
     [clearSettleTimer, id, onOpenChange],
@@ -1006,8 +1256,9 @@ function SwipeRow({
     if (!open || !row || actionCount === 0) return;
     const refit = () => {
       if (swipeRef.current) return;
-      const measured = measureRow(row, actionCount);
+      const measured = measureRow(row, actionCount, itemRef.current);
       const next = measured.geometry;
+      setRadius(measured.radius);
       // The writing direction too: a locale that flips it moves the tray to
       // the other edge, and the content must slide toward it.
       setDirection(measured.direction);
@@ -1093,6 +1344,10 @@ function SwipeRow({
       endPointer();
       clearWheel();
       clearSettleTimer();
+      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+      if (snapTimerRef.current !== null) clearTimeout(snapTimerRef.current);
+      snapTimerRef.current = null;
       // Committing is a decision the viewer already made; a row unmounted
       // mid-slide (the host refiltered the list) still reports it.
       // A row removed mid-confirmation takes its prompt with it.
@@ -1111,7 +1366,7 @@ function SwipeRow({
   React.useEffect(() => {
     const row = rowRef.current;
     if (!row || !hasActions) return;
-    /** Settles a wheel gesture, judged where the fingers left the row. */
+    /** Settles a wheel gesture open or closed, where the fingers left the row. */
     const releaseWheel = (gesture: WheelSwipe) => {
       if (!gesture.geometry || !gesture.track) return;
       applyRelease(
@@ -1119,7 +1374,6 @@ function SwipeRow({
           track: gesture.track,
           start: gesture.start,
           geometry: gesture.geometry,
-          committable: committableSwipeAction(latest.current.actions),
         }),
         gesture.geometry,
       );
@@ -1215,7 +1469,11 @@ function SwipeRow({
           event.preventDefault();
         }
         if (gesture.axis !== "x") return;
-        const measured = measureRow(row, latest.current.actions.length);
+        const measured = measureRow(
+          row,
+          latest.current.actions.length,
+          itemRef.current,
+        );
         gesture.start = restingDisplacement(measured.geometry);
         gesture.geometry = measured.geometry;
         gesture.direction = measured.direction;
@@ -1258,7 +1516,11 @@ function SwipeRow({
           return;
         }
         if (step.event === "resume") {
-          const measured = measureRow(row, latest.current.actions.length);
+          const measured = measureRow(
+            row,
+            latest.current.actions.length,
+            itemRef.current,
+          );
           gesture.start = restingDisplacement(measured.geometry);
           gesture.geometry = measured.geometry;
           latest.current.trace?.({
@@ -1271,20 +1533,22 @@ function SwipeRow({
       }
       if (!gesture.geometry || !gesture.track) return;
       event.preventDefault();
-      const canCommit = committableSwipeAction(latest.current.actions) !== null;
-      showSwipe({
-        phase: "tracking",
-        displacement: clampSwipeDisplacement(
-          gesture.start + gesture.track.travel,
-          gesture.geometry,
-          canCommit,
-        ),
-        reach: clampSwipeDisplacement(
-          gesture.start + gesture.track.reach,
-          gesture.geometry,
-          canCommit,
-        ),
+      // A wheel swipe never commits: past the tray it is resisted as a row
+      // that cannot commit is, and it rests open or closed.
+      const displacement = clampSwipeDisplacement(
+        gesture.start + gesture.track.travel,
+        gesture.geometry,
+        false,
+      );
+      latest.current.trace?.({
+        ev: "f",
+        row: id,
+        via: "wheel",
+        dx: Math.round(deltaX * 10) / 10,
+        travel: Math.round(gesture.track.travel),
+        d: Math.round(displacement),
       });
+      showSwipe({ phase: "tracking", displacement, wheel: true });
     };
     row.addEventListener("wheel", onWheel, { passive: false });
     return () => row.removeEventListener("wheel", onWheel);
@@ -1339,7 +1603,7 @@ function SwipeRow({
       open,
     });
     const row = event.currentTarget;
-    const measured = measureRow(row, actions.length);
+    const measured = measureRow(row, actions.length, itemRef.current);
     const gesture: PointerSwipe = {
       pointerId: event.pointerId,
       originX: event.clientX,
@@ -1484,7 +1748,7 @@ function SwipeRow({
     }
     // A pointer-only tray never takes focus; the host owns that route.
     focusTrayRef.current = openOnContextMenu;
-    beginSwipe(measureRow(row, actions.length));
+    beginSwipe(measureRow(row, actions.length, itemRef.current));
     showSwipe(null);
   };
 
@@ -1503,15 +1767,23 @@ function SwipeRow({
     if (holdsFocus()) itemRef.current?.focus({ preventScroll: true });
   };
 
-  const rawDisplacement = swipe
-    ? swipe.displacement
-    : open && hasActions && geometry
-      ? geometry.openWidth
-      : 0;
-  const displacement =
-    geometry && swipe?.phase === "tracking"
-      ? presentedSwipeDisplacement(rawDisplacement, geometry, reducedMotion)
-      : rawDisplacement;
+  // Every render leaves the row drawn where the newest state puts it; a
+  // drag between renders is drawn by `paint` on animation frames.
+  // A row whose actions are taken away renders its content untouched: the
+  // slide `paint` left on it goes with them.
+  const paintedRef = React.useRef(false);
+  React.useLayoutEffect(() => {
+    if (hasActions) {
+      paint();
+      paintedRef.current = true;
+    } else if (paintedRef.current) {
+      paintedRef.current = false;
+      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+      if (itemRef.current) itemRef.current.style.translate = "";
+    }
+  });
+
   const tracking = swipe?.phase === "tracking";
   const committing = swipe?.phase === "committing";
   const armed =
@@ -1519,18 +1791,14 @@ function SwipeRow({
     (tracking &&
       geometry !== null &&
       swipeArmed(
-        swipe.reach ?? swipe.displacement,
+        swipe.displacement,
         geometry,
-        committable !== null,
+        !swipe.wheel && committable !== null,
       ));
   const trayVisible = hasActions && (open || swipe !== null);
   // While confirming, the confirming action takes the tray the way the
   // primary action does when armed; the others step aside.
   const expandedId = armed ? committable : trayVisible ? confirmingId : null;
-  const displaced = displacement > 0;
-  const contentOpacity = geometry
-    ? swipeContentOpacity(displacement, geometry)
-    : 0;
   const swipeState = swipe?.phase ?? (open ? "open" : undefined);
 
   if (!hasActions) {
@@ -1539,6 +1807,7 @@ function SwipeRow({
         {...props}
         ref={composedRowRef}
         data-slot={slot}
+        style={style}
         className={className}
         onPointerDown={onPointerDownProp}
         onContextMenu={onContextMenuProp}
@@ -1575,23 +1844,20 @@ function SwipeRow({
         onOpenChange(false);
       }
     }),
-    style: displaced
-      ? {
-          ...content.style,
-          translate: `${direction === "rtl" ? displacement : -displacement}px`,
-        }
-      : content.style,
+    // The slide (`translate`) is drawn by `paint`, not rendered.
+    style: content.style,
     className: cn(
       content.className,
       "transition-[color,background-color,translate]",
       settleTransitionClassName,
-      tracking && "transition-none",
+      tracking && !snapping && "transition-none",
+      snapping && fastTransitionClassName,
       // Promote only the moving row: costly content repaints every frame
       // otherwise, and idle rows need no layer of their own.
       swipe !== null && "[will-change:translate]",
       // Slid open, the row is clipped at its own edges, so the content's
       // outline draws inside them.
-      displaced && "focus-visible:-outline-offset-2",
+      trayVisible && "focus-visible:-outline-offset-2",
     ),
   });
 
@@ -1602,12 +1868,20 @@ function SwipeRow({
       data-slot={slot}
       data-swipe={swipeState}
       data-armed={armed || undefined}
+      style={
+        trayVisible && radius
+          ? ({ ...style, "--nessa-swipe-radius": radius } as React.CSSProperties)
+          : style
+      }
       className={cn(
         className,
         "relative touch-pan-y touch-pinch-zoom select-none",
-        // Clip only while displaced: at rest the content's focus outline
-        // draws outside the row's box and must not be cut.
-        displaced && "overflow-hidden",
+        // Clip only while revealed: at rest the content's focus outline
+        // draws outside the row's box and must not be cut. Revealed, the
+        // row takes its content's corner radius, so content and tray are
+        // one surface with the row's own corners.
+        trayVisible && "overflow-hidden",
+        trayVisible && radius && "rounded-(--nessa-swipe-radius)",
       )}
       onPointerDown={composeEventHandler(onPointerDownProp, onPointerDown)}
       onContextMenu={
@@ -1670,35 +1944,42 @@ function SwipeRow({
             announce("");
           } else closeActions();
         }}
-        style={{ width: displacement }}
         className={cn(
-          // The clip: exactly as wide as the row has moved, with no padding
-          // of its own, so a closed or barely moved row shows nothing.
-          "absolute inset-y-0 end-0 overflow-hidden transition-[width]",
-          settleTransitionClassName,
-          tracking && "transition-none",
+          // Covers the row and catches nothing itself; the row clips it
+          // while revealed, so only the uncovered strip shows.
+          "pointer-events-none absolute inset-0",
           !trayVisible && "invisible",
-          // The committed action is already on its way; nothing in the tray
-          // may run a second time while the row slides out.
-          committing && "pointer-events-none",
         )}
       >
         {trayVisible ? (
           <div
-            style={{ width: Math.max(displacement, geometry?.openWidth ?? 0) }}
+            ref={trayInnerRef}
+            style={
+              {
+                width: geometry?.rowWidth ?? 0,
+                "--nessa-swipe-slot": `${
+                  (geometry?.openWidth ?? 0) / Math.max(actions.length, 1)
+                }px`,
+                "--nessa-swipe-open": `${geometry?.openWidth ?? 0}px`,
+              } as React.CSSProperties
+            }
             className={cn(
-              // Laid out at full size from the row's trailing edge, so the
-              // actions slide in with the row and are uncovered rather than
-              // squeezed. Past the resting width they stretch with it.
-              // Reversed so the primary action sits at the trailing edge,
-              // where a full swipe grows it, while staying first in the tab
-              // order.
-              "absolute inset-y-0 start-0 flex flex-row-reverse gap-1 p-1.5 transition-[width]",
+              // A strip as wide as the row, laid out from the content's
+              // trailing edge and moved with it by `paint` (a transform), so
+              // the actions ride in attached to the content with no gap and
+              // nothing is laid out again while the row moves. Reversed so
+              // the primary action sits at the trailing edge and stretches
+              // past the resting width, while staying first in the tab order.
+              "absolute inset-y-0 start-full flex flex-row-reverse transition-transform",
+              // The committed action is already on its way; nothing in the
+              // tray may run a second time while the row slides out.
+              committing ? "pointer-events-none" : "pointer-events-auto",
               settleTransitionClassName,
-              tracking && "transition-none",
+              tracking && !snapping && "transition-none",
+              snapping && fastTransitionClassName,
             )}
           >
-            {actions.map((action) => {
+            {actions.map((action, index) => {
               const needsConfirm = actionNeedsConfirm(action);
               const confirming = confirmingId === action.id;
               const expanded = expandedId === action.id;
@@ -1748,8 +2029,15 @@ function SwipeRow({
                   className={cn(
                     // A transparent border is invisible until forced colors paint it,
                     // which is then the action's only visible edge.
-                    "flex min-w-0 grow basis-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-lg border border-transparent px-1 font-sans nessa-text-1 font-medium",
-                    "transition-[flex-grow,opacity,color,background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)]",
+                    // Flush tiles with no gap or corners of their own: the
+                    // row's clip gives the tray its outer corners, so the
+                    // tray and the content read as one surface. Each tile
+                    // is a slot wide; the primary one also takes the rest
+                    // of the strip, so past the resting width it stretches
+                    // from the content to the row's edge, Mail's way.
+                    "flex h-full min-w-0 shrink-0 basis-(--nessa-swipe-slot) items-center overflow-hidden border border-transparent font-sans nessa-text-1 font-medium",
+                    index === 0 || expanded ? "grow" : "grow-0",
+                    "transition-[flex-grow,flex-basis,opacity,color,background-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)]",
                     // Quiet surfaces, like a secondary button: the tray
                     // sits beside the row's text and must not outshout
                     // it. A destructive action is marked by a red wash
@@ -1768,13 +2056,24 @@ function SwipeRow({
                     // The expanded action — armed by a full swipe, or
                     // waiting to be confirmed — takes the whole tray, so
                     // what happens next is plain before it happens.
-                    collapsed && "grow-0 px-0 opacity-0",
+                    collapsed && "grow-0 basis-0 border-0 opacity-0",
                     actionFocusClassName,
                   )}
                 >
+                  {/* The face sits in the tile's first slot, next to the
+                      content: centred in the resting tray, and snapping to
+                      the content's edge with the tile when a full swipe
+                      arms it. A confirming action centres its face in the
+                      whole resting tray it takes. */}
                   <span
-                    style={{ opacity: contentOpacity }}
-                    className="flex min-w-0 max-w-full flex-col items-center gap-1"
+                    style={{
+                      opacity: "var(--nessa-swipe-reveal, 0)",
+                      width:
+                        confirming && expanded
+                          ? "var(--nessa-swipe-open)"
+                          : "var(--nessa-swipe-slot)",
+                    }}
+                    className="flex min-w-0 shrink-0 flex-col items-center justify-center gap-1 px-1"
                   >
                     {action.render ? (
                       action.render({ confirming, armed: armed && expanded })
