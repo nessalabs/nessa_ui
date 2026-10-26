@@ -76,9 +76,13 @@ export interface ChatTabsProps
    * glowing, one that needs the user in the destructive colour. A dot is
    * still the tab: it carries the title as its name and tooltip, takes the
    * same keys, and `wrapTab` wraps it. It fits a narrow window, where
-   * pills truncate every title they hold.
+   * pills truncate every title they hold. `plain` draws every tab as its
+   * glyph and title on the strip's own ground, the selected one an opaque
+   * rounded tab and the rest only a hover wash, each the same width and
+   * shrinking together; a tab's close shows while it is selected, hovered
+   * or focused. It suits a strip in a window's top row, over header art.
    */
-  variant?: "pills" | "dots"
+  variant?: "pills" | "dots" | "plain"
   /**
    * With `dots`, how many dots show at once (default 4, at least 3). Past
    * that the dots are a window that slides with the selection, so the dots
@@ -177,6 +181,7 @@ function ChatTabs({
   }
 
   const dots = variant === "dots"
+  const plain = variant === "plain"
   // The window of dots on show: the selected dot sits one in from the
   // start where it can, so a step either way stays inside the window. At
   // least three, so a pointer can always reach a neighbour on each side.
@@ -281,7 +286,10 @@ function ChatTabs({
           // lets the dots' widened targets reach past its edges.
           dots
             ? "shrink-0"
-            : "flex-1 gap-1.5 overflow-x-auto [overscroll-behavior-x:contain] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+            : cn(
+                "flex-1 overflow-x-auto [overscroll-behavior-x:contain] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+                plain ? "gap-1" : "gap-1.5",
+              ),
         )}
       >
         {tabs.map((tab, index) => {
@@ -419,34 +427,58 @@ function ChatTabs({
               data-kind={tab.kind ?? "conversation"}
               data-active={active || undefined}
               className={cn(
-                "relative inline-flex max-w-56 shrink-0 items-center rounded-full border transition-[background-color,border-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
-                active
-                  ? "border-(--nessa-chat-accent-ink)/45 bg-(--nessa-chat-accent-ink)/10"
-                  : cn(
-                      // The whole pill — title and close together — takes
-                      // the hover wash as one control.
-                      "hover:bg-accent",
-                      badgeCount > 0
-                        ? "border-destructive/60"
-                        : "border-transparent",
-                    ),
+                plain
+                  ? cn(
+                      // Every tab one width, at most 196px, shrinking
+                      // together as the strip runs out of room; the title
+                      // truncates first. The selected tab is opaque, so art
+                      // behind the strip never shows through its title.
+                      "group/tab relative inline-flex h-7.5 min-w-9 shrink basis-49 items-center rounded-md transition-[background-color,box-shadow,color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
+                      active
+                        ? "bg-background text-foreground shadow-xs ring-[0.5px] ring-foreground/10 ring-inset dark:bg-muted"
+                        : badgeCount > 0
+                          ? "text-muted-foreground ring-1 ring-destructive/60 ring-inset hover:bg-foreground/5 hover:text-foreground"
+                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                    )
+                  : "relative inline-flex max-w-56 shrink-0 items-center rounded-full border transition-[background-color,border-color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
+                plain
+                  ? undefined
+                  : active
+                    ? "border-(--nessa-chat-accent-ink)/45 bg-(--nessa-chat-accent-ink)/10"
+                    : cn(
+                        // The whole pill — title and close together — takes
+                        // the hover wash as one control.
+                        "hover:bg-accent",
+                        badgeCount > 0
+                          ? "border-destructive/60"
+                          : "border-transparent",
+                      ),
               )}
             >
               <button
                 {...tabButton}
                 className={cn(
-                  "inline-flex min-w-0 cursor-pointer items-center gap-1.5 rounded-full border-0 bg-transparent py-1.5 pl-3 font-sans nessa-text-2 transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
-                  tab.closeable && onClose ? "pr-1" : "pr-3",
-                  active
-                    ? "font-semibold text-foreground"
-                    : "font-medium text-muted-foreground",
+                  plain
+                    ? // One weight for every title, selected or not; the
+                      // tab's own colour says which is selected.
+                      "flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent pl-2.5 text-left font-sans nessa-text-2 font-medium whitespace-nowrap text-inherit"
+                    : "inline-flex min-w-0 cursor-pointer items-center gap-1.5 rounded-full border-0 bg-transparent py-1.5 pl-3 font-sans nessa-text-2 transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
+                  tab.closeable && onClose ? "pr-1" : plain ? "pr-2.5" : "pr-3",
+                  plain
+                    ? undefined
+                    : active
+                      ? "font-semibold text-foreground"
+                      : "font-medium text-muted-foreground",
                   chatTabsFocusClassName,
                 )}
               >
                 {tab.icon || goesBack ? (
                   <span
                     aria-hidden="true"
-                    className="relative flex size-3.5 shrink-0 items-center justify-center [&_svg]:size-3.5"
+                    className={cn(
+                      "relative flex shrink-0 items-center justify-center",
+                      plain ? "size-4 [&_svg]:size-4" : "size-3.5 [&_svg]:size-3.5",
+                    )}
                   >
                     {tab.icon ? (
                       <span
@@ -500,7 +532,19 @@ function ChatTabs({
                   tabIndex={-1}
                   title={`Close ${tab.title} (Delete)`}
                   onClick={() => onClose(tab.id)}
-                  className="mr-1.5 inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 text-muted-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:text-foreground motion-reduce:transition-none [&_svg]:size-3"
+                  className={cn(
+                    "inline-flex size-5 shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-muted-foreground outline-none transition-[color,opacity] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:text-foreground motion-reduce:transition-none [&_svg]:size-3",
+                    plain
+                      ? cn(
+                          "mr-1 rounded-sm",
+                          // A plain tab's close waits for the tab to be
+                          // selected, hovered or focused; touch shows it.
+                          active
+                            ? undefined
+                            : "opacity-0 group-hover/tab:opacity-100 group-focus-within/tab:opacity-100 [@media(hover:none)]:opacity-100",
+                        )
+                      : "mr-1.5 rounded-full",
+                  )}
                 >
                   <X aria-hidden="true" />
                 </button>

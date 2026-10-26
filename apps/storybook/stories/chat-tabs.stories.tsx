@@ -22,7 +22,7 @@ function TabsExample({
     { id: "scratch", title: "Scratchpad", closeable: true },
   ],
 }: {
-  variant?: "pills" | "dots"
+  variant?: "pills" | "dots" | "plain"
   initialTabs?: ChatTabItem[]
 }) {
   const [tabs, setTabs] = React.useState<ChatTabItem[]>(initialTabs)
@@ -91,7 +91,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "The floating chat window's tab strip: pill tabs on a horizontally scrolling tablist — the active tab washed and outlined in the chat ink — or, with `variant=\"dots\"`, the selected tab named at the start and every tab a page dot after it; with a glowing dot for tabs whose agent is working, an attention badge for tabs that need the user, close controls on closeable tabs, and a trailing new-tab button. The selected tab is scrolled into the track. Arrow keys, Home, and End rove the tablist, and every focus outline draws inset so the scrolling track never clips it. Pair each tab with a `chat-tab-panel-<id>` panel; PillComposer's Playground shows it as the chat window's conversation switcher.",
+          "The floating chat window's tab strip: pill tabs on a horizontally scrolling tablist — the active tab washed and outlined in the chat ink — or, with `variant=\"dots\"`, the selected tab named at the start and every tab a page dot after it; or, with `variant=\"plain\"`, glyph and title on the strip's own ground with the selected tab an opaque rounded tab; with a glowing dot for tabs whose agent is working, an attention badge for tabs that need the user, close controls on closeable tabs, and a trailing new-tab button. The selected tab is scrolled into the track. Arrow keys, Home, and End rove the tablist, and every focus outline draws inset so the scrolling track never clips it. Pair each tab with a `chat-tab-panel-<id>` panel; PillComposer's Playground shows it as the chat window's conversation switcher.",
       },
     },
   },
@@ -166,6 +166,66 @@ const avatar = (hue: number) => (
     }}
   />
 )
+
+export const Plain: Story = {
+  tags: ["reduced-motion"],
+  parameters: storyDocumentation(
+    "The window top-row variant: every tab is its glyph and title on the strip's own ground, all one width, shrinking together as room runs out. The selected tab is an opaque rounded tab, so art behind the strip never shows through it; the others are text with a hover wash. A tab's close shows while it is selected, hovered, or focused.",
+  ),
+  render: () => (
+    <TabsExample
+      variant="plain"
+      initialTabs={[
+        { id: "release", title: "Release notes", kind: "file", closeable: true, icon: avatar(300) },
+        { id: "triage", title: "Bug triage", kind: "file", closeable: true, icon: avatar(30) },
+        { id: "scratch", title: "Scratchpad", kind: "file", closeable: true, icon: avatar(150) },
+      ]}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    if (!canvasElement.ownerDocument.defaultView?.navigator.webdriver) return
+    const canvas = within(canvasElement)
+    const strip = canvasElement.querySelector<HTMLElement>("[data-slot=chat-tabs]")!
+    await expect(strip).toHaveAttribute("data-variant", "plain")
+    const tabOf = (name: string) =>
+      canvas.getByRole("tab", { name }).closest<HTMLElement>("[data-slot=chat-tab]")!
+    const closeOf = (name: string) =>
+      tabOf(name).querySelector<HTMLElement>("[data-slot=chat-tab-close]")!
+    // Every tab one width.
+    const widths = ["Release notes", "Bug triage", "Scratchpad"].map(
+      (name) => tabOf(name).getBoundingClientRect().width,
+    )
+    await expect(Math.max(...widths) - Math.min(...widths)).toBeLessThan(1)
+    // The selected tab is filled and shows its close; the others are bare
+    // and keep their close hidden until hovered.
+    const fill = (name: string) => getComputedStyle(tabOf(name)).backgroundColor
+    await expect(fill("Release notes")).not.toBe("rgba(0, 0, 0, 0)")
+    await expect(fill("Scratchpad")).toBe("rgba(0, 0, 0, 0)")
+    await expect(getComputedStyle(closeOf("Release notes")).opacity).toBe("1")
+    // Without hover (touch) every close shows; otherwise it waits for the
+    // tab to be hovered or focused. A synthetic hover sets no :hover, so
+    // focus stands in for both.
+    const touch = canvasElement.ownerDocument.defaultView!.matchMedia(
+      "(hover: none)",
+    ).matches
+    await expect(getComputedStyle(closeOf("Scratchpad")).opacity).toBe(
+      touch ? "1" : "0",
+    )
+    canvas.getByRole("tab", { name: "Scratchpad" }).focus()
+    await waitFor(() =>
+      expect(getComputedStyle(closeOf("Scratchpad")).opacity).toBe("1"),
+    )
+    await userEvent.click(canvas.getByRole("tab", { name: "Bug triage" }))
+    await expect(canvas.getByRole("tabpanel")).toHaveTextContent("Bug triage")
+    await userEvent.click(closeOf("Scratchpad"))
+    await expect(
+      canvas.queryByRole("tab", { name: "Scratchpad" }),
+    ).not.toBeInTheDocument()
+    await expect(
+      canvasElement.ownerDocument.scrollingElement?.scrollTop ?? 0,
+    ).toBe(0)
+  },
+}
 
 export const PageDots: Story = {
   tags: ["reduced-motion"],
