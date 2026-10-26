@@ -1,0 +1,19 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "gradient-text",
+  "title": "Gradient Text",
+  "description": "Text painted with one still gradient running across all of it, the wordmark look of Type In without the typing. Stays real text. For a word or two, such as a name in a heading.",
+  "registryDependencies": [
+    "nessalabs/nessa_ui/nessa-base",
+    "nessalabs/nessa_ui/utils"
+  ],
+  "files": [
+    {
+      "path": "packages/react/src/components/gradient-text.tsx",
+      "content": "import * as React from \"react\";\n\nimport { cn } from \"@/lib/utils\";\n\n/** The default paint: the Bloom palette, lifted so it reads on a dark field. */\nconst gradientTextColors = Object.freeze([\n  \"#ffc08a\",\n  \"#ff8ab4\",\n  \"#e3b2ff\",\n  \"#c0a2ff\",\n  \"#9db4ff\",\n] as const);\n\nexport interface GradientTextProps extends React.ComponentProps<\"span\"> {\n  /** CSS colours spread across the text, left to right. */\n  colors?: readonly string[];\n}\n\n/**\n * Text painted with one gradient that runs across all of it, standing still:\n * the wordmark look of TypeIn without the typing. It stays real text, read\n * and selected as written. Made for a word or two, such as a name in a\n * heading; it is not for running copy.\n */\nfunction GradientText({\n  colors = gradientTextColors,\n  className,\n  style,\n  ...props\n}: GradientTextProps) {\n  return (\n    <span\n      data-slot=\"gradient-text\"\n      className={cn(\n        \"bg-clip-text text-transparent [-webkit-background-clip:text] [background-image:var(--nessa-gradient-text-paint)] [box-decoration-break:clone] [-webkit-box-decoration-break:clone]\",\n        className,\n      )}\n      style={\n        {\n          \"--nessa-gradient-text-paint\": `linear-gradient(90deg, ${colors.join(\", \")})`,\n          ...style,\n        } as React.CSSProperties\n      }\n      {...props}\n    />\n  );\n}\n\nexport { GradientText, gradientTextColors };\n",
+      "type": "registry:ui",
+      "target": "components/ui/gradient-text.tsx"
+    }
+  ],
+  "type": "registry:ui"
+}

@@ -383,6 +383,11 @@ export {
   type BloomFieldValue,
 } from "./components/bloom-field"
 export {
+  GradientText,
+  gradientTextColors,
+  type GradientTextProps,
+} from "./components/gradient-text"
+export {
   TypeIn,
   typeInColors,
   typeInGaps,
