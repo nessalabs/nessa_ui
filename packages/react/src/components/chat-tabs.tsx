@@ -431,9 +431,11 @@ function ChatTabs({
                   ? cn(
                       // Every tab one width, at most 196px, shrinking
                       // together as the strip runs out of room; the title
-                      // truncates first. The selected tab is opaque, so art
-                      // behind the strip never shows through its title.
-                      "group/tab relative inline-flex h-7.5 min-w-9 shrink basis-49 items-center rounded-md transition-[background-color,box-shadow,color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
+                      // truncates first, and past the glyph and close's own
+                      // room (64px) the track scrolls. The selected tab is
+                      // opaque, so art behind the strip never shows through
+                      // its title.
+                      "group/tab relative inline-flex h-7.5 min-w-16 shrink basis-49 items-center rounded-md transition-[background-color,box-shadow,color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
                       active
                         ? "bg-muted text-foreground shadow-xs ring-[0.5px] ring-foreground/10 ring-inset"
                         : badgeCount > 0

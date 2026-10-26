@@ -196,6 +196,17 @@ export const Plain: Story = {
       (name) => tabOf(name).getBoundingClientRect().width,
     )
     await expect(Math.max(...widths) - Math.min(...widths)).toBeLessThan(1)
+    // Squeezed, a tab keeps room for its glyph and close: neither overlaps.
+    strip.style.width = "120px"
+    try {
+      const tab = tabOf("Scratchpad")
+      const glyph = tab.querySelector<HTMLElement>("[role=tab] > span")!.getBoundingClientRect()
+      const close = closeOf("Scratchpad").getBoundingClientRect()
+      await expect(glyph.right).toBeLessThanOrEqual(close.left)
+      await expect(close.right).toBeLessThanOrEqual(tab.getBoundingClientRect().right)
+    } finally {
+      strip.style.width = ""
+    }
     // The selected tab is filled and shows its close; the others are bare
     // and keep their close hidden until hovered.
     const fill = (name: string) => getComputedStyle(tabOf(name)).backgroundColor
