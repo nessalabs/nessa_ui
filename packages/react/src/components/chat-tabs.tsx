@@ -435,7 +435,7 @@ function ChatTabs({
                       // behind the strip never shows through its title.
                       "group/tab relative inline-flex h-7.5 min-w-9 shrink basis-49 items-center rounded-md transition-[background-color,box-shadow,color] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
                       active
-                        ? "bg-background text-foreground shadow-xs ring-[0.5px] ring-foreground/10 ring-inset dark:bg-muted"
+                        ? "bg-muted text-foreground shadow-xs ring-[0.5px] ring-foreground/10 ring-inset"
                         : badgeCount > 0
                           ? "text-muted-foreground ring-1 ring-destructive/60 ring-inset hover:bg-foreground/5 hover:text-foreground"
                           : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
