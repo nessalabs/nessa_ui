@@ -15,7 +15,8 @@ import {
 import {
   menuItemCheckClassName,
   menuItemIndicatorClassName,
-  menuShortcutClassName,
+  menuItemNoteClassName,
+  menuRowGeometryClassName,
 } from "@/lib/menu-recipe"
 import { cn } from "@/lib/utils"
 
@@ -177,12 +178,7 @@ function ModelPickerRow({ group, model, selected }: ModelPickerRowProps) {
         {selected ? <Check className={menuItemCheckClassName} /> : null}
       </span>
       {model.description ? (
-        <span
-          className={cn(
-            menuShortcutClassName,
-            "ml-0 max-w-[45%] truncate",
-          )}
-        >
+        <span className={menuItemNoteClassName} title={model.description}>
           {model.description}
         </span>
       ) : null}
@@ -508,7 +504,7 @@ function ModelPicker({
                 getItemId={modelItemId}
                 getItemKeywords={modelItemKeywords}
                 renderItem={renderModelItem}
-                optionClassName="min-h-7.5 rounded-lg px-2.5 py-1 nessa-text-3"
+                optionClassName={menuRowGeometryClassName}
                 value={selectedItemId}
                 onValueChange={selectModel}
                 query={query}
