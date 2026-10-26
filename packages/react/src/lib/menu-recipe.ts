@@ -17,7 +17,7 @@
  * the leading column always holds the item's own icon.
  */
 
-import { cn } from "./utils"
+import { cn } from "@/lib/utils"
 
 /** Padding inside the floating menu card, shared by root and submenus. */
 export const menuSurfacePaddingClassName = cn("p-1.25")
