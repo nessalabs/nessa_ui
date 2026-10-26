@@ -5,6 +5,8 @@ import * as React from "react";
 import { useComposedRefs } from "@/lib/compose";
 import { cn } from "@/lib/utils";
 
+import { gradientTextColors } from "./gradient-text";
+
 const reducedMotionQuery = "(prefers-reduced-motion: reduce)";
 
 function subscribeToReducedMotion(callback: () => void) {
@@ -28,14 +30,8 @@ function useReducedMotion() {
  */
 const typeInGaps = Object.freeze([150, 95, 160, 110, 135] as const);
 
-/** The default paint: the Bloom palette, lifted so it reads on a dark field. */
-const typeInColors = Object.freeze([
-  "#ffc08a",
-  "#ff8ab4",
-  "#e3b2ff",
-  "#c0a2ff",
-  "#9db4ff",
-] as const);
+/** The default paint, the same as GradientText's: a typed name and a still one match. */
+const typeInColors = gradientTextColors;
 
 /** How long the caret blinks before the first key, and each blink after. */
 const BLINK_MS = 250;

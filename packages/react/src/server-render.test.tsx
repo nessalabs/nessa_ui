@@ -30,6 +30,7 @@ import { Input } from "./components/input";
 import { LoadingText } from "./components/loading-text";
 import { UndoCard } from "./components/undo-card";
 import { ToolTrace } from "./components/tool-trace";
+import { GradientText } from "./components/gradient-text";
 import { TypeIn } from "./components/type-in";
 import { StepDots } from "./components/step-dots";
 import { Message } from "./components/message";
@@ -93,6 +94,7 @@ test("primitives render without a browser global", () => {
     ).includes('data-slot="bloom-field"'),
   );
   assert.ok(server(<TypeIn text="Nessa" />).includes("Nessa"));
+  assert.ok(server(<GradientText>Nessa</GradientText>).includes(">Nessa</span>"));
   assert.ok(server(<StepDots count={3} current={1} />).includes("Step 2 of 3"));
   assert.ok(
     server(<AgentCard agent="clawd" name="Claude" />).includes(

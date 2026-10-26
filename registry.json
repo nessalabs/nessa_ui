@@ -985,6 +985,23 @@
       ]
     },
     {
+      "name": "gradient-text",
+      "type": "registry:ui",
+      "title": "Gradient Text",
+      "description": "Text painted with one still gradient running across all of it, the wordmark look of Type In without the typing. Stays real text. For a word or two, such as a name in a heading.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/gradient-text.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/gradient-text.tsx"
+        }
+      ]
+    },
+    {
       "name": "type-in",
       "type": "registry:ui",
       "title": "Type In",
@@ -992,7 +1009,8 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils",
-        "nessalabs/nessa_ui/compose"
+        "nessalabs/nessa_ui/compose",
+        "nessalabs/nessa_ui/gradient-text"
       ],
       "files": [
         {
