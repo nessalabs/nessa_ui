@@ -189,7 +189,7 @@ export const typographyScaleCheck = defineCheck({
       }
     }
 
-    for (const filePath of context.files.match(["packages/react/src/components/**/*.tsx", "packages/react/src/composites/**/*.tsx"])) {
+    for (const filePath of context.files.match(["packages/react/src/components/**/*.tsx", "packages/react/src/composites/**/*.tsx", "packages/react/src/lib/menu-recipe.ts"])) {
       for (const token of new Set(classTokens(await context.parseTypeScript(filePath)))) {
         if (TAILWIND_SIZE.test(token)) {
           findings.push(context.fail(`${token} is a bare Tailwind size; use a coordinated nessa-text level.`, { contractId: "TOKEN-004", path: filePath }))

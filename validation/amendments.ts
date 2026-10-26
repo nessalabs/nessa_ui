@@ -264,7 +264,7 @@ export const amendments: readonly Amendment[] = Object.freeze([
     targets: ["validation/nessa/check-metadata.ts"],
     beforeFingerprint: "7d59b7c0e7937612bbc2cfbba2ca7327a90fa2f369dd22187f7c062b53284d5c",
     afterFingerprint: "ee2dce255347826516fd4cc33ba39d19e47fb527ef53cbe30dd04e41c4767160",
-    rationale: "Every menu's row size and words now come from one recipe outside the component tree, lib/menu-recipe.ts, which dropdown and context menus, the composer's access mode and the model picker's rows all read. The typography-scale check only read components and composites, so the one file that now sets the text level of every menu was outside it. Its inputs widen to that file.",
+    rationale: "Every menu's row size and words now come from one recipe outside the component tree, lib/menu-recipe.ts, which dropdown and context menus, the composer's access mode and the model picker's rows all read. The typography-scale check only read components and composites, so the one file that now sets the text level of every menu was outside it. Both the check's metadata inputs and the files it scans widen to that file, whose classes are written as `cn(...)` calls so the class-surface parser reads them as it reads a component's.",
     compatibility: "Strictly widens what TOKEN-004 reads; no requirement is weakened and no exception is added. The recipe already uses the coordinated levels (nessa-text-2 and nessa-text-3) only.",
     migration: "None for consumers.",
     supersedes: null,

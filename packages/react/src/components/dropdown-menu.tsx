@@ -149,7 +149,7 @@ function DropdownMenuItem({
       className={cn(
         menuItemClassName,
         dropdownMenuItemFocusClassName,
-        "data-[variant=destructive]:text-destructive data-[variant=destructive]:data-[highlighted]:text-destructive",
+        "data-[variant=destructive]:text-destructive data-[variant=destructive]:[&_svg]:text-destructive data-[variant=destructive]:data-[highlighted]:text-destructive",
         className,
       )}
       {...props}

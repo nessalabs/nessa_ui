@@ -443,6 +443,9 @@
           "type": "registry:lib",
           "target": "lib/menu-recipe.ts"
         }
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/utils"
       ]
     },
     {

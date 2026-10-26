@@ -215,10 +215,16 @@ const ComposerAccessMode = React.forwardRef<
                       menuItemClassName,
                       "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                       option === "full-access" &&
-                        "text-destructive data-[highlighted]:text-destructive [&_svg]:text-destructive",
+                        "text-destructive data-[highlighted]:text-destructive",
                     )}
                   >
-                    <ComposerAccessModeIcon value={option} className="size-4" />
+                    <ComposerAccessModeIcon
+                      value={option}
+                      className={cn(
+                        "size-4",
+                        option === "full-access" && "text-destructive",
+                      )}
+                    />
                     <span className="flex-1">{composerAccessModeLabels[option]}</span>
                     <span
                       aria-hidden="true"
