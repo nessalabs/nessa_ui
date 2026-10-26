@@ -12,6 +12,11 @@ import {
   useNessaLayerScope,
   usePortalContainer,
 } from "@/lib/portal-container"
+import {
+  menuItemCheckClassName,
+  menuItemIndicatorClassName,
+  menuShortcutClassName,
+} from "@/lib/menu-recipe"
 import { cn } from "@/lib/utils"
 
 /** Describes one selectable model in a provider catalog. */
@@ -152,25 +157,35 @@ function resolveActiveProviderId(
   )
 }
 
-/** Renders model-specific content inside a searchable-listbox option. */
+/**
+ * Renders model-specific content inside a searchable-listbox option, as one
+ * menu row: the model's icon, its name, the check when chosen, then its
+ * description as a muted trailing note — the order a menu's checkable item
+ * uses (`lib/menu-recipe`).
+ */
 function ModelPickerRow({ group, model, selected }: ModelPickerRowProps) {
   return (
-    <span className="grid w-full grid-cols-[2rem_minmax(0,1fr)_1.25rem] items-center gap-2">
+    <span className="flex w-full min-w-0 items-center gap-2.5">
       <span
         aria-hidden="true"
-        className="flex size-8 items-center justify-center rounded-full bg-background text-foreground shadow-xs [&_svg]:size-4"
+        className="flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4"
       >
         {model.icon ?? group.icon}
       </span>
-      <span className="min-w-0">
-        <span className="block truncate nessa-text-4 font-medium">{model.label}</span>
-        {model.description ? (
-          <span className="block truncate nessa-text-2 text-muted-foreground">
-            {model.description}
-          </span>
-        ) : null}
+      <span className="min-w-0 flex-1 truncate">{model.label}</span>
+      <span aria-hidden="true" className={menuItemIndicatorClassName}>
+        {selected ? <Check className={menuItemCheckClassName} /> : null}
       </span>
-      {selected ? <Check aria-hidden="true" className="size-4" /> : null}
+      {model.description ? (
+        <span
+          className={cn(
+            menuShortcutClassName,
+            "ml-0 max-w-[45%] truncate",
+          )}
+        >
+          {model.description}
+        </span>
+      ) : null}
     </span>
   )
 }
@@ -493,6 +508,7 @@ function ModelPicker({
                 getItemId={modelItemId}
                 getItemKeywords={modelItemKeywords}
                 renderItem={renderModelItem}
+                optionClassName="min-h-7.5 rounded-lg px-2.5 py-1 nessa-text-3"
                 value={selectedItemId}
                 onValueChange={selectModel}
                 query={query}

@@ -87,6 +87,7 @@ type FocusComponent =
   | "drawer"
   | "dialog"
   | "dropdown-menu"
+  | "context-menu"
   | "pagination"
   | "page-outline"
   | "price-chart/price-chart"
@@ -535,10 +536,19 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
-  // The shared item recipe is referenced by the plain, checkbox, radio, and
-  // sub-trigger items.
+  // Each menu's focus class is applied to its plain, checkbox, radio, and
+  // sub-trigger items; the rest of the row is the shared menu recipe.
   {
     component: "dropdown-menu",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 4,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  {
+    component: "context-menu",
     layer: "outline",
     state: "focus-visible",
     className: "focus-visible:outline-ring",
@@ -839,6 +849,8 @@ export const focusGeometryClasses = Object.freeze([
   // outset outline would land on (or past) the padding edge.
   { component: "dropdown-menu", className: "focus-visible:outline-2", count: 4 },
   { component: "dropdown-menu", className: "focus-visible:-outline-offset-2", count: 4 },
+  { component: "context-menu", className: "focus-visible:outline-2", count: 4 },
+  { component: "context-menu", className: "focus-visible:-outline-offset-2", count: 4 },
   // Page buttons routinely sit inside a clipping table shell, so their lone
   // outline draws inset.
   { component: "pagination", className: "focus-visible:outline-2", count: 1 },

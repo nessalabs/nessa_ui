@@ -2,12 +2,23 @@
 
 import * as React from "react"
 import { ContextMenu as ContextMenuPrimitive } from "radix-ui"
-import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react"
+import { CheckIcon, ChevronRightIcon } from "lucide-react"
 
 import {
   useNessaLayerScope,
   usePortalContainer,
 } from "@/lib/portal-container"
+import {
+  menuCheckableItemClassName,
+  menuItemCheckClassName,
+  menuItemClassName,
+  menuItemIndicatorClassName,
+  menuLabelClassName,
+  menuSeparatorClassName,
+  menuShortcutClassName,
+  menuSubTriggerChevronClassName,
+  menuSurfacePaddingClassName,
+} from "@/lib/menu-recipe"
 import { cn } from "@/lib/utils"
 import { popoverSurfaceVariants } from "./popover-surface"
 
@@ -63,8 +74,12 @@ function ContextMenuRadioGroup(
   )
 }
 
-const contextMenuItemClassName =
-  "relative flex cursor-default select-none items-center gap-2 rounded-lg px-2 py-1.5 font-sans nessa-text-4 text-popover-foreground outline-none transition-colors data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground"
+/**
+ * Every row's keyboard focus ring, drawn inset because the card clips its
+ * overflow; the rest of the row comes from the shared menu recipe.
+ */
+const contextMenuItemFocusClassName =
+  "focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
 
 function ContextMenuContent({
   className,
@@ -82,7 +97,8 @@ function ContextMenuContent({
         collisionPadding={12}
         className={cn(
           popoverSurfaceVariants({ elevation: "xl", radius: "xl" }),
-          "z-50 max-h-[var(--radix-context-menu-content-available-height)] min-w-48 origin-[var(--radix-context-menu-content-transform-origin)] overflow-y-auto overflow-x-hidden p-1 outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+          menuSurfacePaddingClassName,
+          "z-50 max-h-[var(--radix-context-menu-content-available-height)] min-w-48 origin-[var(--radix-context-menu-content-transform-origin)] overflow-y-auto overflow-x-hidden outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           className,
         )}
         {...props}
@@ -108,7 +124,8 @@ function ContextMenuSubContent({
         sideOffset={4}
         className={cn(
           popoverSurfaceVariants({ elevation: "xl", radius: "xl" }),
-          "z-50 min-w-40 origin-[var(--radix-context-menu-content-transform-origin)] overflow-hidden p-1 outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+          menuSurfacePaddingClassName,
+          "z-50 min-w-40 origin-[var(--radix-context-menu-content-transform-origin)] overflow-hidden outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
           className,
         )}
         {...props}
@@ -119,7 +136,7 @@ function ContextMenuSubContent({
 
 export interface ContextMenuItemProps
   extends React.ComponentProps<typeof ContextMenuPrimitive.Item> {
-  /** Indents the item to align with checkbox and radio indicators. */
+  /** Indents an icon-less item to line up with siblings that lead with an icon. */
   inset?: boolean
   /** Destructive actions render in the destructive semantic color. */
   variant?: "default" | "destructive"
@@ -137,7 +154,8 @@ function ContextMenuItem({
       data-inset={inset || undefined}
       data-variant={variant}
       className={cn(
-        contextMenuItemClassName,
+        menuItemClassName,
+        contextMenuItemFocusClassName,
         "data-[variant=destructive]:text-destructive data-[variant=destructive]:data-[highlighted]:bg-destructive/10 data-[variant=destructive]:data-[highlighted]:text-destructive data-[variant=destructive]:[&_svg]:text-destructive",
         className,
       )}
@@ -148,7 +166,7 @@ function ContextMenuItem({
 
 export interface ContextMenuSubTriggerProps
   extends React.ComponentProps<typeof ContextMenuPrimitive.SubTrigger> {
-  /** Indents the item to align with checkbox and radio indicators. */
+  /** Indents an icon-less item to line up with siblings that lead with an icon. */
   inset?: boolean
 }
 
@@ -163,14 +181,18 @@ function ContextMenuSubTrigger({
       data-slot="context-menu-sub-trigger"
       data-inset={inset || undefined}
       className={cn(
-        contextMenuItemClassName,
+        menuItemClassName,
+        contextMenuItemFocusClassName,
         "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
         className,
       )}
       {...props}
     >
       {children}
-      <ChevronRightIcon aria-hidden="true" className="ml-auto" />
+      <ChevronRightIcon
+        aria-hidden="true"
+        className={menuSubTriggerChevronClassName}
+      />
     </ContextMenuPrimitive.SubTrigger>
   )
 }
@@ -194,22 +216,28 @@ function ContextMenuCheckboxItem({
   return (
     <ContextMenuPrimitive.CheckboxItem
       data-slot="context-menu-checkbox-item"
-      className={cn(contextMenuItemClassName, "pl-8", className)}
+      className={cn(
+        menuItemClassName,
+        contextMenuItemFocusClassName,
+        menuCheckableItemClassName,
+        className,
+      )}
       onSelect={(event) => {
         if (!closeOnSelect) event.preventDefault()
         onSelect?.(event)
       }}
       {...props}
     >
+      {children}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute left-2 flex size-4 items-center justify-center"
+        data-slot="context-menu-item-indicator"
+        className={menuItemIndicatorClassName}
       >
         <ContextMenuPrimitive.ItemIndicator>
-          <CheckIcon className="size-4 text-popover-foreground" />
+          <CheckIcon className={menuItemCheckClassName} />
         </ContextMenuPrimitive.ItemIndicator>
       </span>
-      {children}
     </ContextMenuPrimitive.CheckboxItem>
   )
 }
@@ -222,25 +250,31 @@ function ContextMenuRadioItem({
   return (
     <ContextMenuPrimitive.RadioItem
       data-slot="context-menu-radio-item"
-      className={cn(contextMenuItemClassName, "pl-8", className)}
+      className={cn(
+        menuItemClassName,
+        contextMenuItemFocusClassName,
+        menuCheckableItemClassName,
+        className,
+      )}
       {...props}
     >
+      {children}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute left-2 flex size-4 items-center justify-center"
+        data-slot="context-menu-item-indicator"
+        className={menuItemIndicatorClassName}
       >
         <ContextMenuPrimitive.ItemIndicator>
-          <CircleIcon className="size-2 fill-current text-popover-foreground" />
+          <CheckIcon className={menuItemCheckClassName} />
         </ContextMenuPrimitive.ItemIndicator>
       </span>
-      {children}
     </ContextMenuPrimitive.RadioItem>
   )
 }
 
 export interface ContextMenuLabelProps
   extends React.ComponentProps<typeof ContextMenuPrimitive.Label> {
-  /** Indents the label to align with checkbox and radio indicators. */
+  /** Indents the label to line up with items that lead with an icon. */
   inset?: boolean
 }
 
@@ -249,10 +283,7 @@ function ContextMenuLabel({ className, inset, ...props }: ContextMenuLabelProps)
     <ContextMenuPrimitive.Label
       data-slot="context-menu-label"
       data-inset={inset || undefined}
-      className={cn(
-        "px-2 py-1.5 font-sans nessa-text-2 font-medium text-muted-foreground data-[inset]:pl-8",
-        className,
-      )}
+      className={cn(menuLabelClassName, className)}
       {...props}
     />
   )
@@ -265,7 +296,7 @@ function ContextMenuSeparator({
   return (
     <ContextMenuPrimitive.Separator
       data-slot="context-menu-separator"
-      className={cn("-mx-1 my-1 h-px bg-border", className)}
+      className={cn(menuSeparatorClassName, className)}
       {...props}
     />
   )
@@ -278,10 +309,7 @@ function ContextMenuShortcut({
   return (
     <span
       data-slot="context-menu-shortcut"
-      className={cn(
-        "ml-auto font-sans nessa-text-2 tracking-widest text-muted-foreground",
-        className,
-      )}
+      className={cn(menuShortcutClassName, className)}
       {...props}
     />
   )

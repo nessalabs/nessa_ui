@@ -1,12 +1,20 @@
 "use client"
 
 import * as React from "react"
+import { Check } from "lucide-react"
 import { DropdownMenu } from "radix-ui"
 
 import {
   useNessaLayerScope,
   usePortalContainer,
 } from "@/lib/portal-container"
+import {
+  menuItemCheckClassName,
+  menuItemClassName,
+  menuItemIndicatorClassName,
+  menuLabelClassName,
+  menuSurfacePaddingClassName,
+} from "@/lib/menu-recipe"
 import { cn } from "@/lib/utils"
 
 export type ComposerAccessModeValue =
@@ -190,11 +198,12 @@ const ComposerAccessMode = React.forwardRef<
             sideOffset={8}
             collisionPadding={12}
             className={cn(
-              "z-50 min-w-48 rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+              menuSurfacePaddingClassName,
+              "z-50 min-w-48 rounded-xl border border-border bg-popover text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
               contentClassName,
             )}
           >
-            <DropdownMenu.Label className="px-2 py-1.5 font-sans nessa-text-2 font-medium text-muted-foreground">
+            <DropdownMenu.Label className={menuLabelClassName}>
               Access mode
             </DropdownMenu.Label>
             <DropdownMenu.RadioGroup value={value} onValueChange={setValue}>
@@ -203,12 +212,23 @@ const ComposerAccessMode = React.forwardRef<
                     key={option}
                     value={option}
                     className={cn(
-                      "flex min-h-10 cursor-default select-none items-center gap-2 rounded-lg px-2 font-sans nessa-text-4 text-foreground outline-none transition-colors data-[highlighted]:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring data-[state=checked]:bg-accent/70",
-                      option === "full-access" && "text-destructive",
+                      menuItemClassName,
+                      "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                      option === "full-access" &&
+                        "text-destructive data-[highlighted]:text-destructive",
                     )}
                   >
                     <ComposerAccessModeIcon value={option} />
                     <span className="flex-1">{composerAccessModeLabels[option]}</span>
+                    <span
+                      aria-hidden="true"
+                      data-slot="composer-access-mode-indicator"
+                      className={menuItemIndicatorClassName}
+                    >
+                      <DropdownMenu.ItemIndicator>
+                        <Check className={menuItemCheckClassName} />
+                      </DropdownMenu.ItemIndicator>
+                    </span>
                   </DropdownMenu.RadioItem>
                 ))}
             </DropdownMenu.RadioGroup>

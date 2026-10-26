@@ -6,6 +6,8 @@
 
 @source "./components";
 @source "./composites";
+/* The one class recipe that lives outside a component: the menu rows. */
+@source "./lib/menu-recipe.ts";
 
 @custom-variant dark (&:is(.dark *));
 

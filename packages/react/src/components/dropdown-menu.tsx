@@ -2,19 +2,38 @@
 
 import * as React from "react"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
-import { Check, ChevronRight, Circle } from "lucide-react"
+import { Check, ChevronRight } from "lucide-react"
 
 import {
   useNessaLayerScope,
   usePortalContainer,
 } from "@/lib/portal-container"
+import {
+  menuCheckableItemClassName,
+  menuItemCheckClassName,
+  menuItemClassName,
+  menuItemIndicatorClassName,
+  menuLabelClassName,
+  menuSeparatorClassName,
+  menuShortcutClassName,
+  menuSubTriggerChevronClassName,
+  menuSurfacePaddingClassName,
+} from "@/lib/menu-recipe"
 import { cn } from "@/lib/utils"
 import { popoverSurfaceVariants } from "./popover-surface"
+
+/**
+ * Every row's keyboard focus ring, drawn inset because the card clips its
+ * overflow; the rest of the row comes from the shared menu recipe.
+ */
+const dropdownMenuItemFocusClassName =
+  "focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
 
 /** The floating card both the root menu and its submenus are drawn on. */
 const dropdownMenuSurfaceClassName = cn(
   popoverSurfaceVariants({ elevation: "md", radius: "xl" }),
-  "z-50 min-w-32 origin-(--radix-dropdown-menu-content-transform-origin) p-1 outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+  menuSurfacePaddingClassName,
+  "z-50 min-w-48 origin-(--radix-dropdown-menu-content-transform-origin) outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
 )
 
 /** The dropdown menu root: owns open state and coordinates trigger and content. */
@@ -97,21 +116,15 @@ function DropdownMenuLabel({
   return (
     <DropdownMenuPrimitive.Label
       data-slot="dropdown-menu-label"
-      className={cn(
-        "px-2 py-1.5 nessa-text-2 font-medium text-muted-foreground",
-        className,
-      )}
+      className={cn(menuLabelClassName, className)}
       {...props}
     />
   )
 }
 
-const dropdownMenuItemClassName =
-  "relative flex min-h-8 cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 font-sans nessa-text-4 text-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground"
-
 export interface DropdownMenuItemProps
   extends React.ComponentProps<typeof DropdownMenuPrimitive.Item> {
-  /** Indents the item to align with indicator-bearing siblings. */
+  /** Indents an icon-less item to line up with siblings that lead with an icon. */
   inset?: boolean
   /** `destructive` renders the item in the destructive text tone. */
   variant?: "default" | "destructive"
@@ -134,8 +147,9 @@ function DropdownMenuItem({
       data-inset={inset || undefined}
       data-variant={variant}
       className={cn(
-        dropdownMenuItemClassName,
-        "data-[inset]:pl-8 data-[variant=destructive]:text-destructive data-[variant=destructive]:data-[highlighted]:text-destructive",
+        menuItemClassName,
+        dropdownMenuItemFocusClassName,
+        "data-[variant=destructive]:text-destructive data-[variant=destructive]:data-[highlighted]:text-destructive",
         className,
       )}
       {...props}
@@ -144,7 +158,7 @@ function DropdownMenuItem({
 }
 
 /**
- * A toggleable menu item. Checked state is shown only by the leading check
+ * A toggleable menu item. Checked state is shown only by the trailing check
  * indicator — never by a persistent background wash — so the highlight wash
  * always means "this row is under the pointer or keyboard".
  */
@@ -157,16 +171,25 @@ function DropdownMenuCheckboxItem({
   return (
     <DropdownMenuPrimitive.CheckboxItem
       data-slot="dropdown-menu-checkbox-item"
-      className={cn(dropdownMenuItemClassName, "pl-8", className)}
+      className={cn(
+        menuItemClassName,
+        dropdownMenuItemFocusClassName,
+        menuCheckableItemClassName,
+        className,
+      )}
       checked={checked}
       {...props}
     >
-      <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
+      {children}
+      <span
+        aria-hidden="true"
+        data-slot="dropdown-menu-item-indicator"
+        className={menuItemIndicatorClassName}
+      >
         <DropdownMenuPrimitive.ItemIndicator>
-          <Check aria-hidden="true" className="size-3.5" />
+          <Check className={menuItemCheckClassName} />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
-      {children}
     </DropdownMenuPrimitive.CheckboxItem>
   )
 }
@@ -185,8 +208,7 @@ function DropdownMenuRadioGroup({
 
 /**
  * One single-select option. Like the checkbox item, selection is shown only
- * by the leading dot indicator, keeping the accent wash reserved for the
- * highlight.
+ * by the trailing check, keeping the accent wash reserved for the highlight.
  */
 function DropdownMenuRadioItem({
   className,
@@ -196,15 +218,24 @@ function DropdownMenuRadioItem({
   return (
     <DropdownMenuPrimitive.RadioItem
       data-slot="dropdown-menu-radio-item"
-      className={cn(dropdownMenuItemClassName, "pl-8", className)}
+      className={cn(
+        menuItemClassName,
+        dropdownMenuItemFocusClassName,
+        menuCheckableItemClassName,
+        className,
+      )}
       {...props}
     >
-      <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
+      {children}
+      <span
+        aria-hidden="true"
+        data-slot="dropdown-menu-item-indicator"
+        className={menuItemIndicatorClassName}
+      >
         <DropdownMenuPrimitive.ItemIndicator>
-          <Circle aria-hidden="true" className="size-2 fill-current" />
+          <Check className={menuItemCheckClassName} />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
-      {children}
     </DropdownMenuPrimitive.RadioItem>
   )
 }
@@ -217,7 +248,7 @@ function DropdownMenuSeparator({
   return (
     <DropdownMenuPrimitive.Separator
       data-slot="dropdown-menu-separator"
-      className={cn("-mx-1 my-1 h-px bg-border", className)}
+      className={cn(menuSeparatorClassName, className)}
       {...props}
     />
   )
@@ -231,10 +262,7 @@ function DropdownMenuShortcut({
   return (
     <span
       data-slot="dropdown-menu-shortcut"
-      className={cn(
-        "ml-auto font-mono nessa-text-2 tracking-widest text-muted-foreground",
-        className,
-      )}
+      className={cn(menuShortcutClassName, className)}
       {...props}
     />
   )
@@ -249,7 +277,7 @@ function DropdownMenuSub({
 
 export interface DropdownMenuSubTriggerProps
   extends React.ComponentProps<typeof DropdownMenuPrimitive.SubTrigger> {
-  /** Indents the trigger to align with indicator-bearing siblings. */
+  /** Indents an icon-less trigger to line up with siblings that lead with an icon. */
   inset?: boolean
 }
 
@@ -265,14 +293,18 @@ function DropdownMenuSubTrigger({
       data-slot="dropdown-menu-sub-trigger"
       data-inset={inset || undefined}
       className={cn(
-        dropdownMenuItemClassName,
-        "data-[inset]:pl-8 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
+        menuItemClassName,
+        dropdownMenuItemFocusClassName,
+        "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
         className,
       )}
       {...props}
     >
       {children}
-      <ChevronRight aria-hidden="true" className="ml-auto size-3.5" />
+      <ChevronRight
+        aria-hidden="true"
+        className={menuSubTriggerChevronClassName}
+      />
     </DropdownMenuPrimitive.SubTrigger>
   )
 }
