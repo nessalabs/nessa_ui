@@ -17,10 +17,11 @@ const meta = {
     },
   },
   args: { children: "Nessa" },
+  // A paragraph, not a heading: the docs page's own h1 must stay the page's heading.
   render: (args) => (
-    <h1 className="nessa-text-1 font-semibold">
+    <p className="nessa-text-1 font-semibold">
       Welcome to <GradientText {...args} />
-    </h1>
+    </p>
   ),
 } satisfies Meta<typeof GradientText>
 
@@ -29,12 +30,12 @@ type Story = StoryObj<typeof meta>
 
 export const Playground: Story = {
   parameters: storyDocumentation(
-    "A name in a heading. The play test proves the text is all there at once, clipped to the gradient, with nothing animating.",
+    "A name in a line of large text. The play test proves the text is all there at once, clipped to the gradient, with nothing animating.",
   ),
   play: async ({ canvasElement }) => {
     const name = canvasElement.querySelector<HTMLElement>('[data-slot="gradient-text"]')!
     await expect(name.textContent).toBe("Nessa")
-    await expect(canvasElement.querySelector("h1")!.textContent).toBe("Welcome to Nessa")
+    await expect(canvasElement.querySelector("p")!.textContent).toBe("Welcome to Nessa")
     await expect(getComputedStyle(name).backgroundClip).toBe("text")
     await expect(getComputedStyle(name).backgroundImage).toContain("linear-gradient")
     await expect(canvasElement.getAnimations({ subtree: true })).toHaveLength(0)
