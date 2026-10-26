@@ -288,7 +288,9 @@ function ChatTabs({
             ? "shrink-0"
             : cn(
                 "flex-1 overflow-x-auto [overscroll-behavior-x:contain] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-                plain ? "gap-1" : "gap-1.5",
+                // A plain tab's shadow falls below it; room for it, since a
+                // scrolling track clips both ways.
+                plain ? "gap-1 py-0.5" : "gap-1.5",
               ),
         )}
       >
