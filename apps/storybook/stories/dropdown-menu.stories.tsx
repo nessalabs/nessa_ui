@@ -18,7 +18,19 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@nessalabs/ui"
-import { Archive, Copy, PencilLine, Share2, Trash2 } from "lucide-react"
+import {
+  Archive,
+  CircleArrowRight,
+  CircleCheck,
+  CircleDashed,
+  CircleSlash,
+  CircleX,
+  Contrast,
+  Copy,
+  PencilLine,
+  Share2,
+  Trash2,
+} from "lucide-react"
 
 import { storyDocumentation } from "./story-documentation"
 
@@ -30,7 +42,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A composable action menu on the popover surface. The trigger projects onto any Nessa button; the content composes groups with labels, plain items, checkbox and radio items with leading indicators, separators, shortcut hints, and nested submenus. The accent wash always means \"this row is under the pointer or keyboard\" — checked state is shown only by the item indicators.",
+          "A composable action menu on the popover surface. The trigger projects onto any Nessa button; the content composes groups with labels, plain items, checkbox and radio items with a trailing check, separators, shortcut hints, and nested submenus. The accent wash always means \"this row is under the pointer or keyboard\" — checked state is shown only by the item indicators.",
       },
     },
   },
@@ -142,7 +154,7 @@ export const Submenu: Story = {
   // Cross-engine: portalled layers, typeahead, and focus return.
   tags: ["cross-engine"],
   parameters: storyDocumentation(
-    "The nested submenu path: hovering or activating the sub-trigger opens the sub-content beside the menu, here holding a single-select radio group whose selection is marked by the leading dot indicator only.",
+    "The nested submenu path: hovering or activating the sub-trigger opens the sub-content beside the menu, here holding a single-select radio group whose selection is marked by the trailing check only.",
   ),
   render: () => <TraceActionsMenu />,
   play: async ({ canvasElement }) => {
@@ -153,6 +165,83 @@ export const Submenu: Story = {
     await userEvent.click(subTrigger)
     const teamOption = await body.findByRole("menuitemradio", { name: "My team" })
     await expect(teamOption).toHaveAttribute("aria-checked", "true")
+    await userEvent.keyboard("{Escape}")
+    await waitFor(() =>
+      expect(body.queryByRole("menu")).not.toBeInTheDocument(),
+    )
+  },
+}
+
+const statuses = [
+  { value: "backlog", label: "Backlog", icon: CircleDashed },
+  { value: "next", label: "Next up", icon: CircleArrowRight },
+  { value: "progress", label: "In progress", icon: Contrast },
+  { value: "blocked", label: "Blocked", icon: CircleSlash },
+  { value: "done", label: "Completed", icon: CircleCheck },
+  { value: "cancelled", label: "Cancelled", icon: CircleX },
+] as const
+
+function StatusMenu() {
+  const [status, setStatus] = React.useState<string>("progress")
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm">
+          Status
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-56">
+        <DropdownMenuRadioGroup value={status} onValueChange={setStatus}>
+          {statuses.map(({ value, label, icon: Icon }, index) => (
+            <DropdownMenuRadioItem key={value} value={value}>
+              <Icon aria-hidden="true" />
+              {label}
+              <DropdownMenuShortcut>{index + 1}</DropdownMenuShortcut>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+export const IconsChecksAndShortcuts: Story = {
+  parameters: storyDocumentation(
+    "Every row in one order: its icon leading, the words, then the check for the chosen option and a muted shortcut at the trailing end. The play test pins that order and the 30px row, and checks the shortcut column lines up whether or not a row is checked.",
+  ),
+  render: () => <StatusMenu />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const body = within(canvasElement.ownerDocument.body)
+    await userEvent.click(canvas.getByRole("button", { name: "Status" }))
+    const chosen = await body.findByRole("menuitemradio", { name: "In progress 3" })
+    const other = body.getByRole("menuitemradio", { name: "Blocked 4" })
+    await expect(chosen).toHaveAttribute("aria-checked", "true")
+
+    const box = (element: Element) => element.getBoundingClientRect()
+    const part = (row: HTMLElement, selector: string) => {
+      const found = row.querySelector(selector)
+      if (!found) throw new Error(`missing ${selector}`)
+      return found
+    }
+    const icon = part(chosen, "svg")
+    const check = part(chosen, '[data-slot="dropdown-menu-item-indicator"] svg')
+    const shortcut = part(chosen, '[data-slot="dropdown-menu-shortcut"]')
+    await expect(Math.round(box(chosen).height)).toBe(30)
+    await expect(box(icon).right).toBeLessThan(box(check).left)
+    await expect(box(check).right).toBeLessThan(box(shortcut).left)
+    await expect(
+      box(part(other, '[data-slot="dropdown-menu-shortcut"]')).right,
+    ).toBe(box(shortcut).right)
+
+    await userEvent.click(other)
+    await waitFor(() =>
+      expect(body.queryByRole("menu")).not.toBeInTheDocument(),
+    )
+    await userEvent.click(canvas.getByRole("button", { name: "Status" }))
+    await expect(
+      await body.findByRole("menuitemradio", { name: "Blocked 4" }),
+    ).toHaveAttribute("aria-checked", "true")
     await userEvent.keyboard("{Escape}")
     await waitFor(() =>
       expect(body.queryByRole("menu")).not.toBeInTheDocument(),

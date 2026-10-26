@@ -433,6 +433,22 @@
       ]
     },
     {
+      "name": "menu-recipe",
+      "type": "registry:lib",
+      "title": "Menu recipe",
+      "description": "The row geometry every Nessa menu shares: the card padding, a 30px row with a leading icon, a trailing check before any shortcut, section labels, hairline separators, and muted shortcut notes. Dropdown menus, context menus, and the model picker's rows all draw from it.",
+      "files": [
+        {
+          "path": "packages/react/src/lib/menu-recipe.ts",
+          "type": "registry:lib",
+          "target": "lib/menu-recipe.ts"
+        }
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/utils"
+      ]
+    },
+    {
       "name": "nessa-provider",
       "type": "registry:lib",
       "title": "Nessa provider",
@@ -1706,6 +1722,7 @@
         "radix-ui"
       ],
       "registryDependencies": [
+        "nessalabs/nessa_ui/menu-recipe",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/searchable-listbox",
@@ -1992,9 +2009,11 @@
       "title": "Composer Access Mode",
       "description": "A compact access and approval mode dropdown using distinct shield states.",
       "dependencies": [
+        "lucide-react",
         "radix-ui"
       ],
       "registryDependencies": [
+        "nessalabs/nessa_ui/menu-recipe",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/portal-container",
         "nessalabs/nessa_ui/utils"
@@ -2259,6 +2278,7 @@
         "radix-ui"
       ],
       "registryDependencies": [
+        "nessalabs/nessa_ui/menu-recipe",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/popover-surface",
         "nessalabs/nessa_ui/portal-container",
@@ -2691,6 +2711,7 @@
         "radix-ui"
       ],
       "registryDependencies": [
+        "nessalabs/nessa_ui/menu-recipe",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/popover-surface",
         "nessalabs/nessa_ui/portal-container",
