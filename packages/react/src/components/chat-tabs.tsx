@@ -462,8 +462,10 @@ function ChatTabs({
                 className={cn(
                   plain
                     ? // One weight for every title, selected or not; the
-                      // tab's own colour says which is selected.
-                      "flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent pl-2.5 text-left font-sans nessa-text-2 font-medium whitespace-nowrap text-inherit"
+                      // tab's own colour says which is selected. A busy dot
+                      // or badge past the room is clipped, never drawn
+                      // over the close.
+                      "flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2 overflow-hidden rounded-md border-0 bg-transparent pl-2.5 text-left font-sans nessa-text-2 font-medium whitespace-nowrap text-inherit"
                     : "inline-flex min-w-0 cursor-pointer items-center gap-1.5 rounded-full border-0 bg-transparent py-1.5 pl-3 font-sans nessa-text-2 transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] motion-reduce:transition-none",
                   tab.closeable && onClose ? "pr-1" : plain ? "pr-2.5" : "pr-3",
                   plain
