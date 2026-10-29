@@ -365,6 +365,56 @@ export const Instant: Story = {
   },
 };
 
+export const LongLabel: Story = {
+  args: {
+    steps: [
+      step("search", "", 0, 5, {
+        label:
+          'Search "site:github.com/nessalabs/nessa-agent/issues/221 startup crash"',
+      }),
+      step(
+        "run",
+        "pnpm --filter @nessalabs/desktop test -- --run gateway",
+        1,
+        3,
+        {
+          label:
+            "Run the desktop gateway tests with the long reporter turned on",
+        },
+      ),
+    ],
+    defaultOpen: true,
+  },
+  parameters: storyDocumentation(
+    "A call whose name is longer than its column, as an agent's own titles often are. The name is cut with an ellipsis where the bar starts, never drawn under it; a detail beside it gives way first.",
+  ),
+  play: async ({ canvasElement }) => {
+    const rows = [
+      ...canvasElement.querySelectorAll<HTMLElement>(
+        "[data-slot=tool-trace-step]",
+      ),
+    ];
+    await expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      const name = row.children[1] as HTMLElement;
+      const track = row.querySelector(
+        "[data-slot=tool-trace-bar]",
+      )!.parentElement!;
+      const label = name.firstElementChild as HTMLElement;
+      // The name and every piece of it end before the bar's track begins.
+      const parts = [...name.children].filter(
+        (part) => !part.classList.contains("sr-only"),
+      );
+      for (const part of [name, ...parts])
+        await expect(part.getBoundingClientRect().right).toBeLessThanOrEqual(
+          track.getBoundingClientRect().left + 0.5,
+        );
+      // And the label is really cut, not merely short.
+      await expect(label.scrollWidth).toBeGreaterThan(label.clientWidth);
+    }
+  },
+};
+
 export const Failed: Story = {
   args: { steps: failed, status: "error", defaultOpen: true },
   parameters: storyDocumentation(
@@ -470,7 +520,9 @@ export const RichText: Story = {
       return found!;
     });
     // The host's drawing, inside the row's one button, with nothing interactive in it.
-    await expect(row.querySelector('[data-story-tag="7f3a2c10"]')).not.toBeNull();
+    await expect(
+      row.querySelector('[data-story-tag="7f3a2c10"]'),
+    ).not.toBeNull();
     await expect(row.querySelectorAll("button, a, [tabindex]")).toHaveLength(0);
     // A row the host leaves alone keeps its text as it is.
     const plain = canvasElement.querySelector<HTMLElement>(
