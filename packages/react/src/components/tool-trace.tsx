@@ -545,17 +545,17 @@ function StepRow({
       >
         {glyph}
       </span>
+      {/* The name column ends where the bar starts: a long label is cut
+          with an ellipsis, never drawn under the bar. The detail gives way
+          first. */}
       <span className="flex min-w-0 items-baseline gap-1.5">
-        <Shimmer
-          active={live(step) && shown}
-          className="shrink-0 whitespace-nowrap"
-        >
+        <Shimmer active={live(step) && shown} className="min-w-0 truncate">
           {renderText(step.label, "label", step)}
         </Shimmer>
         {step.detail ? (
           <span
             className={cn(
-              "min-w-0 truncate font-mono nessa-text-1",
+              "min-w-0 shrink-[4] truncate font-mono nessa-text-1",
               step.status === "failed"
                 ? "text-destructive"
                 : "text-muted-foreground",
