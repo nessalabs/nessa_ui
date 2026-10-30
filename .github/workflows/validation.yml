@@ -17,7 +17,7 @@ concurrency:
 jobs:
   full:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       NESSA_VALIDATION_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
     steps:
