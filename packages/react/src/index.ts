@@ -81,6 +81,12 @@ export {
   type CheckboxListProps,
 } from "./components/checkbox-list"
 export {
+  DeviceFigure,
+  deviceFigureKinds,
+  type DeviceFigureKind,
+  type DeviceFigureProps,
+} from "./components/device-figure"
+export {
   KeyFingerprint,
   fingerprintGroups,
   type KeyFingerprintProps,

@@ -161,6 +161,19 @@
      see docs/architecture/chart-series-ramp.md. */
   --nessa-market-gain: oklch(0.5 0.135 148);
   --nessa-market-loss: oklch(0.55 0.19 27);
+  /* DeviceFigure: a machine drawn as a small object under one soft top
+     light, its body graphite in dark and brushed aluminium in light; a
+     screen is dark glass in both. Shown beside the device's name, never the
+     only way to tell devices apart, so none of these is a contrast pair. */
+  --nessa-device-body-top: oklch(0.97 0.002 286);
+  --nessa-device-body-bottom: oklch(0.83 0.004 286);
+  --nessa-device-rim: oklch(0 0 0 / 0.14);
+  --nessa-device-screen-top: oklch(0.33 0.008 286);
+  --nessa-device-screen-bottom: oklch(0.18 0.004 286);
+  --nessa-device-detail: oklch(0.6 0.005 286);
+  --nessa-device-light: oklch(1 0 0);
+  --nessa-device-led: oklch(0.42 0.005 286);
+  --nessa-device-shadow: oklch(0 0 0 / 0.18);
 }
 
 /* Dark, anchored to the scope that resolved it.
@@ -278,6 +291,15 @@
   --nessa-diff-dark-addition: oklch(0.6222 0.1661 146.22);
   --nessa-market-gain: oklch(0.8 0.19 150);
   --nessa-market-loss: oklch(0.7 0.19 25);
+  --nessa-device-body-top: oklch(0.4 0.006 286);
+  --nessa-device-body-bottom: oklch(0.21 0.004 286);
+  --nessa-device-rim: oklch(1 0 0 / 0.15);
+  --nessa-device-screen-top: oklch(0.29 0.008 286);
+  --nessa-device-screen-bottom: oklch(0.17 0.004 286);
+  --nessa-device-detail: oklch(0.14 0.003 286);
+  --nessa-device-light: oklch(0.96 0.002 286);
+  --nessa-device-led: oklch(0.96 0.002 286);
+  --nessa-device-shadow: oklch(0 0 0 / 0.55);
 }
 
 /* Constrained UI scale. The private factor keeps nested scopes and consumer

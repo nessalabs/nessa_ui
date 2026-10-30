@@ -28,6 +28,7 @@ import { EmptyState } from "./components/empty-state";
 import { Favicon } from "./components/favicon";
 import { Input } from "./components/input";
 import { LoadingText } from "./components/loading-text";
+import { DeviceFigure } from "./components/device-figure";
 import { UndoCard } from "./components/undo-card";
 import { ToolTrace } from "./components/tool-trace";
 import { GradientText } from "./components/gradient-text";
@@ -94,6 +95,9 @@ test("primitives render without a browser global", () => {
     ).includes('data-slot="bloom-field"'),
   );
   assert.ok(server(<TypeIn text="Nessa" />).includes("Nessa"));
+  assert.ok(
+    server(<DeviceFigure kind="server" dimmed />).includes('data-dimmed="true"'),
+  );
   assert.ok(server(<GradientText>Nessa</GradientText>).includes(">Nessa</span>"));
   assert.ok(server(<StepDots count={3} current={1} />).includes("Step 2 of 3"));
   assert.ok(
