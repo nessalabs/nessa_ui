@@ -124,6 +124,7 @@
       "nessa-device-screen-bottom": "oklch(0.18 0.004 286)",
       "nessa-device-detail": "oklch(0.6 0.005 286)",
       "nessa-device-light": "oklch(1 0 0)",
+      "nessa-device-led": "oklch(0.42 0.005 286)",
       "nessa-device-shadow": "oklch(0 0 0 / 0.18)",
       "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 20%, transparent)",
       "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)",
@@ -204,6 +205,7 @@
       "nessa-device-screen-bottom": "oklch(0.17 0.004 286)",
       "nessa-device-detail": "oklch(0.14 0.003 286)",
       "nessa-device-light": "oklch(0.96 0.002 286)",
+      "nessa-device-led": "oklch(0.96 0.002 286)",
       "nessa-device-shadow": "oklch(0 0 0 / 0.55)",
       "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 65%, transparent)",
       "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)",
@@ -399,6 +401,7 @@
       "--nessa-device-screen-bottom": "oklch(0.17 0.004 286)",
       "--nessa-device-detail": "oklch(0.14 0.003 286)",
       "--nessa-device-light": "oklch(0.96 0.002 286)",
+      "--nessa-device-led": "oklch(0.96 0.002 286)",
       "--nessa-device-shadow": "oklch(0 0 0 / 0.55)"
     },
     "@media (prefers-reduced-motion: reduce)": {

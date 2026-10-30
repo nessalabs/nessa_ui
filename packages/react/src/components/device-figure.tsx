@@ -43,7 +43,7 @@ function Desktop({ paint }: { paint: Paint }) {
       <Shadow cy={96} rx={64} />
       <rect x="16" y="54" width="128" height="38" rx="11" fill={`url(#${paint.body})`} stroke="var(--nessa-device-rim)" />
       <rect x="26" y="54.5" width="108" height="1" fill={`url(#${paint.sheen})`} />
-      <circle data-slot="device-figure-light" cx="30" cy="80" r="1.6" fill="var(--nessa-device-light)" opacity="0.85" />
+      <circle data-slot="device-figure-light" cx="30" cy="80" r="1.6" fill="var(--nessa-device-led)" opacity="0.85" />
       <rect x="112" y="78.5" width="7" height="3" rx="1.5" fill="var(--nessa-device-detail)" />
       <rect x="122" y="78.5" width="7" height="3" rx="1.5" fill="var(--nessa-device-detail)" />
     </>
@@ -74,8 +74,8 @@ function Server({ paint }: { paint: Paint }) {
         strokeLinecap="round"
       />
       <rect x="64" y={y + 10.5} width="44" height="7" rx="2" fill="var(--nessa-device-detail)" opacity="0.8" />
-      <circle data-slot="device-figure-light" cx="124" cy={y + 14} r="2" fill="var(--nessa-device-light)" />
-      <circle cx="132" cy={y + 14} r="2" fill="var(--nessa-device-light)" opacity="0.25" />
+      <circle data-slot="device-figure-light" cx="124" cy={y + 14} r="2" fill="var(--nessa-device-led)" />
+      <circle cx="132" cy={y + 14} r="2" fill="var(--nessa-device-led)" opacity="0.25" />
     </g>
   )
   return (
@@ -161,7 +161,7 @@ function DeviceFigure({ kind, dimmed = false, className, ...props }: DeviceFigur
       data-kind={kind}
       data-dimmed={dimmed || undefined}
       className={cn(
-        "inline-block aspect-[4/3] shrink-0 transition-opacity duration-(--nessa-motion-duration-slow) data-[dimmed]:opacity-45 motion-reduce:transition-none [&_[data-slot=device-figure-light]]:transition-opacity data-[dimmed]:[&_[data-slot=device-figure-light]]:opacity-0",
+        "inline-block aspect-[4/3] shrink-0 transition-opacity duration-(--nessa-motion-duration-slow) data-[dimmed]:opacity-45 motion-reduce:transition-none [&_[data-slot=device-figure-light]]:transition-opacity [&_[data-slot=device-figure-light]]:duration-(--nessa-motion-duration-slow) motion-reduce:[&_[data-slot=device-figure-light]]:transition-none data-[dimmed]:[&_[data-slot=device-figure-light]]:opacity-0",
         className,
       )}
       {...props}
