@@ -3600,7 +3600,22 @@
       "name": "device-figure",
       "type": "registry:ui",
       "title": "Device figure",
-      "description": "A machine drawn as a small object under one soft top light (desktop, laptop, server, monitor, phone or cloud), decoration beside a device's name, faded with its lights out while the device is away.",
+      "description": "A machine drawn as a small object under one soft top light (desktop, laptop, server, monitor, phone, cloud, or a two-sail boat on its water that can float), decoration beside a device's name, faded with its lights out while the device is away.",
+      "cssVars": {
+        "theme": {
+          "animate-nessa-float": "nessa-float calc(var(--nessa-motion-duration-ambient) * 1.5) ease-in-out infinite",
+          "animate-nessa-swell": "nessa-swell calc(var(--nessa-motion-duration-ambient) * 1.25) linear infinite"
+        }
+      },
+      "css": {
+        "@keyframes nessa-float": {
+          "0%, 100%": { "transform": "translateY(0) rotate(-1.4deg)" },
+          "50%": { "transform": "translateY(-2.5px) rotate(1.4deg)" }
+        },
+        "@keyframes nessa-swell": {
+          "to": { "transform": "translateX(-24px)" }
+        }
+      },
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
