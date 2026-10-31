@@ -5,7 +5,14 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 /** The kinds of machine a figure can draw. */
-export type DeviceFigureKind = "desktop" | "laptop" | "server" | "monitor" | "phone" | "cloud"
+export type DeviceFigureKind =
+  | "desktop"
+  | "laptop"
+  | "server"
+  | "monitor"
+  | "phone"
+  | "cloud"
+  | "boat"
 
 /** Every kind, in the order a list of devices would show them. */
 export const deviceFigureKinds: readonly DeviceFigureKind[] = Object.freeze([
@@ -15,6 +22,7 @@ export const deviceFigureKinds: readonly DeviceFigureKind[] = Object.freeze([
   "monitor",
   "phone",
   "cloud",
+  "boat",
 ])
 
 export interface DeviceFigureProps extends Omit<React.ComponentProps<"span">, "children"> {
@@ -25,6 +33,12 @@ export interface DeviceFigureProps extends Omit<React.ComponentProps<"span">, "c
    * does not say why; the status belongs beside it, in words.
    */
   dimmed?: boolean
+  /**
+   * Whether a boat bobs on its water: a slow, small rise and roll, and the
+   * swell drifting past. Still when dimmed, and under reduced motion. Only
+   * the boat moves; every other kind ignores it.
+   */
+  afloat?: boolean
 }
 
 /** The shared paint ids of one figure, unique on the page. */
@@ -32,6 +46,8 @@ interface Paint {
   body: string
   screen: string
   sheen: string
+  /** The boat's water, its fade toward both sides, and that fade as a mask. */
+  water: string
 }
 
 /** A soft shadow under a figure, `rx` wide at `cy`. */
@@ -132,29 +148,99 @@ function Cloud({ paint }: { paint: Paint }) {
   )
 }
 
-const drawings: Record<DeviceFigureKind, (props: { paint: Paint }) => React.ReactElement> = {
+/** One wavelength of swell, 24 wide, repeated past both edges so a drift of one wavelength loops unseen. */
+const swell = (y: number) =>
+  `M-24 ${y}` + Array.from({ length: 9 }, () => " q6 -1.6 12 0 t12 0").join("")
+
+function Boat({ paint, moving }: { paint: Paint; moving: boolean }) {
+  const wave = (y: number, opacity: number, reverse = false) => (
+    <path
+      data-slot="device-figure-swell"
+      d={swell(y)}
+      className={cn(moving && "motion-safe:animate-nessa-swell", reverse && "[animation-direction:reverse]")}
+      stroke="var(--nessa-boat-foam)"
+      strokeOpacity={opacity}
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+  )
+  return (
+    <>
+      <linearGradient id={paint.water} x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="var(--nessa-boat-water-top)" />
+        <stop offset="1" stopColor="var(--nessa-boat-water-bottom)" />
+      </linearGradient>
+      <linearGradient id={`${paint.water}-fade`} gradientUnits="userSpaceOnUse" x1="10" y1="0" x2="150" y2="0">
+        <stop offset="0" stopColor="white" stopOpacity="0" />
+        <stop offset="0.3" stopColor="white" />
+        <stop offset="0.7" stopColor="white" />
+        <stop offset="1" stopColor="white" stopOpacity="0" />
+      </linearGradient>
+      <mask id={`${paint.water}-mask`} maskUnits="userSpaceOnUse" x="0" y="0" width="160" height="120">
+        <rect width="160" height="120" fill={`url(#${paint.water}-fade)`} />
+      </mask>
+      <g mask={`url(#${paint.water}-mask)`}>
+        <ellipse cx="80" cy="97" rx="70" ry="11" fill={`url(#${paint.water})`} />
+        {wave(102, 0.22, true)}
+      </g>
+      {/* Two white sails over a dark hull, rocking on one point at the waterline. */}
+      <g
+        data-slot="device-figure-hull"
+        className={cn(
+          "[transform-box:fill-box] [transform-origin:50%_92%]",
+          moving && "motion-safe:animate-nessa-float",
+        )}
+      >
+        <path d="M80 18 V82" stroke="var(--nessa-boat-mast)" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M83 20 L83 78 L120 78 Z" fill="var(--nessa-boat-sail)" stroke="var(--nessa-boat-sail-rim)" strokeLinejoin="round" />
+        <path d="M77 34 L77 78 L50 78 Z" fill="var(--nessa-boat-sail)" stroke="var(--nessa-boat-sail-rim)" strokeLinejoin="round" />
+        <path d="M42 82 H124 Q121 90 112 94 H54 Q46 90 42 82 Z" fill="var(--nessa-boat-hull)" stroke="var(--nessa-boat-sail-rim)" />
+        <rect x="50" y="82.5" width="66" height="1" fill={`url(#${paint.sheen})`} />
+      </g>
+      <g mask={`url(#${paint.water}-mask)`}>{wave(94, 0.6)}</g>
+    </>
+  )
+}
+
+const drawings: Record<
+  DeviceFigureKind,
+  (props: { paint: Paint; moving: boolean }) => React.ReactElement
+> = {
   desktop: Desktop,
   laptop: Laptop,
   server: Server,
   monitor: Monitor,
   phone: Phone,
   cloud: Cloud,
+  boat: Boat,
 }
 
 /**
  * A machine drawn as a small object under one soft top light: a desktop
- * box, a laptop, a rack server, a monitor, a phone or a cloud. No maker's
+ * box, a laptop, a rack server, a monitor, a phone, a cloud, or a white
+ * two-sail boat on blue water (cloud machines rented from Boat). No maker's
  * logo, so one drawing stands for every brand of it. For a list or page of
  * devices, beside each device's name.
  *
  * It is decoration, hidden from assistive technology: the name and status
  * beside it say what it shows. It fills its box at 4:3; give it a width.
  * Its paint is the `--nessa-device-*` tokens, graphite in dark and
- * aluminium in light.
+ * aluminium in light; the boat's is `--nessa-boat-*`, Boat's indigo.
  */
-function DeviceFigure({ kind, dimmed = false, className, ...props }: DeviceFigureProps) {
+function DeviceFigure({
+  kind,
+  dimmed = false,
+  afloat = false,
+  className,
+  ...props
+}: DeviceFigureProps) {
   const id = React.useId().replace(/:/g, "")
-  const paint: Paint = { body: `${id}-body`, screen: `${id}-screen`, sheen: `${id}-sheen` }
+  const paint: Paint = {
+    body: `${id}-body`,
+    screen: `${id}-screen`,
+    sheen: `${id}-sheen`,
+    water: `${id}-water`,
+  }
   const Drawing = drawings[kind]
   return (
     <span
@@ -162,6 +248,7 @@ function DeviceFigure({ kind, dimmed = false, className, ...props }: DeviceFigur
       data-slot="device-figure"
       data-kind={kind}
       data-dimmed={dimmed || undefined}
+      data-afloat={(kind === "boat" && afloat && !dimmed) || undefined}
       className={cn(
         "inline-block aspect-[4/3] shrink-0 transition-opacity duration-(--nessa-motion-duration-slow) data-[dimmed]:opacity-45 motion-reduce:transition-none [&_[data-slot=device-figure-light]]:transition-opacity [&_[data-slot=device-figure-light]]:duration-(--nessa-motion-duration-slow) motion-reduce:[&_[data-slot=device-figure-light]]:transition-none data-[dimmed]:[&_[data-slot=device-figure-light]]:opacity-0",
         className,
@@ -184,7 +271,7 @@ function DeviceFigure({ kind, dimmed = false, className, ...props }: DeviceFigur
             <stop offset="1" stopColor="var(--nessa-device-light)" stopOpacity="0" />
           </linearGradient>
         </defs>
-        <Drawing paint={paint} />
+        <Drawing paint={paint} moving={kind === "boat" && afloat && !dimmed} />
       </svg>
     </span>
   )

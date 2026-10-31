@@ -141,6 +141,13 @@
           "nessa-device-light": "oklch(1 0 0)",
           "nessa-device-led": "oklch(0.42 0.005 286)",
           "nessa-device-shadow": "oklch(0 0 0 / 0.18)",
+          "nessa-boat-water-top": "oklch(0.56 0.19 272)",
+          "nessa-boat-water-bottom": "oklch(0.4 0.18 272)",
+          "nessa-boat-foam": "oklch(1 0 0)",
+          "nessa-boat-sail": "oklch(0.96 0.025 272)",
+          "nessa-boat-sail-rim": "oklch(0.4 0.18 272 / 0.5)",
+          "nessa-boat-hull": "oklch(0.3 0.13 272)",
+          "nessa-boat-mast": "oklch(0.3 0.13 272)",
           "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 20%, transparent)",
           "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)",
           "nessa-chat-accent": "#2a2a2c",
@@ -222,6 +229,13 @@
           "nessa-device-light": "oklch(0.96 0.002 286)",
           "nessa-device-led": "oklch(0.96 0.002 286)",
           "nessa-device-shadow": "oklch(0 0 0 / 0.55)",
+          "nessa-boat-water-top": "oklch(0.52 0.19 272)",
+          "nessa-boat-water-bottom": "oklch(0.34 0.16 272)",
+          "nessa-boat-foam": "oklch(1 0 0)",
+          "nessa-boat-sail": "oklch(0.98 0.004 272)",
+          "nessa-boat-sail-rim": "oklch(1 0 0 / 0.25)",
+          "nessa-boat-hull": "oklch(0.9 0.02 272)",
+          "nessa-boat-mast": "oklch(0.9 0.02 272)",
           "nessa-invalid-ring": "color-mix(in oklab, var(--destructive) 65%, transparent)",
           "nessa-diff-dark-addition": "oklch(0.6222 0.1661 146.22)",
           "nessa-chat-accent": "#3a3a3d",
@@ -417,7 +431,14 @@
           "--nessa-device-detail": "oklch(0.14 0.003 286)",
           "--nessa-device-light": "oklch(0.96 0.002 286)",
           "--nessa-device-led": "oklch(0.96 0.002 286)",
-          "--nessa-device-shadow": "oklch(0 0 0 / 0.55)"
+          "--nessa-device-shadow": "oklch(0 0 0 / 0.55)",
+          "--nessa-boat-water-top": "oklch(0.52 0.19 272)",
+          "--nessa-boat-water-bottom": "oklch(0.34 0.16 272)",
+          "--nessa-boat-foam": "oklch(1 0 0)",
+          "--nessa-boat-sail": "oklch(0.98 0.004 272)",
+          "--nessa-boat-sail-rim": "oklch(1 0 0 / 0.25)",
+          "--nessa-boat-hull": "oklch(0.9 0.02 272)",
+          "--nessa-boat-mast": "oklch(0.9 0.02 272)"
         },
         "@media (prefers-reduced-motion: reduce)": {
           ":root, :where([data-nessa-root], [data-nessa-theme], [data-nessa-scale])": {
@@ -3579,7 +3600,22 @@
       "name": "device-figure",
       "type": "registry:ui",
       "title": "Device figure",
-      "description": "A machine drawn as a small object under one soft top light (desktop, laptop, server, monitor, phone or cloud), decoration beside a device's name, faded with its lights out while the device is away.",
+      "description": "A machine drawn as a small object under one soft top light (desktop, laptop, server, monitor, phone, cloud, or a two-sail boat on its water that can float), decoration beside a device's name, faded with its lights out while the device is away.",
+      "cssVars": {
+        "theme": {
+          "animate-nessa-float": "nessa-float calc(var(--nessa-motion-duration-ambient) * 1.5) ease-in-out infinite",
+          "animate-nessa-swell": "nessa-swell calc(var(--nessa-motion-duration-ambient) * 1.25) linear infinite"
+        }
+      },
+      "css": {
+        "@keyframes nessa-float": {
+          "0%, 100%": { "transform": "translateY(0) rotate(-1.4deg)" },
+          "50%": { "transform": "translateY(-2.5px) rotate(1.4deg)" }
+        },
+        "@keyframes nessa-swell": {
+          "to": { "transform": "translateX(-24px)" }
+        }
+      },
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils"
