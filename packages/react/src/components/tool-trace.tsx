@@ -465,10 +465,13 @@ function StepDetails({
 const rowClassName =
   "grid w-full min-h-7 cursor-pointer items-center gap-2.5 rounded-md border-0 bg-transparent px-1.5 text-start font-sans nessa-text-2 text-muted-foreground outline-none transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-foreground/(--nessa-state-hover) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none";
 
-/** The columns every row and the axis share: glyph, what, bar, time. */
+/**
+ * The columns every row and the axis share: glyph, what, bar, time. The time
+ * column fits the widest thing it holds, the `stopped` pill, on one line.
+ */
 const columns = (timed: boolean) =>
   timed
-    ? "[grid-template-columns:14px_minmax(0,1fr)_minmax(80px,32%)_58px]"
+    ? "[grid-template-columns:14px_minmax(0,1fr)_minmax(80px,32%)_64px]"
     : "[grid-template-columns:14px_minmax(0,1fr)_auto]";
 
 function StepRow({
@@ -508,7 +511,7 @@ function StepRow({
     );
   const meta =
     step.status === "stopped" ? (
-      <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono nessa-text-1 text-muted-foreground">
+      <span className="justify-self-end rounded-sm bg-muted px-1.5 py-0.5 font-mono nessa-text-1 text-muted-foreground whitespace-nowrap">
         stopped
       </span>
     ) : span && (timed || live(step)) ? (
