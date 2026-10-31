@@ -13,7 +13,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A machine drawn as a small object under one soft top light: a desktop box, a laptop, a rack server, a monitor, a phone or a cloud, with no maker's logo. It is decoration beside a device's name, hidden from assistive technology, and fills its box at 4:3. `dimmed` fades it and puts its lights out while the device is away. Its paint is the `--nessa-device-*` tokens: graphite in dark, aluminium in light.",
+          "A machine drawn as a small object under one soft top light: a desktop box, a laptop, a rack server, a monitor, a phone, a cloud, or a white two-sail boat on Boat's indigo water, with no maker's logo. It is decoration beside a device's name, hidden from assistive technology, and fills its box at 4:3. `dimmed` fades it and puts its lights out while the device is away; `afloat` lets the boat bob, still under reduced motion. Its paint is the `--nessa-device-*` tokens: graphite in dark, aluminium in light.",
       },
     },
   },
@@ -48,7 +48,8 @@ export const EveryKind: Story = {
   ),
   play: async ({ canvasElement }) => {
     const ids = [...canvasElement.querySelectorAll("linearGradient")].map((paint) => paint.id)
-    await expect(ids).toHaveLength(deviceFigureKinds.length * 3)
+    // Three shared paints each, and the boat's water and its fade.
+    await expect(ids).toHaveLength(deviceFigureKinds.length * 3 + 2)
     await expect(new Set(ids).size).toBe(ids.length)
   },
 }
@@ -62,5 +63,33 @@ export const Away: Story = {
     const lights = canvasElement.querySelectorAll<SVGElement>("[data-slot=device-figure-light]")
     await expect(lights.length).toBeGreaterThan(0)
     for (const light of lights) await expect(getComputedStyle(light).opacity).toBe("0")
+  },
+}
+
+export const Afloat: Story = {
+  args: { kind: "boat", afloat: true },
+  parameters: storyDocumentation(
+    "The boat bobs and its swell drifts, unless motion is reduced. The play test proves the hull runs its float, then cancels every animation so nothing keeps ticking.",
+  ),
+  play: async ({ canvasElement }) => {
+    const figure = canvasElement.querySelector<HTMLElement>("[data-slot=device-figure]")!
+    await expect(figure).toHaveAttribute("data-afloat", "true")
+    const hull = figure.querySelector<SVGElement>("[data-slot=device-figure-hull]")!
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches
+    await expect(getComputedStyle(hull).animationName).toBe(reduced ? "none" : "nessa-float")
+    for (const animation of figure.getAnimations({ subtree: true })) animation.cancel()
+  },
+}
+
+export const Ashore: Story = {
+  args: { kind: "boat", afloat: true, dimmed: true },
+  parameters: storyDocumentation(
+    "A boat that is away is faded and still: the play test proves the hull runs no animation.",
+  ),
+  play: async ({ canvasElement }) => {
+    const figure = canvasElement.querySelector<HTMLElement>("[data-slot=device-figure]")!
+    await expect(figure).not.toHaveAttribute("data-afloat")
+    const hull = figure.querySelector<SVGElement>("[data-slot=device-figure-hull]")!
+    await expect(getComputedStyle(hull).animationName).toBe("none")
   },
 }
