@@ -1,0 +1,378 @@
+{
+  "date": "2026-11-03T09:13:42.808Z",
+  "documents": 31,
+  "baselines": [
+    {
+      "owner": "ui-approval",
+      "id": "364cd22a-bd27-44ba-946e-d4f93534faf5",
+      "state": "passed",
+      "message": "Every rule held. This checks the design, not the code.",
+      "result": {
+        "sourceRevision": "a32191c26ee27c2d8159ab6498a0f0530a93e3ea",
+        "checker": "tlc-1.7.4",
+        "date": "2026-11-03T09:13:43.797Z",
+        "config": "tla/ApprovalExit.cfg",
+        "modelDigest": "59b07eaaaea7f44c8e8fb18007ef7a7935856a1685eaca5c5408d3b3bd28072c",
+        "states": 89,
+        "held": ["OneReportPerPeriod", "NoStaleReport"],
+        "broke": [],
+        "unchecked": []
+      }
+    },
+    {
+      "owner": "ui-mermaid",
+      "id": "1eb728b3-264e-422f-aba6-2f6b9aa5b1c2",
+      "state": "passed",
+      "message": "Every rule held. This checks the design, not the code.",
+      "result": {
+        "sourceRevision": "a32191c26ee27c2d8159ab6498a0f0530a93e3ea",
+        "checker": "tlc-1.7.4",
+        "date": "2026-11-03T09:13:48.912Z",
+        "config": "tla/MermaidOwnership.cfg",
+        "modelDigest": "79591b24d930e27d42ae735e321ccfc1360622176d37d8d529d2428a59440d6e",
+        "states": 13,
+        "held": ["ExclusiveConfig", "TimeoutKeepsOwner"],
+        "broke": [],
+        "unchecked": []
+      }
+    },
+    {
+      "owner": "ui-overlay",
+      "id": "b6b165fe-db3c-4883-8550-e1c6a9f40bd4",
+      "state": "passed",
+      "message": "Every rule held. This checks the design, not the code.",
+      "result": {
+        "sourceRevision": "a32191c26ee27c2d8159ab6498a0f0530a93e3ea",
+        "checker": "tlc-1.7.4",
+        "date": "2026-11-03T09:13:54.083Z",
+        "config": "tla/OverlayCoverage.cfg",
+        "modelDigest": "8d1ef32a1d7228294ba5ffc30c8ff286a7b41add3f8112030f854aba65de246b",
+        "states": 8,
+        "held": ["RemainingCoverStaysInert", "HostInertSurvives"],
+        "broke": [],
+        "unchecked": []
+      }
+    },
+    {
+      "owner": "ui-preview",
+      "id": "81328833-6771-4f6d-8716-7104d9a2dd65",
+      "state": "passed",
+      "message": "Every rule held. This checks the design, not the code.",
+      "result": {
+        "sourceRevision": "a32191c26ee27c2d8159ab6498a0f0530a93e3ea",
+        "checker": "tlc-1.7.4",
+        "date": "2026-11-03T09:13:59.594Z",
+        "config": "tla/FileTextGeneration.cfg",
+        "modelDigest": "6f226ae23deee9a77ad1f30e10aaf90a24e6e615ea903e0e36ad8fc69b4c5efa",
+        "states": 21,
+        "held": ["OnlyCurrentPublishes"],
+        "broke": [],
+        "unchecked": []
+      }
+    },
+    {
+      "owner": "ui-transcript",
+      "id": "fb718dfc-3d2b-49d6-91bb-93740e128c1b",
+      "state": "passed",
+      "message": "Every rule held. This checks the design, not the code.",
+      "result": {
+        "sourceRevision": "a32191c26ee27c2d8159ab6498a0f0530a93e3ea",
+        "checker": "tlc-1.7.4",
+        "date": "2026-11-03T09:14:01.654Z",
+        "config": "tla/TranscriptCalls.cfg",
+        "modelDigest": "2704e1e62366a7070090e5c118f43f5a713a3b10dbfe953d10e0820023364dcc",
+        "states": 34,
+        "held": ["PromptOnlyOwnPath", "ResultClearsAbandoned"],
+        "broke": [],
+        "unchecked": []
+      }
+    }
+  ],
+  "controls": [
+    {
+      "name": "timer-and-animation-both-report",
+      "owner": "ui-approval",
+      "expected": "OneReportPerPeriod",
+      "passed": true,
+      "id": "04840bcb-14ed-469a-b871-3ce000e4ecc5",
+      "state": "broke",
+      "message": "A rule broke. This checks the design, not the code.",
+      "result": {
+        "sourceRevision": "a32191c26ee27c2d8159ab6498a0f0530a93e3ea",
+        "checker": "tlc-1.7.4",
+        "date": "2026-11-03T09:13:45.929Z",
+        "config": "tla/ApprovalExit.cfg",
+        "modelDigest": "c666c9d4cd76d87cb8b30952eb8dd09720504a273ff71928f31583c36432c1cf",
+        "states": 109,
+        "held": ["NoStaleReport"],
+        "broke": [
+          {
+            "rule": "OneReportPerPeriod",
+            "path": [
+              "Start with cancelled is {}, epoch is 0, active is 0, callbacks is {}, reports is <<>>, reported is {}.",
+              "Resolve: cancelled is {}, epoch is 1, active is 1, callbacks is {<<1, \"timer\">>, <<1, \"animation\">>}, reports is <<>>, reported is {}.",
+              "Next: cancelled is {}, epoch is 1, active is 1, callbacks is {<<1, \"animation\">>}, reports is <<[period |-> 1, current |-> 1]>>, reported is {1}.",
+              "Next: cancelled is {}, epoch is 1, active is 1, callbacks is {}, reports is <<[period |-> 1, current |-> 1], [period |-> 1, current |-> 1]>>, reported is {1}."
+            ],
+            "states": []
+          }
+        ],
+        "unchecked": []
+      }
+    },
+    {
+      "name": "cancelled-exit-still-reports",
+      "owner": "ui-approval",
+      "expected": "NoStaleReport",
+      "passed": true,
+      "id": "49a5f091-c27a-4669-9dcd-3fb690fe57ba",
+      "state": "broke",
+      "message": "A rule broke. This checks the design, not the code.",
+      "result": {
+        "sourceRevision": "a32191c26ee27c2d8159ab6498a0f0530a93e3ea",
+        "checker": "tlc-1.7.4",
+        "date": "2026-11-03T09:13:47.991Z",
+        "config": "tla/ApprovalExit.cfg",
+        "modelDigest": "bee409661abbfab1abb2d1807b8ee5f1edce57987c32d3f6e28cd4b2f6d74b68",
+        "states": 158,
+        "held": ["OneReportPerPeriod"],
+        "broke": [
+          {
+            "rule": "NoStaleReport",
+            "path": [
+              "Start with cancelled is {}, epoch is 0, active is 0, callbacks is {}, reports is <<>>, reported is {}.",
+              "Resolve: cancelled is {}, epoch is 1, active is 1, callbacks is {<<1, \"timer\">>, <<1, \"animation\">>}, reports is <<>>, reported is {}.",
+              "Clear: cancelled is {1}, epoch is 1, active is 0, callbacks is {<<1, \"timer\">>, <<1, \"animation\">>}, reports is <<>>, reported is {}.",
+              "Next: cancelled is {1}, epoch is 1, active is 0, callbacks is {<<1, \"animation\">>}, reports is <<[period |-> 1, current |-> 0]>>, reported is {1}."
+            ],
+            "states": []
+          }
+        ],
+        "unchecked": []
+      }
+    },
+    {
+      "name": "start-ignores-timeout-quarantine",
+      "owner": "ui-mermaid",
+      "expected": "ExclusiveConfig",
+      "passed": true,
+      "id": "05c62871-c7e0-4f5a-8c96-44aabf80fa25",
+      "state": "broke",
+      "message": "A rule broke. This checks the design, not the code.",
+      "result": {
+        "sourceRevision": "a32191c26ee27c2d8159ab6498a0f0530a93e3ea",
+        "checker": "tlc-1.7.4",
+        "date": "2026-11-03T09:13:50.711Z",
+        "config": "tla/MermaidOwnership.cfg",
+        "modelDigest": "89780f3eb3f0eed10d20a569a7f0ac6555a09e4f1068f84b30c59e4f237aed5d",
+        "states": 16,
+        "held": ["TimeoutKeepsOwner"],
+        "broke": [
+          {
+            "rule": "ExclusiveConfig",
+            "path": [
+              "Start with expired is {}, started is 0, active is {}, linkBusy is FALSE, quarantine is 0.",
+              "Start: expired is {}, started is 1, active is {1}, linkBusy is TRUE, quarantine is 0.",
+              "Timeout: expired is {1}, started is 1, active is {1}, linkBusy is FALSE, quarantine is 1.",
+              "Start: expired is {1}, started is 2, active is {1, 2}, linkBusy is TRUE, quarantine is 1."
+            ],
+            "states": []
+          }
+        ],
+        "unchecked": []
+      }
+    },
+    {
+      "name": "timeout-forgets-underlying-owner",
+      "owner": "ui-mermaid",
+      "expected": "TimeoutKeepsOwner",
+      "passed": true,
+      "id": "bd8f2e74-ecb6-4b99-b330-8e948fd73e47",
+      "state": "broke",
+      "message": "A rule broke. This checks the design, not the code.",
+      "result": {
+        "sourceRevision": "a32191c26ee27c2d8159ab6498a0f0530a93e3ea",
+        "checker": "tlc-1.7.4",
+        "date": "2026-11-03T09:13:52.884Z",
+        "config": "tla/MermaidOwnership.cfg",
+        "modelDigest": "edad1f2778fc587ab899aff283c4ee3b3fdfb186296ecbf5e531da67025be6f3",
+        "states": 5,
+        "held": [],
+        "broke": [
+          {
+            "rule": "TimeoutKeepsOwner",
+            "path": [
+              "Start with expired is {}, started is 0, active is {}, linkBusy is FALSE, quarantine is 0.",
+              "Start: expired is {}, started is 1, active is {1}, linkBusy is TRUE, quarantine is 0.",
+              "Timeout: expired is {1}, started is 1, active is {1}, linkBusy is FALSE, quarantine is 0."
+            ],
+            "states": []
+          },
+          {
+            "rule": "ExclusiveConfig",
+            "path": [
+              "Start with expired is {}, started is 0, active is {}, linkBusy is FALSE, quarantine is 0.",
+              "Start: expired is {}, started is 1, active is {1}, linkBusy is TRUE, quarantine is 0.",
+              "Timeout: expired is {1}, started is 1, active is {1}, linkBusy is FALSE, quarantine is 0.",
+              "Start: expired is {1}, started is 2, active is {1, 2}, linkBusy is TRUE, quarantine is 0."
+            ],
+            "states": []
+          }
+        ],
+        "unchecked": []
+      }
+    },
+    {
+      "name": "first-close-exposes-shared-content",
+      "owner": "ui-overlay",
+      "expected": "RemainingCoverStaysInert",
+      "passed": true,
+      "id": "bb1175a6-5630-469c-a973-276479bd6e33",
+      "state": "broke",
+      "message": "A rule broke. This checks the design, not the code.",
+      "result": {
+        "sourceRevision": "a32191c26ee27c2d8159ab6498a0f0530a93e3ea",
+        "checker": "tlc-1.7.4",
+        "date": "2026-11-03T09:13:56.216Z",
+        "config": "tla/OverlayCoverage.cfg",
+        "modelDigest": "759d9238d312103fadacd67341f6d1ca479bfe63757148915316d26c536e8f42",
+        "states": 10,
+        "held": ["HostInertSurvives"],
+        "broke": [
+          {
+            "rule": "RemainingCoverStaysInert",
+            "path": [
+              "Start with hostInert is FALSE, inert is FALSE, held is {}, opened is {}.",
+              "Open: hostInert is FALSE, inert is TRUE, held is {1}, opened is {1}.",
+              "Open: hostInert is FALSE, inert is TRUE, held is {1, 2}, opened is {1, 2}.",
+              "Close: hostInert is FALSE, inert is FALSE, held is {2}, opened is {2}."
+            ],
+            "states": []
+          }
+        ],
+        "unchecked": []
+      }
+    },
+    {
+      "name": "close-removes-host-inert",
+      "owner": "ui-overlay",
+      "expected": "HostInertSurvives",
+      "passed": true,
+      "id": "8b492928-c750-4a0e-9c66-90f8a810296a",
+      "state": "broke",
+      "message": "A rule broke. This checks the design, not the code.",
+      "result": {
+        "sourceRevision": "a32191c26ee27c2d8159ab6498a0f0530a93e3ea",
+        "checker": "tlc-1.7.4",
+        "date": "2026-11-03T09:13:58.584Z",
+        "config": "tla/OverlayCoverage.cfg",
+        "modelDigest": "e8f087168ee33a398c51d3cb9d1c9bef08d9346e8f23ad872f066d6417a7e4f8",
+        "states": 11,
+        "held": ["RemainingCoverStaysInert"],
+        "broke": [
+          {
+            "rule": "HostInertSurvives",
+            "path": [
+              "Start with hostInert is TRUE, inert is TRUE, held is {}, opened is {}.",
+              "Open: hostInert is TRUE, inert is TRUE, held is {}, opened is {1}.",
+              "Close: hostInert is TRUE, inert is FALSE, held is {}, opened is {}."
+            ],
+            "states": []
+          }
+        ],
+        "unchecked": []
+      }
+    },
+    {
+      "name": "publish-aborted-completion",
+      "owner": "ui-preview",
+      "expected": "OnlyCurrentPublishes",
+      "passed": true,
+      "id": "432bb547-b853-41d6-97a2-a97f08584f3c",
+      "state": "broke",
+      "message": "A rule broke. This checks the design, not the code.",
+      "result": {
+        "sourceRevision": "a32191c26ee27c2d8159ab6498a0f0530a93e3ea",
+        "checker": "tlc-1.7.4",
+        "date": "2026-11-03T09:14:00.600Z",
+        "config": "tla/FileTextGeneration.cfg",
+        "modelDigest": "9030d72276e72822353f7c49efcc7426df64795752a52f2f1498b8a1f6bcfd9b",
+        "states": 7,
+        "held": [],
+        "broke": [
+          {
+            "rule": "OnlyCurrentPublishes",
+            "path": [
+              "Start with pending is {}, active is 0, published is <<>>, nextId is 0.",
+              "Select: pending is {1}, active is 1, published is <<>>, nextId is 1.",
+              "Select: pending is {1, 2}, active is 2, published is <<>>, nextId is 2.",
+              "Complete: pending is {2}, active is 2, published is <<[request |-> 1, owner |-> 2]>>, nextId is 2."
+            ],
+            "states": []
+          }
+        ],
+        "unchecked": []
+      }
+    },
+    {
+      "name": "prompt-abandons-other-thread",
+      "owner": "ui-transcript",
+      "expected": "PromptOnlyOwnPath",
+      "passed": true,
+      "id": "40ac6ae5-91c2-45fe-86af-18eed51480ea",
+      "state": "broke",
+      "message": "A rule broke. This checks the design, not the code.",
+      "result": {
+        "sourceRevision": "a32191c26ee27c2d8159ab6498a0f0530a93e3ea",
+        "checker": "tlc-1.7.4",
+        "date": "2026-11-03T09:14:03.907Z",
+        "config": "tla/TranscriptCalls.cfg",
+        "modelDigest": "c38c23744161d07878d56f7a80971fa65834697612be53965a7314019c76021c",
+        "states": 40,
+        "held": ["ResultClearsAbandoned"],
+        "broke": [
+          {
+            "rule": "PromptOnlyOwnPath",
+            "path": [
+              "Start with completed is {}, abandoned is {}, observations is <<>>, promptDone is {}, open is {\"mainCall\", \"childCall\"}.",
+              "Prompt: completed is {}, abandoned is {\"mainCall\", \"childCall\"}, observations is <<[changed |-> {\"mainCall\", \"childCall\"}, scope |-> \"main\"]>>, promptDone is {\"main\"}, open is {}."
+            ],
+            "states": []
+          }
+        ],
+        "unchecked": []
+      }
+    },
+    {
+      "name": "late-result-keeps-abandoned",
+      "owner": "ui-transcript",
+      "expected": "ResultClearsAbandoned",
+      "passed": true,
+      "id": "2a1be724-49a0-4720-a751-96dd5968b9c4",
+      "state": "broke",
+      "message": "A rule broke. This checks the design, not the code.",
+      "result": {
+        "sourceRevision": "a32191c26ee27c2d8159ab6498a0f0530a93e3ea",
+        "checker": "tlc-1.7.4",
+        "date": "2026-11-03T09:14:06.249Z",
+        "config": "tla/TranscriptCalls.cfg",
+        "modelDigest": "badbd8409aa0c3db080e4b611d8b8a8543cfafb0b63960b3b5c9d63dd49b14c3",
+        "states": 34,
+        "held": ["PromptOnlyOwnPath"],
+        "broke": [
+          {
+            "rule": "ResultClearsAbandoned",
+            "path": [
+              "Start with completed is {}, abandoned is {}, observations is <<>>, promptDone is {}, open is {\"mainCall\", \"childCall\"}.",
+              "Prompt: completed is {}, abandoned is {\"mainCall\"}, observations is <<[changed |-> {\"mainCall\"}, scope |-> \"main\"]>>, promptDone is {\"main\"}, open is {\"childCall\"}.",
+              "Result: completed is {\"mainCall\"}, abandoned is {\"mainCall\"}, observations is <<[changed |-> {\"mainCall\"}, scope |-> \"main\"]>>, promptDone is {\"main\"}, open is {\"childCall\"}."
+            ],
+            "states": []
+          }
+        ],
+        "unchecked": []
+      }
+    }
+  ],
+  "ok": true
+}

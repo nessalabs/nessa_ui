@@ -1,0 +1,36 @@
+{
+  "browser": "156.0.8078.80",
+  "surface": "normal diagram view plus selected details",
+  "results": [
+    {
+      "id": "ui-mermaid",
+      "node": "TimedOut",
+      "heading": "What timeout and cancellation leave behind",
+      "criticalExplanationVisible": true
+    },
+    {
+      "id": "ui-overlay",
+      "node": "Covered",
+      "heading": "What remains reachable",
+      "criticalExplanationVisible": true
+    },
+    {
+      "id": "ui-preview",
+      "node": "Retired",
+      "heading": "What changing the file cancels",
+      "criticalExplanationVisible": true
+    },
+    {
+      "id": "ui-approval",
+      "node": "Settled",
+      "heading": "What exit completion means",
+      "criticalExplanationVisible": true
+    },
+    {
+      "id": "ui-transcript",
+      "node": "Refused",
+      "heading": "Replay is not arbitrary reordering",
+      "criticalExplanationVisible": true
+    }
+  ]
+}

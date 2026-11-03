@@ -1,0 +1,168 @@
+{
+  "ok": true,
+  "browser": "156.0.8078.80",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "pages": 31,
+  "diagrams": 6,
+  "errors": [],
+  "results": [
+    {
+      "id": "nessa-ui",
+      "figures": 1,
+      "failed": 0
+    },
+    {
+      "id": "ui-distribution",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-inventory",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-chat",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-approval",
+      "figures": 1,
+      "failed": 0
+    },
+    {
+      "id": "ui-composer",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-history",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-mermaid",
+      "figures": 1,
+      "failed": 0
+    },
+    {
+      "id": "ui-messages",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-overlay",
+      "figures": 1,
+      "failed": 0
+    },
+    {
+      "id": "ui-queue",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-tools",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-content",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-code",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-identity",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-preview",
+      "figures": 1,
+      "failed": 0
+    },
+    {
+      "id": "ui-interface",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-inputs",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-layers",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-theme",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-streams",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-mapping",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-transcript",
+      "figures": 1,
+      "failed": 0
+    },
+    {
+      "id": "ui-workspace",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-boards",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-charts",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-layout",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-schedules",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-tables",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-windows",
+      "figures": 0,
+      "failed": 0
+    },
+    {
+      "id": "ui-verification",
+      "figures": 0,
+      "failed": 0
+    }
+  ]
+}

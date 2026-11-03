@@ -1,0 +1,65 @@
+[
+  {
+    "owner": "ui-mermaid",
+    "name": "start-ignores-timeout-quarantine",
+    "rule": "ExclusiveConfig",
+    "from": "/\\ ~linkBusy /\\ quarantine = 0",
+    "to": "/\\ ~linkBusy /\\ TRUE"
+  },
+  {
+    "owner": "ui-mermaid",
+    "name": "timeout-forgets-underlying-owner",
+    "rule": "TimeoutKeepsOwner",
+    "from": "quarantine' = i",
+    "to": "quarantine' = 0"
+  },
+  {
+    "owner": "ui-preview",
+    "name": "publish-aborted-completion",
+    "rule": "OnlyCurrentPublishes",
+    "from": "IF i = active THEN",
+    "to": "IF TRUE THEN"
+  },
+  {
+    "owner": "ui-overlay",
+    "name": "first-close-exposes-shared-content",
+    "rule": "RemainingCoverStaysInert",
+    "from": "(Cardinality(held) > 1)",
+    "to": "FALSE"
+  },
+  {
+    "owner": "ui-overlay",
+    "name": "close-removes-host-inert",
+    "rule": "HostInertSurvives",
+    "from": "ELSE inert",
+    "to": "ELSE FALSE"
+  },
+  {
+    "owner": "ui-approval",
+    "name": "timer-and-animation-both-report",
+    "rule": "OneReportPerPeriod",
+    "from": "cb[1] \\notin reported",
+    "to": "TRUE"
+  },
+  {
+    "owner": "ui-approval",
+    "name": "cancelled-exit-still-reports",
+    "rule": "NoStaleReport",
+    "from": "cb[1] \\notin cancelled",
+    "to": "TRUE"
+  },
+  {
+    "owner": "ui-transcript",
+    "name": "prompt-abandons-other-thread",
+    "rule": "PromptOnlyOwnPath",
+    "from": "Path(c) = p",
+    "to": "TRUE"
+  },
+  {
+    "owner": "ui-transcript",
+    "name": "late-result-keeps-abandoned",
+    "rule": "ResultClearsAbandoned",
+    "from": "abandoned' = abandoned \\ {c}",
+    "to": "abandoned' = abandoned"
+  }
+]
