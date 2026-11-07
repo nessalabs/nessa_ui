@@ -8,6 +8,9 @@ shadcn/ui source model and provides two ways to adopt the same components:
 
 Storybook is the visual workshop and living component documentation.
 
+The [state atlas](docs/state/README.md) maps every public feature family, explains
+host ownership and cancellation boundaries, and links actual verification evidence.
+
 ## Architecture contract
 
 All future component, theming, packaging, registry, documentation, and tooling

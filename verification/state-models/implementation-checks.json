@@ -1,0 +1,61 @@
+{
+  "sourceRevision": "a32191c26ee27c2d8159ab6498a0f0530a93e3ea",
+  "date": "2026-11-03",
+  "platform": "Darwin arm64",
+  "node": "24.22.1",
+  "pnpm": "11.9.0",
+  "checks": [
+    {
+      "command": "pnpm install --frozen-lockfile",
+      "exit": 0
+    },
+    {
+      "command": "pnpm validate",
+      "exit": 0,
+      "summary": {
+        "PASS": 14,
+        "FAIL": 0,
+        "EXCEPTION": 9,
+        "PLANNED": 3,
+        "REVIEW": 3,
+        "SKIPPED": 0
+      }
+    },
+    {
+      "command": "pnpm typecheck",
+      "exit": 0,
+      "scope": ["agent-stream", "react", "storybook", "validation"]
+    },
+    {
+      "command": "pnpm test:unit",
+      "exit": 0,
+      "tests": 679,
+      "suites": 77,
+      "passed": 679,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "command": "pnpm validate:full",
+      "exit": 0,
+      "validatorTests": 128,
+      "browserTests": {
+        "chromiumAndReducedMotion": 1517,
+        "firefoxAndWebkit": 114
+      },
+      "unitTests": 679,
+      "ssrTests": 13,
+      "registryArtifacts": 127,
+      "storybookDocsPages": 119,
+      "protectedTreeMutation": false,
+      "packageArtifacts": "passed",
+      "consumerTypesAndBudgets": "passed",
+      "setup": "Initial attempt lacked pinned Playwright browsers; installed Chromium v1234, Firefox v1538 and WebKit v2336 before successful full rerun."
+    }
+  ],
+  "notRun": [
+    "live provider integrations",
+    "external application consumer installation"
+  ],
+  "runtimeSourceChanged": false
+}
