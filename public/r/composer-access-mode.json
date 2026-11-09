@@ -8,6 +8,7 @@
     "radix-ui"
   ],
   "registryDependencies": [
+    "nessalabs/nessa_ui/compose",
     "nessalabs/nessa_ui/menu-recipe",
     "nessalabs/nessa_ui/nessa-base",
     "nessalabs/nessa_ui/portal-container",
