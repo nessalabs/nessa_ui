@@ -178,7 +178,7 @@ export const Flat: Story = {
     const rows = canvasElement.querySelectorAll<HTMLElement>('[data-slot="settings-row"]')
     await expect(getComputedStyle(rows[1]).borderTopWidth).toBe("1px")
     await expect(
-      canvasElement.querySelector('[data-slot="settings-group"]')!.getAttribute("data-surface"),
+      canvasElement.querySelector('[data-slot="settings-group"]')!.getAttribute("data-settings-surface"),
     ).toBe("flat")
   },
 }

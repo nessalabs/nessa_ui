@@ -65,7 +65,7 @@ function SettingsGroup({
     <section
       data-slot="settings-group"
       data-disabled={disabled || undefined}
-      data-surface={surface}
+      data-settings-surface={surface}
       aria-labelledby={title !== undefined ? titleId : undefined}
       aria-describedby={showsReason ? reasonId : undefined}
       className={cn("flex flex-col gap-2 font-sans", className)}
