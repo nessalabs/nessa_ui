@@ -376,7 +376,7 @@ function wraps(element: Element, text: string) {
 
 export const Tables: Story = {
   parameters: storyDocumentation(
-    "Markdown tables render through the kit's Table: a hairline panel with a muted header band and row rules only. Cells wrap between words and never inside one, even under a host that sets overflow-wrap: anywhere, so each column is at least as wide as its longest word. A table wider than the reply scrolls sideways in its own panel instead of squeezing its columns, and becomes a focusable region while it does. Numeric columns aligned right in the Markdown stay right-aligned with tabular figures. An edge with columns scrolled past it fades out, since an overlay scrollbar shows nothing until it is used. The copy control sits in the header band and copies the table's Markdown source.",
+    "Markdown tables render through the kit's Table: a hairline panel with a muted header band and row rules only. Cells wrap between words and never inside one, even under a host that sets overflow-wrap: anywhere, so each column is at least as wide as its longest word. A table wider than the reply scrolls sideways in its own panel instead of squeezing its columns, and becomes a focusable region while it does. Numeric columns aligned right in the Markdown stay right-aligned with tabular figures. An edge with columns scrolled past it fades out, since an overlay scrollbar shows nothing until it is used. The copy control sits just above the table's top-right corner, never on a column name, and copies the table's Markdown source.",
   ),
   render: () => (
     <BreakAnywhereColumn>
@@ -425,13 +425,16 @@ export const Tables: Story = {
       expect(scrollPort(screenings!)).toHaveAttribute("data-hidden-left"),
     )
     await expect(scrollPort(screenings!)).not.toHaveAttribute("data-hidden-right")
-    // The copy control keeps clear of the last column's name.
-    const copy = canvas.getAllByRole("button", { name: "Copy table" })[1]!
-    const seatsName = document.createRange()
-    seatsName.selectNodeContents(canvas.getByText("Seats left"))
-    await expect(seatsName.getBoundingClientRect().right).toBeLessThanOrEqual(
-      copy.getBoundingClientRect().left,
-    )
+    // The copy control sits above each table's top-right corner, never on
+    // the table: a wide table cuts its last column at the panel edge, so a
+    // control inside the panel would cover a column name.
+    const copies = canvas.getAllByRole("button", { name: "Copy table" })
+    for (const [index, table] of [prices!, screenings!].entries()) {
+      const copy = copies[index]!.getBoundingClientRect()
+      const panel = scrollPort(table).getBoundingClientRect()
+      await expect(copy.bottom).toBeLessThanOrEqual(panel.top)
+      await expect(Math.abs(copy.right - panel.right)).toBeLessThanOrEqual(1)
+    }
     // The column the Markdown aligns right stays right-aligned.
     const seats = canvas.getByRole("columnheader", { name: "Seats left" })
     await expect(getComputedStyle(seats).textAlign).toBe("right")

@@ -48,7 +48,7 @@ export interface ToolTraceStep {
   id: string;
   /** What the call did, in a word or two: "Read", "Ran", "Edited". */
   label: string;
-  /** What it did it to: a path, a command, a pattern. Drawn in mono, truncated. */
+  /** What it did it to: a path, a command, a pattern. Drawn in mono; a path is cut from its start, anything else from its end. */
   detail?: string;
   /** The call's own glyph, at 14px. Running, failed, and stopped calls draw their state instead. */
   icon?: React.ReactNode;
@@ -131,6 +131,12 @@ const live = (step: ToolTraceStep) =>
 /** A live call in words: a queued call is waiting, not yet running. */
 const liveWord = (step: ToolTraceStep) =>
   step.status === "pending" ? "waiting" : "running";
+
+/**
+ * A detail that is one path ("src/app.ts", "~/x/y"), not a command or a
+ * pattern: its end, the file name, says the most, so it is cut from its start.
+ */
+const isPath = (detail: string) => !/\s/.test(detail) && detail.includes("/");
 
 /** "<0.1s", "0.4s", "12s", "3m 05s". */
 function formatDuration(ms: number) {
@@ -538,7 +544,6 @@ function StepRow({
         rowClassName,
         columns(timed),
         live(step) && "text-foreground",
-        step.status === "failed" && "text-destructive",
         open && "rounded-none hover:bg-foreground/(--nessa-state-hover)",
       )}
     >
@@ -548,24 +553,39 @@ function StepRow({
       >
         {glyph}
       </span>
-      {/* The name column ends where the bar starts: a long label is cut
-          with an ellipsis, never drawn under the bar. The detail gives way
-          first. */}
+      {/* The name column ends where the bar starts. The label is the verb
+          ("Read", "Searched"), so the detail gives way first and a label is
+          cut only when it is a long name of its own. A path is cut from its
+          start, keeping the file name ("…/workspace-panes.tsx"); anything
+          else is cut from its end. A failed call is told by its glyph and
+          its bar, not by colouring its words. */}
       <span className="flex min-w-0 items-baseline gap-1.5">
-        <Shimmer active={live(step) && shown} className="min-w-0 truncate">
+        <Shimmer
+          active={live(step) && shown}
+          className={cn(
+            "min-w-0 truncate",
+            step.detail && "max-w-[70%] shrink-0",
+          )}
+        >
           {renderText(step.label, "label", step)}
         </Shimmer>
         {step.detail ? (
           <span
+            data-cut={isPath(step.detail) ? "start" : "end"}
             className={cn(
-              "min-w-0 shrink-[4] truncate font-mono nessa-text-1",
-              step.status === "failed"
-                ? "text-destructive"
-                : "text-muted-foreground",
+              "min-w-0 truncate font-mono nessa-text-1 text-muted-foreground",
+              // Laid out right to left, the line overflows at its left end,
+              // so the ellipsis goes there; the text inside stays left to
+              // right and sits at the left while it fits.
+              isPath(step.detail) && "text-left [direction:rtl]",
               step.status === "stopped" && "line-through",
             )}
           >
-            {renderText(step.detail, "detail", step)}
+            {isPath(step.detail) ? (
+              <span dir="ltr">{renderText(step.detail, "detail", step)}</span>
+            ) : (
+              renderText(step.detail, "detail", step)
+            )}
           </span>
         ) : null}
         {step.status === "failed" || live(step) ? (

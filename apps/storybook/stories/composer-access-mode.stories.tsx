@@ -1,6 +1,6 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { expect, userEvent, within } from "storybook/test"
+import { expect, userEvent, waitFor, within } from "storybook/test"
 import {
   ComposerAccessMode,
   type ComposerAccessModeValue,
@@ -169,5 +169,41 @@ export const IconOnly: Story = {
   args: {
     value: "ask-approval",
     showLabel: false,
+  },
+}
+
+export const AlignedToComposer: Story = {
+  parameters: storyDocumentation(
+    "Near the composer's right end, the control passes the composer as `alignTo`, so the menu's right edge meets the composer's right edge instead of running on toward the window edge.",
+  ),
+  render: () => {
+    const composer = React.useRef<HTMLDivElement>(null)
+    return (
+      <div className="flex min-h-64 items-end">
+        <div
+          ref={composer}
+          data-testid="composer"
+          className="flex w-[28rem] items-center justify-end gap-2 rounded-3xl border border-border bg-card px-3 py-2"
+        >
+          <ComposerAccessMode alignTo={composer} value="ask-approval" />
+          <span className="size-9 rounded-full bg-muted" />
+          <span className="size-9 rounded-full bg-muted" />
+        </div>
+      </div>
+    )
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const documentBody = within(canvasElement.ownerDocument.body)
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Access mode: Ask for approval" }),
+    )
+    const menu = await documentBody.findByRole("menu")
+    const edge = canvas.getByTestId("composer").getBoundingClientRect().right
+    await waitFor(() =>
+      expect(Math.abs(menu.getBoundingClientRect().right - edge)).toBeLessThanOrEqual(1),
+    )
+    await userEvent.keyboard("{Escape}")
+    await waitFor(() => expect(documentBody.queryByRole("menu")).toBeNull())
   },
 }

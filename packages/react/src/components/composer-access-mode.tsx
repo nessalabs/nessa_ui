@@ -15,6 +15,7 @@ import {
   menuLabelClassName,
   menuSurfacePaddingClassName,
 } from "@/lib/menu-recipe"
+import { useComposedRefs } from "@/lib/compose"
 import { cn } from "@/lib/utils"
 
 export type ComposerAccessModeValue =
@@ -129,6 +130,14 @@ export interface ComposerAccessModeProps
    * body when there is none. Pass `null` to force the body regardless.
    */
   portalContainer?: HTMLElement | null
+  /**
+   * The surface the menu lines up with, usually the composer the control
+   * sits in. The menu's end edge meets that surface's end edge, so a control
+   * near the composer's right end opens a menu that stays inside the
+   * composer's width rather than running on toward the window edge. Without
+   * it, the menu starts at the control.
+   */
+  alignTo?: React.RefObject<HTMLElement | null>
 }
 
 const ComposerAccessMode = React.forwardRef<
@@ -143,12 +152,33 @@ const ComposerAccessMode = React.forwardRef<
       showLabel = false,
       contentClassName,
       portalContainer,
+      alignTo,
       className,
       title,
       ...props
     },
     ref,
   ) => {
+    const triggerRef = React.useRef<HTMLButtonElement | null>(null)
+    const composedRef = useComposedRefs(ref, triggerRef)
+    // How far the surface's end edge lies past the control's, read as the
+    // menu opens: the menu is aligned to the control's end and moved out by
+    // that much.
+    const [edgeOffset, setEdgeOffset] = React.useState(0)
+    const readEdge = React.useCallback(
+      (open: boolean) => {
+        const trigger = triggerRef.current
+        const surface = alignTo?.current
+        if (!open || !trigger || !surface) return
+        const control = trigger.getBoundingClientRect()
+        const edge = surface.getBoundingClientRect()
+        const rtl = getComputedStyle(trigger).direction === "rtl"
+        setEdgeOffset(
+          Math.max(0, rtl ? control.left - edge.left : edge.right - control.right),
+        )
+      },
+      [alignTo],
+    )
     const resolvedPortalContainer = usePortalContainer(portalContainer)
     const layerScope = useNessaLayerScope()
     const [uncontrolledValue, setUncontrolledValue] =
@@ -169,10 +199,10 @@ const ComposerAccessMode = React.forwardRef<
     )
 
     return (
-      <DropdownMenu.Root>
+      <DropdownMenu.Root onOpenChange={readEdge}>
         <DropdownMenu.Trigger asChild>
           <button
-            ref={ref}
+            ref={composedRef}
             type="button"
             data-slot="composer-access-mode"
             data-access-mode={value}
@@ -194,7 +224,9 @@ const ComposerAccessMode = React.forwardRef<
             {...layerScope}
             data-slot="composer-access-mode-content"
             side="top"
-            align="start"
+            align={alignTo ? "end" : "start"}
+            // An end-aligned menu moves outward for a negative offset.
+            alignOffset={alignTo ? -edgeOffset : 0}
             sideOffset={8}
             collisionPadding={12}
             className={cn(
