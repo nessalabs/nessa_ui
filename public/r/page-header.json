@@ -1,0 +1,19 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "page-header",
+  "title": "Page header",
+  "description": "The top of a page: its title in the one page-title size and its actions at the end of the same line, with no subtitle, so every page starts the same way.",
+  "registryDependencies": [
+    "nessalabs/nessa_ui/nessa-base",
+    "nessalabs/nessa_ui/utils"
+  ],
+  "files": [
+    {
+      "path": "packages/react/src/components/page-header.tsx",
+      "content": "import * as React from \"react\"\n\nimport { cn } from \"@/lib/utils\"\n\nexport interface PageHeaderProps\n  extends Omit<React.ComponentProps<\"header\">, \"title\" | \"children\"> {\n  /** The page's name: one line, in the page title's one size. */\n  title: React.ReactNode\n  /** Controls at the end of the header — Add, a filter, Close — on the title's line. */\n  actions?: React.ReactNode\n  /**\n   * The heading level the title is announced at.\n   * @defaultValue 1\n   */\n  level?: 1 | 2\n  /** Props for the heading itself, such as an `id` a region is labelled by. */\n  titleProps?: Omit<React.ComponentProps<\"h1\">, \"children\">\n}\n\n/**\n * The top of a page: its title, and its actions on the same line at the end.\n * One size, one height and no subtitle, so every page in an app starts the\n * same way; where the header sits (its inset and gutter) is the page's. A\n * title too long for the line is cut with an ellipsis rather than pushing\n * the actions off it.\n */\nfunction PageHeader({\n  title,\n  actions,\n  level = 1,\n  titleProps,\n  className,\n  ...props\n}: PageHeaderProps) {\n  const Heading = level === 1 ? \"h1\" : \"h2\"\n  const { className: titleClassName, ...headingProps } = titleProps ?? {}\n  return (\n    <header\n      data-slot=\"page-header\"\n      className={cn(\"flex min-h-9 min-w-0 items-center gap-3 font-sans\", className)}\n      {...props}\n    >\n      <Heading\n        data-slot=\"page-header-title\"\n        className={cn(\n          \"m-0 min-w-0 flex-1 truncate nessa-text-7 font-semibold text-foreground\",\n          titleClassName,\n        )}\n        {...headingProps}\n      >\n        {title}\n      </Heading>\n      {actions !== undefined ? (\n        <div data-slot=\"page-header-actions\" className=\"flex shrink-0 items-center gap-2\">\n          {actions}\n        </div>\n      ) : null}\n    </header>\n  )\n}\n\nexport { PageHeader }\n",
+      "type": "registry:ui",
+      "target": "components/ui/page-header.tsx"
+    }
+  ],
+  "type": "registry:ui"
+}

@@ -275,8 +275,11 @@ function tableLabel(node: MarkdownNode | undefined) {
  * hugs a small table and takes the full width for a large one; a table whose
  * columns cannot fit even at their narrowest scrolls sideways inside its own
  * panel, fading the side with columns past it, rather than pushing the reply
- * wider. The copy control sits at the end of the header band, over room the
- * last column keeps for it, and copies the table's Markdown source.
+ * wider. The copy control sits just above the panel's top-right corner, in a
+ * strip the table keeps for it, and copies the table's Markdown source. It
+ * never sits on the table itself: a table that scrolls sideways cuts its last
+ * column at the panel edge, so any room kept inside a column is cut too and
+ * the control lands on a column name.
  */
 function MarkdownTable({ node, children, className, ...rest }: TableProps) {
   const source = React.useContext(MarkdownSourceContext)
@@ -287,7 +290,10 @@ function MarkdownTable({ node, children, className, ...rest }: TableProps) {
   return (
     <div
       data-slot="markdown-table"
-      className="group/copy relative my-4 w-fit min-w-0 max-w-full"
+      className={cn(
+        "group/copy relative mb-4 w-fit min-w-0 max-w-full",
+        markdown === null ? "mt-4" : "mt-1 pt-8",
+      )}
     >
       <TableShell className="bg-transparent text-inherit">
         <Table
@@ -298,9 +304,6 @@ function MarkdownTable({ node, children, className, ...rest }: TableProps) {
             // A hairline between columns, on the side each cell starts, so
             // the rules sit between columns in either text direction.
             "[&_tr>*+*]:border-s [&_tr>*+*]:border-border",
-            // The last column's cells, heading and data alike, so a
-            // right-aligned column stays aligned under its name.
-            markdown !== null && "[&_tr>*:last-child]:pr-10",
             className,
           )}
           {...rest}
@@ -309,7 +312,7 @@ function MarkdownTable({ node, children, className, ...rest }: TableProps) {
         </Table>
       </TableShell>
       {markdown === null ? null : (
-        <CopyButton text={markdown} label="Copy table" className="right-1 top-1" />
+        <CopyButton text={markdown} label="Copy table" className="right-0 top-0" />
       )}
     </div>
   )

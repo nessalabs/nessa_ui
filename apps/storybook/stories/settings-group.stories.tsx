@@ -158,6 +158,31 @@ function LinkedDevicesExample() {
   )
 }
 
+export const Flat: Story = {
+  parameters: storyDocumentation(
+    "`surface=\"flat\"` draws the rows on the page itself: no card, no fill, no rounded border, only the hairlines between rows. The play test proves the card has no border or fill and the second row still draws its hairline.",
+  ),
+  render: () => (
+    <div className="max-w-xl">
+      <SettingsGroup title="Accounts" surface="flat">
+        <SettingsRow label="GitHub" detail="Connected" control={<Button size="28" variant="tinted">Disconnect</Button>} />
+        <SettingsRow label="Voice" detail="Not connected" control={<Button size="28" variant="tinted">Connect…</Button>} />
+      </SettingsGroup>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const card = canvasElement.querySelector<HTMLElement>('[data-slot="settings-group-card"]')!
+    const style = getComputedStyle(card)
+    await expect(style.borderTopWidth).toBe("0px")
+    await expect(style.backgroundColor).toBe("rgba(0, 0, 0, 0)")
+    const rows = canvasElement.querySelectorAll<HTMLElement>('[data-slot="settings-row"]')
+    await expect(getComputedStyle(rows[1]).borderTopWidth).toBe("1px")
+    await expect(
+      canvasElement.querySelector('[data-slot="settings-group"]')!.getAttribute("data-settings-surface"),
+    ).toBe("flat")
+  },
+}
+
 export const NamedControls: Story = {
   parameters: storyDocumentation(
     "The row's label names whatever control sits at the end, not only a switch. The play test asks for a checkbox and a native select by the row label.",

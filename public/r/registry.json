@@ -2079,6 +2079,7 @@
         "radix-ui"
       ],
       "registryDependencies": [
+        "nessalabs/nessa_ui/compose",
         "nessalabs/nessa_ui/menu-recipe",
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/portal-container",
@@ -3534,6 +3535,23 @@
           "path": "packages/react/src/components/group-header.tsx",
           "type": "registry:ui",
           "target": "components/ui/group-header.tsx"
+        }
+      ]
+    },
+    {
+      "name": "page-header",
+      "type": "registry:ui",
+      "title": "Page header",
+      "description": "The top of a page: its title in the one page-title size and its actions at the end of the same line, with no subtitle, so every page starts the same way.",
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/page-header.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/page-header.tsx"
         }
       ]
     },

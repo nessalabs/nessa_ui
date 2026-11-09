@@ -67,6 +67,7 @@ export {
 } from "./components/tooltip"
 export { SearchField, type SearchFieldProps } from "./components/search-field"
 export { GroupHeader, type GroupHeaderProps } from "./components/group-header"
+export { PageHeader, type PageHeaderProps } from "./components/page-header"
 export {
   SettingsGroup,
   SettingsRow,

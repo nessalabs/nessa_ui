@@ -32,6 +32,7 @@ import { DeviceFigure } from "./components/device-figure";
 import { UndoCard } from "./components/undo-card";
 import { ToolTrace } from "./components/tool-trace";
 import { GradientText } from "./components/gradient-text";
+import { PageHeader } from "./components/page-header";
 import { TypeIn } from "./components/type-in";
 import { StepDots } from "./components/step-dots";
 import { Message } from "./components/message";
@@ -99,6 +100,7 @@ test("primitives render without a browser global", () => {
     server(<DeviceFigure kind="server" dimmed />).includes('data-dimmed="true"'),
   );
   assert.ok(server(<GradientText>Nessa</GradientText>).includes(">Nessa</span>"));
+  assert.ok(server(<PageHeader title="Devices" />).includes(">Devices</h1>"));
   assert.ok(server(<StepDots count={3} current={1} />).includes("Step 2 of 3"));
   assert.ok(
     server(<AgentCard agent="clawd" name="Claude" />).includes(

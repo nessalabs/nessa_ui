@@ -418,7 +418,7 @@ export const LongLabel: Story = {
 export const Failed: Story = {
   args: { steps: failed, status: "error", defaultOpen: true },
   parameters: storyDocumentation(
-    "A run that ended on a failure: the line says how many failed, the failed call is drawn in the destructive tone, and its card shows what it printed.",
+    "A run that ended on a failure: the line says how many failed, the failed call wears a red ✕ and a red bar while its words keep their usual tone, and its card shows what it printed.",
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -426,8 +426,81 @@ export const Failed: Story = {
     // The failure is in the row's name, not only its colour.
     const bad = canvas.getByRole("button", { name: /Ran codesign.*, failed/ });
     await expect(bad).toHaveAttribute("data-status", "failed");
+    // Only the glyph and the bar are red; the words read like any row's.
+    const fine = canvasElement.querySelector<HTMLElement>(
+      "[data-slot=tool-trace-step]:not([data-status=failed])",
+    )!;
+    const wordsOf = (row: HTMLElement) =>
+      (row.children[1] as HTMLElement).firstElementChild as HTMLElement;
+    const detailOf = (row: HTMLElement) =>
+      row.querySelector<HTMLElement>("[data-cut]")!;
+    await expect(getComputedStyle(wordsOf(bad)).color).toBe(
+      getComputedStyle(wordsOf(fine)).color,
+    );
+    await expect(getComputedStyle(detailOf(bad)).color).toBe(
+      getComputedStyle(detailOf(fine)).color,
+    );
     await userEvent.click(bad);
     await expect(canvas.getByText(/not signed at all/)).toBeVisible();
+  },
+};
+
+export const NarrowPane: Story = {
+  args: {
+    steps: [
+      step("read", "src/desktop/workspace/ui/layouts/workspace-panes.tsx", 0, 4),
+      step("read", "src/desktop/workspace/ui/split-view/split-view-math.ts", 2, 8),
+      step("run", "pnpm test --filter @nessalabs/desktop -- split-view", 6, 14),
+    ],
+    defaultOpen: true,
+  },
+  render: (args) => (
+    <div className="w-[22rem] rounded-2xl bg-background p-4">
+      <ToolTrace {...args} />
+    </div>
+  ),
+  parameters: storyDocumentation(
+    "A trace in a narrow pane. The verb is never cut. A path gives way from its start, so the file name stays (…/workspace-panes.tsx); a command gives way from its end, so its program stays.",
+  ),
+  play: async ({ canvasElement }) => {
+    const rows = [
+      ...canvasElement.querySelectorAll<HTMLElement>(
+        "[data-slot=tool-trace-step]",
+      ),
+    ];
+    await expect(rows).toHaveLength(3);
+    for (const row of rows) {
+      const label = (row.children[1] as HTMLElement)
+        .firstElementChild as HTMLElement;
+      // The verb is whole.
+      await expect(label.scrollWidth).toBeLessThanOrEqual(label.clientWidth);
+      const detail = row.querySelector<HTMLElement>("[data-cut]")!;
+      // The detail is cut: the pane is too narrow for it.
+      await expect(detail.scrollWidth).toBeGreaterThan(detail.clientWidth);
+    }
+    // A path keeps its end: the file name's last letter is inside the box.
+    for (const row of rows.slice(0, 2)) {
+      const detail = row.querySelector<HTMLElement>("[data-cut]")!;
+      await expect(detail).toHaveAttribute("data-cut", "start");
+      const text = detail.querySelector("[dir=ltr]")!.firstChild!;
+      const last = document.createRange();
+      last.setStart(text, text.textContent!.length - 1);
+      last.setEnd(text, text.textContent!.length);
+      await expect(last.getBoundingClientRect().right).toBeLessThanOrEqual(
+        detail.getBoundingClientRect().right + 0.5,
+      );
+      const first = document.createRange();
+      first.setStart(text, 0);
+      first.setEnd(text, 1);
+      await expect(first.getBoundingClientRect().left).toBeLessThan(
+        detail.getBoundingClientRect().left,
+      );
+    }
+    // A command keeps its start.
+    await expect(rows[2]!.querySelector("[data-cut]")).toHaveAttribute(
+      "data-cut",
+      "end",
+    );
   },
 };
 
