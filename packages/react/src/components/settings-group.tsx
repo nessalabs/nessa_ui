@@ -26,6 +26,13 @@ export interface SettingsGroupProps
    * section's description.
    */
   disabledReason?: React.ReactNode
+  /**
+   * `card` holds the rows in a rounded, filled card; `flat` draws them on
+   * the page with only the hairlines between them, for a surface that is
+   * itself the page rather than a card on it.
+   * @defaultValue "card"
+   */
+  surface?: "card" | "flat"
 }
 
 /** Whether the enclosing group is disabled; a row folds it into its own. */
@@ -38,13 +45,15 @@ const rowCornerClassName =
 /**
  * A titled card of settings rows: a small heading, one card holding the rows
  * with hairlines between them, and an optional footnote below. When it has a
- * title, the section is named by it.
+ * title, the section is named by it. `surface="flat"` drops the card and
+ * keeps the hairlines.
  */
 function SettingsGroup({
   title,
   footnote,
   disabled = false,
   disabledReason,
+  surface = "card",
   className,
   children,
   ...props
@@ -56,6 +65,7 @@ function SettingsGroup({
     <section
       data-slot="settings-group"
       data-disabled={disabled || undefined}
+      data-surface={surface}
       aria-labelledby={title !== undefined ? titleId : undefined}
       aria-describedby={showsReason ? reasonId : undefined}
       className={cn("flex flex-col gap-2 font-sans", className)}
@@ -81,7 +91,10 @@ function SettingsGroup({
       ) : null}
       <div
         data-slot="settings-group-card"
-        className="flex flex-col rounded-xl border border-border bg-card text-card-foreground [&>[data-slot=settings-row]+[data-slot=settings-row]]:border-t [&>[data-slot=settings-row]+[data-slot=settings-row]]:border-border"
+        className={cn(
+          "flex flex-col text-card-foreground [&>[data-slot=settings-row]+[data-slot=settings-row]]:border-t [&>[data-slot=settings-row]+[data-slot=settings-row]]:border-border",
+          surface === "card" && "rounded-xl border border-border bg-card",
+        )}
       >
         <SettingsGroupDisabledContext.Provider value={disabled}>
           {children}
