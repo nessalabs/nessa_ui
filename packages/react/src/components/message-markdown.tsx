@@ -299,9 +299,11 @@ function MarkdownTable({ node, children, className, ...rest }: TableProps) {
       data-slot="markdown-table"
       className={cn(
         "group/copy relative mb-4 w-fit min-w-0 max-w-full",
-        // The strip's 28px stands in for the margin before the table: a
-        // negative margin cancels what the block above leaves, up to 8px.
-        markdown === null ? "mt-4" : "-mt-2 pt-7",
+        // The strip's 28px stands in for most of the margin before the
+        // table: a small negative margin takes 4px back from what the block
+        // above leaves, which every block there keeps (a display equation
+        // keeps it as its own padding).
+        markdown === null ? "mt-4" : "-mt-1 pt-7",
       )}
     >
       <TableShell className="border-border/80 bg-foreground/[0.018] text-inherit shadow-[inset_0_1px_0_color-mix(in_oklab,var(--foreground)_5%,transparent)]">
@@ -374,7 +376,8 @@ function MarkdownTableRow({
 /**
  * A column name stays on one line, so a column is never narrower than its
  * name. It is set smaller than the cells and in a medium weight, muted, so
- * the names label the columns without competing with what is in them. An
+ * the names label the columns without competing with what is in them. A name
+ * written as code (`userId`) keeps its own case. An
  * alignment the Markdown sets (`:---:`, `---:`) arrives as an inline
  * `text-align` and wins over the kit's left default.
  */
@@ -386,7 +389,7 @@ function MarkdownTableHead({
   return (
     <TableHead
       className={cn(
-        "h-10 px-3.5 text-[0.85em] leading-[1.4] font-medium uppercase tracking-[0.06em] text-muted-foreground",
+        "h-10 px-3.5 text-[0.85em] leading-[1.4] font-medium uppercase tracking-[0.06em] text-muted-foreground [&_code]:normal-case [&_code]:tracking-normal",
         className,
       )}
       {...rest}
