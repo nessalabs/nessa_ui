@@ -270,13 +270,20 @@ function tableLabel(node: MarkdownNode | undefined) {
 }
 
 /**
- * A Markdown table, drawn as the kit's `Table` on a hairline panel: a muted
- * header band and hairline rules between rows and between columns. The panel
+ * A Markdown table, drawn as the kit's `Table` on a quiet panel: a faint
+ * surface lit along its top edge, a header band of smaller medium-weight
+ * column names, the first column a step stronger, and hairlines between rows
+ * and between columns kept fainter than the panel's own edge so the grid
+ * reads as structure, not as a spreadsheet. Its text is sized from the
+ * reply's (`em`), a step below the prose, so a table never reads as small
+ * print beside the paragraph above it. The panel
  * hugs a small table and takes the full width for a large one; a table whose
  * columns cannot fit even at their narrowest scrolls sideways inside its own
  * panel, fading the side with columns past it, rather than pushing the reply
  * wider. The copy control sits just above the panel's top-right corner, in a
- * strip the table keeps for it, and copies the table's Markdown source. It
+ * strip the table keeps for it, and copies the table's Markdown source. The
+ * strip takes the place of the margin above the table, so the panel sits as
+ * close to the heading or paragraph before it as the strip allows. It
  * never sits on the table itself: a table that scrolls sideways cuts its last
  * column at the panel edge, so any room kept inside a column is cut too and
  * the control lands on a column name.
@@ -292,18 +299,25 @@ function MarkdownTable({ node, children, className, ...rest }: TableProps) {
       data-slot="markdown-table"
       className={cn(
         "group/copy relative mb-4 w-fit min-w-0 max-w-full",
-        markdown === null ? "mt-4" : "mt-1 pt-8",
+        // The strip's 28px stands in for the margin before the table: a
+        // negative margin cancels what the block above leaves, up to 8px.
+        markdown === null ? "mt-4" : "-mt-2 pt-7",
       )}
     >
-      <TableShell className="bg-transparent text-inherit">
+      <TableShell className="border-border/80 bg-foreground/[0.018] text-inherit shadow-[inset_0_1px_0_color-mix(in_oklab,var(--foreground)_5%,transparent)]">
         <Table
           containerLabel={tableLabel(node)}
           edgeFade
           className={cn(
-            "tabular-nums",
+            // A step below the reply's own size, whatever size the host
+            // gives it, rather than the kit's fixed small UI text.
+            "text-[0.875em] leading-[1.6] tabular-nums",
             // A hairline between columns, on the side each cell starts, so
-            // the rules sit between columns in either text direction.
-            "[&_tr>*+*]:border-s [&_tr>*+*]:border-border",
+            // the rules sit between columns in either text direction. Fainter
+            // than the rules between rows: rows are what the eye follows.
+            "[&_tr>*+*]:border-s [&_tr>*+*]:border-border/30",
+            // The first column names the row, so it reads a step stronger.
+            "[&_td:first-child]:font-medium",
             className,
           )}
           {...rest}
@@ -312,13 +326,17 @@ function MarkdownTable({ node, children, className, ...rest }: TableProps) {
         </Table>
       </TableShell>
       {markdown === null ? null : (
-        <CopyButton text={markdown} label="Copy table" className="right-0 top-0" />
+        <CopyButton
+          text={markdown}
+          label="Copy table"
+          className="right-0 top-0 size-6 [&_svg]:size-3"
+        />
       )}
     </div>
   )
 }
 
-/** The header band: a quiet wash under the column names, no hover. */
+/** The header band: a faint wash under the column names, no hover. */
 function MarkdownTableHeader({
   node: _node,
   className,
@@ -326,7 +344,7 @@ function MarkdownTableHeader({
 }: React.ComponentProps<"thead"> & { node?: unknown }) {
   return (
     <TableHeader
-      className={cn("bg-muted/50", className)}
+      className={cn("bg-foreground/[0.035]", className)}
       {...rest}
     />
   )
@@ -345,19 +363,35 @@ function MarkdownTableRow({
   className,
   ...rest
 }: React.ComponentProps<"tr"> & { node?: unknown }) {
-  return <TableRow className={cn("hover:bg-transparent", className)} {...rest} />
+  return (
+    <TableRow
+      className={cn("border-border/60 hover:bg-transparent", className)}
+      {...rest}
+    />
+  )
 }
 
 /**
  * A column name stays on one line, so a column is never narrower than its
- * name. An alignment the Markdown sets (`:---:`, `---:`) arrives as an inline
+ * name. It is set smaller than the cells and in a medium weight, muted, so
+ * the names label the columns without competing with what is in them. An
+ * alignment the Markdown sets (`:---:`, `---:`) arrives as an inline
  * `text-align` and wins over the kit's left default.
  */
 function MarkdownTableHead({
   node: _node,
+  className,
   ...rest
 }: React.ComponentProps<"th"> & { node?: unknown }) {
-  return <TableHead {...rest} />
+  return (
+    <TableHead
+      className={cn(
+        "h-10 px-3.5 text-[0.85em] leading-[1.4] font-medium uppercase tracking-[0.06em] text-muted-foreground",
+        className,
+      )}
+      {...rest}
+    />
+  )
 }
 
 /**
@@ -381,7 +415,7 @@ function MarkdownTableCell({
   return (
     <TableCell
       className={cn(
-        "min-w-[8em] whitespace-normal align-top [overflow-wrap:break-word] [text-wrap:pretty]",
+        "min-w-[8em] px-3.5 py-3 whitespace-normal align-top [overflow-wrap:break-word] [text-wrap:pretty]",
         className,
       )}
       {...rest}
