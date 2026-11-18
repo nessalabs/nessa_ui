@@ -168,9 +168,15 @@ export const StarsSearchAndKeys: Story = {
     await userEvent.keyboard("{ArrowRight}")
     await expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-5-mini · medium")
     await expect(body.getByRole("dialog")).toBeVisible()
-    await userEvent.clear(search)
+    // Escape with a search clears it and keeps the picker open.
+    await userEvent.keyboard("{Escape}")
+    await expect(search).toHaveValue("")
+    await expect(search).toHaveFocus()
+    await expect(body.getByRole("dialog")).toBeVisible()
     await userEvent.click(within(dialog).getByRole("button", { name: "Starred" }))
     await expect(within(dialog).getAllByRole("option")).toHaveLength(3)
+    // The list is one Tab stop, however many models it shows.
+    await expect(within(dialog).getAllByRole("option").filter((option) => option.tabIndex === 0)).toHaveLength(1)
     // Pebble has no Fast mode: the bolt is there and disabled.
     await userEvent.click(within(dialog).getByRole("button", { name: "Open Models" }))
     await userEvent.click(within(dialog).getByText("Pebble"))

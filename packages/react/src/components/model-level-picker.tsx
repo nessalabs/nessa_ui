@@ -286,19 +286,30 @@ function ModelLevelPicker({
     [groups],
   )
   const isStarred = (row: Row) => starred.some((ref) => sameRef(ref, row.group.id, row.model.id))
+  // A star on a model the groups no longer list is kept, but neither shown nor counted.
+  const starredRows = starred
+    .map((ref) => allRows.find((row) => sameRef(ref, row.group.id, row.model.id)))
+    .filter((row): row is Row => row !== undefined)
 
   /** Where the picker opens: the starred list when there is one, else the provider in use. */
   const openingFilter = (): Filter => {
-    if (starsOffered && starred.length > 0) return { kind: "starred" }
+    if (starsOffered && starredRows.length > 0) return { kind: "starred" }
     if (selectedGroup) return { kind: "group", id: selectedGroup.id }
     return { kind: "all" }
   }
 
-  const setOpen = (next: boolean) => {
-    if (next) {
+  // Each opening starts afresh, however it was opened (the trigger, `open`,
+  // `defaultOpen`): adjusted while rendering, so no frame shows the last one.
+  const [openedAt, setOpenedAt] = React.useState(false)
+  if (open !== openedAt) {
+    setOpenedAt(open)
+    if (open) {
       setFilter(openingFilter())
       setQuery("")
     }
+  }
+
+  const setOpen = (next: boolean) => {
     if (openProp === undefined) setUncontrolledOpen(next)
     onOpenChange?.(next)
   }
@@ -311,9 +322,7 @@ function ModelLevelPicker({
         ),
       )
     : filter.kind === "starred"
-      ? starred
-          .map((ref) => allRows.find((row) => sameRef(ref, row.group.id, row.model.id)))
-          .filter((row): row is Row => row !== undefined)
+      ? starredRows
       : filter.kind === "group"
         ? allRows.filter((row) => row.group.id === filter.id)
         : allRows
@@ -349,7 +358,7 @@ function ModelLevelPicker({
     const target =
       rows.find((row) => row.dataset.key === key) ?? (fallback === "first" ? rows[0] : rows.at(-1))
     target?.focus()
-    target?.scrollIntoView({ block: "nearest" })
+    target?.scrollIntoView?.({ block: "nearest" })
   }
 
   const onRowKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, row: Row) => {
@@ -363,7 +372,7 @@ function ModelLevelPicker({
         const next = rows[at + (event.key === "ArrowDown" ? 1 : -1)]
         if (next) {
           next.focus()
-          next.scrollIntoView({ block: "nearest" })
+          next.scrollIntoView?.({ block: "nearest" })
         } else if (event.key === "ArrowUp") searchRef.current?.focus()
         return
       }
@@ -379,7 +388,9 @@ function ModelLevelPicker({
         event.preventDefault()
         const current = levels.findIndex((level) => level.value === levelFor?.(row.model, row.group))
         const step = event.key === "ArrowRight" ? 1 : -1
-        const next = levels[Math.max(0, Math.min(levels.length - 1, (current < 0 ? 0 : current) + step))]
+        // With no level lit yet, → lights the first and ← the last.
+        const at = current < 0 ? (step > 0 ? 0 : levels.length - 1) : current + step
+        const next = levels[Math.max(0, Math.min(levels.length - 1, at))]
         if (!next || row.model.disabled) return
         // Moves the level without closing, so a person can step through it.
         onValueChange?.({ providerId: row.group.id, modelId: row.model.id, level: next.value })
@@ -405,7 +416,7 @@ function ModelLevelPicker({
 
   const railEntries: { filter: Filter; label: string; icon: React.ReactNode; count: number; group?: ModelLevelPickerGroup }[] = [
     ...(starsOffered
-      ? [{ filter: { kind: "starred" } as Filter, label: "Starred", icon: <Star className="size-3.5" fill="currentColor" />, count: starred.length }]
+      ? [{ filter: { kind: "starred" } as Filter, label: "Starred", icon: <Star className="size-3.5" fill="currentColor" />, count: starredRows.length }]
       : []),
     { filter: { kind: "all" }, label: "All models", icon: <LayoutGrid className="size-3.5" />, count: allRows.length },
     ...groups.map((group) => ({
@@ -419,6 +430,10 @@ function ModelLevelPicker({
   const sameFilter = (a: Filter, b: Filter) =>
     a.kind === b.kind && (a.kind !== "group" || (b.kind === "group" && a.id === b.id))
 
+  // One Tab stop in the list: the model in use where it is shown, else the first.
+  const tabStop =
+    visible.find((row) => sameRef(value, row.group.id, row.model.id))?.key ?? visible[0]?.key
+
   const renderRow = (row: Row) => {
     const selected = sameRef(value, row.group.id, row.model.id)
     const starredRow = isStarred(row)
@@ -427,7 +442,7 @@ function ModelLevelPicker({
       <div
         key={row.key}
         role="option"
-        tabIndex={0}
+        tabIndex={row.key === tabStop ? 0 : -1}
         aria-selected={selected}
         aria-disabled={row.model.disabled || undefined}
         aria-keyshortcuts={starsOffered ? "S" : undefined}
@@ -547,6 +562,13 @@ function ModelLevelPicker({
               searchRef.current?.focus()
             }}
             onCloseAutoFocus={(event) => focusReturn.release(event)}
+            // Escape with a search clears it first; the dialog listens before the field does.
+            onEscapeKeyDown={(event) => {
+              if (!query) return
+              event.preventDefault()
+              setQuery("")
+              searchRef.current?.focus()
+            }}
             className={cn(
               "flex h-[min(28rem,100%)] w-full max-w-[39rem] flex-col font-sans outline-none",
               contentClassName,
@@ -577,12 +599,8 @@ function ModelLevelPicker({
                         if (event.key === "ArrowDown") {
                           event.preventDefault()
                           focusRow(value ? rowKey(value.providerId, value.modelId) : undefined)
-                        } else if (event.key === "Escape" && query) {
-                          event.preventDefault()
-                          event.stopPropagation()
-                          setQuery("")
                         } else if (event.key === "Enter") {
-                          const first = visible[0]
+                          const first = visible.find((row) => !row.model.disabled)
                           if (first) {
                             event.preventDefault()
                             choose(first)
@@ -627,7 +645,7 @@ function ModelLevelPicker({
                             onClick={() => {
                               setQuery("")
                               setFilter(entry.filter)
-                              listRef.current?.scrollTo({ top: 0 })
+                              if (listRef.current) listRef.current.scrollTop = 0
                             }}
                             className={cn(
                               "flex h-[30px] w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left nessa-text-4 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-sm:justify-center max-sm:px-0",
