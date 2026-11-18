@@ -28,6 +28,7 @@ import { EmptyState } from "./components/empty-state";
 import { Favicon } from "./components/favicon";
 import { Input } from "./components/input";
 import { LoadingText } from "./components/loading-text";
+import { ReplyMarkdown } from "./components/reply-markdown";
 import { DeviceFigure } from "./components/device-figure";
 import { UndoCard } from "./components/undo-card";
 import { ToolTrace } from "./components/tool-trace";
@@ -85,6 +86,20 @@ test("primitives render without a browser global", () => {
   assert.ok(
     server(<LoadingText>Loading Files</LoadingText>).includes("Loading Files"),
   );
+  {
+    // Words parses on the server too, and the tail of a streaming reply has
+    // its unfinished syntax completed.
+    const reply = server(
+      <ReplyMarkdown streaming>{"## Done\n\n| a | b |\n|---|--:|\n| 1 | 2 |\n\nSee $x^2$ and **bol"}</ReplyMarkdown>,
+    );
+    assert.ok(reply.includes("<h2>"));
+    assert.ok(
+      server(<ReplyMarkdown>{"## Done"}</ReplyMarkdown>).includes("<h2>Done</h2>"),
+    );
+    assert.ok(reply.includes('data-slot="markdown-table"'));
+    assert.ok(reply.includes("<svg"));
+    assert.ok(reply.includes("<strong>"));
+  }
   assert.ok(
     server(
       <UndoCard action="Archived" title="Release notes" onUndo={() => {}} />,

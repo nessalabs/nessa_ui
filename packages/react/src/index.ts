@@ -473,6 +473,11 @@ export {
   type MessageMarkdownProps,
 } from "./components/message-markdown"
 export {
+  ReplyMarkdown,
+  type ReplyMarkdownComponents,
+  type ReplyMarkdownProps,
+} from "./components/reply-markdown"
+export {
   MessageScroller,
   MessageScrollerButton,
   MessageScrollerContent,

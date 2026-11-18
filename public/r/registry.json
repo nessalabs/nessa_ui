@@ -1236,6 +1236,30 @@
       ]
     },
     {
+      "name": "reply-markdown",
+      "type": "registry:ui",
+      "title": "Reply Markdown",
+      "description": "An agent's streamed reply as Markdown, parsed incrementally by Words (WebAssembly): finished blocks are parsed once, and code, maths, tables, diagrams and links are drawn as MessageMarkdown draws them.",
+      "dependencies": [
+        "@pierre/words"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/code-block",
+        "nessalabs/nessa_ui/math-block",
+        "nessalabs/nessa_ui/message-markdown",
+        "nessalabs/nessa_ui/mermaid-diagram"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/reply-markdown.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/reply-markdown.tsx"
+        }
+      ]
+    },
+    {
       "name": "message-scroller",
       "type": "registry:ui",
       "title": "Message Scroller",

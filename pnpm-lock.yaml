@@ -135,6 +135,9 @@ importers:
       '@pierre/diffs':
         specifier: ^1.3.5
         version: 1.3.5(@shikijs/themes@4.4.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@pierre/words':
+        specifier: 0.2.1
+        version: 0.2.1(react@19.2.8)
       '@tiptap/core':
         specifier: ^3.31.3
         version: 3.31.3(@tiptap/pm@3.31.3)
@@ -1197,6 +1200,17 @@ packages:
       react-dom:
         optional: true
       shiki:
+        optional: true
+
+  '@pierre/words@0.2.1':
+    resolution: {integrity: sha512-vlnigrCenjmHsqNvX6cjw7sfNpS85YIkwDqv8AEsSKkxdBGMppi73TDSueABJLnrVKzWX4XQVRXO50FPow2hgw==}
+    peerDependencies:
+      '@pierre/highlights': '>=0.5.1'
+      react: ^18.3.1 || ^19.0.0
+    peerDependenciesMeta:
+      '@pierre/highlights':
+        optional: true
+      react:
         optional: true
 
   '@polka/url@1.0.0-next.29':
@@ -5953,6 +5967,10 @@ snapshots:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
       shiki: 4.4.3
+
+  '@pierre/words@0.2.1(react@19.2.8)':
+    optionalDependencies:
+      react: 19.2.8
 
   '@polka/url@1.0.0-next.29': {}
 
