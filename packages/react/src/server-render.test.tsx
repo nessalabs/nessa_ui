@@ -99,6 +99,13 @@ test("primitives render without a browser global", () => {
     assert.ok(reply.includes('data-slot="markdown-table"'));
     assert.ok(reply.includes("<svg"));
     assert.ok(reply.includes("<strong>"));
+    // Words' session keeps addresses as written; only safe ones are drawn.
+    const links = server(
+      <ReplyMarkdown>{"[a](javascript:alert(1)) [b](JaVa\tScript:1) [c](data:text/html,1) ![d](javascript:1) [e](https://ok.example) [f](/docs)"}</ReplyMarkdown>,
+    );
+    assert.ok(!/javascript|data:text/i.test(links));
+    assert.ok(links.includes('href="https://ok.example"'));
+    assert.ok(links.includes('href="/docs"'));
   }
   assert.ok(
     server(

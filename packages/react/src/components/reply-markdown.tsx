@@ -293,6 +293,23 @@ function styleObject(style: string | undefined): React.CSSProperties | undefined
   return out
 }
 
+/**
+ * A link or image address safe to put on the page, or undefined. Words'
+ * session keeps addresses as written (its own renderers check them later),
+ * so the check is here: web, mail, phone and chat schemes, and addresses
+ * with no scheme, pass; `javascript:`, `data:`, `vbscript:` and the rest do
+ * not. Spaces and control characters inside a scheme are ignored first, as
+ * a browser ignores them (`java\tscript:`).
+ */
+function safeUrl(url: string): string | undefined {
+  // eslint-disable-next-line no-control-regex -- control characters are what is stripped
+  const normalized = url.replace(/[\u0000-\u0020\u007f-\u009f]/g, "")
+  if (/^[\\/][\\/]/.test(normalized) || normalized.startsWith("\\")) return undefined
+  const scheme = /^([^#/?:]*):/.exec(normalized)?.[1]
+  if (scheme === undefined) return url
+  return /^(https?|ftp|mailto|tel|xmpp)$/i.test(scheme) ? url : undefined
+}
+
 /** React props for an element's attributes. */
 function propsOf(element: ReplyElement, context: DrawContext) {
   const props: Record<string, unknown> = {}
@@ -302,6 +319,7 @@ function propsOf(element: ReplyElement, context: DrawContext) {
     else if (name === "align") props.style = { ...(props.style as object), textAlign: value }
     else if (name === "id") props.id = context.idPrefix + value
     else if (name === "href" && value.startsWith("#")) props.href = `#${context.idPrefix}${value.slice(1)}`
+    else if (name === "href" || name === "src") props[name] = safeUrl(value)
     else props[name] = value
   }
   return props
