@@ -1803,6 +1803,31 @@
       ]
     },
     {
+      "name": "model-level-picker",
+      "type": "registry:ui",
+      "title": "Model Level Picker",
+      "description": "A modal chooser for a model and its thinking level together, with a provider rail, stars and Fast.",
+      "dependencies": [
+        "lucide-react",
+        "radix-ui"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/compose",
+        "nessalabs/nessa_ui/model-capability-controls",
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/overlay-panel",
+        "nessalabs/nessa_ui/portal-container",
+        "nessalabs/nessa_ui/utils"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/model-level-picker.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/model-level-picker.tsx"
+        }
+      ]
+    },
+    {
       "name": "model-capability-controls",
       "type": "registry:ui",
       "title": "Model Capability Controls",
