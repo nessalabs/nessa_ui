@@ -471,7 +471,7 @@ function ModelLevelPicker({
         onClick={() => choose(row)}
         onKeyDown={(event) => onRowKeyDown(event, row)}
         className={cn(
-          "group/row flex h-[34px] min-w-0 cursor-pointer items-center gap-2.5 rounded-lg px-2 nessa-text-4 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:bg-accent focus-visible:text-foreground aria-disabled:pointer-events-none aria-disabled:opacity-45",
+          "group/row flex h-[34px] min-w-0 cursor-pointer items-center gap-2 rounded-lg px-1.5 nessa-text-3 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:bg-accent focus-visible:text-foreground aria-disabled:pointer-events-none aria-disabled:opacity-45",
           selected && "text-foreground",
         )}
       >
@@ -506,7 +506,7 @@ function ModelLevelPicker({
   const rows = () => {
     if (visible.length === 0) {
       return (
-        <p data-slot="model-level-picker-empty" className="m-0 px-2 py-4 nessa-text-4 text-muted-foreground">
+        <p data-slot="model-level-picker-empty" className="m-0 px-2 py-4 nessa-text-3 text-muted-foreground">
           {normalized ? `${emptyMessage} “${query.trim()}”` : filter.kind === "starred" ? starredEmptyMessage : emptyMessage}
         </p>
       )
@@ -623,7 +623,7 @@ function ModelLevelPicker({
                           }
                         }
                       }}
-                      className="min-w-0 flex-1 bg-transparent nessa-text-4 text-foreground outline-none placeholder:text-muted-foreground/70"
+                      className="min-w-0 flex-1 bg-transparent nessa-text-3 text-foreground outline-none placeholder:text-muted-foreground/70"
                     />
                   </label>
                   {fast ? (
@@ -664,7 +664,7 @@ function ModelLevelPicker({
                               if (listRef.current) listRef.current.scrollTop = 0
                             }}
                             className={cn(
-                              "flex h-[30px] w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left nessa-text-4 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-sm:justify-center max-sm:px-0",
+                              "flex h-[30px] w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left nessa-text-3 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-sm:justify-center max-sm:px-0",
                               current && "bg-accent text-foreground",
                             )}
                           >
