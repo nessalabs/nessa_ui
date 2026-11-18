@@ -510,8 +510,15 @@ function drawElement(
       />
     )
   if (voidTags.has(tag)) return React.createElement(Host ?? tag, { key, ...props })
-  const children = drawChildren(element.children, key, modeInside(tag, mode), context)
-  if (Host) return <Host key={key} {...props}>{children}</Host>
+  const inner = modeInside(tag, mode)
+  // Code's text reaches a host component as one string, as react-markdown
+  // gives it, so a host can read what the code says.
+  const children =
+    inner === "literal" && element.children.every((child) => typeof child === "string")
+      ? [element.children.join("")]
+      : drawChildren(element.children, key, inner, context)
+  // Spread, so a single child (code's text) arrives as itself, not a list.
+  if (Host) return React.createElement(Host, { key, ...props }, ...children)
   if (tag === "a")
     return (
       <MarkdownSiteLink key={key} streaming={context.streaming} {...props}>

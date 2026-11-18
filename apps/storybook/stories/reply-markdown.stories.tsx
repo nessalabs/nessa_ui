@@ -237,8 +237,9 @@ function markIds(text: string): React.ReactNode {
 }
 
 function TaggedCode({ children, ...props }: { children?: React.ReactNode }) {
+  // Inline code arrives as one string, so a host can read what it says.
   return (
-    <code data-tagged="" {...props}>
+    <code data-tagged={typeof children === "string" ? children : "not text"} {...props}>
       {children}
     </code>
   )
@@ -260,7 +261,7 @@ export const HostDrawnText: Story = {
   play: async ({ canvasElement }) => {
     const markdown = canvasElement.querySelector('[data-slot="reply-markdown"]')!
     await expect(markdown.querySelectorAll("mark[data-id]")).toHaveLength(1)
-    await expect(markdown.querySelector("code[data-tagged]")).toHaveTextContent("a1b2c3")
+    await expect(markdown.querySelector('code[data-tagged="a1b2c3"]')).toHaveTextContent("a1b2c3")
     await expect(markdown.querySelector("a mark")).toBeNull()
   },
 }
