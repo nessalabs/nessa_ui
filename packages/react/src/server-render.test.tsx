@@ -113,6 +113,16 @@ test("primitives render without a browser global", () => {
     const [inLine, alone] = maths.split("</p>");
     assert.ok(inLine.includes("<code>x</code>") && !inLine.includes("<pre"));
     assert.ok(alone.includes('<pre class="my-3">y^2</pre>') && !alone.includes("<p>"));
+    // Display maths Words writes straight into a list item or a quote is a block there too.
+    const nested = server(
+      <ReplyMarkdown>{"- item\n\n  $$\n  y\n  $$\n\n> $$\n> z\n> $$"}</ReplyMarkdown>,
+    );
+    assert.ok(nested.includes('<pre class="my-3">y</pre>'));
+    assert.ok(nested.includes('<pre class="my-3">z</pre>'));
+    // Only footnote ids are made unique per reply; the agent's own anchors stay.
+    const anchors = server(<ReplyMarkdown>{"[top](#top) and a note[^1]\n\n[^1]: n"}</ReplyMarkdown>);
+    assert.ok(anchors.includes('href="#top"'));
+    assert.ok(!anchors.includes('href="#fn-1"') && /href="#[^"]+-fn-1"/.test(anchors));
     // A table's copy keeps what its cells hold, escaped as Markdown.
     const table = server(
       <ReplyMarkdown>{"| a | b |\n|---|---|\n| `x\\|y` | 2*3 ![i](https://i.example/a.png) |"}</ReplyMarkdown>,

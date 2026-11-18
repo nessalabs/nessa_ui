@@ -209,6 +209,14 @@ function textOf(node: ReplyNode): string {
   return typeof node === "string" ? node : node.children.map(textOf).join("")
 }
 
+/** Code as a Markdown code span, fenced past any run of backticks it holds. */
+function codeSpan(code: string) {
+  const longest = Math.max(0, ...(code.match(/`+/g) ?? []).map((run) => run.length))
+  const fence = "`".repeat(longest + 1)
+  const pad = longest > 0 ? " " : ""
+  return `${fence}${pad}${code}${pad}${fence}`
+}
+
 /** A cell's content written back as Markdown, for the table's copy control. */
 function inlineMarkdown(node: ReplyNode): string {
   if (typeof node === "string") return node.replace(/[\\`*_~[\]|<]/g, "\\$&")
@@ -222,7 +230,7 @@ function inlineMarkdown(node: ReplyNode): string {
       return `~~${inner}~~`
     case "code":
       // A pipe ends the cell even inside code, so it stays escaped there.
-      return `\`${textOf(node).replace(/\|/g, "\\|")}\``
+      return codeSpan(textOf(node).replace(/\|/g, "\\|"))
     case "img":
       return `![${(node.attrs.alt ?? "").replace(/[[\]|]/g, "\\$&")}](${node.attrs.src ?? ""})`
     case "a":
@@ -313,6 +321,9 @@ function safeUrl(url: string): string | undefined {
   return /^(https?|ftp|mailto|tel|xmpp)$/i.test(scheme) ? url : undefined
 }
 
+/** The ids Words gives footnotes and their references, made unique per reply. */
+const footnoteId = /^fn(ref)?-/
+
 /** React props for an element's attributes. */
 function propsOf(element: ReplyElement, context: DrawContext) {
   const props: Record<string, unknown> = {}
@@ -320,8 +331,9 @@ function propsOf(element: ReplyElement, context: DrawContext) {
     if (name === "class") props.className = value
     else if (name === "style") props.style = styleObject(value)
     else if (name === "align") props.style = { ...(props.style as object), textAlign: value }
-    else if (name === "id") props.id = context.idPrefix + value
-    else if (name === "href" && value.startsWith("#")) props.href = `#${context.idPrefix}${value.slice(1)}`
+    else if (name === "id" && footnoteId.test(value)) props.id = context.idPrefix + value
+    else if (name === "href" && footnoteId.test(value.slice(1)) && value.startsWith("#"))
+      props.href = `#${context.idPrefix}${value.slice(1)}`
     else if (name === "href" || name === "src") props[name] = safeUrl(value)
     else props[name] = value
   }
@@ -369,21 +381,37 @@ function drawText(text: string, key: string, mode: TextMode, context: DrawContex
   return out.length === 1 && typeof out[0] === "string" ? out[0] : out
 }
 
+/**
+ * Where Words' display maths stands as a block of its own: at the top of the
+ * reply, in a list item, or in a quote, where Words writes it with no
+ * paragraph around it. Anywhere else (in a line of text, in emphasis, in a
+ * link, in a table cell) it is drawn in the line; a paragraph that holds
+ * nothing but one takes its place (see `drawElement`).
+ */
+const blockParents = new Set(["", "li", "blockquote", "section", "div"])
+
 function drawChildren(
   children: ReplyNode[],
   key: string,
   mode: TextMode,
   context: DrawContext,
+  parent: string,
 ): React.ReactNode[] {
-  return children.map((child, index) =>
-    typeof child === "string" ? (
-      <React.Fragment key={`${key}.${index}`}>
-        {drawText(child, `${key}.${index}`, mode, context)}
-      </React.Fragment>
-    ) : (
-      drawElement(child, `${key}.${index}`, mode, context)
-    ),
-  )
+  return children.map((child, index) => drawNode(child, `${key}.${index}`, mode, context, parent))
+}
+
+/** One node, under an element named `parent` ("" for the reply itself). */
+function drawNode(
+  node: ReplyNode,
+  key: string,
+  mode: TextMode,
+  context: DrawContext,
+  parent: string,
+): React.ReactNode {
+  if (typeof node === "string")
+    return <React.Fragment key={key}>{drawText(node, key, mode, context)}</React.Fragment>
+  if (isDisplayMath(node)) return drawMath(node, key, blockParents.has(parent))
+  return drawElement(node, key, mode, context)
 }
 
 /** A fenced block: Mermaid through MermaidDiagram, the rest through CodeBlock. */
@@ -409,7 +437,7 @@ function drawFence(pre: ReplyElement, key: string, context: DrawContext) {
 /**
  * Whether Words marked this maths as a display block. Words marks every
  * `$$…$$` so, even one in the middle of a line; it is drawn as a block only
- * when it is all of its paragraph (see `drawElement`), and in the line
+ * where it stands as a block (see `blockParents`), and in the line
  * otherwise, as MessageMarkdown's remark-math reads one-line `$$x$$`.
  */
 function isDisplayMath(node: ReplyNode): node is ReplyElement {
@@ -455,13 +483,13 @@ function drawTable(table: ReplyElement, key: string, context: DrawContext) {
       case "th":
         return (
           <MarkdownTableHead key={at} {...props}>
-            {drawChildren(node.children, at, "prose", context)}
+            {drawChildren(node.children, at, "prose", context, node.tag)}
           </MarkdownTableHead>
         )
       case "td":
         return (
           <MarkdownTableCell key={at} {...props}>
-            {drawChildren(node.children, at, "prose", context)}
+            {drawChildren(node.children, at, "prose", context, node.tag)}
           </MarkdownTableCell>
         )
       default:
@@ -484,7 +512,7 @@ function drawElement(
   context: DrawContext,
 ): React.ReactNode {
   const { tag } = element
-  if (tag === "svg") return drawMath(element, key)
+  if (tag === "svg") return drawMath(element, key, false)
   if (tag === "pre") return drawFence(element, key, context)
   if (tag === "table") return drawTable(element, key, context)
   if (tag === "p") {
@@ -516,7 +544,7 @@ function drawElement(
   const children =
     inner === "literal" && element.children.every((child) => typeof child === "string")
       ? [element.children.join("")]
-      : drawChildren(element.children, key, inner, context)
+      : drawChildren(element.children, key, inner, context, tag)
   // Spread, so a single child (code's text) arrives as itself, not a list.
   if (Host) return React.createElement(Host, { key, ...props }, ...children)
   if (tag === "a")
@@ -541,9 +569,7 @@ const ReplyBlock = React.memo(function ReplyBlock({
   index: number
   context: DrawContext
 }) {
-  // A display block Words wrote outside a paragraph (`$$` on its own lines).
-  if (isDisplayMath(node)) return drawMath(node, String(index), true)
-  return <>{drawElement(node, String(index), "prose", context)}</>
+  return <>{drawNode(node, String(index), "prose", context, "")}</>
 })
 
 /* ------------------------------------------------------------------------ */
@@ -610,7 +636,7 @@ function ReplyMarkdown({
   const id = React.useId()
   const { stable, pending } = useReplyBlocks(children, streaming)
   const context = React.useMemo<DrawContext>(
-    () => ({ streaming, components, renderText, idPrefix: `${id.replace(/:/g, "")}-` }),
+    () => ({ streaming, components, renderText, idPrefix: `${id}-` }),
     [streaming, components, renderText, id],
   )
   return (
