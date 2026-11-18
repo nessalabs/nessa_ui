@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { createHtmlSession } from "@pierre/words"
 
 import { cn } from "@/lib/utils"
 
@@ -17,6 +16,28 @@ import {
   MarkdownFadeWord,
   MarkdownProse,
 } from "./message-markdown"
+
+type Words = typeof import("@pierre/words")
+
+/*
+ * Words compiles its WebAssembly the moment it is imported, so the kit loads
+ * it only when a reply is first drawn or a host asks for it early: never
+ * because an app imported the kit for a Button.
+ */
+let words: Words | undefined
+let loadingWords: Promise<Words> | undefined
+
+/**
+ * Starts loading Words, the parser ReplyMarkdown draws with, and resolves
+ * once it is ready. ReplyMarkdown loads it by itself on its first draw and
+ * shows the reply as plain text for that moment; a host that calls this at
+ * start never shows that. A page with a Content Security Policy needs
+ * `script-src 'wasm-unsafe-eval'` for it.
+ */
+function preloadReplyMarkdown(): Promise<void> {
+  loadingWords ??= import("@pierre/words").then((module) => (words = module))
+  return loadingWords.then(() => undefined)
+}
 
 const MathBlock = React.lazy(() =>
   import("./math-block").then((module) => ({ default: module.MathBlock })),
@@ -577,15 +598,15 @@ const ReplyBlock = React.memo(function ReplyBlock({
 /* ------------------------------------------------------------------------ */
 
 interface ReplyCache {
-  session: ReturnType<typeof createHtmlSession>
+  session: ReturnType<Words["createHtmlSession"]>
   stableHtml: string
   stable: ReplyElement[]
 }
 
-function useReplyBlocks(source: string, streaming: boolean) {
+function useReplyBlocks(parser: Words, source: string, streaming: boolean) {
   const cache = React.useRef<ReplyCache>(null)
   return React.useMemo(() => {
-    cache.current ??= { session: createHtmlSession(), stableHtml: "", stable: [] }
+    cache.current ??= { session: parser.createHtmlSession(), stableHtml: "", stable: [] }
     const state = cache.current
     // Completion guesses what the stream will send next, so a finished
     // reply never uses it.
@@ -600,7 +621,7 @@ function useReplyBlocks(source: string, streaming: boolean) {
       state.stableHtml = update.stable
     }
     return { stable: state.stable, pending: readHtml(update.pending) }
-  }, [source, streaming])
+  }, [parser, source, streaming])
 }
 
 /**
@@ -624,17 +645,47 @@ function useReplyBlocks(source: string, streaming: boolean) {
  * `[x]: url`), any later text can change what came before it, so Words
  * parses the whole reply on each update from then on, as MessageMarkdown
  * does; the output stays right.
+ *
+ * Words loads on the first draw (see preloadReplyMarkdown); until it has,
+ * the reply shows as plain text.
  */
-function ReplyMarkdown({
+function ReplyMarkdown(props: ReplyMarkdownProps) {
+  const { children, streaming, components, renderText, className, ...rest } = props
+  return (
+    <React.Suspense
+      fallback={
+        <MarkdownProse
+          data-slot="reply-markdown"
+          data-loading=""
+          className={cn("whitespace-pre-wrap", className)}
+          {...rest}
+        >
+          {children}
+        </MarkdownProse>
+      }
+    >
+      <LoadedReply {...props} />
+    </React.Suspense>
+  )
+}
+
+/** The reply once Words has loaded; suspends the first time, until it has. */
+function LoadedReply(props: ReplyMarkdownProps) {
+  if (!words) preloadReplyMarkdown()
+  return <ReplyWithWords parser={words ?? React.use(loadingWords!)} {...props} />
+}
+
+function ReplyWithWords({
+  parser,
   children,
   streaming = false,
   components,
   renderText,
   className,
   ...props
-}: ReplyMarkdownProps) {
+}: ReplyMarkdownProps & { parser: Words }) {
   const id = React.useId()
-  const { stable, pending } = useReplyBlocks(children, streaming)
+  const { stable, pending } = useReplyBlocks(parser, children, streaming)
   const context = React.useMemo<DrawContext>(
     () => ({ streaming, components, renderText, idPrefix: `${id}-` }),
     [streaming, components, renderText, id],
@@ -661,4 +712,4 @@ function ReplyMarkdown({
   )
 }
 
-export { ReplyMarkdown }
+export { preloadReplyMarkdown, ReplyMarkdown }

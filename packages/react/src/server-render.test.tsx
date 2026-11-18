@@ -28,7 +28,7 @@ import { EmptyState } from "./components/empty-state";
 import { Favicon } from "./components/favicon";
 import { Input } from "./components/input";
 import { LoadingText } from "./components/loading-text";
-import { ReplyMarkdown } from "./components/reply-markdown";
+import { preloadReplyMarkdown, ReplyMarkdown } from "./components/reply-markdown";
 import { DeviceFigure } from "./components/device-figure";
 import { UndoCard } from "./components/undo-card";
 import { ToolTrace } from "./components/tool-trace";
@@ -76,7 +76,7 @@ function server(element: React.ReactElement): string {
   return renderToStaticMarkup(element);
 }
 
-test("primitives render without a browser global", () => {
+test("primitives render without a browser global", async () => {
   assert.ok(server(<Button>Continue</Button>).includes("Continue"));
   assert.ok(server(<Badge>New</Badge>).includes("New"));
   assert.ok(
@@ -86,6 +86,12 @@ test("primitives render without a browser global", () => {
   assert.ok(
     server(<LoadingText>Loading Files</LoadingText>).includes("Loading Files"),
   );
+  {
+    // Words loads on first draw: until it has, the reply is plain text.
+    const early = server(<ReplyMarkdown>{"## Soon"}</ReplyMarkdown>);
+    assert.ok(early.includes("data-loading") && early.includes("## Soon"));
+    await preloadReplyMarkdown();
+  }
   {
     // Words parses on the server too, and the tail of a streaming reply has
     // its unfinished syntax completed.

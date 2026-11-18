@@ -473,6 +473,7 @@ export {
   type MessageMarkdownProps,
 } from "./components/message-markdown"
 export {
+  preloadReplyMarkdown,
   ReplyMarkdown,
   type ReplyMarkdownComponents,
   type ReplyMarkdownProps,

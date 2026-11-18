@@ -7,6 +7,7 @@ import {
   MessageBubble,
   MessageContent,
   MessageHeader,
+  preloadReplyMarkdown,
   ReplyMarkdown,
   useMessageStreamText,
 } from "@nessalabs/ui"
@@ -46,11 +47,14 @@ const meta = {
   component: ReplyMarkdown,
   args: { children: richMarkdown },
   tags: ["autodocs", "test"],
+  // Words loads on first draw; the stories wait for it, as a host that
+  // calls preloadReplyMarkdown at start does.
+  loaders: [async () => (await preloadReplyMarkdown(), {})],
   parameters: {
     docs: {
       description: {
         component:
-          "An agent's reply as Markdown, parsed by Words (@pierre/words), a WebAssembly parser that keeps the blocks it has finished. While a reply streams, each update parses only its unfinished tail, so a long reply costs the same per chunk as a short one; MessageMarkdown's parser starts over on every chunk. It draws the same elements as MessageMarkdown with the same styles — CodeBlock for fenced code, MermaidDiagram for ```mermaid fences, the kit's Table with a copy control, links led by their site's Favicon, and maths through MathBlock, and new words fading in while it streams. It takes no remark plugins: a host draws an element itself through components, and sets parts of prose apart through renderText. Raw HTML in the source is never drawn.",
+          "An agent's reply as Markdown, parsed by Words (@pierre/words), a WebAssembly parser that keeps the blocks it has finished. While a reply streams, each update parses only its unfinished tail, so a long reply costs the same per chunk as a short one; MessageMarkdown's parser starts over on every chunk. It draws the same elements as MessageMarkdown with the same styles — CodeBlock for fenced code, MermaidDiagram for ```mermaid fences, the kit's Table with a copy control, links led by their site's Favicon, and maths through MathBlock, and new words fading in while it streams. It takes no remark plugins: a host draws an element itself through components, and sets parts of prose apart through renderText. Raw HTML in the source is never drawn. Words compiles its WebAssembly as it loads, so it loads on the first draw (the reply shows as plain text until then) or when a host calls preloadReplyMarkdown.",
       },
     },
   },
