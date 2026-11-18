@@ -348,6 +348,17 @@ function ModelLevelPicker({
     )
   }
 
+  // A row unstarred from the keyboard on Starred leaves the list: the keys
+  // go to the row after it (or before it), or to search once none is left.
+  const focusAfterLeaving = React.useRef<{ leaving: string; next: string | undefined } | null>(null)
+  React.useLayoutEffect(() => {
+    const pending = focusAfterLeaving.current
+    if (!pending || rowElements().some((row) => row.dataset.key === pending.leaving)) return
+    focusAfterLeaving.current = null
+    if (pending.next) focusRow(pending.next)
+    else searchRef.current?.focus()
+  })
+
   const rowElements = () =>
     Array.from(
       listRef.current?.querySelectorAll<HTMLElement>('[data-slot="model-level-picker-row"]') ?? [],
@@ -405,6 +416,11 @@ function ModelLevelPicker({
       case "S":
         if (event.metaKey || event.ctrlKey || event.altKey) return
         event.preventDefault()
+        if (filter.kind === "starred" && !normalized && isStarred(row))
+          focusAfterLeaving.current = {
+            leaving: row.key,
+            next: (rows[at + 1] ?? rows[at - 1])?.dataset.key,
+          }
         toggleStar(row)
         return
       case "/":

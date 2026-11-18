@@ -177,6 +177,11 @@ export const StarsSearchAndKeys: Story = {
     await expect(within(dialog).getAllByRole("option")).toHaveLength(3)
     // The list is one Tab stop, however many models it shows.
     await expect(within(dialog).getAllByRole("option").filter((option) => option.tabIndex === 0)).toHaveLength(1)
+    // Unstarred from the keyboard on Starred, a model leaves and the keys go to the next one.
+    within(dialog).getAllByRole("option")[0]!.focus()
+    await userEvent.keyboard("s")
+    await waitFor(() => expect(within(dialog).getAllByRole("option")).toHaveLength(2))
+    await expect(within(dialog).getAllByRole("option")[0]).toHaveFocus()
     // Pebble has no Fast mode: the bolt is there and disabled.
     await userEvent.click(within(dialog).getByRole("button", { name: "Open Models" }))
     await userEvent.click(within(dialog).getByText("Pebble"))
