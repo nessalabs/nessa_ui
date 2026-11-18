@@ -106,6 +106,18 @@ test("primitives render without a browser global", () => {
     assert.ok(!/javascript|data:text/i.test(links));
     assert.ok(links.includes('href="https://ok.example"'));
     assert.ok(links.includes('href="/docs"'));
+    // `$$x$$` in a line stays in the line; one that is its whole paragraph is a block.
+    const maths = server(
+      <ReplyMarkdown>{"see **$$x$$** more\n\n$$\ny^2\n$$"}</ReplyMarkdown>,
+    );
+    const [inLine, alone] = maths.split("</p>");
+    assert.ok(inLine.includes("<code>x</code>") && !inLine.includes("<pre"));
+    assert.ok(alone.includes('<pre class="my-3">y^2</pre>') && !alone.includes("<p>"));
+    // A table's copy keeps what its cells hold, escaped as Markdown.
+    const table = server(
+      <ReplyMarkdown>{"| a | b |\n|---|---|\n| `x\\|y` | 2*3 ![i](https://i.example/a.png) |"}</ReplyMarkdown>,
+    );
+    assert.ok(table.includes("Copy table"));
   }
   assert.ok(
     server(

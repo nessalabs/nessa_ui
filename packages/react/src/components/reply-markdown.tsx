@@ -211,7 +211,7 @@ function textOf(node: ReplyNode): string {
 
 /** A cell's content written back as Markdown, for the table's copy control. */
 function inlineMarkdown(node: ReplyNode): string {
-  if (typeof node === "string") return node.replace(/\|/g, "\\|")
+  if (typeof node === "string") return node.replace(/[\\`*_~[\]|<]/g, "\\$&")
   const inner = node.children.map(inlineMarkdown).join("")
   switch (node.tag) {
     case "strong":
@@ -221,7 +221,10 @@ function inlineMarkdown(node: ReplyNode): string {
     case "del":
       return `~~${inner}~~`
     case "code":
-      return `\`${textOf(node)}\``
+      // A pipe ends the cell even inside code, so it stays escaped there.
+      return `\`${textOf(node).replace(/\|/g, "\\|")}\``
+    case "img":
+      return `![${(node.attrs.alt ?? "").replace(/[[\]|]/g, "\\$&")}](${node.attrs.src ?? ""})`
     case "a":
       return `[${inner}](${node.attrs.href ?? ""})`
     case "br":
@@ -403,7 +406,12 @@ function drawFence(pre: ReplyElement, key: string, context: DrawContext) {
   return <CodeBlock key={key} code={source} language={language} className="my-3" />
 }
 
-/** Whether Words drew this maths as a display block rather than in the line. */
+/**
+ * Whether Words marked this maths as a display block. Words marks every
+ * `$$…$$` so, even one in the middle of a line; it is drawn as a block only
+ * when it is all of its paragraph (see `drawElement`), and in the line
+ * otherwise, as MessageMarkdown's remark-math reads one-line `$$x$$`.
+ */
 function isDisplayMath(node: ReplyNode): node is ReplyElement {
   return (
     typeof node !== "string" &&
@@ -413,24 +421,19 @@ function isDisplayMath(node: ReplyNode): node is ReplyElement {
 }
 
 /**
- * Maths, drawn by MathBlock (KaTeX) from the TeX Words read. Words' own SVG
- * sets glyphs in the system's maths font, and a system without one (Linux,
- * most Windows) sets them in the text face, letters overlapping; so it is
- * only the stand-in while KaTeX loads, which it does only for a reply with
- * maths in it.
+ * Maths, drawn by MathBlock (KaTeX) from the TeX Words read, as
+ * MessageMarkdown draws it. Words' own SVG is not used: it sets glyphs in the
+ * system's maths font, and a system without one (Linux, most Windows) sets
+ * them in the text face, letters overlapping. Until KaTeX loads, which it
+ * does only for a reply with maths in it, the TeX shows as written.
  */
-function drawMath(svg: ReplyElement, key: string) {
-  const display = isDisplayMath(svg)
-  const tex = svg.attrs["aria-label"] ?? ""
-  const fallback = (
-    <span
-      data-slot="reply-math"
-      className={display ? "my-3 block overflow-x-auto" : "inline"}
-      dangerouslySetInnerHTML={{ __html: svg.raw ?? "" }}
-    />
-  )
+function drawMath(svg: ReplyElement, key: string, display = false) {
+  const tex = (svg.attrs["aria-label"] ?? "").trim()
   return (
-    <React.Suspense key={key} fallback={fallback}>
+    <React.Suspense
+      key={key}
+      fallback={display ? <pre className="my-3">{tex}</pre> : <code>{tex}</code>}
+    >
       <MathBlock tex={tex} inline={!display} className={display ? "my-3" : undefined} />
     </React.Suspense>
   )
@@ -484,21 +487,15 @@ function drawElement(
   if (tag === "svg") return drawMath(element, key)
   if (tag === "pre") return drawFence(element, key, context)
   if (tag === "table") return drawTable(element, key, context)
-  if (tag === "p" && element.children.some(isDisplayMath)) {
-    // A display equation is a block, and a block cannot sit in a <p>: one
-    // alone takes the paragraph's place, and one among text makes it a div.
-    const rest = element.children.filter((child) => !isDisplayMath(child))
-    if (rest.every((child) => typeof child === "string" && child.trim() === ""))
-      return (
-        <React.Fragment key={key}>
-          {element.children.filter(isDisplayMath).map((svg, index) => drawMath(svg, `${key}.${index}`))}
-        </React.Fragment>
-      )
-    return (
-      <div key={key} className="my-3">
-        {drawChildren(element.children, key, mode, context)}
-      </div>
+  if (tag === "p") {
+    // A display equation that is all of its paragraph takes the paragraph's
+    // place: it is a block, and a block cannot sit in a <p>. Anywhere else
+    // its maths is drawn in the line.
+    const content = element.children.filter(
+      (child) => !(typeof child === "string" && child.trim() === ""),
     )
+    if (content.length === 1 && isDisplayMath(content[0]))
+      return drawMath(content[0], key, true)
   }
   const props = propsOf(element, context)
   const Host = context.components?.[tag]
@@ -537,6 +534,8 @@ const ReplyBlock = React.memo(function ReplyBlock({
   index: number
   context: DrawContext
 }) {
+  // A display block Words wrote outside a paragraph (`$$` on its own lines).
+  if (isDisplayMath(node)) return drawMath(node, String(index), true)
   return <>{drawElement(node, String(index), "prose", context)}</>
 })
 
@@ -585,7 +584,13 @@ function useReplyBlocks(source: string, streaming: boolean) {
  *
  * Unlike MessageMarkdown it takes no remark plugins: a host changes how
  * an element is drawn through `components`, and how prose text is drawn
- * through `renderText`.
+ * through `renderText`. Fenced code, tables, maths and task boxes are always
+ * the kit's own, so `components.pre`, `table`, `svg` and `input` are not used.
+ *
+ * Once a reply holds a footnote or link reference definition (`[^1]: …`,
+ * `[x]: url`), any later text can change what came before it, so Words
+ * parses the whole reply on each update from then on, as MessageMarkdown
+ * does; the output stays right.
  */
 function ReplyMarkdown({
   children,
