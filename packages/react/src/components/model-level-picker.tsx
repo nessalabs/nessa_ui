@@ -593,13 +593,13 @@ function ModelLevelPicker({
             <PortalContainerProvider container={layers.container}>
               <div
                 data-slot="model-level-picker-surface"
-                className="grid min-h-0 flex-1 grid-rows-[auto_1fr] overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-xl animate-nessa-enter"
+                className="grid min-h-0 flex-1 grid-rows-[auto_1fr] overflow-hidden rounded-xl border border-foreground/15 bg-popover text-popover-foreground shadow-2xl animate-nessa-enter"
               >
                 <DialogPrimitive.Title className="sr-only">{contentLabel}</DialogPrimitive.Title>
-                <div data-slot="model-level-picker-top" className="flex items-center gap-2 border-b border-border p-2.5">
+                <div data-slot="model-level-picker-top" className="flex items-center gap-2 border-b border-foreground/8 p-2.5">
                   <label
                     data-slot="model-level-picker-search"
-                    className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-background/40 px-2.5 text-muted-foreground"
+                    className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg border border-foreground/8 bg-background/50 px-2.5 text-muted-foreground"
                   >
                     <Search aria-hidden="true" className="size-3.5 shrink-0" />
                     <input
@@ -633,7 +633,7 @@ function ModelLevelPicker({
                       disabled={!fast.available}
                       title={fast.available ? "Fast mode" : "This model has no Fast mode"}
                       data-slot="model-level-picker-fast"
-                      className="rounded-lg border border-border"
+                      className="rounded-lg border border-foreground/8"
                     />
                   ) : null}
                 </div>
@@ -641,7 +641,7 @@ function ModelLevelPicker({
                   <nav
                     aria-label="Providers"
                     data-slot="model-level-picker-rail"
-                    className="grid min-h-0 content-start gap-px overflow-y-auto border-r border-border p-1.5 [scrollbar-width:thin]"
+                    className="grid min-h-0 content-start gap-px overflow-y-auto border-r border-foreground/8 p-1.5 [scrollbar-width:thin]"
                   >
                     {railEntries.map((entry, index) => {
                       const current = !normalized && sameFilter(entry.filter, filter)
@@ -649,7 +649,7 @@ function ModelLevelPicker({
                       return (
                         <React.Fragment key={entry.filter.kind === "group" ? entry.filter.id : entry.filter.kind}>
                           {entry.group && index > 0 && !railEntries[index - 1]?.group ? (
-                            <div aria-hidden="true" className="mx-1.5 my-1 h-px bg-border" />
+                            <div aria-hidden="true" className="mx-1.5 my-1 h-px bg-foreground/8" />
                           ) : null}
                           <button
                             type="button"
