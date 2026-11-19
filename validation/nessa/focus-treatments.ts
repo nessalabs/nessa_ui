@@ -32,6 +32,9 @@ const composerFocusComponents = Object.freeze([
   { component: "message-scroller", count: 2 },
   { component: "model-capability-controls", count: 3 },
   { component: "model-picker", count: 2 },
+  // The chip and the rail's providers. Rows show focus as their hover fill,
+  // like a menu's, and their star and bars are pointer targets only.
+  { component: "model-level-picker", count: 2 },
   // Only the options carry a focus outline. Like the composer textarea, the
   // search field draws none: browsers match :focus-visible on editable fields
   // for pointer focus too, so an outline there would box the row permanently.
