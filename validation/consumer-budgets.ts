@@ -154,6 +154,19 @@
  * reshuffling of tens of bytes; no input is new and none is gone.
  * `file-preview` crossed its minified ceiling by 0.5 kB, inside its gzip
  * one; all four minified ceilings move up by 5 kB.
+ *
+ * ## Re-recorded for ReplyMarkdown
+ *
+ * ReplyMarkdown draws a reply with Words (`@pierre/words`), whose module
+ * compiles a 123 kB WebAssembly binary as it loads. Imported statically, that
+ * put the binary, and the compile, on every fixture. It now loads Words on a
+ * reply's first draw (or `preloadReplyMarkdown`), so no fixture reaches it.
+ * Diffed against `main` by input, `button-only` grew 15.8 kB minified (about
+ * 5.4 kB gzip): 14.1 kB of `packages/react/dist/index.js` (ReplyMarkdown's
+ * own reading and drawing code, which the barrel hands every consumer) and
+ * 1.7 kB of the shared chunk (MessageMarkdown's link, table and prose parts,
+ * now shared with ReplyMarkdown). No input is new and none is gone. All four
+ * minified ceilings move up by 20 kB and gzip ones by 5 kB.
  */
 
 export interface ConsumerBudget {
@@ -183,32 +196,32 @@ export const consumerBudgets: readonly ConsumerBudget[] = Object.freeze([
     name: "button-only",
     rationale:
       "An app that wanted one control. If the barrel leaks, it leaks here first — and it does: the whole rich-content stack, as the note above records.",
-    maximumBytes: 1_660_000,
-    maximumGzipBytes: 480_000,
+    maximumBytes: 1_680_000,
+    maximumGzipBytes: 485_000,
     maximumCssBytes: 48_000,
   },
   {
     name: "picker",
     rationale:
       "Radix, a portalled popover and the listbox engine, and — through the barrel, not through anything it imports — the same rich-content stack every other fixture carries.",
-    maximumBytes: 1_680_000,
-    maximumGzipBytes: 485_000,
+    maximumBytes: 1_700_000,
+    maximumGzipBytes: 490_000,
     maximumCssBytes: 48_000,
   },
   {
     name: "file-preview",
     rationale:
       "An app that previews one kind of file. It reads within a couple of kilobytes of button-only, which is the finding: what a consumer fetches is the barrel, not the component it named.",
-    maximumBytes: 1_850_000,
-    maximumGzipBytes: 535_000,
+    maximumBytes: 1_870_000,
+    maximumGzipBytes: 540_000,
     maximumCssBytes: 48_000,
   },
   {
     name: "rich-transcript",
     rationale:
       "Markdown, highlighting, maths and diagrams — everything the barrel already hands the other three. It reads close to them, and that is the finding rather than the reassurance.",
-    maximumBytes: 1_840_000,
-    maximumGzipBytes: 535_000,
+    maximumBytes: 1_860_000,
+    maximumGzipBytes: 540_000,
     maximumCssBytes: 48_000,
   },
 ] satisfies readonly ConsumerBudget[])

@@ -28,6 +28,7 @@ import { EmptyState } from "./components/empty-state";
 import { Favicon } from "./components/favicon";
 import { Input } from "./components/input";
 import { LoadingText } from "./components/loading-text";
+import { preloadReplyMarkdown, ReplyMarkdown } from "./components/reply-markdown";
 import { DeviceFigure } from "./components/device-figure";
 import { UndoCard } from "./components/undo-card";
 import { ToolTrace } from "./components/tool-trace";
@@ -75,7 +76,7 @@ function server(element: React.ReactElement): string {
   return renderToStaticMarkup(element);
 }
 
-test("primitives render without a browser global", () => {
+test("primitives render without a browser global", async () => {
   assert.ok(server(<Button>Continue</Button>).includes("Continue"));
   assert.ok(server(<Badge>New</Badge>).includes("New"));
   assert.ok(
@@ -85,6 +86,55 @@ test("primitives render without a browser global", () => {
   assert.ok(
     server(<LoadingText>Loading Files</LoadingText>).includes("Loading Files"),
   );
+  {
+    // Words loads on first draw: until it has, the reply is plain text.
+    const early = server(<ReplyMarkdown>{"## Soon"}</ReplyMarkdown>);
+    assert.ok(early.includes("data-loading") && early.includes("## Soon"));
+    await preloadReplyMarkdown();
+  }
+  {
+    // Words parses on the server too, and the tail of a streaming reply has
+    // its unfinished syntax completed.
+    const reply = server(
+      <ReplyMarkdown streaming>{"## Done\n\n| a | b |\n|---|--:|\n| 1 | 2 |\n\nSee $x^2$ and **bol"}</ReplyMarkdown>,
+    );
+    assert.ok(reply.includes("<h2>"));
+    assert.ok(
+      server(<ReplyMarkdown>{"## Done"}</ReplyMarkdown>).includes("<h2>Done</h2>"),
+    );
+    assert.ok(reply.includes('data-slot="markdown-table"'));
+    assert.ok(reply.includes("<svg"));
+    assert.ok(reply.includes("<strong>"));
+    // Words' session keeps addresses as written; only safe ones are drawn.
+    const links = server(
+      <ReplyMarkdown>{"[a](javascript:alert(1)) [b](JaVa\tScript:1) [c](data:text/html,1) ![d](javascript:1) [e](https://ok.example) [f](/docs)"}</ReplyMarkdown>,
+    );
+    assert.ok(!/javascript|data:text/i.test(links));
+    assert.ok(links.includes('href="https://ok.example"'));
+    assert.ok(links.includes('href="/docs"'));
+    // `$$x$$` in a line stays in the line; one that is its whole paragraph is a block.
+    const maths = server(
+      <ReplyMarkdown>{"see **$$x$$** more\n\n$$\ny^2\n$$"}</ReplyMarkdown>,
+    );
+    const [inLine, alone] = maths.split("</p>");
+    assert.ok(inLine.includes("<code>x</code>") && !inLine.includes("<pre"));
+    assert.ok(alone.includes('<pre class="my-3">y^2</pre>') && !alone.includes("<p>"));
+    // Display maths Words writes straight into a list item or a quote is a block there too.
+    const nested = server(
+      <ReplyMarkdown>{"- item\n\n  $$\n  y\n  $$\n\n> $$\n> z\n> $$"}</ReplyMarkdown>,
+    );
+    assert.ok(nested.includes('<pre class="my-3">y</pre>'));
+    assert.ok(nested.includes('<pre class="my-3">z</pre>'));
+    // Only footnote ids are made unique per reply; the agent's own anchors stay.
+    const anchors = server(<ReplyMarkdown>{"[top](#top) and a note[^1]\n\n[^1]: n"}</ReplyMarkdown>);
+    assert.ok(anchors.includes('href="#top"'));
+    assert.ok(!anchors.includes('href="#fn-1"') && /href="#[^"]+-fn-1"/.test(anchors));
+    // A table's copy keeps what its cells hold, escaped as Markdown.
+    const table = server(
+      <ReplyMarkdown>{"| a | b |\n|---|---|\n| `x\\|y` | 2*3 ![i](https://i.example/a.png) |"}</ReplyMarkdown>,
+    );
+    assert.ok(table.includes("Copy table"));
+  }
   assert.ok(
     server(
       <UndoCard action="Archived" title="Release notes" onUndo={() => {}} />,
