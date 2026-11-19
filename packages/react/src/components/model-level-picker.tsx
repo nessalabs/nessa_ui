@@ -159,7 +159,9 @@ function ModelLevelPickerMark({
 
 /**
  * The bars a row draws: one per level that lights one, rising, lit up to the
- * level the row shows. Each bar chooses its model at its level.
+ * level the row shows. Each bar chooses its model at its level, except that
+ * the lowest bar is a toggle: pressed while it is the only one lit, it chooses
+ * the model's unlit level, so a pointer can turn thinking off too.
  */
 function LevelBars({
   row,
@@ -174,6 +176,7 @@ function LevelBars({
   const bars = levels.filter((level) => !level.unlit)
   if (bars.length === 0) return <span data-slot="model-level-picker-bars" className="w-14 shrink-0" />
   const litAt = levels.findIndex((level) => level.value === lit)
+  const off = levels.find((level) => level.unlit)
   return (
     <span
       data-slot="model-level-picker-bars"
@@ -181,6 +184,8 @@ function LevelBars({
     >
       {bars.map((level, index) => {
         const on = litAt >= 0 && levels.indexOf(level) <= litAt
+        const turnsOff = off !== undefined && index === 0 && level.value === lit
+        const target = turnsOff ? off : level
         return (
           <button
             key={level.value}
@@ -189,11 +194,11 @@ function LevelBars({
             data-slot="model-level-picker-bar"
             data-level={level.value}
             data-lit={on || undefined}
-            aria-label={`${row.model.label}, ${level.label}`}
+            aria-label={`${row.model.label}, ${target.label}`}
             disabled={row.model.disabled}
             onClick={(event) => {
               event.stopPropagation()
-              onChoose(level.value)
+              onChoose(target.value)
             }}
             className="group/bar flex h-[18px] w-2.5 items-end justify-center outline-none"
           >
@@ -223,7 +228,8 @@ function LevelBars({
  * Each row is a model's mark, its name, a star, and its thinking levels as
  * rising bars lit up to the level it would take. Pressing a name chooses the
  * model and keeps the host's level; pressing a bar chooses the model at that
- * level. Either closes the picker. The model in use has its mark's tile
+ * level; pressing the lowest bar while it alone is lit turns thinking off,
+ * when the model can. Either closes the picker. The model in use has its mark's tile
  * filled with its provider's colour. From the keyboard: ↑ ↓ move between
  * rows, ← → choose the row's model a level down or up, Enter chooses the row,
  * `s` stars it, and `/` goes to search.

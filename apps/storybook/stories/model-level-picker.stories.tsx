@@ -144,6 +144,19 @@ export const Playground: Story = {
     await userEvent.click(within(again).getByText("Pebble"))
     await expect(canvas.getByTestId("choice")).toHaveTextContent("open/pebble · high")
     await expect(canvas.getByRole("button", { name: "Change model, currently Pebble" })).toBeVisible()
+
+    // The lowest bar, pressed while it alone is lit, turns thinking off.
+    const pick = async (bar: string) => {
+      await userEvent.click(canvas.getByRole("button", { name: /^Change model, currently/ }))
+      const open = await body.findByRole("dialog", { name: "Choose a model" })
+      await userEvent.click(within(open).getByRole("button", { name: "All models" }))
+      await userEvent.click(within(open).getByRole("button", { name: bar }))
+      await waitFor(() => expect(body.queryByRole("dialog")).not.toBeInTheDocument())
+    }
+    await pick("Forge 5 Mini, Low")
+    await expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-5-mini · low")
+    await pick("Forge 5 Mini, None")
+    await expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-5-mini · none")
   },
 }
 
