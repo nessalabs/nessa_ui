@@ -3,12 +3,13 @@ id: "ui-messages"
 title: "Message rendering"
 kind: "contract"
 status: "implemented"
-summary: "Message arranges an avatar and content for a supplied participant. MessageMarkdown renders supplied Markdown with element overrides; CodeBlock, MathBlock and MermaidDiagram handle their own content formats. The host chooses the message order and what is final."
+summary: "Message arranges an avatar and content for a supplied participant. MessageMarkdown renders supplied Markdown with element overrides; ReplyMarkdown renders an agent's streamed reply with Words, parsing only the unfinished tail on each update; CodeBlock, MathBlock and MermaidDiagram handle their own content formats. The host chooses the message order and what is final."
 parent: "ui-chat"
 sources:
   [
     "packages/react/src/components/message.tsx",
     "packages/react/src/components/message-markdown.tsx",
+    "packages/react/src/components/reply-markdown.tsx",
     "packages/react/src/components/message-scroller.tsx",
     "packages/react/src/components/message-actions/index.ts",
     "packages/react/src/components/code-block.tsx",
@@ -22,7 +23,7 @@ diagramLinks: {}
 
 # Read messages and streaming output
 
-Message arranges an avatar and content for a supplied participant. MessageMarkdown renders supplied Markdown with element overrides; CodeBlock, MathBlock and MermaidDiagram handle their own content formats. The host chooses the message order and what is final.
+Message arranges an avatar and content for a supplied participant. MessageMarkdown renders supplied Markdown with element overrides; ReplyMarkdown renders an agent's streamed reply with Words, parsing only the unfinished tail on each update; CodeBlock, MathBlock and MermaidDiagram handle their own content formats. The host chooses the message order and what is final.
 
 Use MessageScroller to keep a reader at the live edge while following new content and to offer a return to the newest content after they move away. A scroll position is a reading choice, not evidence that the agent completed. MessageActions, ChatBubbles, TranscriptDivider and SelectionTooltip expose actions or reading affordances for supplied content. GeneratingSurface and LoadingText announce progress the host asks them to show; their animation does not measure backend liveness.
 

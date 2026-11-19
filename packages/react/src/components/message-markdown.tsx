@@ -295,6 +295,30 @@ function MarkdownTable({ node, children, className, ...rest }: TableProps) {
   const markdown =
     start !== undefined && end !== undefined ? source.slice(start, end) : null
   return (
+    <MarkdownTableFrame
+      label={tableLabel(node)}
+      markdown={markdown}
+      className={className}
+      {...rest}
+    >
+      {children}
+    </MarkdownTableFrame>
+  )
+}
+
+/**
+ * The table panel itself, shared with ReplyMarkdown: `label` names the
+ * scrolling region and `markdown`, when known, is what the copy control
+ * copies.
+ */
+function MarkdownTableFrame({
+  label,
+  markdown,
+  children,
+  className,
+  ...rest
+}: React.ComponentProps<"table"> & { label: string; markdown: string | null }) {
+  return (
     <div
       data-slot="markdown-table"
       className={cn(
@@ -308,7 +332,7 @@ function MarkdownTable({ node, children, className, ...rest }: TableProps) {
     >
       <TableShell className="border-border/80 bg-foreground/[0.018] text-inherit shadow-[inset_0_1px_0_color-mix(in_oklab,var(--foreground)_5%,transparent)]">
         <Table
-          containerLabel={tableLabel(node)}
+          containerLabel={label}
           edgeFade
           className={cn(
             // A step below the reply's own size, whatever size the host
@@ -435,8 +459,18 @@ type LinkProps = React.ComponentProps<"a"> & { node?: unknown }
  * arriving (`https://github.c`) is already a link, and would ask a host the
  * reply never named.
  */
-function MarkdownLink({ node: _node, href, children, ...rest }: LinkProps) {
+function MarkdownLink({ node: _node, ...rest }: LinkProps) {
   const streaming = React.useContext(MarkdownStreamingContext)
+  return <MarkdownSiteLink streaming={streaming} {...rest} />
+}
+
+/** The link itself, shared with ReplyMarkdown. */
+function MarkdownSiteLink({
+  href,
+  streaming,
+  children,
+  ...rest
+}: React.ComponentProps<"a"> & { streaming: boolean }) {
   return (
     <a href={href} {...rest}>
       {href && !streaming ? (
@@ -445,6 +479,40 @@ function MarkdownLink({ node: _node, href, children, ...rest }: LinkProps) {
       {children}
     </a>
   )
+}
+
+/**
+ * The prose styles every Markdown renderer here shares — headings, lists,
+ * inline code, quotes, links, rules — so MessageMarkdown and ReplyMarkdown
+ * set the same text the same way.
+ */
+const markdownProseClassName = cn(
+  // whitespace-normal guards against inheriting pre-wrap from a
+  // MessageBubble, which would render the newlines between markdown
+  // blocks as extra blank lines on top of the block margins.
+  "min-w-0 max-w-full whitespace-normal nessa-text-4 leading-6 text-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+  "[&_p]:my-3",
+  "[&_h1]:mb-3 [&_h1]:mt-5 [&_h1]:text-[1.428571em] [&_h1]:leading-[1.4] [&_h1]:font-semibold [&_h2]:mb-3 [&_h2]:mt-5 [&_h2]:text-[1.285714em] [&_h2]:leading-[1.555556] [&_h2]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-[1.142857em] [&_h3]:leading-[1.5] [&_h3]:font-semibold [&_h4]:mb-2 [&_h4]:mt-4 [&_h4]:font-semibold",
+  "[&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_li]:pl-1",
+  // The :not guards keep inline-code and fallback <pre> styling away
+  // from the DOM rendered by the code, math, and diagram surfaces.
+  "[&_code:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:rounded-md [&_code:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:bg-muted [&_code:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:px-1.5 [&_code:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:py-0.5 [&_code:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:font-mono [&_code:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:text-[0.8125em]",
+  "[&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:my-3 [&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:overflow-x-auto [&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:rounded-xl [&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:bg-muted [&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:p-3",
+  "[&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground",
+  "[&_a]:font-medium [&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-2",
+  "[&_hr]:my-4 [&_hr]:border-border",
+  "[&_img]:max-w-full [&_img]:rounded-xl",
+  "[&_.katex-display]:my-0 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:py-1",
+)
+
+/** A container that sets Markdown prose in the shared styles. */
+function MarkdownProse({ className, ...props }: React.ComponentProps<"div">) {
+  return <div className={cn(markdownProseClassName, className)} {...props} />
+}
+
+/** One streamed word, fading in on mount as MessageMarkdown's do. */
+function MarkdownFadeWord({ children }: { children: React.ReactNode }) {
+  return <span className={fadeSpanClass}>{children}</span>
 }
 
 const defaultComponents: Components = {
@@ -484,22 +552,7 @@ function MessageMarkdown({
     <div
       data-slot="message-markdown"
       className={cn(
-        // whitespace-normal guards against inheriting pre-wrap from a
-        // MessageBubble, which would render the newlines between markdown
-        // blocks as extra blank lines on top of the block margins.
-        "min-w-0 max-w-full whitespace-normal nessa-text-4 leading-6 text-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
-        "[&_p]:my-3",
-        "[&_h1]:mb-3 [&_h1]:mt-5 [&_h1]:text-[1.428571em] [&_h1]:leading-[1.4] [&_h1]:font-semibold [&_h2]:mb-3 [&_h2]:mt-5 [&_h2]:text-[1.285714em] [&_h2]:leading-[1.555556] [&_h2]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-[1.142857em] [&_h3]:leading-[1.5] [&_h3]:font-semibold [&_h4]:mb-2 [&_h4]:mt-4 [&_h4]:font-semibold",
-        "[&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1 [&_li]:pl-1",
-        // The :not guards keep inline-code and fallback <pre> styling away
-        // from the DOM rendered by the code, math, and diagram surfaces.
-        "[&_code:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:rounded-md [&_code:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:bg-muted [&_code:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:px-1.5 [&_code:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:py-0.5 [&_code:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:font-mono [&_code:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:text-[0.8125em]",
-        "[&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:my-3 [&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:overflow-x-auto [&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:rounded-xl [&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:bg-muted [&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:p-3",
-        "[&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground",
-        "[&_a]:font-medium [&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-2",
-        "[&_hr]:my-4 [&_hr]:border-border",
-        "[&_img]:max-w-full [&_img]:rounded-xl",
-        "[&_.katex-display]:my-0 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:py-1",
+        markdownProseClassName,
         className,
       )}
       {...props}
@@ -519,4 +572,16 @@ function MessageMarkdown({
   )
 }
 
-export { MessageMarkdown }
+export {
+  MessageMarkdown,
+  // Shared with ReplyMarkdown, which draws the same elements from Words' HTML.
+  MarkdownSiteLink,
+  MarkdownTableBody,
+  MarkdownTableCell,
+  MarkdownTableFrame,
+  MarkdownTableHead,
+  MarkdownTableHeader,
+  MarkdownTableRow,
+  MarkdownFadeWord,
+  MarkdownProse,
+}
