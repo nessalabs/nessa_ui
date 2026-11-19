@@ -107,16 +107,14 @@ export interface ModelLevelPickerProps {
   /** Where the dialog mounts; the nearest Nessa portal container by default. */
   container?: HTMLElement | null
   /**
-   * Scroll and swipe over the list (experimental). Scrolling up and down
-   * moves a highlight from model to model instead of scrolling the list, and
-   * a sideways swipe moves the highlighted model's level, as ← and → do. The
-   * pointer moving onto a row highlights it; Enter or a press chooses it.
+   * A sideways trackpad swipe over a model's row moves that model's level,
+   * as ← and → do, without closing. Fingers moving right light more bars.
+   * Scrolling up and down still scrolls the list.
    */
-  gestures?: boolean
+  swipeLevels?: boolean
 }
 
-/** How far a scroll or a swipe goes for one step, in pixels. */
-const ROW_STEP = 28
+/** How far a sideways swipe goes for one level, in pixels. */
 const LEVEL_STEP = 44
 /** A pause this long between wheel events starts a new gesture. */
 const GESTURE_GAP_MS = 160
@@ -272,7 +270,7 @@ function ModelLevelPicker({
   className,
   contentClassName,
   container: containerProp,
-  gestures = false,
+  swipeLevels = false,
 }: ModelLevelPickerProps) {
   const container = usePortalContainer(containerProp)
   const layerScope = useNessaLayerScope()
@@ -288,8 +286,6 @@ function ModelLevelPicker({
   const [query, setQuery] = React.useState("")
   const starsOffered = onStarredChange !== undefined
   const [filter, setFilter] = React.useState<Filter>({ kind: "all" })
-  // With gestures, the row a scroll has reached: what a swipe and Enter act on.
-  const [activeKey, setActiveKey] = React.useState<string>()
 
   const selectedGroup = groups.find((group) => group.id === value?.providerId)
   const selectedModel = selectedGroup?.models.find((model) => model.id === value?.modelId)
@@ -328,7 +324,6 @@ function ModelLevelPicker({
     if (open) {
       setFilter(openingFilter())
       setQuery("")
-      setActiveKey(undefined)
     }
   }
 
@@ -480,65 +475,54 @@ function ModelLevelPicker({
   const tabStop =
     visible.find((row) => sameRef(value, row.group.id, row.model.id))?.key ?? visible[0]?.key
 
-  // The highlighted row: the one a scroll reached while it is still listed,
-  // else the model in use, else the first.
-  const active = gestures
-    ? (visible.find((row) => row.key === activeKey) ??
-      visible.find((row) => row.key === tabStop) ??
-      visible[0])
-    : undefined
-
-  const moveActive = (step: 1 | -1) => {
-    const enabled = visible.filter((row) => !row.model.disabled)
-    if (enabled.length === 0) return
-    const at = enabled.findIndex((row) => row.key === active?.key)
-    const next = enabled[Math.max(0, Math.min(enabled.length - 1, at < 0 ? 0 : at + step))]
-    if (!next) return
-    setActiveKey(next.key)
-    rowElements()
-      .find((element) => element.dataset.key === next.key)
-      ?.scrollIntoView?.({ block: "nearest" })
-  }
-
-  // One wheel gesture moves along one axis, chosen by its first event: up and
-  // down moves the highlight, sideways moves its level. The latest render's
-  // handlers are read through a ref, since the listener is added once.
-  const gesture = React.useRef<{ axis?: "x" | "y"; sum: number; last: number }>({ sum: 0, last: -Infinity })
-  const wheelHandlers = React.useRef({ moveActive, stepLevel, active })
-  wheelHandlers.current = { moveActive, stepLevel, active }
-  const listWheelRef = React.useCallback(
+  // One wheel gesture keeps to the direction its first event took. A
+  // sideways one steps the level of the row it began over; an up-and-down
+  // one is left to scroll the list. The latest render's rows and handler are
+  // read through a ref, since the listener is added once.
+  const gesture = React.useRef<{ axis?: "x" | "y"; row?: string; sum: number; last: number }>({
+    sum: 0,
+    last: -Infinity,
+  })
+  const swipeState = React.useRef({ visible, stepLevel })
+  swipeState.current = { visible, stepLevel }
+  const listSwipeRef = React.useCallback(
     (list: HTMLDivElement | null) => {
       listRef.current = list
-      if (!list || !gestures) return
+      if (!list || !swipeLevels) return
       const onWheel = (event: WheelEvent) => {
         if (event.ctrlKey) return // a pinch zooms
-        const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? list.clientHeight : 1
+        const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? list.clientWidth : 1
         const dx = event.deltaX * scale
         const dy = event.deltaY * scale
         const state = gesture.current
         if (event.timeStamp - state.last > GESTURE_GAP_MS) {
           state.axis = undefined
+          state.row = undefined
           state.sum = 0
         }
         state.last = event.timeStamp
         if (dx === 0 && dy === 0) return
-        state.axis ??= Math.abs(dx) > Math.abs(dy) ? "x" : "y"
+        if (!state.axis) {
+          state.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y"
+          state.row = (event.target as Element | null)
+            ?.closest?.<HTMLElement>('[data-slot="model-level-picker-row"]')?.dataset.key
+        }
+        if (state.axis === "y") return
         event.preventDefault()
+        const row = swipeState.current.visible.find((each) => each.key === state.row)
+        if (!row) return
         // Fingers moving right light more bars: on a Mac that is a negative deltaX.
-        state.sum += state.axis === "x" ? -dx : dy
-        const size = state.axis === "x" ? LEVEL_STEP : ROW_STEP
-        while (Math.abs(state.sum) >= size) {
+        state.sum -= dx
+        while (Math.abs(state.sum) >= LEVEL_STEP) {
           const step = state.sum > 0 ? 1 : -1
-          state.sum -= step * size
-          const handlers = wheelHandlers.current
-          if (state.axis === "y") handlers.moveActive(step)
-          else if (handlers.active) handlers.stepLevel(handlers.active, step)
+          state.sum -= step * LEVEL_STEP
+          swipeState.current.stepLevel(row, step)
         }
       }
       list.addEventListener("wheel", onWheel, { passive: false })
       return () => list.removeEventListener("wheel", onWheel)
     },
-    [gestures],
+    [swipeLevels],
   )
 
   const renderRow = (row: Row) => {
@@ -558,15 +542,12 @@ function ModelLevelPicker({
         data-provider={row.group.id}
         data-model={row.model.id}
         data-selected={selected || undefined}
-        data-active={row.key === active?.key || undefined}
         style={accentStyle(row.group)}
         onClick={() => choose(row)}
-        onPointerMove={gestures ? () => row.key !== activeKey && setActiveKey(row.key) : undefined}
         onKeyDown={(event) => onRowKeyDown(event, row)}
         className={cn(
           "group/row flex h-[34px] min-w-0 cursor-pointer items-center gap-2 rounded-lg px-1.5 nessa-text-3 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:bg-accent focus-visible:text-foreground aria-disabled:pointer-events-none aria-disabled:opacity-45",
           selected && "text-foreground",
-          gestures && "hover:bg-transparent data-[active]:bg-accent data-[active]:text-foreground",
         )}
       >
         <ModelLevelPickerMark group={row.group} selected={selected} />
@@ -710,10 +691,7 @@ function ModelLevelPicker({
                           event.preventDefault()
                           focusRow(value ? rowKey(value.providerId, value.modelId) : undefined)
                         } else if (event.key === "Enter") {
-                          const first =
-                            active && !active.model.disabled
-                              ? active
-                              : visible.find((row) => !row.model.disabled)
+                          const first = visible.find((row) => !row.model.disabled)
                           if (first) {
                             event.preventDefault()
                             choose(first)
@@ -785,7 +763,7 @@ function ModelLevelPicker({
                     })}
                   </nav>
                   <div
-                    ref={listWheelRef}
+                    ref={listSwipeRef}
                     role="listbox"
                     aria-label="Models"
                     data-slot="model-level-picker-list"
