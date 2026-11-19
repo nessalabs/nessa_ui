@@ -697,16 +697,10 @@ function ReplyWithWords({
       className={cn("[&_li>input]:mr-1.5 [&_li>input]:align-[-0.125em]", className)}
       {...props}
     >
-      {stable.map((node, index) => (
+      {/* One keyed list, so a block keeps its element (and its fades and
+          state) when it moves from the unfinished tail to the finished part. */}
+      {[...stable, ...pending].map((node, index) => (
         <ReplyBlock key={index} node={node} index={index} context={context} />
-      ))}
-      {pending.map((node, index) => (
-        <ReplyBlock
-          key={stable.length + index}
-          node={node}
-          index={stable.length + index}
-          context={context}
-        />
       ))}
     </MarkdownProse>
   )

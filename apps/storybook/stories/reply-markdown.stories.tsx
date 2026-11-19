@@ -167,6 +167,18 @@ export const StreamingReply: StoryObj<StreamingReplyArgs> = {
   play: async ({ canvasElement }) => {
     const markdown = canvasElement.querySelector('[data-slot="reply-markdown"]')!
     const initialLength = markdown.textContent!.length
+    // The first paragraph, caught while it is still the unfinished tail, is
+    // the same element once the reply has finished: moving from the tail to
+    // the finished part never draws a block again.
+    const first = await waitFor(
+      () => {
+        const paragraph = markdown.querySelector("p")
+        expect(paragraph?.textContent).toMatch(/^The pacing/)
+        expect(paragraph?.textContent).not.toMatch(/complete\.$/)
+        return paragraph!
+      },
+      { timeout: 5000, interval: 20 },
+    )
     await waitFor(
       () => expect(markdown.textContent!.length).toBeGreaterThan(initialLength),
       { timeout: 5000 },
@@ -183,6 +195,7 @@ export const StreamingReply: StoryObj<StreamingReplyArgs> = {
       expect(markdown.querySelectorAll('span[class*="starting:"]')).toHaveLength(0),
     )
     await expect(markdown.textContent).toContain("every display.")
+    await expect(markdown.querySelector("p")).toBe(first)
     await expect(markdown.querySelectorAll('[data-slot="mermaid-diagram"]')).toHaveLength(2)
   },
 }
