@@ -391,15 +391,16 @@ function ModelLevelPicker({
   }
 
   /**
-   * Moves a row's level one step, without closing, so a person can step
-   * through it. With no level lit yet, a step up lights the first and a step
-   * down the last.
+   * Moves a row's level `steps` steps (negative is down), without closing,
+   * so a person can step through it. With no level lit yet, a step up lights
+   * the first and a step down the last.
    */
-  const stepLevel = (row: Row, step: 1 | -1) => {
+  const stepLevel = (row: Row, steps: number) => {
     const levels = row.model.levels ?? []
-    if (levels.length === 0 || row.model.disabled) return
+    if (levels.length === 0 || row.model.disabled || steps === 0) return
     const current = levels.findIndex((level) => level.value === levelFor?.(row.model, row.group))
-    const at = current < 0 ? (step > 0 ? 0 : levels.length - 1) : current + step
+    const at =
+      current < 0 ? (steps > 0 ? steps - 1 : levels.length + steps) : current + steps
     const next = levels[Math.max(0, Math.min(levels.length - 1, at))]
     if (!next || next.value === levelFor?.(row.model, row.group)) return
     onValueChange?.({ providerId: row.group.id, modelId: row.model.id, level: next.value })
@@ -513,11 +514,12 @@ function ModelLevelPicker({
         if (!row) return
         // Fingers moving right light more bars: on a Mac that is a negative deltaX.
         state.sum -= dx
-        while (Math.abs(state.sum) >= LEVEL_STEP) {
-          const step = state.sum > 0 ? 1 : -1
-          state.sum -= step * LEVEL_STEP
-          swipeState.current.stepLevel(row, step)
-        }
+        // Every step this event crossed goes in one change: the host's level
+        // does not move until it renders, so separate steps would all start
+        // from the same one.
+        const steps = Math.trunc(state.sum / LEVEL_STEP)
+        state.sum -= steps * LEVEL_STEP
+        swipeState.current.stepLevel(row, steps)
       }
       list.addEventListener("wheel", onWheel, { passive: false })
       return () => list.removeEventListener("wheel", onWheel)

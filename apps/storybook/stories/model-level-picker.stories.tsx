@@ -236,6 +236,16 @@ export const SwipeLevels: Story = {
     await expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · medium")
     wheel(forge, 30, 0)
     await waitFor(() => expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · low"))
+    // One fast swipe across three steps moves three levels, not one.
+    await pause()
+    wheel(forge, -3 * 44 - 4, 0)
+    await waitFor(() => expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · xhigh"))
+    await pause()
+    wheel(forge, 2 * 44 + 4, 0)
+    await waitFor(() => expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · medium"))
+    await pause()
+    wheel(forge, 44, 0)
+    await waitFor(() => expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · low"))
     // A swipe that begins between rows changes nothing.
     await pause()
     wheel(list, -60, 0)
