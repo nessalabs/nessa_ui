@@ -66,7 +66,7 @@ function nearest(model: ModelLevelPickerModel, value: string) {
   return below
 }
 
-function Example({ defaultOpen = false }: { defaultOpen?: boolean }) {
+function Example({ defaultOpen = false, gestures = false }: { defaultOpen?: boolean; gestures?: boolean }) {
   const [model, setModel] = React.useState<ModelLevelPickerModelRef>({
     providerId: "studio",
     modelId: "studio-large",
@@ -95,6 +95,7 @@ function Example({ defaultOpen = false }: { defaultOpen?: boolean }) {
         onStarredChange={setStarred}
         fast={{ available: fastModels.has(model.modelId), pressed: fast, onPressedChange: setFast }}
         defaultOpen={defaultOpen}
+        gestures={gestures}
       />
     </div>
   )
@@ -203,5 +204,50 @@ export const StarsSearchAndKeys: Story = {
     await expect(within(reopened).getByRole("button", { name: "Fast mode" })).toBeDisabled()
     await userEvent.keyboard("{Escape}")
     await waitFor(() => expect(body.queryByRole("dialog")).not.toBeInTheDocument())
+  },
+}
+
+const wheel = (target: Element, deltaX: number, deltaY: number) =>
+  target.dispatchEvent(new WheelEvent("wheel", { deltaX, deltaY, bubbles: true, cancelable: true }))
+const pause = () => new Promise((resolve) => setTimeout(resolve, 200))
+
+export const ScrollAndSwipe: Story = {
+  parameters: storyDocumentation(
+    "Experimental (`gestures`): scrolling up and down moves the highlight from model to model, and a sideways swipe on it moves its thinking level without closing. Fingers moving right light more bars. Enter or a press chooses the highlighted model.",
+  ),
+  render: () => <Example defaultOpen gestures />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const body = within(canvasElement.ownerDocument.body)
+    const dialog = await body.findByRole("dialog", { name: "Choose a model" })
+    const list = within(dialog).getByRole("listbox", { name: "Models" })
+    const active = () => list.querySelector("[data-active]")?.getAttribute("data-model")
+    // The highlight starts on the model in use.
+    await expect(active()).toBe("studio-large")
+    // A scroll down moves it to the next model, and takes the event from the list.
+    await expect(wheel(list, 0, 30)).toBe(false)
+    await waitFor(() => expect(active()).toBe("forge-6"))
+    // A short scroll is not yet a step; the rest of the same gesture makes one.
+    await pause()
+    wheel(list, 0, -14)
+    await expect(active()).toBe("forge-6")
+    wheel(list, 0, -14)
+    await waitFor(() => expect(active()).toBe("studio-large"))
+    await pause()
+    wheel(list, 0, 30)
+    await waitFor(() => expect(active()).toBe("forge-6"))
+    // Fingers moving right (a negative deltaX) light one bar more on the highlighted model.
+    await pause()
+    wheel(list, -50, 2)
+    await waitFor(() => expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · medium"))
+    await expect(body.getByRole("dialog")).toBeVisible()
+    // One gesture stays on its axis: a sideways swipe that drifts down does not move the highlight.
+    wheel(list, -10, 40)
+    await expect(active()).toBe("forge-6")
+    // Enter in search chooses the highlighted model and closes.
+    await pause()
+    await userEvent.keyboard("{Enter}")
+    await waitFor(() => expect(body.queryByRole("dialog")).not.toBeInTheDocument())
+    await expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · medium")
   },
 }
