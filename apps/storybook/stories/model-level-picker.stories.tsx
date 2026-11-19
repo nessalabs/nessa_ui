@@ -66,7 +66,7 @@ function nearest(model: ModelLevelPickerModel, value: string) {
   return below
 }
 
-function Example({ defaultOpen = false }: { defaultOpen?: boolean }) {
+function Example({ defaultOpen = false, swipeLevels = false }: { defaultOpen?: boolean; swipeLevels?: boolean }) {
   const [model, setModel] = React.useState<ModelLevelPickerModelRef>({
     providerId: "studio",
     modelId: "studio-large",
@@ -95,6 +95,7 @@ function Example({ defaultOpen = false }: { defaultOpen?: boolean }) {
         onStarredChange={setStarred}
         fast={{ available: fastModels.has(model.modelId), pressed: fast, onPressedChange: setFast }}
         defaultOpen={defaultOpen}
+        swipeLevels={swipeLevels}
       />
     </div>
   )
@@ -201,6 +202,54 @@ export const StarsSearchAndKeys: Story = {
     await userEvent.click(canvas.getByRole("button", { name: /Change model, currently Pebble/ }))
     const reopened = await body.findByRole("dialog", { name: "Choose a model" })
     await expect(within(reopened).getByRole("button", { name: "Fast mode" })).toBeDisabled()
+    await userEvent.keyboard("{Escape}")
+    await waitFor(() => expect(body.queryByRole("dialog")).not.toBeInTheDocument())
+  },
+}
+
+const wheel = (target: Element, deltaX: number, deltaY: number) =>
+  target.dispatchEvent(new WheelEvent("wheel", { deltaX, deltaY, bubbles: true, cancelable: true }))
+const pause = () => new Promise((resolve) => setTimeout(resolve, 200))
+
+export const SwipeLevels: Story = {
+  parameters: storyDocumentation(
+    "With `swipeLevels`, a sideways trackpad swipe over a model's row moves that model's level without closing; fingers moving right light more bars. Scrolling up and down still scrolls the list.",
+  ),
+  render: () => <Example defaultOpen swipeLevels />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const body = within(canvasElement.ownerDocument.body)
+    const dialog = await body.findByRole("dialog", { name: "Choose a model" })
+    const list = within(dialog).getByRole("listbox", { name: "Models" })
+    const forge = within(dialog).getByRole("option", { name: /Forge 6/ })
+    // Up and down is left to the list's own scroll: no level changes.
+    wheel(forge, 0, 30)
+    await expect(canvas.getByTestId("choice")).toHaveTextContent("studio/studio-large · low")
+    // Fingers moving right (a negative deltaX) over Forge 6 light one bar more on it.
+    await pause()
+    await expect(wheel(forge, -50, 2)).toBe(false)
+    await waitFor(() => expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · medium"))
+    await expect(body.getByRole("dialog")).toBeVisible()
+    // A short swipe is not yet a step; the rest of the same gesture makes one, back down.
+    await pause()
+    wheel(forge, 20, 0)
+    await expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · medium")
+    wheel(forge, 30, 0)
+    await waitFor(() => expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · low"))
+    // One fast swipe across three steps moves three levels, not one.
+    await pause()
+    wheel(forge, -3 * 44 - 4, 0)
+    await waitFor(() => expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · xhigh"))
+    await pause()
+    wheel(forge, 2 * 44 + 4, 0)
+    await waitFor(() => expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · medium"))
+    await pause()
+    wheel(forge, 44, 0)
+    await waitFor(() => expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · low"))
+    // A swipe that begins between rows changes nothing.
+    await pause()
+    wheel(list, -60, 0)
+    await expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · low")
     await userEvent.keyboard("{Escape}")
     await waitFor(() => expect(body.queryByRole("dialog")).not.toBeInTheDocument())
   },
