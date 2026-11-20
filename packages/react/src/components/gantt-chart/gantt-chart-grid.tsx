@@ -1536,11 +1536,11 @@ function GanttChartGrid({ className, ref: forwardedRef, ...props }: GanttChartGr
       >
         <div
           data-slot="gantt-chart-header"
-          className="sticky top-0 z-30 flex shrink-0 border-b border-border bg-background"
+          className="sticky top-0 z-30 flex shrink-0 border-b border-hairline bg-background"
           style={{ height: HEADER_HEIGHT }}
         >
           <div
-            className="sticky left-0 z-10 flex shrink-0 items-end gap-1 border-r border-border bg-background pe-3 ps-3 pb-1 nessa-text-2 font-medium text-muted-foreground"
+            className="sticky left-0 z-10 flex shrink-0 items-end gap-1 border-r border-hairline bg-background pe-3 ps-3 pb-1 nessa-text-2 font-medium text-muted-foreground"
             style={{ width: taskListWidth }}
           >
             <span className="min-w-0 flex-1 truncate">
@@ -1603,7 +1603,7 @@ function GanttChartGrid({ className, ref: forwardedRef, ...props }: GanttChartGr
             {secondaryCells.map((cell) => (
               <div
                 key={cell.key}
-                className="absolute inset-y-0 border-l border-border/40"
+                className="absolute inset-y-0 border-l border-hairline"
                 style={{
                   left: cell.offsetDays * dayWidth,
                   width: cell.days * dayWidth,
@@ -1732,7 +1732,7 @@ function GanttChartGrid({ className, ref: forwardedRef, ...props }: GanttChartGr
                     through it across the pinned column. */}
                 <div
                   data-slot="gantt-chart-task-cell"
-                  className="sticky left-0 z-20 flex shrink-0 items-center gap-1 border-b border-r border-border/40 border-r-border bg-background pe-3 ps-(--gantt-row-indent) nessa-text-4"
+                  className="sticky left-0 z-20 flex shrink-0 items-center gap-1 border-b border-r border-hairline border-r-border bg-background pe-3 ps-(--gantt-row-indent) nessa-text-4"
                   style={{
                     width: taskListWidth,
                     "--gantt-row-indent": `${8 + row.depth * 16}px`,
@@ -1797,7 +1797,7 @@ function GanttChartGrid({ className, ref: forwardedRef, ...props }: GanttChartGr
                 <div
                   data-slot="gantt-chart-lane"
                   data-task-id={row.task.id}
-                  className="group/lane relative shrink-0 border-b border-border/40"
+                  className="group/lane relative shrink-0 border-b border-hairline"
                   style={{ width: timelineWidth }}
                 >
                   {renderQuickCreate ? (
@@ -1947,7 +1947,7 @@ function GanttChartGrid({ className, ref: forwardedRef, ...props }: GanttChartGr
             className="flex min-h-0 flex-1"
           >
             <div
-              className="sticky left-0 z-20 shrink-0 border-r border-border bg-background"
+              className="sticky left-0 z-20 shrink-0 border-r border-hairline bg-background"
               style={{ width: taskListWidth }}
             />
             <div className="shrink-0" style={{ width: timelineWidth }} />

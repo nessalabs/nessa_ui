@@ -1235,7 +1235,7 @@ function SelectionTooltipPanel({
         }}
         data-slot="selection-tooltip-panel-content"
         className={cn(
-          "border-t border-border bg-muted/40 px-3 py-2.5 font-sans nessa-text-3 text-popover-foreground",
+          "border-t border-hairline bg-muted/40 px-3 py-2.5 font-sans nessa-text-3 text-popover-foreground",
           // Out of flow while shut, so a band wider than the action row
           // cannot widen the pill it is not showing in — the row's own width
           // is what the pill holds at rest, and what the lock hands to the

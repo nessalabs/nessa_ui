@@ -1037,7 +1037,7 @@ function ChatComposerTrigger({
           }}
           onKeyDown={handlePanelKeyDown}
           className={cn(
-            "z-50 w-[var(--radix-popover-trigger-width)] overflow-hidden rounded-2xl border border-border bg-popover font-sans text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            "z-50 w-[var(--radix-popover-trigger-width)] overflow-hidden rounded-2xl border border-hairline bg-popover font-sans text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             className,
           )}
         >

@@ -298,7 +298,7 @@ function ActivityRingsCard({
                   data-emphasis={emphasisOf(context.ring.id)}
                   className={cn(
                     ROW_CLASSES,
-                    "gap-0.5 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0",
+                    "gap-0.5 border-t border-hairline py-3 first:border-t-0 first:pt-0 last:pb-0",
                   )}
                   {...rowHandlers(context.ring.id)}
                 >

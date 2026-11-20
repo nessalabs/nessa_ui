@@ -795,7 +795,7 @@ function ModelThinkingControl({
           sideOffset={8}
           collisionPadding={12}
           className={cn(
-            "relative z-50 w-[min(17rem,calc(100vw-1.5rem))] rounded-xl border border-border bg-popover p-3 font-sans text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            "relative z-50 w-[min(17rem,calc(100vw-1.5rem))] rounded-xl border border-hairline bg-popover p-3 font-sans text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             contentClassName,
           )}
         >

@@ -272,8 +272,8 @@ export const ganttChartToneVariants = cva("", {
   variants: {
     tone: {
       primary: "bg-primary text-primary-foreground",
-      secondary: "border border-border bg-secondary text-secondary-foreground",
-      muted: "border border-border bg-muted text-muted-foreground",
+      secondary: "border border-hairline bg-secondary text-secondary-foreground",
+      muted: "border border-hairline bg-muted text-muted-foreground",
       destructive: "bg-destructive text-destructive-foreground",
     },
   },

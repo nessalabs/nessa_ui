@@ -152,7 +152,7 @@ function AgentDetailsProject({
     <div
       data-slot="agent-details-project"
       className={cn(
-        "flex w-full min-w-0 flex-col gap-0.5 border-b border-border pb-3",
+        "flex w-full min-w-0 flex-col gap-0.5 border-b border-hairline pb-3",
         className,
       )}
       {...props}
@@ -190,7 +190,7 @@ function AgentDetailsField({
     <div
       data-slot="agent-details-field"
       className={cn(
-        "flex w-full min-w-0 items-baseline justify-between gap-4 border-b border-border py-2.5 last:border-b-0",
+        "flex w-full min-w-0 items-baseline justify-between gap-4 border-b border-hairline py-2.5 last:border-b-0",
         className,
       )}
       {...props}

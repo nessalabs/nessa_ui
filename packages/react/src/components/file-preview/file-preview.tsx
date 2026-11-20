@@ -111,7 +111,7 @@ function FilePreview({
         role="group"
         aria-label={file?.name ?? "File preview"}
         className={cn(
-          "flex h-full min-h-0 w-full flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground",
+          "flex h-full min-h-0 w-full flex-col overflow-hidden rounded-xl border border-hairline bg-card text-card-foreground",
           className,
         )}
         {...props}
@@ -140,7 +140,7 @@ function FilePreviewHeader({
     <div
       data-slot="file-preview-header"
       className={cn(
-        "flex shrink-0 items-center gap-2 border-b border-border px-3 py-2",
+        "flex shrink-0 items-center gap-2 border-b border-hairline px-3 py-2",
         className,
       )}
       {...props}

@@ -153,7 +153,7 @@ function ChatMessageQuote({ className, ...props }: React.ComponentProps<"span">)
     <span
       data-slot="chat-message-quote"
       className={cn(
-        "mb-1 max-w-full truncate rounded-2xl border border-border px-3 py-1 font-sans nessa-text-2 leading-4 text-muted-foreground",
+        "mb-1 max-w-full truncate rounded-2xl border border-hairline px-3 py-1 font-sans nessa-text-2 leading-4 text-muted-foreground",
         className,
       )}
       {...props}

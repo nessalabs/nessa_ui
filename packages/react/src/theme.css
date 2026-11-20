@@ -17,6 +17,9 @@
   --destructive: oklch(0.577 0.235 27.325);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.922 0 0);
+  /* A line that only separates: a divider, a panel's edge, a card's rim.
+     Faint on purpose; a control's outline people must see stays --border. */
+  --hairline: oklch(0 0 0 / 8%);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.556 0 0);
   --sidebar: oklch(0.985 0 0);
@@ -239,6 +242,8 @@
      and 3.82:1 for colors the screen draws at 1.33:1 and 1.47:1. These are
      the alphas that actually clear the 3:1 required-boundary threshold. */
   --border: oklch(1 0 0 / 35%);
+  /* Decoration, not a required boundary, so it need not clear 3:1. */
+  --hairline: oklch(1 0 0 / 9%);
   --input: oklch(1 0 0 / 38%);
   /* Focus rings are drawn at 40% opacity, so the ring token has to be bright
      enough that 40% of it still clears 3:1 against the darkest surface it
@@ -493,6 +498,7 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
+  --color-hairline: var(--hairline);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);

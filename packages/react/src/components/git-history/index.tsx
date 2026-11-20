@@ -34,9 +34,9 @@ export function GitHistory({ commits, virtualize = true, rowHeight = 56, height 
   const graphWidth = Math.max(44, graph.lanes * 10 + 20)
   const columns = "grid grid-cols-[min(22cqw,var(--nessa-git-width))_minmax(0,1fr)] @[48rem]:grid-cols-[min(22cqw,var(--nessa-git-width))_minmax(0,1fr)_140px_120px_76px]"
   return (
-    <div {...props} data-slot="git-history" className={cn("@container min-w-0 overflow-hidden rounded-lg border border-border bg-background font-sans nessa-text-3 text-foreground", className)}>
+    <div {...props} data-slot="git-history" className={cn("@container min-w-0 overflow-hidden rounded-lg border border-hairline bg-background font-sans nessa-text-3 text-foreground", className)}>
       <div style={{ "--nessa-git-width": `${graphWidth}px` } as React.CSSProperties}>
-        <div aria-hidden="true" className={cn(columns, "border-b border-border bg-muted py-2 text-muted-foreground")}>
+        <div aria-hidden="true" className={cn(columns, "border-b border-hairline bg-muted py-2 text-muted-foreground")}>
           <span className="pl-3">Graph</span><span>Commit history</span><span className="hidden @[48rem]:block">Date (UTC)</span><span className="hidden @[48rem]:block">Author</span><span className="hidden @[48rem]:block">Commit</span>
         </div>
         {commits.length === 0 ? <div role="status" className="p-6 text-muted-foreground">{emptyMessage}</div> : (

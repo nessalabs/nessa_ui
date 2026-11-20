@@ -195,7 +195,7 @@ function ComposerQueue({
             className={cn(
               "m-0 grid list-none p-0",
               appearance === "card"
-                ? "overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-sm"
+                ? "overflow-hidden rounded-2xl border border-hairline bg-card text-card-foreground shadow-sm"
                 : // Plain lists keep overflow visible so a dragged row's shadow
                   // is not clipped by the list box.
                   "overflow-visible bg-transparent text-foreground",
@@ -309,7 +309,7 @@ function ComposerQueueItem({
       // an idle item leaves consumer transition utilities untouched instead of
       // pinning `transition` to an unset custom property.
       className={cn(
-        "group relative z-0 grid min-h-11 gap-2 border-b border-border font-sans last:border-b-0 data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg",
+        "group relative z-0 grid min-h-11 gap-2 border-b border-hairline font-sans last:border-b-0 data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg",
         showHandle
           ? "grid-cols-[1.75rem_minmax(0,1fr)_auto]"
           : "grid-cols-[minmax(0,1fr)_auto]",

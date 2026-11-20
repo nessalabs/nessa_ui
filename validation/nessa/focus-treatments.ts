@@ -604,13 +604,14 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
   // The dialog panel takes focus when it opens, as the drawer's does; it is
   // centered with a margin around it, so its outline draws outset. The body
   // takes focus while it scrolls, so a keyboard can scroll text, and draws
-  // inset between the header and footer.
+  // inset between the header and footer; an aside's content does the same
+  // under the aside's title.
   {
     component: "dialog",
     layer: "outline",
     state: "focus-visible",
     className: "focus-visible:outline-ring",
-    count: 2,
+    count: 3,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -874,9 +875,9 @@ export const focusGeometryClasses = Object.freeze([
   { component: "pagination", className: "focus-visible:-outline-offset-2", count: 1 },
   { component: "drawer", className: "focus-visible:outline-2", count: 1 },
   { component: "drawer", className: "focus-visible:-outline-offset-2", count: 1 },
-  { component: "dialog", className: "focus-visible:outline-2", count: 2 },
+  { component: "dialog", className: "focus-visible:outline-2", count: 3 },
   { component: "dialog", className: "focus-visible:outline-offset-2", count: 1 },
-  { component: "dialog", className: "focus-visible:-outline-offset-2", count: 1 },
+  { component: "dialog", className: "focus-visible:-outline-offset-2", count: 2 },
   { component: "drawer", className: "focus-visible:ring-2", count: 1 },
   { component: "drawer", className: "focus-visible:ring-offset-0", count: 1 },
   { component: "split-view/split-view-separator", className: "focus-visible:ring-2", count: 1 },

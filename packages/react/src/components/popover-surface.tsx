@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils"
  * reuse the exact classes.
  */
 const popoverSurfaceVariants = cva(
-  "border border-border bg-popover font-sans text-popover-foreground",
+  "border border-hairline bg-popover font-sans text-popover-foreground",
   {
     variants: {
       elevation: {

@@ -169,7 +169,7 @@ function MermaidViewer({ svg, onClose }: { svg: string; onClose: () => void }) {
       className="h-dvh max-h-none w-dvw max-w-none bg-background p-0 text-foreground"
     >
       <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
+        <div className="flex items-center justify-between gap-2 border-b border-hairline px-4 py-2">
           <span className="nessa-text-4 font-medium">Diagram</span>
           <div className="flex items-center gap-1.5">
             <button

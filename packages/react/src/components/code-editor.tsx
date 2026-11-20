@@ -151,7 +151,7 @@ export function CodeEditor({
       "--nessa-code-bg-dark": themedSurface ? syntax.colors?.dark.background ?? "var(--muted)" : syntax.colors ? `color-mix(in srgb, ${syntax.colors.dark.foreground} 12%, ${syntax.colors.dark.background})` : "var(--muted)",
       ...style,
     } as React.CSSProperties} {...props}>
-      <div data-slot="code-editor-header" data-code-mode={syntax.mode} contentEditable={false} className={cn(codeSurfaceDarkModeClassName, "flex items-center justify-between border-b border-border px-2 py-1 bg-[var(--nessa-code-background)] [--nessa-code-background:var(--nessa-code-header-light)] data-[code-mode=light]:[--nessa-code-background:var(--nessa-code-header-light)]! data-[code-mode=dark]:[--nessa-code-background:var(--nessa-code-bg-dark)]!")}>
+      <div data-slot="code-editor-header" data-code-mode={syntax.mode} contentEditable={false} className={cn(codeSurfaceDarkModeClassName, "flex items-center justify-between border-b border-hairline px-2 py-1 bg-[var(--nessa-code-background)] [--nessa-code-background:var(--nessa-code-header-light)] data-[code-mode=light]:[--nessa-code-background:var(--nessa-code-header-light)]! data-[code-mode=dark]:[--nessa-code-background:var(--nessa-code-bg-dark)]!")}>
         <Popover.Root open={open && !disabled} onOpenChange={setOpen}>
           <Popover.Trigger asChild>
             <Button type="button" variant="ghost" size="sm" className="text-inherit hover:text-inherit hover:bg-transparent" disabled={disabled} aria-label={`Code language: ${label}`}>

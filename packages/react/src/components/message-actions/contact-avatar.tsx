@@ -90,7 +90,7 @@ export function ContactAvatar({
           these rows sit on a muted tile, where a muted circle on muted fill
           disappears and muted-on-muted initials sit at the 4.5:1 floor —
           legible by the letter of the gate, faint in the hand. */}
-      <span className="flex size-full select-none items-center justify-center overflow-hidden rounded-full border border-border bg-muted nessa-text-2 font-medium text-foreground">
+      <span className="flex size-full select-none items-center justify-center overflow-hidden rounded-full border border-hairline bg-muted nessa-text-2 font-medium text-foreground">
         {children ??
           (showsImage ? (
             <img

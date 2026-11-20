@@ -357,7 +357,7 @@ function AgentActivityCard({
       type="button"
       data-slot="agent-activity-card"
       className={cn(
-        "flex w-full min-w-0 items-center gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2 text-start font-sans shadow-xs outline-none transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        "flex w-full min-w-0 items-center gap-2.5 rounded-xl border border-hairline bg-card px-2.5 py-2 text-start font-sans shadow-xs outline-none transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         className,
       )}
       {...props}

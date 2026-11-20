@@ -386,7 +386,7 @@ function StepDetails({
     <div
       id={id}
       data-slot="tool-trace-details"
-      className="flex min-w-0 flex-col gap-2.5 border-t border-border px-2.5 pt-2 pb-2.5"
+      className="flex min-w-0 flex-col gap-2.5 border-t border-hairline px-2.5 pt-2 pb-2.5"
     >
       <Tabs
         value={chosen}
@@ -598,7 +598,7 @@ function StepRow({
       {timed ? (
         <span
           aria-hidden="true"
-          className="relative h-3.5 border-s border-border [background-image:repeating-linear-gradient(90deg,transparent_0_calc(25%-1px),color-mix(in_oklab,var(--border)_55%,transparent)_calc(25%-1px)_25%)]"
+          className="relative h-3.5 border-s border-hairline [background-image:repeating-linear-gradient(90deg,transparent_0_calc(25%-1px),color-mix(in_oklab,var(--border)_55%,transparent)_calc(25%-1px)_25%)]"
         >
           {span ? (
             <span
