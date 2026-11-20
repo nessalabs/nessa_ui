@@ -376,6 +376,104 @@ export const FullWithAside: Story = {
   },
 }
 
+function DecisionsWithLongList() {
+  return (
+    <Dialog
+      trigger={<Button variant="outline">Open decisions</Button>}
+      title="Decisions"
+      description="Ship the alpha release"
+      size="full"
+      aside={
+        <ul className="m-0 flex list-none flex-col gap-2 p-0">
+          {Array.from({ length: 60 }, (_, index) => (
+            <li key={index} className="nessa-text-4">
+              Decision {index + 1}
+            </li>
+          ))}
+        </ul>
+      }
+      footer={<Button>Answer</Button>}
+    >
+      <p className="m-0 nessa-text-4">What the chosen one says</p>
+    </Dialog>
+  )
+}
+
+async function openLongList(canvasElement: HTMLElement) {
+  const canvas = within(canvasElement)
+  const page = within(canvasElement.ownerDocument.body)
+  await userEvent.click(canvas.getByRole("button", { name: "Open decisions" }))
+  const dialog = await page.findByRole("dialog", { name: "Decisions" })
+  const surface = dialog.querySelector<HTMLElement>("[data-slot=dialog-surface]")!
+  await waitFor(async () => {
+    await expect(["1", "none"]).toContain(getComputedStyle(surface).scale)
+  })
+  return { dialog, page }
+}
+
+export const FullWithLongAside: Story = {
+  parameters: storyDocumentation(
+    "An aside holding more than fits scrolls on its own, under a title that stays put, and joins the tab order only while it scrolls, as the body does. The play test opens a list of sixty, proves the aside's content scrolls and is focusable, scrolls it to the end, and proves the title has not moved.",
+  ),
+  render: () => <DecisionsWithLongList />,
+  play: async ({ canvasElement }) => {
+    const { dialog, page } = await openLongList(canvasElement)
+    const content = dialog.querySelector<HTMLElement>("[data-slot=dialog-aside-content]")!
+    await waitFor(async () => {
+      await expect(content.dataset.scrolls).toBe("true")
+    })
+    await expect(content.scrollHeight).toBeGreaterThan(content.clientHeight)
+    await expect(content.tabIndex).toBe(0)
+    const title = page.getByRole("heading", { name: "Decisions" })
+    const titleTop = title.getBoundingClientRect().top
+    content.scrollTop = content.scrollHeight
+    await waitFor(async () => {
+      await expect(content.scrollTop).toBeGreaterThan(0)
+    })
+    await expect(title.getBoundingClientRect().top).toBe(titleTop)
+    await userEvent.keyboard("{Escape}")
+    await waitFor(async () => {
+      await expect(dialog.isConnected).toBe(false)
+    })
+  },
+}
+
+export const FullWithAsideNarrow: Story = {
+  parameters: {
+    ...storyDocumentation(
+      "Below the sm breakpoint the aside stacks above the body instead of beside it, held to at most 40% of the panel's height, so a phone-width window still leaves the body and footer the full width. The play test opens it at 320px and proves the aside sits above a body as wide as the panel.",
+    ),
+    viewport: {
+      defaultViewport: "dialog-320",
+      options: {
+        "dialog-320": {
+          name: "Dialog 320px",
+          styles: { width: "320px", height: "700px" },
+          type: "mobile" as const,
+        },
+      },
+    },
+  },
+  render: () => <DecisionsWithLongList />,
+  play: async ({ canvasElement }) => {
+    await expect(canvasElement.ownerDocument.defaultView?.innerWidth).toBe(320)
+    const { dialog } = await openLongList(canvasElement)
+    const surface = dialog.querySelector<HTMLElement>("[data-slot=dialog-surface]")!
+    const aside = dialog.querySelector<HTMLElement>("[data-slot=dialog-aside]")!
+    const body = dialog.querySelector<HTMLElement>("[data-slot=dialog-body]")!
+    const footer = dialog.querySelector<HTMLElement>("[data-slot=dialog-footer]")!
+    const asideRect = aside.getBoundingClientRect()
+    await expect(body.getBoundingClientRect().top).toBeGreaterThanOrEqual(asideRect.bottom - 1)
+    await expect(asideRect.height).toBeLessThanOrEqual(surface.clientHeight * 0.4 + 1)
+    await expect(body.getBoundingClientRect().width).toBeCloseTo(surface.clientWidth, 0)
+    await expect(footer.getBoundingClientRect().width).toBeCloseTo(surface.clientWidth, 0)
+    await userEvent.keyboard("{Escape}")
+    await waitFor(async () => {
+      await expect(dialog.isConnected).toBe(false)
+    })
+  },
+}
+
 export const MenuInside: Story = {
   parameters: storyDocumentation(
     "A menu opened from inside the dialog portals into the dialog rather than the body, so it is inside the boundary the dialog traps focus in and hides the page from, and it paints above the panel. The play test opens the menu, proves its content is a descendant of the dialog and takes focus, then dismisses only the menu with Escape — the dialog stays open — before a second Escape closes the dialog.",

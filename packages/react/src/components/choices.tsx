@@ -119,7 +119,7 @@ function Choices({
             data-state={checked ? "checked" : "unchecked"}
             data-disabled={unavailable || undefined}
             className={cn(
-              "relative flex min-w-0 cursor-default flex-col gap-1 rounded-lg border border-hairline bg-card p-3 text-card-foreground",
+              "relative flex min-w-0 cursor-default flex-col gap-1 rounded-lg border border-border bg-card p-3 text-card-foreground",
               "transition-[background-color,border-color,box-shadow] [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)]",
               "hover:bg-foreground/(--nessa-state-hover)",
               "has-[:checked]:border-foreground has-[:checked]:ring-1 has-[:checked]:ring-inset has-[:checked]:ring-foreground has-[:checked]:hover:bg-card",

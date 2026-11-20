@@ -194,6 +194,8 @@ function Dialog({
   const focusReturn = useOpenerFocusReturn(onReturnFocus)
   const [bodyNode, setBodyNode] = React.useState<HTMLDivElement | null>(null)
   const bodyScrolls = useOverflows(bodyNode)
+  const [asideNode, setAsideNode] = React.useState<HTMLDivElement | null>(null)
+  const asideScrolls = useOverflows(asideNode)
   const hasDescription = hasContent(description)
   const hasFooter = hasContent(footer)
   const hasAside = hasContent(aside)
@@ -302,23 +304,39 @@ function Dialog({
                 className={cn(
                   "relative flex min-h-0 shrink flex-col rounded-[inherit] border border-hairline bg-card text-card-foreground shadow-xl animate-nessa-enter",
                   full && "h-full",
-                  hasAside && "grid grid-cols-[minmax(0,17.5rem)_minmax(0,1fr)] overflow-hidden",
+                  // Side by side from the sm breakpoint; narrower, the aside
+                  // stacks above the body, held to at most 40% of the height.
+                  hasAside &&
+                    "overflow-hidden sm:grid sm:grid-cols-[minmax(0,17.5rem)_minmax(0,1fr)]",
                 )}
               >
                 {hasAside ? (
                   <div
                     data-slot="dialog-aside"
-                    className="flex min-h-0 flex-col border-e border-hairline bg-sidebar"
+                    className="flex max-h-[40%] min-h-0 shrink-0 flex-col border-b border-hairline bg-sidebar sm:max-h-none sm:border-b-0 sm:border-e"
                   >
                     {header}
-                    <div className="flex min-h-0 flex-1 flex-col px-3 pb-3">{aside}</div>
+                    {/*
+                      Scrolls on its own when the aside holds more than fits,
+                      while the title stays put; in the tab order only then,
+                      like the body.
+                    */}
+                    <div
+                      ref={setAsideNode}
+                      data-slot="dialog-aside-content"
+                      data-scrolls={asideScrolls || undefined}
+                      tabIndex={asideScrolls ? 0 : undefined}
+                      className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3 outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                    >
+                      {aside}
+                    </div>
                   </div>
                 ) : (
                   header
                 )}
                 <div
                   data-slot="dialog-main"
-                  className={cn("flex min-h-0 min-w-0 flex-col", hasAside && "pt-3", full && "flex-1")}
+                  className={cn("flex min-h-0 min-w-0 flex-col", hasAside && "flex-1 pt-3", full && "flex-1")}
                 >
                   <div
                     ref={setBodyNode}
@@ -333,7 +351,7 @@ function Dialog({
                       // would cross the header and footer it sits between.
                       "focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
                       !hasFooter && "pb-5",
-                      hasAside && "px-8",
+                      hasAside && "sm:px-8",
                     )}
                   >
                     {children}
@@ -343,7 +361,7 @@ function Dialog({
                       data-slot="dialog-footer"
                       className={cn(
                         "flex shrink-0 flex-wrap items-center justify-end gap-2 px-5 pt-3 pb-5",
-                        hasAside && "border-t border-hairline px-8 pt-3 pb-3.5",
+                        hasAside && "border-t border-hairline pt-3 pb-3.5 sm:px-8",
                       )}
                     >
                       {footer}
