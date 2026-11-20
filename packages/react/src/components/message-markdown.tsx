@@ -341,7 +341,7 @@ function MarkdownTableFrame({
             // A hairline between columns, on the side each cell starts, so
             // the rules sit between columns in either text direction. Fainter
             // than the rules between rows: rows are what the eye follows.
-            "[&_tr>*+*]:border-s [&_tr>*+*]:border-hairline",
+            "[&_tr>*+*]:border-s [&_tr>*+*]:border-hairline/50",
             // The first column names the row, so it reads a step stronger.
             "[&_td:first-child]:font-medium",
             className,
