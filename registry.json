@@ -1929,7 +1929,8 @@
       "registryDependencies": [
         "nessalabs/nessa_ui/nessa-base",
         "nessalabs/nessa_ui/utils",
-        "nessalabs/nessa_ui/button"
+        "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/compose"
       ],
       "files": [
         {
