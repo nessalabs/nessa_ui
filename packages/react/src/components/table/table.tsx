@@ -25,7 +25,7 @@ function TableShell({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="table-shell"
       className={cn(
-        "flex box-border w-full min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card font-sans text-card-foreground",
+        "flex box-border w-full min-w-0 flex-col overflow-hidden rounded-xl border border-hairline bg-card font-sans text-card-foreground",
         className,
       )}
       {...props}
@@ -270,7 +270,7 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
     <tfoot
       data-slot="table-footer"
       className={cn(
-        "border-t border-border bg-muted/50 font-medium [&>tr]:last:border-b-0",
+        "border-t border-hairline bg-muted/50 font-medium [&>tr]:last:border-b-0",
         className,
       )}
       {...props}
@@ -287,7 +287,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "border-b border-border transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-muted/50 data-[state=selected]:bg-muted motion-reduce:transition-none",
+        "border-b border-hairline transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:bg-muted/50 data-[state=selected]:bg-muted motion-reduce:transition-none",
         className,
       )}
       {...props}

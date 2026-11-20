@@ -568,8 +568,8 @@ const eventCalendarToneVariants = cva("", {
   variants: {
     tone: {
       primary: "bg-primary text-primary-foreground",
-      secondary: "border border-border bg-secondary text-secondary-foreground",
-      muted: "border border-border bg-muted text-muted-foreground",
+      secondary: "border border-hairline bg-secondary text-secondary-foreground",
+      muted: "border border-hairline bg-muted text-muted-foreground",
       destructive: "bg-destructive text-destructive-foreground",
     },
   },
@@ -1207,7 +1207,7 @@ function EventCalendar({
         data-view={view}
         onKeyDown={handleShortcutKeyDown}
         className={cn(
-          "flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-background font-sans text-foreground",
+          "flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-xl border border-hairline bg-background font-sans text-foreground",
           className,
         )}
         {...props}
@@ -1292,7 +1292,7 @@ function EventCalendarToolbar({
     <div
       data-slot="event-calendar-toolbar"
       className={cn(
-        "flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2",
+        "flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline px-3 py-2",
         className,
       )}
       {...props}
@@ -2163,7 +2163,7 @@ function TimeDayColumn({
   return (
     <div
       data-slot="event-calendar-day-column"
-      className="relative min-w-0 flex-1 border-s border-border"
+      className="relative min-w-0 flex-1 border-s border-hairline"
       style={{ height: gridHeight }}
     >
       {Array.from(
@@ -2173,7 +2173,7 @@ function TimeDayColumn({
         <div
           key={hour}
           aria-hidden="true"
-          className="pointer-events-none relative border-b border-border"
+          className="pointer-events-none relative border-b border-hairline"
           style={{ height: hourHeight }}
         >
           <div className="absolute inset-x-0 top-1/2 border-b border-dashed border-border/60" />
@@ -2642,7 +2642,7 @@ function TimeGrid({ days }: { days: Date[] }) {
       data-slot="event-calendar-time-scroll"
       className="min-h-0 flex-1 select-none overflow-y-auto overscroll-contain"
     >
-      <div className="sticky top-0 z-50 border-b border-border bg-background">
+      <div className="sticky top-0 z-50 border-b border-hairline bg-background">
         <div className="flex">
           <div className="w-14 shrink-0" />
           {days.map((day) => {
@@ -2650,7 +2650,7 @@ function TimeGrid({ days }: { days: Date[] }) {
             return (
               <div
                 key={day.getTime()}
-                className="flex min-w-0 flex-1 flex-col items-center gap-0.5 border-s border-border py-1.5"
+                className="flex min-w-0 flex-1 flex-col items-center gap-0.5 border-s border-hairline py-1.5"
               >
                 <span className="nessa-text-2 text-muted-foreground">
                   {weekdayFormat.format(day)}
@@ -2677,7 +2677,7 @@ function TimeGrid({ days }: { days: Date[] }) {
           })}
         </div>
         {hasAllDay ? (
-          <div data-slot="event-calendar-all-day-row" className="flex border-t border-border">
+          <div data-slot="event-calendar-all-day-row" className="flex border-t border-hairline">
             <div className="flex w-14 shrink-0 items-start justify-end pe-2 pt-1">
               <span className="nessa-text-1 text-muted-foreground">
                 {labels.allDay}
@@ -2686,7 +2686,7 @@ function TimeGrid({ days }: { days: Date[] }) {
             {days.map((day) => (
               <div
                 key={day.getTime()}
-                className="flex min-w-0 flex-1 flex-col gap-0.5 border-s border-border p-0.5"
+                className="flex min-w-0 flex-1 flex-col gap-0.5 border-s border-hairline p-0.5"
               >
                 {allDayEventsFor(events, day).map((event) => (
                   <AllDayChip key={event.id} event={event} />
@@ -2795,7 +2795,7 @@ function MonthDayCell({
     <div
       data-slot="event-calendar-month-cell"
       data-outside-month={outsideMonth || undefined}
-      className="relative flex min-h-0 min-w-0 flex-col gap-0.5 overflow-hidden border-b border-s border-border p-1"
+      className="relative flex min-h-0 min-w-0 flex-col gap-0.5 overflow-hidden border-b border-s border-hairline p-1"
     >
       <div
         role="button"
@@ -2956,11 +2956,11 @@ function MonthGrid() {
       data-slot="event-calendar-month-grid"
       className="flex min-h-0 flex-1 flex-col"
     >
-      <div className="grid shrink-0 grid-cols-7 border-b border-border">
+      <div className="grid shrink-0 grid-cols-7 border-b border-hairline">
         {days.slice(0, WEEK_LENGTH).map((day) => (
           <span
             key={day.getTime()}
-            className="border-s border-border py-1 text-center nessa-text-2 text-muted-foreground first:border-s-0"
+            className="border-s border-hairline py-1 text-center nessa-text-2 text-muted-foreground first:border-s-0"
           >
             {weekdayFormat.format(day)}
           </span>

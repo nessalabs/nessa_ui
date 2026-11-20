@@ -57,7 +57,7 @@ const tabsListVariants = cva(
         // read two `group-data-*` conditions off the same ancestor — that
         // compiles to two nested ancestors, and there is only one list.
         underline: [
-          "gap-4 border-border data-[orientation=horizontal]:border-b data-[orientation=vertical]:gap-1 data-[orientation=vertical]:border-e",
+          "gap-4 border-hairline data-[orientation=horizontal]:border-b data-[orientation=vertical]:gap-1 data-[orientation=vertical]:border-e",
           // A horizontal strip scrolls rather than crushing its tabs: the
           // tabs keep their natural width and the strip overflows, so a
           // narrow column gets a scrollable strip instead of a cramped one.

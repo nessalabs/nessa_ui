@@ -330,7 +330,7 @@ function MarkdownTableFrame({
         markdown === null ? "mt-4" : "-mt-1 pt-7",
       )}
     >
-      <TableShell className="border-border/80 bg-foreground/[0.018] text-inherit shadow-[inset_0_1px_0_color-mix(in_oklab,var(--foreground)_5%,transparent)]">
+      <TableShell className="border-hairline bg-foreground/[0.018] text-inherit shadow-[inset_0_1px_0_color-mix(in_oklab,var(--foreground)_5%,transparent)]">
         <Table
           containerLabel={label}
           edgeFade
@@ -341,7 +341,7 @@ function MarkdownTableFrame({
             // A hairline between columns, on the side each cell starts, so
             // the rules sit between columns in either text direction. Fainter
             // than the rules between rows: rows are what the eye follows.
-            "[&_tr>*+*]:border-s [&_tr>*+*]:border-border/30",
+            "[&_tr>*+*]:border-s [&_tr>*+*]:border-hairline",
             // The first column names the row, so it reads a step stronger.
             "[&_td:first-child]:font-medium",
             className,
@@ -391,7 +391,7 @@ function MarkdownTableRow({
 }: React.ComponentProps<"tr"> & { node?: unknown }) {
   return (
     <TableRow
-      className={cn("border-border/60 hover:bg-transparent", className)}
+      className={cn("border-hairline hover:bg-transparent", className)}
       {...rest}
     />
   )
@@ -498,9 +498,9 @@ const markdownProseClassName = cn(
   // from the DOM rendered by the code, math, and diagram surfaces.
   "[&_code:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:rounded-md [&_code:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:bg-muted [&_code:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:px-1.5 [&_code:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:py-0.5 [&_code:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:font-mono [&_code:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:text-[0.8125em]",
   "[&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:my-3 [&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:overflow-x-auto [&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:rounded-xl [&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:bg-muted [&_pre:not([data-slot=code-block]_*,[data-slot=math-block]_*,[data-slot=mermaid-diagram]_*)]:p-3",
-  "[&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground",
+  "[&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:border-hairline [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground",
   "[&_a]:font-medium [&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-2",
-  "[&_hr]:my-4 [&_hr]:border-border",
+  "[&_hr]:my-4 [&_hr]:border-hairline",
   "[&_img]:max-w-full [&_img]:rounded-xl",
   "[&_.katex-display]:my-0 [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:py-1",
 )

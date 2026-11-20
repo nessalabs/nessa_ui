@@ -1128,7 +1128,7 @@ function PriceChart({
           <div
             data-slot="price-chart-selection-summary"
             aria-hidden="true"
-            className="pointer-events-none absolute top-0 rounded-md border border-border bg-popover px-2 py-1 nessa-text-1 whitespace-nowrap text-popover-foreground tabular-nums shadow-sm"
+            className="pointer-events-none absolute top-0 rounded-md border border-hairline bg-popover px-2 py-1 nessa-text-1 whitespace-nowrap text-popover-foreground tabular-nums shadow-sm"
             style={{
               left: `${summaryX}px`,
               transform: `translateX(-${summaryShift}%)`,

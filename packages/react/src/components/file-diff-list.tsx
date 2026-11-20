@@ -86,7 +86,7 @@ function FileDiffCard({
         data-slot="file-diff-card"
         data-expanded={expanded ? "true" : "false"}
         className={cn(
-          "grid overflow-hidden rounded-2xl border border-border bg-card font-sans text-card-foreground shadow-sm",
+          "grid overflow-hidden rounded-2xl border border-hairline bg-card font-sans text-card-foreground shadow-sm",
           className,
         )}
         {...props}
@@ -105,7 +105,7 @@ function FileDiffCardHeader({
     <div
       data-slot="file-diff-card-header"
       className={cn(
-        "flex items-center gap-3 border-b border-border px-4 py-3",
+        "flex items-center gap-3 border-b border-hairline px-4 py-3",
         className,
       )}
       {...props}

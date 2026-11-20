@@ -250,7 +250,7 @@ function CheckboxList({
       ) : null}
       <div
         data-slot="checkbox-list-card"
-        className="flex flex-col rounded-xl border border-border bg-card text-card-foreground [&>[data-slot=checkbox-list-row]+[data-slot=checkbox-list-row]]:border-t [&>[data-slot=checkbox-list-row]+[data-slot=checkbox-list-row]]:border-border"
+        className="flex flex-col rounded-xl border border-hairline bg-card text-card-foreground [&>[data-slot=checkbox-list-row]+[data-slot=checkbox-list-row]]:border-t [&>[data-slot=checkbox-list-row]+[data-slot=checkbox-list-row]]:border-hairline"
       >
         {options.length === 0 ? (
           <p

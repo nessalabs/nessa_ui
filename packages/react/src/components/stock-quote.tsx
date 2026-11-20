@@ -479,7 +479,7 @@ function StockQuote({
       data-slot="stock-quote"
       data-tone={tone}
       className={cn(
-        "@container flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-background font-sans text-foreground",
+        "@container flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-xl border border-hairline bg-background font-sans text-foreground",
         className,
       )}
       {...props}
@@ -700,7 +700,7 @@ function StockQuote({
       {stats?.length ? (
         <dl
           data-slot="stock-quote-stats"
-          className="m-0 grid shrink-0 grid-cols-2 gap-x-4 gap-y-3 border-t border-border px-4 py-3 @md:grid-cols-4 @md:px-6"
+          className="m-0 grid shrink-0 grid-cols-2 gap-x-4 gap-y-3 border-t border-hairline px-4 py-3 @md:grid-cols-4 @md:px-6"
         >
           {stats.map((stat) => (
             <div key={stat.label} className="flex min-w-0 flex-col gap-0.5">

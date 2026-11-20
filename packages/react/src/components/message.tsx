@@ -592,7 +592,7 @@ function MessageAttachment({
 }: MessageAttachmentProps) {
   const interactive = onClick != null
   const tileClassName = cn(
-    "relative flex size-36 shrink-0 flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border border-border bg-muted text-center",
+    "relative flex size-36 shrink-0 flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border border-hairline bg-muted text-center",
     interactive &&
       "cursor-pointer transition-colors hover:border-ring/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
     className,
@@ -719,7 +719,7 @@ function MessageThreadSummary({
       type="button"
       data-slot="message-thread-summary"
       className={cn(
-        "group/thread-summary ml-10 flex w-fit min-w-0 items-center gap-1.5 rounded-lg border border-transparent bg-transparent px-1.5 py-1 nessa-text-2 font-medium text-foreground outline-none transition-[border-color,background-color] hover:border-border hover:bg-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        "group/thread-summary ml-10 flex w-fit min-w-0 items-center gap-1.5 rounded-lg border border-transparent bg-transparent px-1.5 py-1 nessa-text-2 font-medium text-foreground outline-none transition-[border-color,background-color] hover:border-hairline hover:bg-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         "[&_[data-slot=message-avatar]]:size-5 [&_[data-slot=message-avatar]]:text-[0.8333em]",
         className,
       )}

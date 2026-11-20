@@ -412,7 +412,7 @@ function GeneratingSurface({
           aria-hidden="true"
           data-slot="generating-surface-placeholder"
           className={cn(
-            "pointer-events-none relative flex min-h-28 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/40",
+            "pointer-events-none relative flex min-h-28 items-center justify-center overflow-hidden rounded-xl border border-hairline bg-muted/40",
             placeholderClassName,
             phase === "revealing" && "absolute inset-0 min-h-0",
           )}

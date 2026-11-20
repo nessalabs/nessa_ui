@@ -487,7 +487,7 @@ function ModelPicker({
           collisionPadding={12}
           dir={effectiveDir}
           className={cn(
-            "z-50 w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            "z-50 w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-hairline bg-popover text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             contentClassName,
           )}
         >
@@ -522,7 +522,7 @@ function ModelPicker({
                 data-slot="model-picker-provider-tabs"
                 role="tablist"
                 aria-label={tabsLabel}
-                className="flex min-h-11 items-center gap-1 overflow-x-auto border-t border-border bg-muted/35 p-1.5"
+                className="flex min-h-11 items-center gap-1 overflow-x-auto border-t border-hairline bg-muted/35 p-1.5"
               >
                 {groups.map((group) => {
                   const selected = group.id === activeProvider?.id

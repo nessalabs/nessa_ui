@@ -275,7 +275,7 @@ function ReferenceTrigger({
         {...(href !== undefined ? { href } : {})}
         {...(!asChild && href === undefined ? { type: "button" } : {})}
         className={cn(
-          "mx-0.5 box-border inline-flex max-w-48 shrink-0 cursor-pointer items-center gap-1 overflow-hidden whitespace-nowrap rounded-full border border-border bg-background px-1.5 py-px align-baseline font-sans nessa-text-2 font-medium text-muted-foreground no-underline transition-colors hover:border-ring/60 hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring data-[state=open]:border-ring/60 data-[state=open]:text-foreground [&>svg]:size-3 [&>svg]:shrink-0",
+          "mx-0.5 box-border inline-flex max-w-48 shrink-0 cursor-pointer items-center gap-1 overflow-hidden whitespace-nowrap rounded-full border border-hairline bg-background px-1.5 py-px align-baseline font-sans nessa-text-2 font-medium text-muted-foreground no-underline transition-colors hover:border-ring/60 hover:text-foreground focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring data-[state=open]:border-ring/60 data-[state=open]:text-foreground [&>svg]:size-3 [&>svg]:shrink-0",
           className,
         )}
         onClick={(event: React.MouseEvent<HTMLAnchorElement>) => {
@@ -421,7 +421,7 @@ function ReferenceContent({
           if (target && isWithinTrigger(target)) event.preventDefault()
         }}
         className={cn(
-          "z-50 w-[min(22rem,calc(100vw-1.5rem))] rounded-xl border border-border bg-popover font-sans nessa-text-4 text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+          "z-50 w-[min(22rem,calc(100vw-1.5rem))] rounded-xl border border-hairline bg-popover font-sans nessa-text-4 text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           className,
         )}
         {...props}
@@ -640,7 +640,7 @@ function ReferenceCard({
           {source.meta !== undefined ? (
             <span
               data-slot="reference-card-meta"
-              className="inline-flex items-center rounded-full border border-border px-2 py-0.5 nessa-text-2 text-muted-foreground"
+              className="inline-flex items-center rounded-full border border-hairline px-2 py-0.5 nessa-text-2 text-muted-foreground"
             >
               {source.meta}
             </span>
