@@ -1922,6 +1922,28 @@
       ]
     },
     {
+      "name": "access-request",
+      "type": "registry:ui",
+      "title": "Access Request",
+      "description": "A red card asking to raise what agents may do: what is asked and why, a destructive Approve beside Not now, and once approved the plain lines saying what was allowed. The host raises the access and reports a refusal or a hold.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "registryDependencies": [
+        "nessalabs/nessa_ui/nessa-base",
+        "nessalabs/nessa_ui/utils",
+        "nessalabs/nessa_ui/button",
+        "nessalabs/nessa_ui/compose"
+      ],
+      "files": [
+        {
+          "path": "packages/react/src/components/access-request.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/access-request.tsx"
+        }
+      ]
+    },
+    {
       "name": "chat-tabs",
       "type": "registry:ui",
       "title": "Chat Tabs",
