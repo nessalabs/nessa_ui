@@ -18,7 +18,7 @@ import { cn, hasContent } from "@/lib/utils"
 import { Button } from "./button"
 
 /** How wide a dialog may grow before it stops and centers. */
-type DialogSize = "sm" | "md" | "lg"
+type DialogSize = "sm" | "md" | "lg" | "xl"
 
 /**
  * Whether an element's content overflows it, kept current as either changes.
@@ -43,6 +43,7 @@ const sizeClassName: Record<DialogSize, string> = {
   sm: "max-w-sm",
   md: "max-w-md",
   lg: "max-w-xl",
+  xl: "max-w-5xl",
 }
 
 export interface DialogProps
@@ -80,8 +81,9 @@ export interface DialogProps
   /** Called when the dialog asks to open or close. */
   onOpenChange?: (open: boolean) => void
   /**
-   * The widest the panel grows: `sm` 24rem, `md` 28rem, `lg` 36rem. It is
-   * never wider than the viewport less its margin.
+   * The widest the panel grows: `sm` 24rem, `md` 28rem, `lg` 36rem, `xl`
+   * 64rem for a workspace of its own, such as a list beside what it opens.
+   * It is never wider than the viewport less its margin.
    * @defaultValue "md"
    */
   size?: DialogSize

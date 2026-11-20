@@ -324,6 +324,44 @@ export const TallBody: Story = {
   },
 }
 
+export const ExtraLarge: Story = {
+  parameters: storyDocumentation(
+    "`xl` is for a dialog that is a workspace of its own, such as a list beside the item it opens: it grows to 64rem, and never past the viewport less its margin. The play test opens it at rest and proves it is wider than `lg` would allow and inside the viewport.",
+  ),
+  render: () => (
+    <Dialog
+      trigger={<Button variant="outline">Open decisions</Button>}
+      title="Decisions"
+      description="Every question in this chat."
+      size="xl"
+    >
+      <div className="grid grid-cols-[16rem_1fr] gap-4 nessa-text-4">
+        <p className="m-0">The list</p>
+        <p className="m-0">What the chosen one says</p>
+      </div>
+    </Dialog>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const page = within(canvasElement.ownerDocument.body)
+    await userEvent.click(canvas.getByRole("button", { name: "Open decisions" }))
+    const dialog = await page.findByRole("dialog", { name: "Decisions" })
+    const surface = dialog.querySelector<HTMLElement>("[data-slot=dialog-surface]")!
+    await waitFor(async () => {
+      await expect(["1", "none"]).toContain(getComputedStyle(surface).scale)
+    })
+    const rem = parseFloat(getComputedStyle(canvasElement.ownerDocument.documentElement).fontSize)
+    const viewport = canvasElement.ownerDocument.documentElement.clientWidth
+    const width = dialog.getBoundingClientRect().width
+    await expect(width).toBeLessThanOrEqual(Math.min(64 * rem, viewport))
+    if (viewport > 40 * rem) await expect(width).toBeGreaterThan(36 * rem)
+    await userEvent.keyboard("{Escape}")
+    await waitFor(async () => {
+      await expect(dialog.isConnected).toBe(false)
+    })
+  },
+}
+
 export const MenuInside: Story = {
   parameters: storyDocumentation(
     "A menu opened from inside the dialog portals into the dialog rather than the body, so it is inside the boundary the dialog traps focus in and hides the page from, and it paints above the panel. The play test opens the menu, proves its content is a descendant of the dialog and takes focus, then dismisses only the menu with Escape — the dialog stays open — before a second Escape closes the dialog.",
