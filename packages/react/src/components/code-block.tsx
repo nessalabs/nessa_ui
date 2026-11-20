@@ -458,6 +458,34 @@ function CodeBlockSkeleton({ code }: { code: string }) {
 }
 
 /**
+ * Takes the engine's drawn code out of the element it drew into whenever
+ * React lets go of that element without removing it.
+ *
+ * React keeps an element and re-attaches it when a Suspense boundary hides
+ * and shows its content again, and StrictMode does the same once to every
+ * new element. Each attach gives Pierre's `File` a fresh instance, which
+ * hydrates: it takes any `<pre>` already in the element's shadow root as
+ * server-drawn code and draws nothing until its file changes. So a block
+ * that had drawn nothing yet (a fence whose code had not arrived, or a
+ * theme still loading) stayed an empty `<pre>` once its code came, and a
+ * block hidden mid-stream kept the older code. Removing the `<pre>` here
+ * leaves the next instance nothing to adopt, so it draws what it has.
+ *
+ * This is the surface's own element, around the engine's, and React lets go
+ * of a parent before its children and attaches it after them: the `<pre>` is
+ * gone before the old instance lets go and the new one hydrates. Kept at
+ * module scope so React never sees a new ref and re-attaches on a render.
+ */
+function forgetDrawnCode(surface: HTMLDivElement | null) {
+  if (surface === null) return
+  return () => {
+    for (const host of surface.children)
+      for (const drawn of [...(host.shadowRoot?.children ?? [])])
+        if (drawn instanceof HTMLPreElement) drawn.remove()
+  }
+}
+
+/**
  * A syntax-highlighted code block backed by Pierre's rendering engine
  * (Shiki-based highlighting with dark and light themes). Standalone it
  * renders any snippet; MessageMarkdown composes it automatically for fenced
@@ -537,7 +565,9 @@ function CodeBlock({
         }
       >
         <React.Suspense fallback={<CodeBlockSkeleton code={code} />}>
-          <LazyFile file={file} options={options} />
+          <div data-slot="code-block-surface" ref={forgetDrawnCode} className="contents">
+            <LazyFile file={file} options={options} />
+          </div>
         </React.Suspense>
       </LazyHighlighterBoundary>
       <CopyButton text={code} label="Copy code" />
