@@ -41,6 +41,11 @@ export interface AccessRequestProps extends Omit<
   approveLabel?: string;
   /** Defaults to "Not now". */
   declineLabel?: string;
+  /**
+   * Said once approved, to assistive technology only, so an approval that
+   * lands while focus is elsewhere is still heard. Defaults to "Approved."
+   */
+  approvedLabel?: string;
   /** The title's heading level, to fit the page around the card. Defaults to 3. */
   headingLevel?: 2 | 3 | 4;
   /** Raises the access. The host moves `state` to `approving`, then `approved`. */
@@ -72,6 +77,7 @@ function AccessRequest({
   failure,
   approveLabel = "Approve",
   declineLabel = "Not now",
+  approvedLabel = "Approved.",
   headingLevel = 3,
   onApprove,
   onDecline,
@@ -84,12 +90,15 @@ function AccessRequest({
   const grantsId = React.useId();
   const Heading = `h${headingLevel}` as const;
   const approving = state === "approving";
-  // Why the last Approve did not take, then why it can't be pressed now.
-  const note = [
-    ...(failure ? [{ tone: "failure" as const, text: failure }] : []),
-    ...(held ? [{ tone: "held" as const, text: held }] : []),
-  ];
   const approved = state === "approved";
+  // Why the last Approve did not take, then why it can't be pressed now;
+  // once approved, only that it was.
+  const note = approved
+    ? [{ tone: "approved" as const, text: approvedLabel }]
+    : [
+        ...(failure ? [{ tone: "failure" as const, text: failure }] : []),
+        ...(held ? [{ tone: "held" as const, text: held }] : []),
+      ];
   const card = React.useRef<HTMLElement>(null);
   const ref = useComposedRefs(card, forwardedRef);
   // Whether focus was in the card while it was asked: only then does the
@@ -157,8 +166,10 @@ function AccessRequest({
             <li key={index}>{grant}</li>
           ))}
         </ul>
-      ) : (
-        <div className="flex flex-col">
+      ) : null}
+      {/* One element across every state, so the live region is never remounted. */}
+      <div className={cn("flex flex-col", approved && "sr-only")}>
+        {approved ? null : (
           <div
             data-slot="access-request-actions"
             className="flex flex-wrap gap-2 ps-6.5"
@@ -184,29 +195,29 @@ function AccessRequest({
               {declineLabel}
             </Button>
           </div>
-          <div
-            role="status"
-            id={noteId}
-            data-slot="access-request-note"
-            className="flex flex-col gap-0.5 ps-6.5 nessa-text-2 not-empty:mt-2.5"
-          >
-            {note.map((each) => (
-              <p
-                key={each.tone}
-                data-tone={each.tone}
-                className={cn(
-                  "m-0",
-                  each.tone === "failure"
-                    ? "font-medium text-foreground"
-                    : "text-muted-foreground",
-                )}
-              >
-                {each.text}
-              </p>
-            ))}
-          </div>
+        )}
+        <div
+          role="status"
+          id={noteId}
+          data-slot="access-request-note"
+          className="flex flex-col gap-0.5 ps-6.5 nessa-text-2 not-empty:mt-2.5"
+        >
+          {note.map((each) => (
+            <p
+              key={each.tone}
+              data-tone={each.tone}
+              className={cn(
+                "m-0",
+                each.tone === "failure"
+                  ? "font-medium text-foreground"
+                  : "text-muted-foreground",
+              )}
+            >
+              {each.text}
+            </p>
+          ))}
         </div>
-      )}
+      </div>
     </section>
   );
 }

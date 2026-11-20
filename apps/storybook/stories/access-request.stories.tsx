@@ -112,11 +112,12 @@ function ApproveExample({ refuse }: { refuse?: boolean }) {
 
 export const Approved: Story = {
   parameters: storyDocumentation(
-    "Approve raises the access; the actions go and the card lists what was allowed. Focus was on Approve, so the card takes it and is read with what was allowed.",
+    "Approve raises the access; the actions go and the card lists what was allowed. Focus was on Approve, so the card takes it and is read with what was allowed. The note says Approved to assistive technology, for a person whose focus was elsewhere.",
   ),
   render: () => <ApproveExample />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    const status = canvas.getByRole("status");
     await userEvent.click(canvas.getByRole("button", { name: "Approve" }));
     const list = await waitFor(() => canvas.getByRole("list"));
     await expect(
@@ -130,6 +131,9 @@ export const Approved: Story = {
     });
     await waitFor(() => expect(card).toHaveFocus());
     await expect(card).toHaveAccessibleDescription(grants.join(" "));
+    // The same live region, so the change to it is announced.
+    await expect(canvas.getByRole("status")).toBe(status);
+    await expect(status).toHaveTextContent("Approved.");
     await settle(canvasElement);
   },
 };
