@@ -123,7 +123,7 @@ function AccessRequest({
         props.onBlur?.(event);
       }}
       className={cn(
-        "flex min-w-0 flex-col gap-2.5 rounded-xl bg-destructive/8 p-3 font-sans text-foreground ring-1 ring-destructive/35 ring-inset outline-none",
+        "flex min-w-0 flex-col gap-2.5 rounded-xl bg-destructive/8 p-3 font-sans text-foreground ring-1 ring-destructive/35 ring-inset outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         className,
       )}
     >

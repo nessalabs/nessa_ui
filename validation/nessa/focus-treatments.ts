@@ -65,6 +65,7 @@ type FocusComponent =
   | "conversation-rail"
   | "conversation-history"
   | "swipe-row"
+  | "access-request"
   | "undo-card"
   | "tool-trace"
   | "event-calendar"
@@ -224,6 +225,17 @@ export const focusTreatments: readonly FocusTreatment[] = Object.freeze([
     state: "focus-visible",
     className: "focus-visible:outline-ring",
     count: 3,
+    light: { token: "--ring", opacity: 1 },
+    dark: { token: "--ring", opacity: 1 },
+  },
+  // The access request card itself, focused once approved so it is read
+  // with what was allowed: an outset outline around the card.
+  {
+    component: "access-request",
+    layer: "outline",
+    state: "focus-visible",
+    className: "focus-visible:outline-ring",
+    count: 1,
     light: { token: "--ring", opacity: 1 },
     dark: { token: "--ring", opacity: 1 },
   },
@@ -746,6 +758,8 @@ export const focusGeometryClasses = Object.freeze([
   { component: "tool-trace", className: "focus-visible:outline-2", count: 3 },
   { component: "tool-trace", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "tool-trace", className: "focus-visible:-outline-offset-2", count: 2 },
+  { component: "access-request", className: "focus-visible:outline-2", count: 1 },
+  { component: "access-request", className: "focus-visible:outline-offset-2", count: 1 },
   { component: "undo-card", className: "focus-visible:outline-2", count: 1 },
   { component: "undo-card", className: "focus-visible:outline-offset-2", count: 1 },
   // The content, slid open and clipped at the row's edges, has its outline
