@@ -92,8 +92,8 @@ function SettingsGroup({
       <div
         data-slot="settings-group-card"
         className={cn(
-          "flex flex-col text-card-foreground [&>[data-slot=settings-row]+[data-slot=settings-row]]:border-t [&>[data-slot=settings-row]+[data-slot=settings-row]]:border-border",
-          surface === "card" && "rounded-xl border border-border bg-card",
+          "flex flex-col text-card-foreground [&>[data-slot=settings-row]+[data-slot=settings-row]]:border-t [&>[data-slot=settings-row]+[data-slot=settings-row]]:border-hairline",
+          surface === "card" && "rounded-xl border border-hairline bg-card",
         )}
       >
         <SettingsGroupDisabledContext.Provider value={disabled}>

@@ -56,13 +56,13 @@ export function GitCommitDetails({ commit, onFileSelect, onResourceSelect, onOpe
   const totals = files?.reduce((sum, file) => ({ additions: sum.additions + (file.additions ?? 0), deletions: sum.deletions + (file.deletions ?? 0) }), { additions: 0, deletions: 0 })
   if (!commit) return null
   return (
-    <aside {...props} aria-labelledby={titleId} data-slot="git-commit-details" className={cn("min-w-0 overflow-auto rounded-lg border border-border bg-background font-sans nessa-text-3 text-foreground", className)}>
-      <header className="flex items-center justify-between gap-3 border-b border-border p-4">
+    <aside {...props} aria-labelledby={titleId} data-slot="git-commit-details" className={cn("min-w-0 overflow-auto rounded-lg border border-hairline bg-background font-sans nessa-text-3 text-foreground", className)}>
+      <header className="flex items-center justify-between gap-3 border-b border-hairline p-4">
         <h2 id={titleId} className="font-medium">Commit details</h2>
         {onClose && <Button size="sm" variant="ghost" onClick={onClose}>Close</Button>}
       </header>
       <>
-        <section aria-label="Commit metadata" className="space-y-3 border-b border-border p-4">
+        <section aria-label="Commit metadata" className="space-y-3 border-b border-hairline p-4">
           <div className="font-medium break-words">{commit.author}</div>
           {commit.email && <div className="break-all nessa-text-2 text-muted-foreground">{commit.email}</div>}
           <div className="break-words nessa-text-2 text-muted-foreground">{Number.isNaN(Date.parse(commit.date)) ? commit.date : new Date(commit.date).toISOString().slice(0, 16).replace("T", " ") + " UTC"}</div>
@@ -87,8 +87,8 @@ export function GitCommitDetails({ commit, onFileSelect, onResourceSelect, onOpe
             })}
           </FileDiffList></FileDiffCard>}
         </section>
-        {!!commit.resources?.length && <section aria-label="Linked work" className="space-y-2 border-t border-border p-4"><h3 className="font-medium">Linked work</h3>{commit.resources.map((resource) => <div key={resource.id} className="min-w-0 space-y-1"><div className="nessa-text-2 text-muted-foreground">{resource.kind}</div>{onResourceSelect ? <Button variant="link" className="h-auto max-w-full justify-start whitespace-normal py-1 text-left break-words" onClick={() => onResourceSelect(resource, commit)}>{resource.title}</Button> : <div className="break-words">{resource.title}</div>}{resource.description && <p className="break-words nessa-text-2 text-muted-foreground">{resource.description}</p>}</div>)}</section>}
-        {onOpenCommit && <footer className="border-t border-border p-4"><Button variant="outline" className="w-full" onClick={() => onOpenCommit(commit)}>View commit</Button></footer>}
+        {!!commit.resources?.length && <section aria-label="Linked work" className="space-y-2 border-t border-hairline p-4"><h3 className="font-medium">Linked work</h3>{commit.resources.map((resource) => <div key={resource.id} className="min-w-0 space-y-1"><div className="nessa-text-2 text-muted-foreground">{resource.kind}</div>{onResourceSelect ? <Button variant="link" className="h-auto max-w-full justify-start whitespace-normal py-1 text-left break-words" onClick={() => onResourceSelect(resource, commit)}>{resource.title}</Button> : <div className="break-words">{resource.title}</div>}{resource.description && <p className="break-words nessa-text-2 text-muted-foreground">{resource.description}</p>}</div>)}</section>}
+        {onOpenCommit && <footer className="border-t border-hairline p-4"><Button variant="outline" className="w-full" onClick={() => onOpenCommit(commit)}>View commit</Button></footer>}
       </>
     </aside>
   )

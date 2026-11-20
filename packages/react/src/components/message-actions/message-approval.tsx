@@ -283,7 +283,7 @@ function MessageApproval({
       )}
       <div
         data-slot="message-approval-card"
-        className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-card p-3 text-card-foreground shadow-xs @[24rem]/message-approval:p-4"
+        className="flex min-w-0 flex-col gap-3 rounded-2xl border border-hairline bg-card p-3 text-card-foreground shadow-xs @[24rem]/message-approval:p-4"
       >
         <div
           data-slot="message-approval-recipient"

@@ -247,7 +247,7 @@ function AgentNotification({
       data-state={state}
       data-dismissing={dismissing || undefined}
       className={cn(
-        "relative isolate flex min-w-0 max-w-full shrink-0 items-center gap-2 rounded-2xl border border-border bg-card/80 bg-linear-to-br from-foreground/5 to-transparent px-3 py-2 font-sans text-card-foreground shadow-xs backdrop-blur-xl",
+        "relative isolate flex min-w-0 max-w-full shrink-0 items-center gap-2 rounded-2xl border border-hairline bg-card/80 bg-linear-to-br from-foreground/5 to-transparent px-3 py-2 font-sans text-card-foreground shadow-xs backdrop-blur-xl",
         "w-full",
         className,
       )}

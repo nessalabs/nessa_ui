@@ -298,7 +298,7 @@ function ToolCallTabs({
             forceMount
             data-slot="tool-call-tab-panel"
             className={cn(
-              "col-start-1 row-start-1 max-h-64 w-full min-w-0 overflow-y-auto rounded-lg border border-border bg-muted/40 p-3 outline-none data-[state=inactive]:invisible",
+              "col-start-1 row-start-1 max-h-64 w-full min-w-0 overflow-y-auto rounded-lg border border-hairline bg-muted/40 p-3 outline-none data-[state=inactive]:invisible",
               panelClassName,
             )}
           >
@@ -510,7 +510,7 @@ function ToolCallFile({
 }: ToolCallFileProps) {
   const interactive = onClick != null
   const chipClassName = cn(
-    "inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 nessa-text-2 text-foreground [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground",
+    "inline-flex max-w-full items-center gap-1.5 rounded-md border border-hairline bg-background px-2 py-1 nessa-text-2 text-foreground [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground",
     interactive &&
       "cursor-pointer transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] hover:border-ring/40 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none",
     className,

@@ -231,7 +231,7 @@ const ComposerAccessMode = React.forwardRef<
             collisionPadding={12}
             className={cn(
               menuSurfacePaddingClassName,
-              "z-50 min-w-48 rounded-xl border border-border bg-popover text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+              "z-50 min-w-48 rounded-xl border border-hairline bg-popover text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
               contentClassName,
             )}
           >

@@ -98,7 +98,7 @@ function TablePagination({
     <div
       data-slot="table-pagination"
       className={cn(
-        "flex box-border min-h-9.5 w-full items-center justify-between gap-2 border-t border-border px-2.5 py-1.5 font-sans",
+        "flex box-border min-h-9.5 w-full items-center justify-between gap-2 border-t border-hairline px-2.5 py-1.5 font-sans",
         className,
       )}
       {...props}

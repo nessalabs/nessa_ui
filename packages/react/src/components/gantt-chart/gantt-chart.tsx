@@ -888,7 +888,7 @@ function GanttChart({
       <div
         data-slot="gantt-chart"
         className={cn(
-          "flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-background font-sans text-foreground",
+          "flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-xl border border-hairline bg-background font-sans text-foreground",
           className,
         )}
         onKeyDown={handleShortcuts}
@@ -942,7 +942,7 @@ function GanttChartToolbar({
     <div
       data-slot="gantt-chart-toolbar"
       className={cn(
-        "flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2",
+        "flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline px-3 py-2",
         className,
       )}
       {...props}

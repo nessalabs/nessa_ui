@@ -1104,7 +1104,7 @@ export function PageOutline({
                   {hidden > 0 && !isFolded ? (
                     <span
                       data-slot="page-outline-count"
-                      className="flex-none rounded-full border border-border px-[5px] nessa-text-1 font-medium tabular-nums text-muted-foreground/75 transition-opacity"
+                      className="flex-none rounded-full border border-hairline px-[5px] nessa-text-1 font-medium tabular-nums text-muted-foreground/75 transition-opacity"
                     >
                       <span aria-hidden="true">{hidden}</span>
                       <span className="sr-only">{getHiddenLabel(hidden)}</span>

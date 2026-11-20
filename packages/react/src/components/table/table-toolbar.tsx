@@ -74,7 +74,7 @@ function TableFilterPanel({ className, ...props }: React.ComponentProps<"div">) 
     <div
       data-slot="table-filter-panel"
       className={cn(
-        "flex w-full min-w-0 flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3 font-sans",
+        "flex w-full min-w-0 flex-wrap items-center gap-2 rounded-xl border border-hairline bg-card p-3 font-sans",
         className,
       )}
       {...props}

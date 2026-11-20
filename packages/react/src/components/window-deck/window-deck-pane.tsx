@@ -607,7 +607,7 @@ function WindowDeckPane({
         // pane's natural height.
         "h-[var(--nessa-window-deck-pane-lift,var(--nessa-window-deck-pane-height))]",
         chrome &&
-          "rounded-xl border border-border bg-card text-card-foreground shadow-lg",
+          "rounded-xl border border-hairline bg-card text-card-foreground shadow-lg",
         // Everything the deck moves is a transform, so a pane never reflows
         // its content while it travels between carousel, tile, and off-deck.
         //
@@ -658,7 +658,7 @@ function WindowDeckPane({
           inert={contentInert}
           className={cn(
             "flex shrink-0 items-center gap-2 px-3 py-2",
-            chrome && "border-b border-border",
+            chrome && "border-b border-hairline",
             headerClassName,
           )}
         >
@@ -688,7 +688,7 @@ function WindowDeckPane({
           inert={contentInert}
           className={cn(
             "flex shrink-0 items-center gap-2 px-3 py-2",
-            chrome && "border-t border-border",
+            chrome && "border-t border-hairline",
             footerClassName,
           )}
         >

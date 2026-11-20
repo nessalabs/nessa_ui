@@ -648,7 +648,7 @@ function DrawerContent({
           // to, and `overflow-hidden` here would eat the outward half of the
           // resize handle's focus ring and pointer target, both of which sit
           // on the panel's own edge. The scrolling body owns its own clip.
-          "fixed z-50 flex max-w-full flex-col border-border bg-card font-sans text-card-foreground shadow-xl outline-none",
+          "fixed z-50 flex max-w-full flex-col border-hairline bg-card font-sans text-card-foreground shadow-xl outline-none",
           // The panel takes focus on open, so a keyboard open carries an
           // indicator like any other focus target. `:focus-visible` cannot
           // express this on its own: a programmatically focused container
@@ -731,7 +731,7 @@ function DrawerHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="drawer-header"
       className={cn(
-        "flex shrink-0 flex-col gap-1 border-b border-border p-4 pr-14",
+        "flex shrink-0 flex-col gap-1 border-b border-hairline p-4 pr-14",
         className,
       )}
       {...props}
@@ -759,7 +759,7 @@ function DrawerFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="drawer-footer"
       className={cn(
-        "mt-auto flex shrink-0 items-center justify-end gap-2 border-t border-border p-4",
+        "mt-auto flex shrink-0 items-center justify-end gap-2 border-t border-hairline p-4",
         className,
       )}
       {...props}

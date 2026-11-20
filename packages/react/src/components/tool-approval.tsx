@@ -372,7 +372,7 @@ function ToolApproval({
       // action buttons.
       inert={exiting || undefined}
       className={cn(
-        "group/tool-approval relative flex min-w-0 flex-col gap-3 border border-border bg-card font-sans text-card-foreground",
+        "group/tool-approval relative flex min-w-0 flex-col gap-3 border border-hairline bg-card font-sans text-card-foreground",
         exiting && "pointer-events-none",
         // With motion off there is no player to hold the exit's last frame,
         // so the same end state applies instantly — an inert card must
@@ -610,7 +610,7 @@ function ToolApprovalCommand({
   }, [json, structured])
   // leading-5 deliberately loosens level 2's ratio for scannable mono JSON.
   const regionClassName = cn(
-    "max-h-48 w-full min-w-0 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/40 px-3 py-2 font-mono nessa-text-2 leading-5 text-foreground outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
+    "max-h-48 w-full min-w-0 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-hairline bg-muted/40 px-3 py-2 font-mono nessa-text-2 leading-5 text-foreground outline-none focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
     className,
   )
   const regionProps = {
@@ -773,7 +773,7 @@ function ToolApprovalActionMenu({
           sideOffset={6}
           collisionPadding={12}
           className={cn(
-            "z-50 min-w-48 rounded-xl border border-border bg-popover p-1 font-sans text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            "z-50 min-w-48 rounded-xl border border-hairline bg-popover p-1 font-sans text-popover-foreground shadow-xl outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             contentClassName,
           )}
         >

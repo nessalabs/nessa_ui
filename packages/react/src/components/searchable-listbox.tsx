@@ -150,7 +150,7 @@ function SearchableListbox<Item>({
         className={cn(
           // The search row owns the focus treatment for the field it wraps,
           // because the bare input must not paint an outline of its own.
-          "flex h-11 items-center gap-2 border-b border-border px-3 text-muted-foreground transition-colors focus-within:bg-accent/50 focus-within:text-foreground",
+          "flex h-11 items-center gap-2 border-b border-hairline px-3 text-muted-foreground transition-colors focus-within:bg-accent/50 focus-within:text-foreground",
           searchClassName,
         )}
       >
