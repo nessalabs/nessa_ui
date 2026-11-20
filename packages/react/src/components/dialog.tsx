@@ -17,8 +17,8 @@ import { cn, hasContent } from "@/lib/utils"
 
 import { Button } from "./button"
 
-/** How wide a dialog may grow before it stops and centers. */
-type DialogSize = "sm" | "md" | "lg" | "xl"
+/** How wide a dialog may grow before it stops and centers; `full` fills the window. */
+type DialogSize = "sm" | "md" | "lg" | "full"
 
 /**
  * Whether an element's content overflows it, kept current as either changes.
@@ -43,7 +43,7 @@ const sizeClassName: Record<DialogSize, string> = {
   sm: "max-w-sm",
   md: "max-w-md",
   lg: "max-w-xl",
-  xl: "max-w-5xl",
+  full: "h-full max-w-none",
 }
 
 export interface DialogProps
@@ -81,12 +81,20 @@ export interface DialogProps
   /** Called when the dialog asks to open or close. */
   onOpenChange?: (open: boolean) => void
   /**
-   * The widest the panel grows: `sm` 24rem, `md` 28rem, `lg` 36rem, `xl`
-   * 64rem for a workspace of its own, such as a list beside what it opens.
-   * It is never wider than the viewport less its margin.
+   * The widest the panel grows: `sm` 24rem, `md` 28rem, `lg` 36rem, or
+   * `full`, the whole window less its margin, for a workspace of its own,
+   * such as a list beside what it opens (see `aside`). It is never wider
+   * than the viewport less its margin.
    * @defaultValue "md"
    */
   size?: DialogSize
+  /**
+   * A column down the panel's start edge, full height, under the title and
+   * description, which move into it: a list beside what the body shows.
+   * It lays out its children as a column, so a last child can sit at its
+   * foot with `mt-auto`. The body and footer take the rest of the width.
+   */
+  aside?: React.ReactNode
   /**
    * The element focus moves to when the dialog opens. By default the panel
    * itself takes focus, so a screen reader reads the title and description
@@ -162,6 +170,7 @@ function Dialog({
   defaultOpen,
   onOpenChange,
   size = "md",
+  aside,
   initialFocus,
   showCloseButton = true,
   closeLabel = "Close",
@@ -187,6 +196,34 @@ function Dialog({
   const bodyScrolls = useOverflows(bodyNode)
   const hasDescription = hasContent(description)
   const hasFooter = hasContent(footer)
+  const hasAside = hasContent(aside)
+  const full = size === "full"
+  // In the aside when there is one, else across the top.
+  const header = (
+    <div
+      data-slot="dialog-header"
+      className={cn(
+        "flex shrink-0 flex-col gap-1 px-5 pt-5 pb-3",
+        showCloseButton && !hasAside && "pr-14",
+        hasAside && "px-4 pt-4.5",
+      )}
+    >
+      <DialogPrimitive.Title
+        data-slot="dialog-title"
+        className="m-0 nessa-text-5 font-semibold text-foreground"
+      >
+        {title}
+      </DialogPrimitive.Title>
+      {hasDescription ? (
+        <DialogPrimitive.Description
+          data-slot="dialog-description"
+          className="m-0 nessa-text-4 text-muted-foreground"
+        >
+          {description}
+        </DialogPrimitive.Description>
+      ) : null}
+    </div>
+  )
 
   return (
     <DialogPrimitive.Root open={open} defaultOpen={defaultOpen} onOpenChange={onOpenChange}>
@@ -205,6 +242,7 @@ function Dialog({
           data-slot="dialog-overlay"
           className={cn(
             "fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-xs",
+            full && "sm:p-8",
             overlayClassName,
           )}
         >
@@ -260,52 +298,58 @@ function Dialog({
               */}
               <div
                 data-slot="dialog-surface"
-                className="relative flex min-h-0 shrink flex-col rounded-[inherit] border border-border bg-card text-card-foreground shadow-xl animate-nessa-enter"
+                data-aside={hasAside || undefined}
+                className={cn(
+                  "relative flex min-h-0 shrink flex-col rounded-[inherit] border border-hairline bg-card text-card-foreground shadow-xl animate-nessa-enter",
+                  full && "h-full",
+                  hasAside && "grid grid-cols-[minmax(0,17.5rem)_minmax(0,1fr)] overflow-hidden",
+                )}
               >
-                <div
-                  data-slot="dialog-header"
-                  className={cn("flex shrink-0 flex-col gap-1 px-5 pt-5 pb-3", showCloseButton && "pr-14")}
-                >
-                  <DialogPrimitive.Title
-                    data-slot="dialog-title"
-                    className="m-0 nessa-text-5 font-semibold text-foreground"
+                {hasAside ? (
+                  <div
+                    data-slot="dialog-aside"
+                    className="flex min-h-0 flex-col border-e border-hairline bg-sidebar"
                   >
-                    {title}
-                  </DialogPrimitive.Title>
-                  {hasDescription ? (
-                    <DialogPrimitive.Description
-                      data-slot="dialog-description"
-                      className="m-0 nessa-text-4 text-muted-foreground"
+                    {header}
+                    <div className="flex min-h-0 flex-1 flex-col px-3 pb-3">{aside}</div>
+                  </div>
+                ) : (
+                  header
+                )}
+                <div
+                  data-slot="dialog-main"
+                  className={cn("flex min-h-0 min-w-0 flex-col", hasAside && "pt-3", full && "flex-1")}
+                >
+                  <div
+                    ref={setBodyNode}
+                    data-slot="dialog-body"
+                    data-scrolls={bodyScrolls || undefined}
+                    // In the tab order only while it scrolls, so a keyboard can
+                    // read past the fold of a body that holds no control.
+                    tabIndex={bodyScrolls ? 0 : undefined}
+                    className={cn(
+                      "min-h-0 flex-1 overflow-y-auto px-5 py-2 outline-none",
+                      // Inset: the surface clips nothing, but an outset outline
+                      // would cross the header and footer it sits between.
+                      "focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
+                      !hasFooter && "pb-5",
+                      hasAside && "px-8",
+                    )}
+                  >
+                    {children}
+                  </div>
+                  {hasFooter ? (
+                    <div
+                      data-slot="dialog-footer"
+                      className={cn(
+                        "flex shrink-0 flex-wrap items-center justify-end gap-2 px-5 pt-3 pb-5",
+                        hasAside && "border-t border-hairline px-8 pt-3 pb-3.5",
+                      )}
                     >
-                      {description}
-                    </DialogPrimitive.Description>
+                      {footer}
+                    </div>
                   ) : null}
                 </div>
-                <div
-                  ref={setBodyNode}
-                  data-slot="dialog-body"
-                  data-scrolls={bodyScrolls || undefined}
-                  // In the tab order only while it scrolls, so a keyboard can
-                  // read past the fold of a body that holds no control.
-                  tabIndex={bodyScrolls ? 0 : undefined}
-                  className={cn(
-                    "min-h-0 flex-1 overflow-y-auto px-5 py-2 outline-none",
-                    // Inset: the surface clips nothing, but an outset outline
-                    // would cross the header and footer it sits between.
-                    "focus-visible:[outline-style:solid] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
-                    !hasFooter && "pb-5",
-                  )}
-                >
-                  {children}
-                </div>
-                {hasFooter ? (
-                  <div
-                    data-slot="dialog-footer"
-                    className="flex shrink-0 flex-wrap items-center justify-end gap-2 px-5 pt-3 pb-5"
-                  >
-                    {footer}
-                  </div>
-                ) : null}
                 {showCloseButton ? (
                   <DialogPrimitive.Close asChild>
                     <Button

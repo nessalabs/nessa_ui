@@ -324,21 +324,25 @@ export const TallBody: Story = {
   },
 }
 
-export const ExtraLarge: Story = {
+export const FullWithAside: Story = {
   parameters: storyDocumentation(
-    "`xl` is for a dialog that is a workspace of its own, such as a list beside the item it opens: it grows to 64rem, and never past the viewport less its margin. The play test opens it at rest and proves it is wider than `lg` would allow and inside the viewport.",
+    "`full` with an `aside` is a workspace of its own: the panel fills the window less its margin, and a column down its start edge holds the title, the description and a list, beside the body and footer. Its edges are the faint `--hairline`, not `--border`. The play test opens it at rest and proves the panel fills the viewport less its margin, the title sits in the aside, and the body and footer sit beside it.",
   ),
   render: () => (
     <Dialog
       trigger={<Button variant="outline">Open decisions</Button>}
       title="Decisions"
-      description="Every question in this chat."
-      size="xl"
+      description="Ship the alpha release"
+      size="full"
+      aside={
+        <>
+          <p className="m-0 nessa-text-4">The list</p>
+          <p className="m-0 mt-auto nessa-text-3 text-muted-foreground">At its foot</p>
+        </>
+      }
+      footer={<Button>Answer</Button>}
     >
-      <div className="grid grid-cols-[16rem_1fr] gap-4 nessa-text-4">
-        <p className="m-0">The list</p>
-        <p className="m-0">What the chosen one says</p>
-      </div>
+      <p className="m-0 nessa-text-4">What the chosen one says</p>
     </Dialog>
   ),
   play: async ({ canvasElement }) => {
@@ -350,11 +354,21 @@ export const ExtraLarge: Story = {
     await waitFor(async () => {
       await expect(["1", "none"]).toContain(getComputedStyle(surface).scale)
     })
-    const rem = parseFloat(getComputedStyle(canvasElement.ownerDocument.documentElement).fontSize)
-    const viewport = canvasElement.ownerDocument.documentElement.clientWidth
-    const width = dialog.getBoundingClientRect().width
-    await expect(width).toBeLessThanOrEqual(Math.min(64 * rem, viewport))
-    if (viewport > 40 * rem) await expect(width).toBeGreaterThan(36 * rem)
+    const root = canvasElement.ownerDocument.documentElement
+    const rem = parseFloat(getComputedStyle(root).fontSize)
+    const rect = dialog.getBoundingClientRect()
+    // The overlay's margin is at most 2rem a side.
+    await expect(rect.width).toBeGreaterThanOrEqual(root.clientWidth - 4 * rem - 1)
+    await expect(rect.height).toBeGreaterThanOrEqual(root.clientHeight - 4 * rem - 1)
+    const aside = dialog.querySelector<HTMLElement>("[data-slot=dialog-aside]")!
+    await expect(aside.contains(page.getByRole("heading", { name: "Decisions" }))).toBe(true)
+    const body = dialog.querySelector<HTMLElement>("[data-slot=dialog-body]")!
+    const footer = dialog.querySelector<HTMLElement>("[data-slot=dialog-footer]")!
+    const asideRight = aside.getBoundingClientRect().right
+    await expect(body.getBoundingClientRect().left).toBeGreaterThanOrEqual(asideRight - 1)
+    await expect(footer.getBoundingClientRect().left).toBeGreaterThanOrEqual(asideRight - 1)
+    // Down the whole panel, inside its edge.
+    await expect(aside.getBoundingClientRect().height).toBeCloseTo(surface.clientHeight, 0)
     await userEvent.keyboard("{Escape}")
     await waitFor(async () => {
       await expect(dialog.isConnected).toBe(false)
