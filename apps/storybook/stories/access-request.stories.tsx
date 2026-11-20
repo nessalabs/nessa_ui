@@ -178,6 +178,7 @@ export const Held: Story = {
     approve.focus();
     await userEvent.keyboard("{Enter}");
     await expect(args.onApprove).not.toHaveBeenCalled();
+    await settle(canvasElement);
   },
 };
 
