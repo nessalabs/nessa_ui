@@ -615,6 +615,11 @@ export {
 } from "./components/chat-bubbles"
 export { UndoCard, type UndoCardProps } from "./components/undo-card"
 export {
+  AccessRequest,
+  type AccessRequestProps,
+  type AccessRequestState,
+} from "./components/access-request"
+export {
   ChatTabs,
   type ChatTabItem,
   type ChatTabKind,
