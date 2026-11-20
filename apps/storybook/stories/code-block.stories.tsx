@@ -213,3 +213,64 @@ export const AppWideTheme: StoryObj<ProviderArgs> = {
     )
   },
 }
+
+/** Suspends until `until` settles: stands in for any lazy sibling. */
+function Waits({ until }: { until: Promise<void> }) {
+  React.use(until)
+  return null
+}
+
+/**
+ * A block that drew empty, as a streamed fence that has only opened does,
+ * and whose code arrives in an update where a sibling suspends: React hides
+ * the boundary's content and shows it again, letting go of the block's
+ * element and attaching it again. The engine must draw the code it now has
+ * rather than adopt the empty <pre> it left there as finished code.
+ */
+function FilledWhileHidden() {
+  const [step, setStep] = React.useState<{ code: string; wait?: Promise<void> }>({
+    code: "",
+  })
+  return (
+    <CodeFrame>
+      <button
+        type="button"
+        onClick={() =>
+          setStep({
+            code: "const seatsLeft = 42",
+            wait: new Promise((resolve) => setTimeout(resolve, 300)),
+          })
+        }
+      >
+        Fill
+      </button>
+      <React.Suspense fallback={<p>Loading</p>}>
+        <CodeBlock code={step.code} language="ts" mode="dark" />
+        {step.wait ? <Waits until={step.wait} /> : null}
+      </React.Suspense>
+    </CodeFrame>
+  )
+}
+
+export const RefilledWhileHidden: StoryObj = {
+  parameters: storyDocumentation(
+    "Regression: a code block that drew empty and is hidden and shown again while its code arrives draws that code, rather than keeping the empty block.",
+  ),
+  render: () => <FilledWhileHidden />,
+  play: async ({ canvasElement }) => {
+    const block = () => canvasElement.querySelector('[data-slot="code-block"]')!
+    // Drawn empty first: the engine has made its <pre>.
+    await waitFor(
+      () =>
+        expect(
+          block().querySelector("diffs-container")?.shadowRoot?.querySelector("pre"),
+        ).toBeTruthy(),
+      { timeout: 15000 },
+    )
+    canvasElement.querySelector("button")!.click()
+    await waitFor(() => expect(renderedCode(block())).toMatch(/seatsLeft/), {
+      timeout: 15000,
+    })
+    await expect(block().getBoundingClientRect().height).toBeGreaterThan(0)
+  },
+}
