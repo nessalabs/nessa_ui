@@ -166,3 +166,42 @@ export const FocusedOnOpen: Story = {
     await waitFor(() => expect(terminal.textContent).toContain("Welcome to the Nessa terminal."))
   },
 }
+
+export const SetInAPage: Story = {
+  parameters: storyDocumentation(
+    "Inline output set in a scrolling page (`scrollsHistory=\"focused\"`): the wheel over it scrolls the page, never its history, until the person clicks into it. A focused view's cursor blinks.",
+  ),
+  render: () => <InPage />,
+  play: async ({ canvasElement }) => {
+    const terminal = canvasElement.querySelector<HTMLElement>('[data-slot="terminal"]')!
+    await waitFor(() => expect(terminal.textContent).toContain("line 30"))
+    terminal.dispatchEvent(new WheelEvent("wheel", { deltaY: -200, bubbles: true, cancelable: true }))
+    await new Promise((done) => requestAnimationFrame(() => done(null)))
+    await expect(terminal.querySelector('[data-slot="terminal-scrolled"]')).toBeNull()
+    terminal.focus()
+    await waitFor(() =>
+      expect(terminal.querySelector('[data-slot="terminal-cursor"]')?.getAttribute("data-blinking")).toBe(
+        matchMedia("(prefers-reduced-motion: reduce)").matches ? null : "true",
+      ),
+    )
+    terminal.dispatchEvent(new WheelEvent("wheel", { deltaY: -200, bubbles: true, cancelable: true }))
+    await waitFor(() => expect(terminal.querySelector('[data-slot="terminal-scrolled"]')).not.toBeNull())
+    terminal.blur()
+  },
+}
+
+function InPage() {
+  const shell = useFakeShell(Array.from({ length: 30 }, (_, index) => `line ${index + 1}`))
+  return (
+    <div className="h-40 w-[40rem] max-w-full overflow-hidden rounded-md border border-border">
+      <Terminal
+        aria-label="Output"
+        scrollsHistory="focused"
+        subscribe={shell.subscribe}
+        onFit={shell.onFit}
+        onFocusView={shell.onFit}
+        onInput={shell.onInput}
+      />
+    </div>
+  )
+}

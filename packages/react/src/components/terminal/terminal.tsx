@@ -54,6 +54,12 @@ export interface TerminalProps
   fontSize?: number
   /** Takes the keyboard on mount. */
   autoFocus?: boolean
+  /**
+   * When the wheel scrolls back through history: `always` (a terminal of
+   * its own), or `focused`, for a view set inside a page that scrolls, so
+   * scrolling the page past it does not scroll it.
+   */
+  scrollsHistory?: "always" | "focused"
 }
 
 interface Grid {
@@ -167,6 +173,7 @@ function Terminal({
   onCopyText,
   fontSize = 13,
   autoFocus,
+  scrollsHistory = "always",
   className,
   style,
   ...props
@@ -191,6 +198,8 @@ function Terminal({
   })
   const [ended, setEnded] = React.useState<{ status: number | null } | null>(null)
   const [focused, setFocused] = React.useState(false)
+  // Keys typed, so the cursor can restart its blink after each one.
+  const [typed, setTyped] = React.useState(0)
   const [cell, setCell] = React.useState({ width: 8, height: 16 })
   const [box, setBox] = React.useState({ width: 0, height: 0 })
   const [flash, setFlash] = React.useState<CopyFlash | null>(null)
@@ -377,6 +386,8 @@ function Terminal({
     if (!bytes) return
     event.preventDefault()
     followLive()
+    // The cursor holds still while typing, and starts blinking again after.
+    setTyped((count) => count + 1)
     send(bytes)
   }
 
@@ -425,6 +436,7 @@ function Terminal({
   const wheel = React.useRef(0)
 
   const onWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (scrollsHistory === "focused" && !focused) return
     if (sendMouse("wheel", event, event.deltaY < 0 ? "up" : "down")) return
     // Accumulate pixels so a trackpad and a notched wheel scroll alike.
     wheel.current += event.deltaY
@@ -567,7 +579,9 @@ function Terminal({
         {scroll.offset === 0 && cursor.visible && !ended && (
           <div
             aria-hidden
+            key={typed}
             data-slot="terminal-cursor"
+            data-blinking={focused && !reducedMotion ? "true" : undefined}
             className={cn(
               "pointer-events-none absolute",
               focused ? "bg-foreground/70" : "border border-foreground/60",
@@ -577,6 +591,12 @@ function Terminal({
               top: cursor.row * cell.height,
               width: cell.width,
               height: cell.height,
+              // Solid for a moment after each key (the key above remounts
+              // it), then blinking; bounded so an idle window stops.
+              animation:
+                focused && !reducedMotion
+                  ? "nessa-terminal-blink 1.06s step-end 0.5s 60"
+                  : undefined,
             }}
           />
         )}
