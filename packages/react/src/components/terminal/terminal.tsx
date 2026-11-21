@@ -584,6 +584,9 @@ function Terminal({
             data-blinking={focused && !reducedMotion ? "true" : undefined}
             className={cn(
               "pointer-events-none absolute",
+              // Solid for a moment after each key (the key above remounts
+              // it), then blinking; bounded so an idle window stops.
+              "data-[blinking=true]:animate-[nessa-terminal-blink_1.06s_step-end_0.5s_60]",
               focused ? "bg-foreground/70" : "border border-foreground/60",
             )}
             style={{
@@ -591,12 +594,6 @@ function Terminal({
               top: cursor.row * cell.height,
               width: cell.width,
               height: cell.height,
-              // Solid for a moment after each key (the key above remounts
-              // it), then blinking; bounded so an idle window stops.
-              animation:
-                focused && !reducedMotion
-                  ? "nessa-terminal-blink 1.06s step-end 0.5s 60"
-                  : undefined,
             }}
           />
         )}
