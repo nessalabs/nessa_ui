@@ -344,7 +344,13 @@ function Terminal({
     const last = fitRef.current
     if (last && last.cols === fit.cols && last.rows === fit.rows) return
     fitRef.current = fit
-    handlers.current.onFit?.(fit)
+    // A box that already holds the keyboard (autoFocus focuses it before it
+    // is measured, so its focus event carried no fit) sizes the terminal:
+    // its fit goes as focus, never as a bare fit the gateway only rescales.
+    const element = boxRef.current
+    if (element && element.ownerDocument.activeElement === element)
+      handlers.current.onFocusView?.(fit)
+    else handlers.current.onFit?.(fit)
   }, [fit])
 
   React.useEffect(() => {

@@ -60,14 +60,28 @@ function useFakeShell(lines: string[]) {
   return { subscribe, onFit, onInput }
 }
 
-function Demo(props: { onInput?: (bytes: Uint8Array) => void; lines?: string[] }) {
+function Demo(props: {
+  onInput?: (bytes: Uint8Array) => void
+  onFit?: (size: TerminalSize) => void
+  onFocusView?: (size: TerminalSize) => void
+  autoFocus?: boolean
+  lines?: string[]
+}) {
   const shell = useFakeShell(props.lines ?? ["Welcome to the Nessa terminal.", "README.md  src  package.json"])
   return (
     <div className="h-72 w-[40rem] max-w-full overflow-hidden rounded-md border border-border">
       <Terminal
         aria-label="Shell"
+        autoFocus={props.autoFocus}
         subscribe={shell.subscribe}
-        onFit={shell.onFit}
+        onFit={(size) => {
+          props.onFit?.(size)
+          shell.onFit(size)
+        }}
+        onFocusView={(size) => {
+          props.onFocusView?.(size)
+          shell.onFit(size)
+        }}
         onInput={(bytes) => {
           props.onInput?.(bytes)
           shell.onInput(bytes)
@@ -135,5 +149,20 @@ export const CopyShimmer: Story = {
       timeout: 2000,
     })
     selection.removeAllRanges()
+  },
+}
+
+export const FocusedOnOpen: Story = {
+  parameters: storyDocumentation(
+    "A view that opens with the keyboard (autoFocus) is focused before its box is measured, so its first fit is reported as focus: the host gives it the size, and a later box change resizes the terminal instead of only rescaling this view.",
+  ),
+  args: { onFit: fn(), onFocusView: fn() },
+  render: (args) => <Demo autoFocus onFit={args.onFit} onFocusView={args.onFocusView} />,
+  play: async ({ canvasElement, args }) => {
+    const terminal = canvasElement.querySelector<HTMLElement>('[data-slot="terminal"]')!
+    await waitFor(() => expect(args.onFocusView).toHaveBeenCalled())
+    await expect(document.activeElement).toBe(terminal)
+    await expect(args.onFit).not.toHaveBeenCalled()
+    await waitFor(() => expect(terminal.textContent).toContain("Welcome to the Nessa terminal."))
   },
 }
