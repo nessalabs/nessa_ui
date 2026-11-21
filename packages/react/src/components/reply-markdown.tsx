@@ -75,6 +75,23 @@ export interface ReplyMarkdownProps
    * text unchanged for no change. Keep the function stable.
    */
   renderText?: (text: string) => React.ReactNode
+  /**
+   * Draws a finished fenced block the host wants to draw itself — a shell
+   * fence with a Run button, say — given its source and language. Return
+   * undefined to leave the block to the kit (CodeBlock, or MermaidDiagram).
+   * A fence still being written is always the kit's. Keep the function stable.
+   */
+  renderFence?: (fence: ReplyFence) => React.ReactNode | undefined
+}
+
+/** A fenced block as `renderFence` is given it. */
+export interface ReplyFence {
+  /** The block's source, without its last line break. */
+  code: string
+  /** The fence's info word (```bash), if it has one. */
+  language?: string
+  /** Where in the reply the fence is, as a path of block positions: stable while the reply grows. */
+  at: string
 }
 
 /* ------------------------------------------------------------------------ */
@@ -222,6 +239,7 @@ interface DrawContext {
   streaming: boolean
   components: ReplyMarkdownComponents | undefined
   renderText: ((text: string) => React.ReactNode) | undefined
+  renderFence: ((fence: ReplyFence) => React.ReactNode | undefined) | undefined
   /** Prefixed to footnote ids, so two replies on one page do not collide. */
   idPrefix: string
 }
@@ -442,6 +460,15 @@ function drawFence(pre: ReplyElement, key: string, context: DrawContext) {
   )
   const source = code ? textOf(code).replace(/\n$/, "") : textOf(pre)
   const language = /language-(\S+)/.exec(code?.attrs.class ?? "")?.[1]
+  const open = context.streaming && "data-markdown-incomplete" in pre.attrs
+  if (context.renderFence && !open) {
+    const drawn = context.renderFence({
+      code: source,
+      language,
+      at: key,
+    })
+    if (drawn !== undefined) return <React.Fragment key={key}>{drawn}</React.Fragment>
+  }
   if (language === "mermaid") {
     // Words marks a fence still waiting for its closer; until it closes the
     // diagram keeps its placeholder rather than redrawing on every line.
@@ -650,7 +677,7 @@ function useReplyBlocks(parser: Words, source: string, streaming: boolean) {
  * the reply shows as plain text.
  */
 function ReplyMarkdown(props: ReplyMarkdownProps) {
-  const { children, streaming, components, renderText, className, ...rest } = props
+  const { children, streaming, components, renderText, renderFence, className, ...rest } = props
   return (
     <React.Suspense
       fallback={
@@ -681,14 +708,15 @@ function ReplyWithWords({
   streaming = false,
   components,
   renderText,
+  renderFence,
   className,
   ...props
 }: ReplyMarkdownProps & { parser: Words }) {
   const id = React.useId()
   const { stable, pending } = useReplyBlocks(parser, children, streaming)
   const context = React.useMemo<DrawContext>(
-    () => ({ streaming, components, renderText, idPrefix: `${id}-` }),
-    [streaming, components, renderText, id],
+    () => ({ streaming, components, renderText, renderFence, idPrefix: `${id}-` }),
+    [streaming, components, renderText, renderFence, id],
   )
   return (
     <MarkdownProse

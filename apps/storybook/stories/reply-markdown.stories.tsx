@@ -282,3 +282,45 @@ export const HostDrawnText: Story = {
     await expect(markdown.querySelector("a mark")).toBeNull()
   },
 }
+
+const fencedText = [
+  "Start the dev server:",
+  "",
+  "```bash",
+  "npm run dev",
+  "```",
+  "",
+  "Then the config:",
+  "",
+  "```json",
+  '{ "port": 3000 }',
+  "```",
+].join("\n")
+
+/** Draws shell fences itself, with a button beside the command; leaves the rest to the kit. */
+function shellFence(fence: import("@nessalabs/ui").ReplyFence) {
+  if (fence.language !== "bash") return undefined
+  return (
+    <div data-host-fence={fence.at} className="my-3 flex items-center gap-2">
+      <code>{fence.code}</code>
+      <button type="button">Run</button>
+    </div>
+  )
+}
+
+export const HostDrawnFence: Story = {
+  parameters: storyDocumentation(
+    "A host draws a finished fence itself through renderFence (here, a shell command with a Run button) and returns undefined for the rest, which stay the kit's code blocks. A fence still being written is always the kit's.",
+  ),
+  render: () => (
+    <Reply>
+      <ReplyMarkdown renderFence={shellFence}>{fencedText}</ReplyMarkdown>
+    </Reply>
+  ),
+  play: async ({ canvasElement }) => {
+    const markdown = canvasElement.querySelector('[data-slot="reply-markdown"]')!
+    await waitFor(() => expect(markdown.querySelectorAll("[data-host-fence]")).toHaveLength(1))
+    await expect(markdown.querySelector("[data-host-fence] code")).toHaveTextContent("npm run dev")
+    await expect(markdown.querySelector("[data-host-fence]")!.getAttribute("data-host-fence")).not.toBe("")
+  },
+}

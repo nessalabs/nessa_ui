@@ -475,6 +475,7 @@ export {
 export {
   preloadReplyMarkdown,
   ReplyMarkdown,
+  type ReplyFence,
   type ReplyMarkdownComponents,
   type ReplyMarkdownProps,
 } from "./components/reply-markdown"
