@@ -28,6 +28,7 @@ import { EmptyState } from "./components/empty-state";
 import { Favicon } from "./components/favicon";
 import { Input } from "./components/input";
 import { LoadingText } from "./components/loading-text";
+import { Terminal } from "./components/terminal";
 import { preloadReplyMarkdown, ReplyMarkdown } from "./components/reply-markdown";
 import { DeviceFigure } from "./components/device-figure";
 import { UndoCard } from "./components/undo-card";
@@ -85,6 +86,11 @@ test("primitives render without a browser global", async () => {
   assert.ok(server(<Checkbox aria-label="Agree" />).length > 0);
   assert.ok(
     server(<LoadingText>Loading Files</LoadingText>).includes("Loading Files"),
+  );
+  assert.ok(
+    server(
+      <Terminal aria-label="Shell" subscribe={() => () => {}} onInput={() => {}} />,
+    ).includes('data-slot="terminal"'),
   );
   {
     // Words loads on first draw: until it has, the reply is plain text.
