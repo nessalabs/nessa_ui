@@ -176,9 +176,22 @@ function Terminal({
   scrollsHistory = "always",
   className,
   style,
+  "aria-label": label,
   ...props
 }: TerminalProps) {
   const boxRef = React.useRef<HTMLDivElement>(null)
+  // The keyboard's target: a field the eye never sees, so an input method's
+  // composed text has somewhere to land. The box hands focus to it.
+  const inputRef = React.useRef<HTMLTextAreaElement>(null)
+  const takeKeyboard = () => inputRef.current?.focus({ preventScroll: true })
+  // Focus moves to that field only while nothing is selected: focusing a
+  // field would clear a selection the person is about to copy.
+  const pressing = React.useRef(false)
+  const handOver = () => {
+    const box = boxRef.current
+    if (!box || box.ownerDocument.activeElement !== box) return
+    if (box.ownerDocument.getSelection()?.isCollapsed ?? true) takeKeyboard()
+  }
   const gridRef = React.useRef<HTMLDivElement>(null)
   const modesRef = React.useRef<TerminalModes>(defaultModes)
   const [styles, setStyles] = React.useState<ReadonlyMap<number, TerminalStyle>>(
@@ -357,13 +370,13 @@ function Terminal({
     // is measured, so its focus event carried no fit) sizes the terminal:
     // its fit goes as focus, never as a bare fit the gateway only rescales.
     const element = boxRef.current
-    if (element && element.ownerDocument.activeElement === element)
+    if (element?.contains(element.ownerDocument.activeElement))
       handlers.current.onFocusView?.(fit)
     else handlers.current.onFit?.(fit)
   }, [fit])
 
   React.useEffect(() => {
-    if (autoFocus) boxRef.current?.focus({ preventScroll: true })
+    if (autoFocus) inputRef.current?.focus({ preventScroll: true })
   }, [autoFocus])
 
   // Another view may own the size; a smaller box shows the whole grid scaled.
@@ -493,6 +506,15 @@ function Terminal({
     handlers.current.onCopyText?.(plain)
   }
 
+  // Text an input method composed arrives once, whole, when it is committed.
+  const onCompositionEnd = (event: React.CompositionEvent<HTMLTextAreaElement>) => {
+    event.currentTarget.value = ""
+    if (!event.data) return
+    followLive()
+    setTyped((count) => count + 1)
+    send(new TextEncoder().encode(event.data))
+  }
+
   const onPaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
     event.preventDefault()
     const text = event.clipboardData.getData("text/plain")
@@ -512,24 +534,41 @@ function Terminal({
   return (
     <div
       ref={boxRef}
-      role="textbox"
-      aria-multiline="true"
-      aria-readonly={ended ? "true" : undefined}
-      tabIndex={0}
+      tabIndex={-1}
       data-slot="terminal"
       data-state={ended ? "exited" : "running"}
       data-focused={focused ? "true" : undefined}
       onKeyDown={onKeyDown}
       onCopy={onCopy}
       onPaste={onPaste}
-      onFocus={() => {
+      onFocus={(event) => {
         setFocused(true)
         if (fitRef.current) handlers.current.onFocusView?.(fitRef.current)
+        // A click or focus() on the box lands on the box: pass it on, once
+        // a press has ended (it may be starting a selection).
+        if (event.target === event.currentTarget && !pressing.current) handOver()
       }}
-      onBlur={() => setFocused(false)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false)
+      }}
       onMouseDown={(event) => {
+        // Wherever the press ends, even outside the box.
+        pressing.current = true
+        event.currentTarget.ownerDocument.addEventListener(
+          "mouseup",
+          () => {
+            pressing.current = false
+            handOver()
+          },
+          { once: true, capture: true },
+        )
         const button = buttonName(event)
-        if (sendMouse("down", event, button)) dragging.current = button
+        // A program tracking the mouse keeps the press from focusing the
+        // box, so the view takes the keyboard itself.
+        if (sendMouse("down", event, button)) {
+          dragging.current = button
+          takeKeyboard()
+        }
       }}
       onMouseUp={(event) => {
         sendMouse("up", event, dragging.current ?? buttonName(event))
@@ -557,6 +596,19 @@ function Terminal({
       style={{ "--nessa-terminal-font-size": `${fontSize}px`, ...style } as React.CSSProperties}
       {...props}
     >
+      <textarea
+        ref={inputRef}
+        aria-label={label}
+        aria-multiline="true"
+        aria-readonly={ended ? "true" : undefined}
+        data-slot="terminal-input"
+        autoCapitalize="off"
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
+        onCompositionEnd={onCompositionEnd}
+        className="pointer-events-none absolute top-0 left-0 size-px resize-none overflow-hidden border-0 p-0 opacity-0 outline-none"
+      />
       <div
         ref={gridRef}
         data-slot="terminal-grid"

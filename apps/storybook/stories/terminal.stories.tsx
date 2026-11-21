@@ -12,7 +12,7 @@ type Cell = [string, number, number]
  * with a line of output. It speaks the same messages the real runtime
  * does, so the story exercises the component exactly as a host would.
  */
-function useFakeShell(lines: string[]) {
+function useFakeShell(lines: string[], mouse: "none" | "press" = "none") {
   const listeners = React.useRef(new Set<(message: TerminalMessage) => void>())
   const state = React.useRef({ size: { cols: 80, rows: 12 } as TerminalSize, screen: lines, typed: "" })
   const emit = (message: TerminalMessage) => listeners.current.forEach((listener) => listener(message))
@@ -40,8 +40,16 @@ function useFakeShell(lines: string[]) {
     state.current.size = size
     emit({ type: "ready", cols: size.cols, rows: size.rows })
     emit({ type: "styles", styles: [{ id: 1, fg: [24, 82, 196] }] })
+    emit({
+      type: "modes",
+      application_cursor: false,
+      bracketed_paste: false,
+      alternate_screen: false,
+      mouse,
+      mouse_encoding: "sgr",
+    })
     paint()
-  }, [])
+  }, [mouse])
   const onInput = React.useCallback((bytes: Uint8Array) => {
     const text = new TextDecoder().decode(bytes)
     for (const char of text) {
@@ -66,8 +74,12 @@ function Demo(props: {
   onFocusView?: (size: TerminalSize) => void
   autoFocus?: boolean
   lines?: string[]
+  mouse?: "none" | "press"
 }) {
-  const shell = useFakeShell(props.lines ?? ["Welcome to the Nessa terminal.", "README.md  src  package.json"])
+  const shell = useFakeShell(
+    props.lines ?? ["Welcome to the Nessa terminal.", "README.md  src  package.json"],
+    props.mouse,
+  )
   return (
     <div className="h-72 w-[40rem] max-w-full overflow-hidden rounded-md border border-border">
       <Terminal
@@ -111,6 +123,17 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
+/**
+ * Ends a play test with the keyboard elsewhere, so the focused cursor's
+ * blink stops before the next story runs rather than ticking on.
+ */
+async function letGo(terminal: HTMLElement) {
+  ;(document.activeElement as HTMLElement | null)?.blur()
+  await waitFor(() =>
+    expect(terminal.querySelector('[data-slot="terminal-cursor"]')?.getAttribute("data-blinking") ?? null).toBeNull(),
+  )
+}
+
 export const Playground: Story = {
   parameters: storyDocumentation(
     "A pretend shell. The play test types a command and checks the bytes sent and the row painted back.",
@@ -124,6 +147,13 @@ export const Playground: Story = {
     await expect(args.onInput).toHaveBeenCalledWith(new TextEncoder().encode("\r"))
     await waitFor(() => expect(terminal.textContent).toContain("ran: ls"))
     await expect(terminal.querySelector('[data-slot="terminal-cursor"]')).not.toBeNull()
+    // Text an input method composes arrives once, when it is committed.
+    const input = terminal.querySelector<HTMLTextAreaElement>('[data-slot="terminal-input"]')!
+    await expect(document.activeElement).toBe(input)
+    input.dispatchEvent(new CompositionEvent("compositionend", { data: "日本", bubbles: true }))
+    await expect(args.onInput).toHaveBeenCalledWith(new TextEncoder().encode("日本"))
+    await waitFor(() => expect(terminal.textContent).toContain("日本"))
+    await letGo(terminal)
   },
 }
 
@@ -149,6 +179,7 @@ export const CopyShimmer: Story = {
       timeout: 2000,
     })
     selection.removeAllRanges()
+    await letGo(terminal)
   },
 }
 
@@ -161,9 +192,32 @@ export const FocusedOnOpen: Story = {
   play: async ({ canvasElement, args }) => {
     const terminal = canvasElement.querySelector<HTMLElement>('[data-slot="terminal"]')!
     await waitFor(() => expect(args.onFocusView).toHaveBeenCalled())
-    await expect(document.activeElement).toBe(terminal)
+    await expect(terminal.contains(document.activeElement)).toBe(true)
     await expect(args.onFit).not.toHaveBeenCalled()
     await waitFor(() => expect(terminal.textContent).toContain("Welcome to the Nessa terminal."))
+    await letGo(terminal)
+  },
+}
+
+export const MouseTracking: Story = {
+  parameters: storyDocumentation(
+    "A program that tracks the mouse gets the press, which keeps the browser from focusing the box; the view takes the keyboard itself, so a click is enough to type into it.",
+  ),
+  args: { onInput: fn(), onFocusView: fn() },
+  render: (args) => <Demo mouse="press" onInput={args.onInput} onFocusView={args.onFocusView} />,
+  play: async ({ canvasElement, args }) => {
+    const terminal = canvasElement.querySelector<HTMLElement>('[data-slot="terminal"]')!
+    await waitFor(() => expect(terminal.textContent).toContain("Welcome"))
+    const row = terminal.querySelector<HTMLElement>('[data-slot="terminal-row"]')!
+    const at = row.getBoundingClientRect()
+    row.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true, cancelable: true, clientX: at.left + 4, clientY: at.top + 4 }),
+    )
+    await expect(args.onInput).toHaveBeenCalledWith(new TextEncoder().encode("\x1b[<0;1;1M"))
+    await expect(terminal.contains(document.activeElement)).toBe(true)
+    await expect(args.onFocusView).toHaveBeenCalled()
+    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }))
+    await letGo(terminal)
   },
 }
 
@@ -186,7 +240,7 @@ export const SetInAPage: Story = {
     )
     terminal.dispatchEvent(new WheelEvent("wheel", { deltaY: -200, bubbles: true, cancelable: true }))
     await waitFor(() => expect(terminal.querySelector('[data-slot="terminal-scrolled"]')).not.toBeNull())
-    terminal.blur()
+    await letGo(terminal)
   },
 }
 

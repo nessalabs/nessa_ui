@@ -694,6 +694,13 @@ export const editableFocusDeclarations: readonly EditableFocusDeclaration[] = Ob
     reason: "The standalone code textarea is the field and draws an inset focus-visible ring; custom child editors retain their own focus contract.",
   },
   {
+    component: "terminal/terminal",
+    element: "textarea",
+    slot: "terminal-input",
+    indicator: "none",
+    reason: "The terminal is the field: its input is an invisible sink for keys and an input method's composed text, and the focused grid's solid, blinking cursor shows where keys go.",
+  },
+  {
     component: "chat-composer",
     element: "textarea",
     indicator: "none",
