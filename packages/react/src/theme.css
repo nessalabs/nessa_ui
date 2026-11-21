@@ -29,10 +29,8 @@
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.556 0 0);
   --radius: 0.625rem;
-  --nessa-font-sans:
-    "Geist Variable", "Geist", ui-sans-serif, system-ui, sans-serif;
-  --nessa-font-mono:
-    "Geist Mono Variable", "Geist Mono", ui-monospace, monospace;
+  --nessa-font-sans: "Geist Variable", "Geist", ui-sans-serif, system-ui, sans-serif;
+  --nessa-font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, monospace;
   /* Coordinated typography levels: each level is a size, an unitless
      line-height ratio, and a tracking contract, never a lone font size. */
   --nessa-font-size-1: 0.6875rem;
@@ -100,9 +98,7 @@
      ink, never in the surface colour, and give every accent surface the
      rim. */
   --nessa-chat-accent: #2a2a2c;
-  --nessa-chat-accent-rim:
-    inset 0 0 0 1px rgb(255 255 255 / 0.22),
-    inset 0 1px 0 rgb(255 255 255 / 0.36);
+  --nessa-chat-accent-rim: inset 0 0 0 1px rgb(255 255 255 / 0.22), inset 0 1px 0 rgb(255 255 255 / 0.36);
   --nessa-chat-accent-ink: #1d1d1f;
   --nessa-chat-rim-0: rgba(245, 158, 11, 0.06);
   --nessa-chat-rim-1: rgba(245, 158, 11, 0.22);
@@ -133,7 +129,7 @@
   --nessa-chart-label-ink: oklch(0.205 0 0);
   /* Notification wash tints, separate from market and diff semantics. */
   --nessa-notification-error: oklch(0.65 0.13 20);
-  --nessa-notification-success: oklch(0.62 0.1 155);
+  --nessa-notification-success: oklch(0.62 0.10 155);
   /* The closing-ring trio, in the register people already read as activity:
      energy, effort, uprightness. This is a named set of roles, not three
      slots borrowed from the categorical ramp — see
@@ -155,11 +151,7 @@
   --nessa-activity-ring-cap-shadow: oklch(0 0 0 / 0.38);
   --nessa-diff-addition: oklch(0.5 0.137 150);
   --nessa-diff-deletion: oklch(0.55 0.19 27);
-  --nessa-invalid-ring: color-mix(
-    in oklab,
-    var(--destructive) 20%,
-    transparent
-  );
+  --nessa-invalid-ring: color-mix(in oklab, var(--destructive) 20%, transparent);
   --nessa-diff-dark-addition: oklch(0.6222 0.1661 146.22);
   /* Market direction — a second colour axis beside the categorical series
      ramp: a quote's rise and fall are one semantic pair, not two series
@@ -271,9 +263,7 @@
      #262626 here, and a sent one has to stand apart from it by more than
      its rim. White on it is 11:1. */
   --nessa-chat-accent: #3a3a3d;
-  --nessa-chat-accent-rim:
-    inset 0 0 0 1px rgb(255 255 255 / 0.22),
-    inset 0 1px 0 rgb(255 255 255 / 0.36);
+  --nessa-chat-accent-rim: inset 0 0 0 1px rgb(255 255 255 / 0.22), inset 0 1px 0 rgb(255 255 255 / 0.36);
   --nessa-chat-accent-ink: #f5f5f7;
   --nessa-chat-rim-0: rgba(245, 158, 11, 0.06);
   --nessa-chat-rim-1: rgba(245, 158, 11, 0.22);
@@ -312,11 +302,7 @@
   /* 65%, not 40%: the invalid ring is a required non-text boundary, and the
      dark destructive at 40% composites to 1.96:1 against the surfaces it is
      drawn on. */
-  --nessa-invalid-ring: color-mix(
-    in oklab,
-    var(--destructive) 65%,
-    transparent
-  );
+  --nessa-invalid-ring: color-mix(in oklab, var(--destructive) 65%, transparent);
   --nessa-diff-dark-addition: oklch(0.6222 0.1661 146.22);
   --nessa-market-gain: oklch(0.8 0.19 150);
   --nessa-market-loss: oklch(0.7 0.19 25);
@@ -370,28 +356,26 @@
   --_nessa-scale-factor: 1.25;
 }
 
-:where(:root, [data-nessa-root], [data-nessa-theme], [data-nessa-scale]) {
-  --_nessa-font-size-1: calc(
-    var(--nessa-font-size-1) * var(--_nessa-scale-factor)
-  );
-  --_nessa-font-size-2: calc(
-    var(--nessa-font-size-2) * var(--_nessa-scale-factor)
-  );
-  --_nessa-font-size-3: calc(
-    var(--nessa-font-size-3) * var(--_nessa-scale-factor)
-  );
-  --_nessa-font-size-4: calc(
-    var(--nessa-font-size-4) * var(--_nessa-scale-factor)
-  );
-  --_nessa-font-size-5: calc(
-    var(--nessa-font-size-5) * var(--_nessa-scale-factor)
-  );
-  --_nessa-font-size-6: calc(
-    var(--nessa-font-size-6) * var(--_nessa-scale-factor)
-  );
-  --_nessa-font-size-7: calc(
-    var(--nessa-font-size-7) * var(--_nessa-scale-factor)
-  );
+:where(
+  :root,
+  [data-nessa-root],
+  [data-nessa-theme],
+  [data-nessa-scale]
+) {
+  --_nessa-font-size-1:
+    calc(var(--nessa-font-size-1) * var(--_nessa-scale-factor));
+  --_nessa-font-size-2:
+    calc(var(--nessa-font-size-2) * var(--_nessa-scale-factor));
+  --_nessa-font-size-3:
+    calc(var(--nessa-font-size-3) * var(--_nessa-scale-factor));
+  --_nessa-font-size-4:
+    calc(var(--nessa-font-size-4) * var(--_nessa-scale-factor));
+  --_nessa-font-size-5:
+    calc(var(--nessa-font-size-5) * var(--_nessa-scale-factor));
+  --_nessa-font-size-6:
+    calc(var(--nessa-font-size-6) * var(--_nessa-scale-factor));
+  --_nessa-font-size-7:
+    calc(var(--nessa-font-size-7) * var(--_nessa-scale-factor));
   --_nessa-line-height-1: var(--nessa-line-height-1);
   --_nessa-line-height-2: var(--nessa-line-height-2);
   --_nessa-line-height-3: var(--nessa-line-height-3);
@@ -448,28 +432,26 @@
   --_nessa-scale-factor: 1.1;
 }
 
-:where(:root, [data-nessa-root], [data-nessa-theme], [data-nessa-scale]) {
-  --_nessa-font-size-1: calc(
-    var(--nessa-font-size-1) * var(--_nessa-scale-factor)
-  );
-  --_nessa-font-size-2: calc(
-    var(--nessa-font-size-2) * var(--_nessa-scale-factor)
-  );
-  --_nessa-font-size-3: calc(
-    var(--nessa-font-size-3) * var(--_nessa-scale-factor)
-  );
-  --_nessa-font-size-4: calc(
-    var(--nessa-font-size-4) * var(--_nessa-scale-factor)
-  );
-  --_nessa-font-size-5: calc(
-    var(--nessa-font-size-5) * var(--_nessa-scale-factor)
-  );
-  --_nessa-font-size-6: calc(
-    var(--nessa-font-size-6) * var(--_nessa-scale-factor)
-  );
-  --_nessa-font-size-7: calc(
-    var(--nessa-font-size-7) * var(--_nessa-scale-factor)
-  );
+:where(
+  :root,
+  [data-nessa-root],
+  [data-nessa-theme],
+  [data-nessa-scale]
+) {
+  --_nessa-font-size-1:
+    calc(var(--nessa-font-size-1) * var(--_nessa-scale-factor));
+  --_nessa-font-size-2:
+    calc(var(--nessa-font-size-2) * var(--_nessa-scale-factor));
+  --_nessa-font-size-3:
+    calc(var(--nessa-font-size-3) * var(--_nessa-scale-factor));
+  --_nessa-font-size-4:
+    calc(var(--nessa-font-size-4) * var(--_nessa-scale-factor));
+  --_nessa-font-size-5:
+    calc(var(--nessa-font-size-5) * var(--_nessa-scale-factor));
+  --_nessa-font-size-6:
+    calc(var(--nessa-font-size-6) * var(--_nessa-scale-factor));
+  --_nessa-font-size-7:
+    calc(var(--nessa-font-size-7) * var(--_nessa-scale-factor));
   --_nessa-line-height-1: var(--nessa-line-height-1);
   --_nessa-line-height-2: var(--nessa-line-height-2);
   --_nessa-line-height-3: var(--nessa-line-height-3);
@@ -535,10 +517,10 @@
   /* A boat on its water (DeviceFigure afloat): a slow rise and roll, and
      the swell drifting one wavelength (24 user units) at a time. Ambient
      loops, so their users gate them behind motion-safe. */
-  --animate-nessa-float: nessa-float
-    calc(var(--nessa-motion-duration-ambient) * 1.5) ease-in-out infinite;
-  --animate-nessa-swell: nessa-swell
-    calc(var(--nessa-motion-duration-ambient) * 1.25) linear infinite;
+  --animate-nessa-float: nessa-float calc(var(--nessa-motion-duration-ambient) * 1.5)
+    ease-in-out infinite;
+  --animate-nessa-swell: nessa-swell calc(var(--nessa-motion-duration-ambient) * 1.25)
+    linear infinite;
 
   /* Entrance for content that appears in place (palettes, callouts):
      opacity plus the individual scale property, never transform, so a
