@@ -543,6 +543,13 @@
     }
   }
 
+  /* A focused terminal's cursor: on, then off, in two hard steps. */
+  @keyframes nessa-terminal-blink {
+    50% {
+      opacity: 0;
+    }
+  }
+
   @keyframes nessa-swell {
     to {
       transform: translateX(-24px);

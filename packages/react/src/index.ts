@@ -475,6 +475,7 @@ export {
 export {
   preloadReplyMarkdown,
   ReplyMarkdown,
+  type ReplyFence,
   type ReplyMarkdownComponents,
   type ReplyMarkdownProps,
 } from "./components/reply-markdown"
@@ -1309,3 +1310,13 @@ export { GitCommitDetails, type GitCommitDetailsProps, type GitCommitDetailsData
 export { ChatComposerMarkdownEditor, type ChatComposerMarkdownEditorProps } from "./components/chat-composer-markdown-editor"
 
 export { CodeEditor, type CodeEditorProps, type CodeEditorLanguage } from "./components/code-editor"
+export {
+  Terminal,
+  type TerminalProps,
+  rowText as terminalRowText,
+  type TerminalCell,
+  type TerminalMessage,
+  type TerminalModes,
+  type TerminalSize,
+  type TerminalStyle,
+} from "./components/terminal"
