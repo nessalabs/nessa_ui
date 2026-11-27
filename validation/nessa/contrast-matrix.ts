@@ -47,6 +47,9 @@ export const contrastMatrix = Object.freeze([
   { foreground: "--nessa-attention", background: "--card", minimum: 4.5, role: "normal-text" },
   { foreground: "--nessa-attention", background: "--background", minimum: 4.5, role: "normal-text" },
   { foreground: "--nessa-attention", background: "--popover", minimum: 4.5, role: "normal-text" },
+  // Attention is also written on a side column's rows, plain and tinted as hovered or chosen.
+  { foreground: "--nessa-attention", background: "--sidebar", minimum: 4.5, role: "normal-text" },
+  { foreground: "--nessa-attention", background: "--sidebar", overlay: { token: "--foreground", opacity: 0.08 }, minimum: 4.5, role: "normal-text" },
   { foreground: "--nessa-fast-mode-active", background: "--card", minimum: 4.5, role: "normal-text" },
   { foreground: "--nessa-fast-mode-active", background: "--background", minimum: 4.5, role: "normal-text" },
   // The sent bubble's white text on the graphite chat accent, in both themes.
