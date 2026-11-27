@@ -93,6 +93,9 @@ export interface DialogProps
    * description, which move into it: a list beside what the body shows.
    * It lays out its children as a column, so a last child can sit at its
    * foot with `mt-auto`. The body and footer take the rest of the width.
+   * It is 17.5rem wide at most; a host whose aside holds more than a list,
+   * such as the controls that act on what the body shows, widens it with
+   * `--nessa-dialog-aside-width` on the dialog or any ancestor.
    */
   aside?: React.ReactNode
   /**
@@ -307,7 +310,7 @@ function Dialog({
                   // Side by side from the sm breakpoint; narrower, the aside
                   // stacks above the body, held to at most 40% of the height.
                   hasAside &&
-                    "overflow-hidden sm:grid sm:grid-cols-[minmax(0,17.5rem)_minmax(0,1fr)]",
+                    "overflow-hidden sm:grid sm:grid-cols-[minmax(0,var(--nessa-dialog-aside-width,17.5rem))_minmax(0,1fr)]",
                 )}
               >
                 {hasAside ? (

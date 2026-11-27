@@ -376,6 +376,45 @@ export const FullWithAside: Story = {
   },
 }
 
+export const WideAside: Story = {
+  parameters: storyDocumentation(
+    "An aside that holds the controls acting on what the body shows, not only a list, is wider than 17.5rem: the host sets `--nessa-dialog-aside-width` on the dialog (or any ancestor). The play test proves the aside takes that width and the body still starts at its edge.",
+  ),
+  render: () => (
+    <Dialog
+      trigger={<Button variant="outline">Open decisions</Button>}
+      title="Decisions"
+      description="0 of 3 decided"
+      size="full"
+      style={{ "--nessa-dialog-aside-width": "26rem" } as React.CSSProperties}
+      aside={<p className="m-0 nessa-text-4">The question and its choices</p>}
+    >
+      <p className="m-0 nessa-text-4">The brief</p>
+    </Dialog>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const page = within(canvasElement.ownerDocument.body)
+    await userEvent.click(canvas.getByRole("button", { name: "Open decisions" }))
+    const dialog = await page.findByRole("dialog", { name: "Decisions" })
+    const surface = dialog.querySelector<HTMLElement>("[data-slot=dialog-surface]")!
+    await waitFor(async () => {
+      await expect(["1", "none"]).toContain(getComputedStyle(surface).scale)
+    })
+    const rem = parseFloat(getComputedStyle(canvasElement.ownerDocument.documentElement).fontSize)
+    const aside = dialog.querySelector<HTMLElement>("[data-slot=dialog-aside]")!
+    const body = dialog.querySelector<HTMLElement>("[data-slot=dialog-body]")!
+    await expect(aside.getBoundingClientRect().width).toBeCloseTo(26 * rem, 0)
+    await expect(body.getBoundingClientRect().left).toBeGreaterThanOrEqual(
+      aside.getBoundingClientRect().right - 1,
+    )
+    await userEvent.keyboard("{Escape}")
+    await waitFor(async () => {
+      await expect(dialog.isConnected).toBe(false)
+    })
+  },
+}
+
 function DecisionsWithLongList() {
   return (
     <Dialog
