@@ -222,6 +222,76 @@ export const MultipleChoice: Story = {
   },
 }
 
+/** The drawn row (label) that holds a choice's native input. */
+function choiceRow(input: HTMLElement) {
+  return input.closest<HTMLElement>('[data-slot="questionnaire-choice"]')!
+}
+
+export const PlainChoices: Story = {
+  parameters: storyDocumentation(
+    "The plain variant of QuestionnaireChoices, for a column of choices read top to bottom beside other content, such as the option list in a decisions view. Rows drop their frames: a row tints on hover and keeps a stronger tint once chosen, so the list reads as text rather than a stack of boxes. The play test proves the rows have no border, that only the chosen row is tinted, and that arrow keys move both the selection and the tint.",
+  ),
+  render: () => (
+    <StoryFrame>
+      <StoryForm>
+        <Questionnaire>
+          <QuestionnaireItem name="rollout">
+            <QuestionnaireTitle>How should the migration roll out?</QuestionnaireTitle>
+            <QuestionnaireChoices variant="plain" defaultValue={["batches"]}>
+              <QuestionnaireChoice value="batches">
+                In batches overnight
+              </QuestionnaireChoice>
+              <QuestionnaireChoice value="once">All at once</QuestionnaireChoice>
+              <QuestionnaireChoice value="wait">
+                Wait until Monday
+              </QuestionnaireChoice>
+            </QuestionnaireChoices>
+          </QuestionnaireItem>
+        </Questionnaire>
+      </StoryForm>
+    </StoryFrame>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const batches = canvas.getByRole("radio", { name: "In batches overnight" })
+    const once = canvas.getByRole("radio", { name: "All at once" })
+    const transparent = "rgba(0, 0, 0, 0)"
+
+    await expect(
+      canvasElement.querySelector('[data-slot="questionnaire-choices"]'),
+    ).toHaveAttribute("data-variant", "plain")
+    // Plain rows have no frame.
+    await expect(getComputedStyle(choiceRow(batches)).borderTopWidth).toBe("0px")
+
+    await waitFor(async () => {
+      finishStoryTransitions(canvasElement)
+      await expect(getComputedStyle(choiceRow(batches)).backgroundColor).not.toBe(
+        transparent,
+      )
+      await expect(getComputedStyle(choiceRow(once)).backgroundColor).toBe(
+        transparent,
+      )
+    })
+
+    // Arrow keys move the native radio selection, and the tint follows it.
+    batches.focus()
+    await userEvent.keyboard("{ArrowDown}")
+    await expect(once).toBeChecked()
+    await expect(batches).not.toBeChecked()
+    await userEvent.unhover(choiceRow(once))
+    await waitFor(async () => {
+      finishStoryTransitions(canvasElement)
+      await expect(getComputedStyle(choiceRow(once)).backgroundColor).not.toBe(
+        transparent,
+      )
+      await expect(getComputedStyle(choiceRow(batches)).backgroundColor).toBe(
+        transparent,
+      )
+    })
+    await expectChoiceGlyphs(canvasElement, [[once, "1"], [batches, "0"]])
+  },
+}
+
 export const TextAnswer: Story = {
   parameters: storyDocumentation(
     "A freeform question answered through QuestionnaireInput — the library Input wired to the item's field name for form submission — and closed by the submit button in the actions row. The item legend names the group, so the input carries its own accessible name via aria-label. The play test types an answer, asserts the value and the input's questionnaire slot wiring, and submits without leaving the page.",
