@@ -44,6 +44,9 @@ export const contrastMatrix = Object.freeze([
   { foreground: "--nessa-market-loss", background: "--background", minimum: 4.5, role: "normal-text" },
   { foreground: "--nessa-market-gain", background: "--popover", minimum: 4.5, role: "normal-text" },
   { foreground: "--nessa-market-loss", background: "--popover", minimum: 4.5, role: "normal-text" },
+  { foreground: "--nessa-attention", background: "--card", minimum: 4.5, role: "normal-text" },
+  { foreground: "--nessa-attention", background: "--background", minimum: 4.5, role: "normal-text" },
+  { foreground: "--nessa-attention", background: "--popover", minimum: 4.5, role: "normal-text" },
   { foreground: "--nessa-fast-mode-active", background: "--card", minimum: 4.5, role: "normal-text" },
   { foreground: "--nessa-fast-mode-active", background: "--background", minimum: 4.5, role: "normal-text" },
   // The sent bubble's white text on the graphite chat accent, in both themes.

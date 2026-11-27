@@ -164,6 +164,13 @@
      see docs/architecture/chart-series-ramp.md. */
   --nessa-market-gain: oklch(0.5 0.135 148);
   --nessa-market-loss: oklch(0.55 0.19 27);
+  /* Attention — the one warm hue in a graphite kit: something waits on the
+     person, such as a decision an agent asked, and the choice it suggests.
+     Written as text (a live dot, a "Suggested" word), so it is held to 4.5:1
+     on the card, background and popover. Use it only for what waits on the
+     person; a surface that uses it for anything else teaches people to
+     ignore it. */
+  --nessa-attention: oklch(0.55 0.115 72);
   /* DeviceFigure: a machine drawn as a small object under one soft top
      light, its body graphite in dark and brushed aluminium in light; a
      screen is dark glass in both. Shown beside the device's name, never the
@@ -306,6 +313,7 @@
   --nessa-diff-dark-addition: oklch(0.6222 0.1661 146.22);
   --nessa-market-gain: oklch(0.8 0.19 150);
   --nessa-market-loss: oklch(0.7 0.19 25);
+  --nessa-attention: oklch(0.8 0.105 78);
   --nessa-device-body-top: oklch(0.4 0.006 286);
   --nessa-device-body-bottom: oklch(0.21 0.004 286);
   --nessa-device-rim: oklch(1 0 0 / 0.15);

@@ -159,6 +159,9 @@ test("custom text tokens are enforced on their rendered surfaces, including the 
     "--nessa-market-loss|--background|",
     "--nessa-market-gain|--popover|",
     "--nessa-market-loss|--popover|",
+    "--nessa-attention|--card|",
+    "--nessa-attention|--background|",
+    "--nessa-attention|--popover|",
     "--nessa-fast-mode-active|--card|",
     "--nessa-fast-mode-active|--background|",
   ]) {
