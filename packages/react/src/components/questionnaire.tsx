@@ -33,6 +33,8 @@ interface QuestionnaireChoicesContextValue {
   isSelected: (value: string) => boolean
   /** Applies a native input's checked change to the group value. */
   setSelected: (value: string, checked: boolean) => void
+  /** How the rows are drawn; see `QuestionnaireChoicesProps.variant`. */
+  variant: "outlined" | "plain"
 }
 
 const QuestionnaireChoicesContext =
@@ -269,6 +271,15 @@ export interface QuestionnaireChoicesProps
   defaultValue?: readonly string[]
   /** Notified with the new selection after every toggle. */
   onValueChange?: (value: string[]) => void
+  /**
+   * How the rows are drawn. `outlined` (the default) frames each row;
+   * `plain` drops the frames for quiet rows that tint on hover and hold a
+   * stronger tint once chosen, for a column of choices read top to bottom
+   * beside other content, where frames would crowd it.
+   *
+   * @default "outlined"
+   */
+  variant?: "outlined" | "plain"
 }
 
 /**
@@ -285,6 +296,7 @@ function QuestionnaireChoices({
   value,
   defaultValue,
   onValueChange,
+  variant = "outlined",
   className,
   ...props
 }: QuestionnaireChoicesProps) {
@@ -307,6 +319,7 @@ function QuestionnaireChoices({
     () => ({
       name: groupName,
       multiple,
+      variant,
       isSelected: (choice) => selected.includes(choice),
       setSelected: (choice, checked) => {
         const withoutChoice = selected.filter(
@@ -323,14 +336,15 @@ function QuestionnaireChoices({
         onValueChange?.(next)
       },
     }),
-    [groupName, multiple, selected, value, onValueChange],
+    [groupName, multiple, variant, selected, value, onValueChange],
   )
 
   return (
     <QuestionnaireChoicesContext.Provider value={context}>
       <div
         data-slot="questionnaire-choices"
-        className={cn("flex flex-col gap-2", className)}
+        data-variant={variant}
+        className={cn("flex flex-col", variant === "plain" ? "gap-0.5" : "gap-2", className)}
         {...props}
       />
     </QuestionnaireChoicesContext.Provider>
@@ -369,7 +383,7 @@ function QuestionnaireChoice({
   children,
   ...props
 }: QuestionnaireChoiceProps) {
-  const { name, multiple, isSelected, setSelected } =
+  const { name, multiple, variant, isSelected, setSelected } =
     useQuestionnaireChoices("QuestionnaireChoice")
   const { className: inputClassName, ...restInputProps } = inputProps ?? {}
 
@@ -377,7 +391,13 @@ function QuestionnaireChoice({
     <label
       data-slot="questionnaire-choice"
       className={cn(
-        "flex w-full min-w-0 cursor-pointer items-start gap-3 rounded-lg border border-border bg-transparent px-3 py-2.5 transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] select-none hover:border-ring/60 has-[:checked]:border-ring/60 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50 motion-reduce:transition-none",
+        "flex w-full min-w-0 cursor-pointer items-start gap-3 bg-transparent px-3 py-2.5 transition-colors [transition-duration:var(--nessa-motion-duration-fast)] [transition-timing-function:var(--nessa-motion-easing-standard)] select-none has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50 motion-reduce:transition-none",
+        variant === "plain"
+          ? // No frame: the row tints on hover and keeps a stronger tint
+            // once chosen. Forced colours drop tints, so there the chosen
+            // row is outlined instead.
+            "rounded-md hover:bg-foreground/(--nessa-state-hover) has-[:checked]:bg-foreground/(--nessa-state-hover-strong) forced-colors:has-[:checked]:outline-1 forced-colors:has-[:checked]:outline-solid"
+          : "rounded-lg border border-border hover:border-ring/60 has-[:checked]:border-ring/60",
         className,
       )}
       {...props}
