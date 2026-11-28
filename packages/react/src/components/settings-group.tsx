@@ -284,12 +284,25 @@ function hasTextContent(node: React.ReactNode): boolean {
  * row, where the label is known, rather than only inside controls that
  * happen to read the label context.
  */
+/**
+ * Clones a wrapper with its children labelled, keeping them as the siblings
+ * they were written as. Passed as one array, they would read as a list, and
+ * every child written side by side in JSX would need a key.
+ */
+function relabelChildren(
+  node: React.ReactElement<LabelableProps>,
+  labelId: string,
+): React.ReactNode {
+  const children = node.props.children
+  return Array.isArray(children)
+    ? React.cloneElement(node, {}, ...children.map((child) => withRowLabel(child, labelId)))
+    : React.cloneElement(node, {}, withRowLabel(children, labelId))
+}
+
 function withRowLabel(node: React.ReactNode, labelId: string): React.ReactNode {
   if (Array.isArray(node)) return node.map((child) => withRowLabel(child, labelId))
   if (!React.isValidElement<LabelableProps>(node)) return node
-  if (node.type === React.Fragment) {
-    return React.cloneElement(node, {}, withRowLabel(node.props.children, labelId))
-  }
+  if (node.type === React.Fragment) return relabelChildren(node, labelId)
 
   const props = node.props
   if (hasOwnName(props)) return node
@@ -300,7 +313,7 @@ function withRowLabel(node: React.ReactNode, labelId: string): React.ReactNode {
     if (tag === "input" || tag === "select" || tag === "textarea" || tag === "button") {
       return React.cloneElement(node, { "aria-labelledby": labelId })
     }
-    return React.cloneElement(node, {}, withRowLabel(props.children, labelId))
+    return relabelChildren(node, labelId)
   }
 
   // A component that renders its children, such as Button, already has a name.

@@ -1,6 +1,6 @@
 import * as React from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { expect, userEvent, within } from "storybook/test"
+import { expect, spyOn, userEvent, within } from "storybook/test"
 import { Laptop, Smartphone } from "lucide-react"
 import {
   Button,
@@ -410,6 +410,55 @@ export const ContentKeepsItsName: Story = {
     const canvas = within(canvasElement)
     await expect(canvas.getByRole("switch", { name: "Notify me" })).toBeChecked()
     await expect(canvas.getByRole("switch", { name: "Only when I am away" })).not.toBeChecked()
+  },
+}
+
+/** A key field that appears on Edit: a wrapper holding the field and its Save. */
+function KeyRow() {
+  const [editing, setEditing] = React.useState(false)
+  return (
+    <SettingsRow
+      label="API key"
+      control={
+        editing ? (
+          <form className="flex items-center gap-2" onSubmit={(event) => event.preventDefault()}>
+            <input type="password" className="rounded-md border border-border px-2 py-1" />
+            <Button type="submit" size="sm">
+              Save
+            </Button>
+          </form>
+        ) : (
+          <Button size="sm" onClick={() => setEditing(true)}>
+            Edit
+          </Button>
+        )
+      }
+    />
+  )
+}
+
+export const WrappedControls: Story = {
+  parameters: storyDocumentation(
+    "A control may sit in a wrapper with its siblings, such as a form holding a field and its Save. The row's label still names the field, and the siblings stay siblings: the play test opens the form and checks the field's name and that React warned about nothing, such as a missing key.",
+  ),
+  render: () => (
+    <div className="max-w-xl">
+      <SettingsGroup title="Agent37">
+        <KeyRow />
+      </SettingsGroup>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const errors = spyOn(console, "error")
+    try {
+      await userEvent.click(canvas.getByRole("button", { name: "Edit" }))
+      await expect(canvas.getByLabelText("API key")).toHaveAttribute("type", "password")
+      await expect(canvas.getByRole("button", { name: "Save" })).toBeVisible()
+      await expect(errors).not.toHaveBeenCalled()
+    } finally {
+      errors.mockRestore()
+    }
   },
 }
 
