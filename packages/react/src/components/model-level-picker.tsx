@@ -81,9 +81,18 @@ export interface ModelLevelPickerProps {
    * would think at before choosing. Nothing, and the row's bars are all dark.
    */
   levelFor?: (model: ModelLevelPickerModel, group: ModelLevelPickerGroup) => string | undefined
-  /** Called with a model, or a model and a level, when one is chosen. The picker then closes. */
+  /**
+   * Called with a model, or a model and a level, when one is chosen. Choosing
+   * by name closes the picker; a bar, ← →, or a swipe changes the level and
+   * keeps it open.
+   */
   onValueChange?: (value: ModelLevelPickerValue) => void
-  /** The starred models, in the order they were starred. Without `onStarredChange` there are no stars. */
+  /**
+   * The starred models, in the order they were starred. Without
+   * `onStarredChange` there are no stars. A model unstarred while Starred is
+   * shown stays on it, unstarred, so the star can be put back; it leaves the
+   * next time Starred is shown.
+   */
   starred?: readonly ModelLevelPickerModelRef[]
   onStarredChange?: (starred: ModelLevelPickerModelRef[]) => void
   /**
@@ -169,6 +178,14 @@ function ModelLevelPickerMark({
 }
 
 /**
+ * After a press of a bar or star, which keeps the picker open, the keys go to
+ * its row (← → ↑ ↓, s, Enter), not to the small button a click may focus.
+ */
+function keysToRow(control: HTMLElement) {
+  control.closest<HTMLElement>('[data-slot="model-level-picker-row"]')?.focus()
+}
+
+/**
  * The bars a row draws: one per level that lights one, rising, lit up to the
  * level the row shows. Each bar chooses its model at its level, except that
  * the lowest bar is a toggle: pressed while it is the only one lit, it chooses
@@ -210,6 +227,7 @@ function LevelBars({
             onClick={(event) => {
               event.stopPropagation()
               onChoose(target.value)
+              keysToRow(event.currentTarget)
             }}
             className="group/bar flex h-[18px] w-2.5 items-end justify-center outline-none"
           >
@@ -240,10 +258,12 @@ function LevelBars({
  * rising bars lit up to the level it would take. Pressing a name chooses the
  * model and keeps the host's level; pressing a bar chooses the model at that
  * level; pressing the lowest bar while it alone is lit turns thinking off,
- * when the model can. Either closes the picker. The model in use has its mark's tile
+ * when the model can. A name closes the picker; a bar keeps it open, so
+ * a level can be tried and changed again. The model in use has its mark's tile
  * filled with its provider's colour. From the keyboard: ↑ ↓ move between
  * rows, ← → choose the row's model a level down or up, Enter chooses the row,
- * `s` stars it, and `/` goes to search.
+ * `s` stars it, and `/` goes to search. A model unstarred on Starred stays
+ * there, unstarred, until Starred is next shown.
  *
  * Which level a model shows, and which it takes when chosen by name, is the
  * host's (`levelFor`, `onValueChange`): the picker knows no level names.
@@ -308,6 +328,20 @@ function ModelLevelPicker({
   const starredRows = starred
     .map((ref) => allRows.find((row) => sameRef(ref, row.group.id, row.model.id)))
     .filter((row): row is Row => row !== undefined)
+  // The rows Starred showed when it was last shown. One unstarred since stays
+  // in its place, shown unstarred, so a mistaken unstar can be undone where it
+  // happened; it leaves the next time Starred is shown.
+  const [starredShown, setStarredShown] = React.useState<readonly string[]>([])
+  const shownStarredRows = [
+    ...starredShown
+      .map((key) => allRows.find((row) => row.key === key))
+      .filter((row): row is Row => row !== undefined),
+    ...starredRows.filter((row) => !starredShown.includes(row.key)),
+  ]
+  const showFilter = (next: Filter) => {
+    setFilter(next)
+    if (next.kind === "starred") setStarredShown(starredRows.map((row) => row.key))
+  }
 
   /** Where the picker opens: the starred list when there is one, else the provider in use. */
   const openingFilter = (): Filter => {
@@ -322,7 +356,7 @@ function ModelLevelPicker({
   if (open !== openedAt) {
     setOpenedAt(open)
     if (open) {
-      setFilter(openingFilter())
+      showFilter(openingFilter())
       setQuery("")
     }
   }
@@ -340,7 +374,7 @@ function ModelLevelPicker({
         ),
       )
     : filter.kind === "starred"
-      ? starredRows
+      ? shownStarredRows
       : filter.kind === "group"
         ? allRows.filter((row) => row.group.id === filter.id)
         : allRows
@@ -356,6 +390,12 @@ function ModelLevelPicker({
     setOpen(false)
   }
 
+  /** A bar: the model at that level, keeping the picker open to try another. */
+  const chooseLevel = (row: Row, level: string) => {
+    if (row.model.disabled) return
+    onValueChange?.({ providerId: row.group.id, modelId: row.model.id, level })
+  }
+
   const toggleStar = (row: Row) => {
     if (!onStarredChange) return
     const ref = { providerId: row.group.id, modelId: row.model.id }
@@ -365,17 +405,6 @@ function ModelLevelPicker({
         : [...starred, ref],
     )
   }
-
-  // A row unstarred from the keyboard on Starred leaves the list: the keys
-  // go to the row after it (or before it), or to search once none is left.
-  const focusAfterLeaving = React.useRef<{ leaving: string; next: string | undefined } | null>(null)
-  React.useLayoutEffect(() => {
-    const pending = focusAfterLeaving.current
-    if (!pending || rowElements().some((row) => row.dataset.key === pending.leaving)) return
-    focusAfterLeaving.current = null
-    if (pending.next) focusRow(pending.next)
-    else searchRef.current?.focus()
-  })
 
   const rowElements = () =>
     Array.from(
@@ -442,11 +471,6 @@ function ModelLevelPicker({
       case "S":
         if (event.metaKey || event.ctrlKey || event.altKey) return
         event.preventDefault()
-        if (filter.kind === "starred" && !normalized && isStarred(row))
-          focusAfterLeaving.current = {
-            leaving: row.key,
-            next: (rows[at + 1] ?? rows[at - 1])?.dataset.key,
-          }
         toggleStar(row)
         return
       case "/":
@@ -530,6 +554,7 @@ function ModelLevelPicker({
   const renderRow = (row: Row) => {
     const selected = sameRef(value, row.group.id, row.model.id)
     const starredRow = isStarred(row)
+    const onStarredList = filter.kind === "starred" && !normalized
     const lit = levelFor?.(row.model, row.group)
     return (
       <div
@@ -566,16 +591,19 @@ function ModelLevelPicker({
             onClick={(event) => {
               event.stopPropagation()
               toggleStar(row)
+              keysToRow(event.currentTarget)
             }}
             className={cn(
               "flex size-[22px] shrink-0 items-center justify-center rounded-md text-muted-foreground/60 opacity-0 outline-none transition-opacity [transition-duration:var(--nessa-motion-duration-fast)] hover:bg-background/40 hover:text-muted-foreground group-hover/row:opacity-100 group-focus-visible/row:opacity-100 motion-reduce:transition-none",
               starredRow && "text-muted-foreground opacity-100",
+              // On Starred every star shows, so one just unstarred can be put back.
+              onStarredList && "opacity-100",
             )}
           >
             <Star className="size-3.5" fill={starredRow ? "currentColor" : "none"} aria-hidden="true" />
           </button>
         ) : null}
-        <LevelBars row={row} lit={lit} onChoose={(level) => choose(row, level)} />
+        <LevelBars row={row} lit={lit} onChoose={(level) => chooseLevel(row, level)} />
       </div>
     )
   }
@@ -737,7 +765,7 @@ function ModelLevelPicker({
                             title={entry.label}
                             onClick={() => {
                               setQuery("")
-                              setFilter(entry.filter)
+                              showFilter(entry.filter)
                               if (listRef.current) listRef.current.scrollTop = 0
                             }}
                             className={cn(
