@@ -143,6 +143,11 @@ export const Playground: Story = {
     await expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · xhigh")
     await userEvent.click(within(dialog).getByRole("button", { name: "Forge 6, High" }))
     await expect(body.getByRole("dialog")).toBeVisible()
+    // The keys then go to the row: ← steps it a level down.
+    await expect(within(dialog).getByRole("option", { name: /Forge 6/ })).toHaveFocus()
+    await userEvent.keyboard("{ArrowLeft}")
+    await expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · medium")
+    await userEvent.keyboard("{ArrowRight}")
     await userEvent.click(within(dialog).getByText("Forge 6"))
     await waitFor(() => expect(body.queryByRole("dialog")).not.toBeInTheDocument())
     await expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · high · fast false")

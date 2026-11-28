@@ -178,6 +178,14 @@ function ModelLevelPickerMark({
 }
 
 /**
+ * After a press of a bar or star, which keeps the picker open, the keys go to
+ * its row (← → ↑ ↓, s, Enter), not to the small button a click may focus.
+ */
+function keysToRow(control: HTMLElement) {
+  control.closest<HTMLElement>('[data-slot="model-level-picker-row"]')?.focus()
+}
+
+/**
  * The bars a row draws: one per level that lights one, rising, lit up to the
  * level the row shows. Each bar chooses its model at its level, except that
  * the lowest bar is a toggle: pressed while it is the only one lit, it chooses
@@ -219,6 +227,7 @@ function LevelBars({
             onClick={(event) => {
               event.stopPropagation()
               onChoose(target.value)
+              keysToRow(event.currentTarget)
             }}
             className="group/bar flex h-[18px] w-2.5 items-end justify-center outline-none"
           >
@@ -582,6 +591,7 @@ function ModelLevelPicker({
             onClick={(event) => {
               event.stopPropagation()
               toggleStar(row)
+              keysToRow(event.currentTarget)
             }}
             className={cn(
               "flex size-[22px] shrink-0 items-center justify-center rounded-md text-muted-foreground/60 opacity-0 outline-none transition-opacity [transition-duration:var(--nessa-motion-duration-fast)] hover:bg-background/40 hover:text-muted-foreground group-hover/row:opacity-100 group-focus-visible/row:opacity-100 motion-reduce:transition-none",
