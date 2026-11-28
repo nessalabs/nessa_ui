@@ -121,7 +121,7 @@ type Story = StoryObj<typeof meta>
 
 export const Playground: Story = {
   parameters: storyDocumentation(
-    "Pressing a name keeps the level; pressing a bar chooses the model at that level. The chosen model's mark is filled with its provider's colour.",
+    "Pressing a name keeps the level and closes; pressing a bar chooses the model at that level and stays open. The chosen model's mark is filled with its provider's colour.",
   ),
   render: () => <Example />,
   play: async ({ canvasElement }) => {
@@ -133,8 +133,17 @@ export const Playground: Story = {
     await expect(within(dialog).getAllByRole("option")).toHaveLength(2)
     await expect(canvasElement.ownerDocument.activeElement).toBe(within(dialog).getByLabelText("Search models"))
 
-    // A bar picks the model at that level, and closes the picker.
+    // A bar picks the model at that level and keeps the picker open, so
+    // another level can be tried; the model's name then closes it.
     await userEvent.click(within(dialog).getByRole("button", { name: "Forge 6, High" }))
+    await expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · high · fast false")
+    await expect(body.getByRole("dialog")).toBeVisible()
+    await expect(within(dialog).getByRole("option", { name: /Forge 6/ })).toHaveAttribute("aria-selected", "true")
+    await userEvent.click(within(dialog).getByRole("button", { name: "Forge 6, Extra high" }))
+    await expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · xhigh")
+    await userEvent.click(within(dialog).getByRole("button", { name: "Forge 6, High" }))
+    await expect(body.getByRole("dialog")).toBeVisible()
+    await userEvent.click(within(dialog).getByText("Forge 6"))
     await waitFor(() => expect(body.queryByRole("dialog")).not.toBeInTheDocument())
     await expect(canvas.getByTestId("choice")).toHaveTextContent("forge/forge-6 · high · fast false")
 
@@ -152,6 +161,7 @@ export const Playground: Story = {
       const open = await body.findByRole("dialog", { name: "Choose a model" })
       await userEvent.click(within(open).getByRole("button", { name: "All models" }))
       await userEvent.click(within(open).getByRole("button", { name: bar }))
+      await userEvent.keyboard("{Escape}")
       await waitFor(() => expect(body.queryByRole("dialog")).not.toBeInTheDocument())
     }
     await pick("Forge 5 Mini, Low")
@@ -191,11 +201,25 @@ export const StarsSearchAndKeys: Story = {
     await expect(within(dialog).getAllByRole("option")).toHaveLength(3)
     // The list is one Tab stop, however many models it shows.
     await expect(within(dialog).getAllByRole("option").filter((option) => option.tabIndex === 0)).toHaveLength(1)
-    // Unstarred from the keyboard on Starred, a model leaves and the keys go to the next one.
-    within(dialog).getAllByRole("option")[0]!.focus()
+    // Unstarred on Starred, a model stays where it was, unstarred and with
+    // focus, so a slip can be undone; Starred's count drops at once.
+    const first = within(dialog).getAllByRole("option")[0]!
+    first.focus()
     await userEvent.keyboard("s")
-    await waitFor(() => expect(within(dialog).getAllByRole("option")).toHaveLength(2))
-    await expect(within(dialog).getAllByRole("option")[0]).toHaveFocus()
+    await expect(within(dialog).getAllByRole("option")).toHaveLength(3)
+    await expect(first).toHaveFocus()
+    await expect(within(first).getByRole("button", { name: "Star Studio Large 5" })).toHaveAttribute("aria-pressed", "false")
+    await expect(within(first).getByRole("button", { name: "Star Studio Large 5" })).toBeVisible()
+    await expect(within(dialog).getByRole("button", { name: "Starred" })).toHaveTextContent("2")
+    // Starred again, it is back as it was; unstarred by pointer, it stays too.
+    await userEvent.keyboard("s")
+    await expect(within(first).getByRole("button", { name: "Unstar Studio Large 5" })).toBeVisible()
+    await userEvent.click(within(first).getByRole("button", { name: "Unstar Studio Large 5" }))
+    await expect(within(dialog).getAllByRole("option")).toHaveLength(3)
+    // Shown again, Starred leaves it out.
+    await userEvent.click(within(dialog).getByRole("button", { name: "All models" }))
+    await userEvent.click(within(dialog).getByRole("button", { name: "Starred" }))
+    await expect(within(dialog).getAllByRole("option")).toHaveLength(2)
     // Pebble has no Fast mode: the bolt is there and disabled.
     await userEvent.click(within(dialog).getByRole("button", { name: "Open Models" }))
     await userEvent.click(within(dialog).getByText("Pebble"))
